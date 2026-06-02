@@ -1,119 +1,143 @@
 // src/components/screens/MarketScreen.tsx
-// 市場画面：システムショップ + オークション（後続実装）。
+// 市場画面：システムショップ（売却・購入）＋アイテム使用ボタン追加。
 
 import { useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
 
-type ShopTab = 'sell' | 'buy' | 'auction';
+type ShopTab = 'sell' | 'buy' | 'use';
 
 export function MarketScreen() {
-  const player = useGameStore((s) => s.player);
-  const changeGold = useGameStore((s) => s.changeGold);
-  const consumeItem = useGameStore((s) => s.consumeItem);
-  const addItems = useGameStore((s) => s.addItems);
-  const addNotification = useGameStore((s) => s.addNotification);
-
+  const player = useGameStore(s => s.player);
+  const changeGold = useGameStore(s => s.changeGold);
+  const consumeItem = useGameStore(s => s.consumeItem);
+  const addItems = useGameStore(s => s.addItems);
+  const useItem = useGameStore(s => s.useItem);
+  const addNotification = useGameStore(s => s.addNotification);
   const [shopTab, setShopTab] = useState<ShopTab>('sell');
 
-  // --- 売却 ---
   const handleSell = (itemId: string, amount: number) => {
     const item = ITEM_MASTER[itemId];
     if (!item || item.sellPrice === 0) return;
-    const success = consumeItem(itemId, amount);
-    if (success) {
+    if (consumeItem(itemId, amount)) {
       changeGold(item.sellPrice * amount);
-      addNotification('success', `${item.icon} ${item.name} ×${amount} を ${item.sellPrice * amount}G で売却しました`);
+      addNotification('success', `${item.icon} ${item.name} ×${amount} を ${(item.sellPrice * amount).toLocaleString()}G で売却しました`);
     }
   };
 
-  // --- 購入 ---
   const handleBuy = (itemId: string, amount: number) => {
     const item = ITEM_MASTER[itemId];
     if (!item || item.buyPrice === 0) return;
-    const totalCost = item.buyPrice * amount;
-    const success = changeGold(-totalCost);
-    if (success) {
+    const total = item.buyPrice * amount;
+    if (changeGold(-total)) {
       addItems([{ itemId, amount }]);
-      addNotification('success', `${item.icon} ${item.name} ×${amount} を ${totalCost}G で購入しました`);
+      addNotification('success', `${item.icon} ${item.name} ×${amount} を ${total.toLocaleString()}G で購入しました`);
     } else {
       addNotification('error', 'ゴールドが足りません！');
     }
   };
 
-  // 売却可能アイテム（所持 + sellPrice > 0）
-  const sellableItems = Object.entries(player?.inventory ?? {})
-    .filter(([itemId, qty]) => qty > 0 && (ITEM_MASTER[itemId]?.sellPrice ?? 0) > 0)
-    .map(([itemId, qty]) => ({ item: ITEM_MASTER[itemId], qty }))
-    .filter((e) => e.item);
+  const inventoryEntries = Object.entries(player?.inventory ?? {}).filter(([, qty]) => qty > 0);
 
-  // 購入可能アイテム（buyPrice > 0）
-  const buyableItems = Object.values(ITEM_MASTER).filter((item) => item.buyPrice > 0);
+  const sellable = inventoryEntries
+    .map(([id, qty]) => ({ item: ITEM_MASTER[id], qty, id }))
+    .filter(e => e.item && e.item.sellPrice > 0);
+
+  const buyable = Object.values(ITEM_MASTER).filter(item => item.buyPrice > 0);
+
+  const usable = inventoryEntries
+    .map(([id, qty]) => ({ item: ITEM_MASTER[id], qty, id }))
+    .filter(e => e.item?.useEffect);
+
+  const ROW = { display:'flex', alignItems:'center', gap:10, background:'#1c2235', border:'1px solid #2d3752', borderRadius:6, padding:'8px 12px', marginBottom:4 } as const;
+  const BTN = (bg: string) => ({ padding:'5px 12px', background:bg, color:'#fff', border:'none', borderRadius:4, cursor:'pointer', fontSize:'0.8rem', whiteSpace:'nowrap' as const });
 
   return (
-    <div className="screen market-screen">
-      <h2 className="screen-title">🏪 市場</h2>
+    <div style={{padding:'12px 8px'}}>
+      <h2 style={{fontFamily:'Cinzel,serif', color:'#f0c060', marginBottom:12, borderBottom:'1px solid #2d3752', paddingBottom:8}}>🏪 市場</h2>
 
-      <div className="shop-tabs">
-        {(['sell', 'buy', 'auction'] as ShopTab[]).map((t) => (
+      <div style={{display:'flex', gap:6, marginBottom:14}}>
+        {(['sell','buy','use'] as ShopTab[]).map(t => (
           <button
             key={t}
-            className={`shop-tab-btn ${shopTab === t ? 'active' : ''}`}
             onClick={() => setShopTab(t)}
+            style={{
+              flex:1, padding:'8px 4px', fontSize:'0.8rem',
+              background: shopTab===t ? 'rgba(91,141,238,0.2)' : '#1c2235',
+              border: `1px solid ${shopTab===t ? '#5b8dee' : '#2d3752'}`,
+              color: shopTab===t ? '#e8e6ff' : '#8a92b2',
+              borderRadius:6, cursor:'pointer',
+            }}
           >
-            {t === 'sell' ? '💰 売却' : t === 'buy' ? '🛒 購入' : '🏷️ オークション'}
+            {t==='sell' ? '💰 売却' : t==='buy' ? '🛒 購入' : '🍖 使用'}
           </button>
         ))}
       </div>
 
+      {/* 売却 */}
       {shopTab === 'sell' && (
-        <div className="item-list">
-          {sellableItems.length === 0 ? (
-            <p className="empty-msg">売れるアイテムがありません</p>
-          ) : (
-            sellableItems.map(({ item, qty }) => (
-              <div key={item!.id} className="item-row">
-                <span className="item-icon">{item!.icon}</span>
-                <div className="item-info">
-                  <span className="item-name">{item!.name}</span>
-                  <span className="item-qty">所持: {qty}</span>
-                </div>
-                <span className="item-price">{item!.sellPrice}G/個</span>
-                <button className="action-btn sell" onClick={() => handleSell(item!.id, 1)}>×1 売る</button>
-                <button className="action-btn sell" onClick={() => handleSell(item!.id, qty)}>全部売る</button>
+        sellable.length === 0
+          ? <p style={{color:'#4a5070', fontSize:'0.85rem', textAlign:'center', padding:20}}>売れるアイテムがありません</p>
+          : sellable.map(({ item, qty, id }) => (
+            <div key={id} style={ROW}>
+              <span style={{fontSize:'1.4rem'}}>{item!.icon}</span>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:600, fontSize:'0.9rem'}}>{item!.name}</div>
+                <div style={{fontSize:'0.72rem', color:'#8a92b2'}}>所持: {qty}個</div>
               </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {shopTab === 'buy' && (
-        <div className="item-list">
-          {buyableItems.map((item) => (
-            <div key={item.id} className="item-row">
-              <span className="item-icon">{item.icon}</span>
-              <div className="item-info">
-                <span className="item-name">{item.name}</span>
-                <span className="item-desc">{item.description}</span>
-              </div>
-              <span className="item-price">{item.buyPrice}G</span>
-              <button
-                className="action-btn buy"
-                onClick={() => handleBuy(item.id, 1)}
-                disabled={(player?.gold ?? 0) < item.buyPrice}
-              >
-                購入
-              </button>
+              <span style={{color:'#f0c060', fontSize:'0.85rem', whiteSpace:'nowrap'}}>{item!.sellPrice}G/個</span>
+              <button style={BTN('#4caf87')} onClick={() => handleSell(id, 1)}>×1</button>
+              <button style={BTN('#2d8060')} onClick={() => handleSell(id, qty)}>全部</button>
             </div>
-          ))}
-        </div>
+          ))
       )}
 
-      {shopTab === 'auction' && (
-        <div className="auction-placeholder">
-          <p>🏷️ オークション機能は次フェーズで実装予定です。</p>
-          <p>他プレイヤーとリアルタイムでアイテム取引ができるようになります。</p>
+      {/* 購入 */}
+      {shopTab === 'buy' && buyable.map(item => (
+        <div key={item.id} style={ROW}>
+          <span style={{fontSize:'1.4rem'}}>{item.icon}</span>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:600, fontSize:'0.9rem'}}>{item.name}</div>
+            <div style={{fontSize:'0.72rem', color:'#8a92b2'}}>{item.description}</div>
+          </div>
+          <span style={{color:'#f0c060', fontSize:'0.85rem', whiteSpace:'nowrap'}}>{item.buyPrice}G</span>
+          <button
+            style={BTN('#5b8dee')}
+            onClick={() => handleBuy(item.id, 1)}
+            disabled={(player?.gold ?? 0) < item.buyPrice}
+          >
+            購入
+          </button>
         </div>
+      ))}
+
+      {/* アイテム使用 */}
+      {shopTab === 'use' && (
+        <>
+          <p style={{fontSize:'0.78rem', color:'#8a92b2', marginBottom:10}}>
+            食料やポーションをインベントリから使用できます。満腹度やHPが回復します。
+          </p>
+          {usable.length === 0
+            ? <p style={{color:'#4a5070', fontSize:'0.85rem', textAlign:'center', padding:20}}>使用できるアイテムがありません</p>
+            : usable.map(({ item, qty, id }) => {
+              const e = item!.useEffect!;
+              return (
+                <div key={id} style={ROW}>
+                  <span style={{fontSize:'1.4rem'}}>{item!.icon}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:600, fontSize:'0.9rem'}}>{item!.name}</div>
+                    <div style={{fontSize:'0.72rem', color:'#8a92b2', display:'flex', gap:8}}>
+                      {e.hpRestore     && <span style={{color:'#e05555'}}>❤️ +{e.hpRestore}</span>}
+                      {e.satietyRestore && <span style={{color:'#f0a830'}}>🍖 +{e.satietyRestore}</span>}
+                      <span style={{color:'#4a5070'}}>所持: {qty}</span>
+                    </div>
+                  </div>
+                  <button style={BTN('#9b6df0')} onClick={() => useItem(id)}>使用</button>
+                </div>
+              );
+            })
+          }
+        </>
       )}
     </div>
   );

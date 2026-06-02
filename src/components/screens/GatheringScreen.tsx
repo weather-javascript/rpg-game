@@ -1,196 +1,143 @@
 // src/components/screens/GatheringScreen.tsx
-// 採取画面：ボタンを押して資材を集めるメインゲームプレイ。
+// 採取画面：満腹度ペナルティ・スキルボーナス連動。
 
 import { useState, useCallback } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { GATHER_NODE_MASTER, ITEM_MASTER } from '../../data/masters';
-import type { GatherNodeMaster, GatherResult } from '../../types/game';
+import type { GatherNodeMaster } from '../../types/game';
 
-// ============================================================
-// === 採取ロジック（純粋関数） ===
-// ============================================================
-
-/**
- * 採取を実行してドロップ結果を計算する。
- * スキルレベルに応じてドロップ率がボーナスアップ。
- */
-function calcGatherResult(
-  node: GatherNodeMaster,
-  skillLevel: number
-): GatherResult {
+function calcGatherResult(node: GatherNodeMaster, skillLevel: number) {
   const drops: { itemId: string; amount: number }[] = [];
   const expGained: Record<string, number> = {};
-
   for (const drop of node.drops) {
-    const rate = Math.min(
-      1.0,
-      drop.baseRate + (drop.skillRateBonus ?? 0) * skillLevel
-    );
+    const rate = Math.min(1.0, drop.baseRate + (drop.skillRateBonus ?? 0) * skillLevel);
     if (Math.random() < rate) {
-      const amount =
-        drop.minAmount +
-        Math.floor(Math.random() * (drop.maxAmount - drop.minAmount + 1));
+      const amount = drop.minAmount + Math.floor(Math.random() * (drop.maxAmount - drop.minAmount + 1));
       drops.push({ itemId: drop.itemId, amount });
     }
   }
-
-  // スキル経験値（採取ノードごとに固定値）
   expGained[node.requiredSkill.skillId] = 10 + skillLevel * 2;
-
   return { drops, expGained, staminaUsed: node.staminaCost };
 }
 
-// ============================================================
-// === 採取ノードカード ===
-// ============================================================
-interface NodeCardProps {
-  node: GatherNodeMaster;
-  onGather: (nodeId: string) => void;
-  cooldownRemaining: number;
-}
-
-function NodeCard({ node, onGather, cooldownRemaining }: NodeCardProps) {
-  const player = useGameStore((s) => s.player);
-  const skillLevel = player?.skillLevels[node.requiredSkill.skillId] ?? 1;
-  const meetsLevel = skillLevel >= node.requiredSkill.minLevel;
-  const isCooldown = cooldownRemaining > 0;
-  const isDisabled = !meetsLevel || isCooldown;
-
-  return (
-    <div className={`node-card ${!meetsLevel ? 'locked' : ''}`}>
-      <div className="node-header">
-        <span className="node-icon">{node.icon}</span>
-        <div className="node-info">
-          <h3 className="node-name">{node.name}</h3>
-          <p className="node-desc">{node.description}</p>
-        </div>
-      </div>
-
-      <div className="node-drops">
-        {node.drops.map((drop) => {
-          const item = ITEM_MASTER[drop.itemId];
-          const rate = Math.min(
-            100,
-            Math.floor((drop.baseRate + (drop.skillRateBonus ?? 0) * skillLevel) * 100)
-          );
-          return (
-            <span key={drop.itemId} className="drop-tag">
-              {item?.icon} {item?.name} ({rate}%)
-            </span>
-          );
-        })}
-      </div>
-
-      <div className="node-footer">
-        <span className="node-skill">
-          {node.requiredSkill.skillId === 'mining' ? '⛏️' : '🪓'} Lv.
-          {node.requiredSkill.minLevel}〜
-          <span className="my-level">（自分: Lv.{skillLevel}）</span>
-        </span>
-        <span className="node-stamina">🍖 -{node.staminaCost}</span>
-      </div>
-
-      <button
-        className={`gather-btn ${isCooldown ? 'cooldown' : ''}`}
-        onClick={() => onGather(node.id)}
-        disabled={isDisabled}
-      >
-        {!meetsLevel
-          ? `🔒 Lv.${node.requiredSkill.minLevel} 必要`
-          : isCooldown
-          ? `⏳ ${(cooldownRemaining / 1000).toFixed(1)}s`
-          : `採取する`}
-      </button>
-    </div>
-  );
-}
-
-// ============================================================
-// === 採取画面 ===
-// ============================================================
 export function GatheringScreen() {
-  const player = useGameStore((s) => s.player);
-  const addItems = useGameStore((s) => s.addItems);
-  const changeSatiety = useGameStore((s) => s.changeSatiety);
-  const addSkillExp = useGameStore((s) => s.addSkillExp);
-  const addNotification = useGameStore((s) => s.addNotification);
-
-  // クールダウン管理: { nodeId: 残りms }
+  const player = useGameStore(s => s.player);
+  const addItems = useGameStore(s => s.addItems);
+  const changeSatiety = useGameStore(s => s.changeSatiety);
+  const changeHp = useGameStore(s => s.changeHp);
+  const addSkillExp = useGameStore(s => s.addSkillExp);
+  const addNotification = useGameStore(s => s.addNotification);
   const [cooldowns, setCooldowns] = useState<Record<string, number>>({});
-  // 最後の採取結果ログ
   const [log, setLog] = useState<string[]>([]);
 
-  const handleGather = useCallback(
-    (nodeId: string) => {
-      const node = GATHER_NODE_MASTER[nodeId];
-      if (!node || !player) return;
+  const handleGather = useCallback((nodeId: string) => {
+    const node = GATHER_NODE_MASTER[nodeId];
+    if (!node || !player) return;
 
-      // 満腹度チェック
-      if (player.stats.satiety < node.staminaCost) {
-        addNotification('warning', '満腹度が足りません！食料を補給してください。');
-        return;
+    // 満腹度チェック
+    if (player.stats.satiety < node.staminaCost) {
+      addNotification('warning', '満腹度が足りません！食料を補給してください。');
+      return;
+    }
+
+    const skillLevel = player.skillLevels[node.requiredSkill.skillId] ?? 1;
+    const result = calcGatherResult(node, skillLevel);
+
+    addItems(result.drops);
+    changeSatiety(-result.staminaUsed);
+
+    // 満腹度0の場合HP減少ペナルティ
+    if (player.stats.satiety - result.staminaUsed <= 0) {
+      changeHp(-3);
+      addNotification('warning', '空腹で採取したためHPが減少しました！');
+    }
+
+    for (const [skillId, exp] of Object.entries(result.expGained)) {
+      addSkillExp(skillId, exp);
+    }
+
+    const msgs = result.drops.length > 0
+      ? result.drops.map(d => `${ITEM_MASTER[d.itemId]?.icon} ${ITEM_MASTER[d.itemId]?.name} ×${d.amount}`).join('、')
+      : '何も手に入らなかった...';
+    setLog(prev => [`[${node.name}] ${msgs}`, ...prev].slice(0, 20));
+
+    // クールダウン
+    setCooldowns(prev => ({ ...prev, [nodeId]: node.cooldownMs }));
+    const start = Date.now();
+    const tick = () => {
+      const rem = node.cooldownMs - (Date.now() - start);
+      if (rem <= 0) {
+        setCooldowns(prev => { const n = { ...prev }; delete n[nodeId]; return n; });
+      } else {
+        setCooldowns(prev => ({ ...prev, [nodeId]: rem }));
+        requestAnimationFrame(tick);
       }
-
-      const skillLevel = player.skillLevels[node.requiredSkill.skillId] ?? 1;
-      const result = calcGatherResult(node, skillLevel);
-
-      // State に反映
-      addItems(result.drops);
-      changeSatiety(-result.staminaUsed);
-      for (const [skillId, exp] of Object.entries(result.expGained)) {
-        addSkillExp(skillId, exp);
-      }
-
-      // ログ更新
-      const logMessages = result.drops.map((d) => {
-        const item = ITEM_MASTER[d.itemId];
-        return `${item?.icon} ${item?.name} ×${d.amount}`;
-      });
-      if (logMessages.length === 0) {
-        logMessages.push('何も手に入らなかった...');
-      }
-      setLog((prev) => [`[${node.name}] ${logMessages.join('、')}`, ...prev].slice(0, 20));
-
-      // クールダウン開始
-      setCooldowns((prev) => ({ ...prev, [nodeId]: node.cooldownMs }));
-      const startTime = Date.now();
-      const tick = () => {
-        const remaining = node.cooldownMs - (Date.now() - startTime);
-        if (remaining <= 0) {
-          setCooldowns((prev) => { const n = { ...prev }; delete n[nodeId]; return n; });
-        } else {
-          setCooldowns((prev) => ({ ...prev, [nodeId]: remaining }));
-          requestAnimationFrame(tick);
-        }
-      };
-      requestAnimationFrame(tick);
-    },
-    [player, addItems, changeSatiety, addSkillExp, addNotification]
-  );
+    };
+    requestAnimationFrame(tick);
+  }, [player, addItems, changeSatiety, changeHp, addSkillExp, addNotification]);
 
   const nodes = Object.values(GATHER_NODE_MASTER);
 
   return (
-    <div className="screen gathering-screen">
-      <h2 className="screen-title">⛏️ 採取</h2>
+    <div style={{padding:'12px 8px'}}>
+      <h2 style={{fontFamily:'Cinzel,serif', color:'#f0c060', marginBottom:12, borderBottom:'1px solid #2d3752', paddingBottom:8}}>⛏️ 採取</h2>
 
-      <div className="node-grid">
-        {nodes.map((node) => (
-          <NodeCard
-            key={node.id}
-            node={node}
-            onGather={handleGather}
-            cooldownRemaining={cooldowns[node.id] ?? 0}
-          />
-        ))}
+      {player && player.stats.satiety <= 20 && (
+        <div style={{background:'rgba(224,85,85,0.15)', border:'1px solid #e05555', borderRadius:8, padding:'8px 12px', marginBottom:12, fontSize:'0.82rem', color:'#e05555'}}>
+          ⚠️ 満腹度が低下しています！市場の「使用」タブで食料を補給してください。
+        </div>
+      )}
+
+      <div style={{display:'grid', gap:10, gridTemplateColumns:'1fr 1fr'}}>
+        {nodes.map(node => {
+          const skillLv = player?.skillLevels[node.requiredSkill.skillId] ?? 1;
+          const meetsLv = skillLv >= node.requiredSkill.minLevel;
+          const cd = cooldowns[node.id] ?? 0;
+          const disabled = !meetsLv || cd > 0;
+          return (
+            <div key={node.id} style={{background:'#1c2235', border:`1px solid ${!meetsLv ? '#2d3752' : '#2d3752'}`, borderRadius:10, padding:12, opacity: meetsLv ? 1 : 0.5}}>
+              <div style={{display:'flex', gap:8, marginBottom:8}}>
+                <span style={{fontSize:'1.8rem'}}>{node.icon}</span>
+                <div>
+                  <div style={{fontWeight:700, fontSize:'0.9rem'}}>{node.name}</div>
+                  <div style={{fontSize:'0.72rem', color:'#8a92b2'}}>{node.description}</div>
+                </div>
+              </div>
+              <div style={{display:'flex', flexWrap:'wrap', gap:4, marginBottom:8}}>
+                {node.drops.map(d => {
+                  const rate = Math.min(100, Math.floor((d.baseRate + (d.skillRateBonus ?? 0) * skillLv) * 100));
+                  return (
+                    <span key={d.itemId} style={{background:'rgba(91,141,238,0.12)', border:'1px solid rgba(91,141,238,0.3)', borderRadius:20, padding:'2px 7px', fontSize:'0.68rem', color:'#5b8dee'}}>
+                      {ITEM_MASTER[d.itemId]?.icon} {ITEM_MASTER[d.itemId]?.name} ({rate}%)
+                    </span>
+                  );
+                })}
+              </div>
+              <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.72rem', marginBottom:8}}>
+                <span style={{color:'#8a92b2'}}>Lv.{node.requiredSkill.minLevel}〜 <span style={{color:'#4caf87'}}>(自分:Lv.{skillLv})</span></span>
+                <span style={{color:'#f0a830'}}>🍖 -{node.staminaCost}</span>
+              </div>
+              <button
+                onClick={() => handleGather(node.id)}
+                disabled={disabled}
+                style={{
+                  width:'100%', padding:'8px', fontWeight:700, fontSize:'0.82rem',
+                  background: disabled ? '#2d3752' : 'linear-gradient(135deg,#5b8dee,#3d6fd0)',
+                  color: disabled ? '#4a5070' : '#fff',
+                  border:'none', borderRadius:6, cursor: disabled ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {!meetsLv ? `🔒 Lv.${node.requiredSkill.minLevel}必要` : cd > 0 ? `⏳ ${(cd/1000).toFixed(1)}s` : '採取する'}
+              </button>
+            </div>
+          );
+        })}
       </div>
 
       {log.length > 0 && (
-        <div className="gather-log">
-          <h3 className="log-title">📋 採取ログ</h3>
-          {log.map((entry, i) => (
-            <div key={i} className="log-entry">{entry}</div>
-          ))}
+        <div style={{marginTop:16, background:'#161b26', border:'1px solid #2d3752', borderRadius:8, padding:12}}>
+          <h3 style={{fontSize:'0.85rem', color:'#8a92b2', marginBottom:8}}>📋 採取ログ</h3>
+          {log.map((e, i) => <div key={i} style={{fontSize:'0.78rem', color:'#e8e6ff', padding:'3px 0', borderBottom:'1px solid #2d3752'}}>{e}</div>)}
         </div>
       )}
     </div>
