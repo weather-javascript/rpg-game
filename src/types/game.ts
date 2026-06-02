@@ -4,7 +4,7 @@ export type IdMap<T> = Record<string, T>;
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 export type ItemCategory = 'material' | 'tool' | 'consumable' | 'weapon' | 'armor' | 'treasure' | 'food' | 'potion';
 export type SkillId = 'mining' | 'woodcutting' | 'combat' | 'fishing' | 'crafting';
-export type TabId = 'gathering' | 'market' | 'dungeon' | 'gamble' | 'status' | 'online';
+export type TabId = 'gathering' | 'market' | 'dungeon' | 'gamble' | 'status' | 'online' | 'fishing';
 export type GambleType = 'slot' | 'treasure_box' | 'coin_flip' | 'chohan' | 'chinchiro' | 'jackpot' | 'poker';
 export type DungeonTier = 'beginner' | 'intermediate' | 'advanced' | 'super' | 'extreme' | 'volcano';
 
@@ -94,6 +94,8 @@ export interface DungeonMaster {
   // 報酬ボーナス係数
   expBonus: number;
   goldBonus: number;
+  // 解放条件（前のダンジョンをN回クリア）
+  unlockCondition?: { dungeonId: string; clearedCount: number };
 }
 
 export interface GambleReward {
@@ -141,6 +143,20 @@ export interface PlayerData {
   skillExp: IdMap<number>;
   lastSavedAt: number;
   createdAt: number;
+  // ダンジョンクリア回数（解放条件追跡）
+  dungeonClearedCount: IdMap<number>;
+  // 釣りスコア（FFGG Rank4+でのみ蓄積）
+  fishingScore: number;
+  // 装備中の釣り竿ID
+  equippedRodId: string;
+  // アクティブジョブ
+  activeJob: string | null;
+  // 有効バフ
+  activeBuffs: { id: string; name: string; expiry: number; fishingBonus?: number; miningBonus?: number }[];
+  // 救済措置使用回数
+  reliefUsedCount: number;
+  // 救済措置最終使用時刻
+  reliefLastUsed: number;
 }
 
 // ============================================================

@@ -92,6 +92,13 @@ function createNewPlayerData(uid: string): PlayerData {
     },
     lastSavedAt: now,
     createdAt: now,
+    dungeonClearedCount: {},
+    fishingScore: 0,
+    equippedRodId: 'basic_rod',
+    activeJob: null,
+    activeBuffs: [],
+    reliefUsedCount: 0,
+    reliefLastUsed: 0,
   };
 }
 
