@@ -77,8 +77,32 @@ export async function buyAuction(
   if (!snap.exists()) return { success: false, listing: null };
   const listing = { id: snap.id, ...(snap.data() as Omit<AuctionListing,'id'>) };
   if (listing.sellerUid === buyerUid) return { success: false, listing };
-  if (buyerGold < listing.pricePerUnit * listing.amount) return { success: false, listing };
+  const totalCost = listing.pricePerUnit * listing.amount;
+  if (buyerGold < totalCost) return { success: false, listing };
   await deleteDoc(ref);
+
+  // 出品者のgoldをFirestoreで直接加算
+  try {
+    const sellerRef = doc(db, 'players', listing.sellerUid);
+    await updateDoc(sellerRef, { gold: increment(totalCost) });
+  } catch {
+    // 出品者データ更新失敗は購入処理自体は成功とする
+  }
+
+  // 出品者への売却通知をFirestoreに書き込む
+  try {
+    await addDoc(collection(db, 'sold_notifications'), {
+      sellerUid: listing.sellerUid,
+      itemId: listing.itemId,
+      amount: listing.amount,
+      totalGold: totalCost,
+      createdAt: Date.now(),
+      read: false,
+    });
+  } catch {
+    // 通知書き込み失敗は無視
+  }
+
   return { success: true, listing };
 }
 
@@ -100,6 +124,34 @@ export function subscribeAuctions(cb: (listings: AuctionListing[]) => void): Uns
   return onSnapshot(q, snap => {
     cb(snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<AuctionListing,'id'>) })));
   });
+}
+
+// ============================================================
+// 売却通知（出品者へのリアルタイム通知）
+// ============================================================
+export function subscribeSoldNotifications(
+  uid: string,
+  cb: (notifications: { id: string; itemId: string; amount: number; totalGold: number }[]) => void
+): Unsubscribe {
+  const q = query(
+    collection(db, 'sold_notifications'),
+    where('sellerUid', '==', uid),
+    where('read', '==', false),
+    orderBy('createdAt', 'desc'),
+    limit(20),
+  );
+  return onSnapshot(q, snap => {
+    cb(snap.docs.map(d => ({
+      id: d.id,
+      itemId: d.data()['itemId'] as string,
+      amount: d.data()['amount'] as number,
+      totalGold: d.data()['totalGold'] as number,
+    })));
+  });
+}
+
+export async function markSoldNotificationRead(notificationId: string): Promise<void> {
+  await updateDoc(doc(db, 'sold_notifications', notificationId), { read: true });
 }
 
 // ============================================================

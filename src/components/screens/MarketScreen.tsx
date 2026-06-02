@@ -14,6 +14,7 @@ export function MarketScreen() {
   const addItems = useGameStore(s => s.addItems);
   const useItem = useGameStore(s => s.useItem);
   const addNotification = useGameStore(s => s.addNotification);
+  const saveGame = useGameStore(s => s.saveGame);
   const [shopTab, setShopTab] = useState<ShopTab>('sell');
 
   const handleSell = (itemId: string, amount: number) => {
@@ -22,6 +23,7 @@ export function MarketScreen() {
     if (consumeItem(itemId, amount)) {
       changeGold(item.sellPrice * amount);
       addNotification('success', `${item.icon} ${item.name} ×${amount} を ${(item.sellPrice * amount).toLocaleString()}G で売却しました`);
+      saveGame();
     }
   };
 

@@ -2,6 +2,7 @@
 import { useGameStore } from './stores/gameStore';
 import { useAuth } from './hooks/useAuth';
 import { useAutoSave } from './hooks/useAutoSave';
+import { useEffect } from 'react';
 import type { TabId } from './types/game';
 import { GatheringScreen } from './components/screens/GatheringScreen';
 import { MarketScreen }    from './components/screens/MarketScreen';
@@ -10,6 +11,8 @@ import { GambleScreen }    from './components/screens/GambleScreen';
 import { StatusScreen }    from './components/screens/StatusScreen';
 import { OnlineScreen }    from './components/screens/OnlineScreen';
 import { FishingScreen }   from './components/screens/FishingScreen';
+import { subscribeSoldNotifications, markSoldNotificationRead } from './services/multiplayer';
+import { ITEM_MASTER } from './data/masters';
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id:'gathering', label:'採取',     icon:'⛏️' },
@@ -17,6 +20,7 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
   { id:'market',    label:'市場',     icon:'🏪' },
   { id:'dungeon',   label:'ダンジョン', icon:'⚔️' },
   { id:'gamble',    label:'ギャンブル', icon:'🎰' },
+  { id:'online',    label:'オンライン', icon:'🌐' },
   { id:'status',    label:'状態',     icon:'📊' },
 ];
 
@@ -184,6 +188,27 @@ export default function App() {
   const player = useGameStore(s => s.player);
   const activeTab = useGameStore(s => s.activeTab) as TabId;
   const setActiveTab = useGameStore(s => s.setActiveTab);
+  const addNotification = useGameStore(s => s.addNotification);
+  const changeGold = useGameStore(s => s.changeGold);
+
+  // 売却通知の購読（出品者がオンライン中に購入された場合に通知）
+  useEffect(() => {
+    if (!player) return;
+    const unsub = subscribeSoldNotifications(player.uid, async (notifications) => {
+      for (const n of notifications) {
+        const itemName = ITEM_MASTER[n.itemId]?.name ?? n.itemId;
+        const itemIcon = ITEM_MASTER[n.itemId]?.icon ?? '📦';
+        addNotification('success', `🏷️ ${itemIcon} ${itemName} ×${n.amount} が購入されました！+${n.totalGold.toLocaleString()}G`);
+        // ローカルのgoldを同期（Firestoreには既にincrementで加算済み）
+        changeGold(n.totalGold);
+        try {
+          await markSoldNotificationRead(n.id);
+        } catch { /* ignore */ }
+      }
+    });
+    return unsub;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player?.uid]);
 
   if (isAuthLoading || !player) return <LoadingScreen />;
 
