@@ -17,8 +17,6 @@ import { onSnapshot, doc } from 'firebase/firestore';
 import { db } from './services/firebase';
 import { ITEM_MASTER, VERSION_PATCHES } from './data/masters';
 
-const LATEST_VERSION = VERSION_PATCHES[0]?.version ?? '1.0.0';
-
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id:'gathering', label:'採取',     icon:'⛏️' },
   { id:'fishing',   label:'釣り',     icon:'🎣' },
