@@ -223,7 +223,6 @@ export function StatusScreen() {
   const saveGame = useGameStore(s => s.saveGame);
   const isSaving = useGameStore(s => s.isSaving);
   const useItem = useGameStore(s => s.useItem);
-  const canUseRelief = useGameStore(s => s.canUseRelief);
   const setActiveTab = useGameStore(s => s.setActiveTab);
   const [activeSection, setActiveSection] = useState<'stats'|'skills'|'inventory'|'crafting'|'email'>('stats');
   const [showRename, setShowRename] = useState(false);
