@@ -227,16 +227,11 @@ export function StatusScreen() {
   const saveGame = useGameStore(s => s.saveGame);
   const isSaving = useGameStore(s => s.isSaving);
   const useItem = useGameStore(s => s.useItem);
-  const canUseRelief = useGameStore(s => s.canUseRelief);
-  const useRelief = useGameStore(s => s.useRelief);
   const setActiveTab = useGameStore(s => s.setActiveTab);
   const [activeSection, setActiveSection] = useState<'stats'|'skills'|'inventory'|'crafting'|'email'>('stats');
   const [showRename, setShowRename] = useState(false);
 
   if (!player) return null;
-
-  const reliefCheck = canUseRelief();
-  const isStruggling = player.stats.hp <= 30 && player.stats.satiety <= 10 && player.gold < 500;
 
   const hpPct = (player.stats.hp / player.stats.maxHp) * 100;
   const satPct = (player.stats.satiety / player.stats.maxSatiety) * 100;
