@@ -1,7 +1,7 @@
 // src/components/screens/GambleScreen.tsx
 // ジャックポットは他のギャンブルで蓄積する仕様に変更
 // PvP対戦機能追加
-
+import { GameIcon } from '../icons';
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { GAMBLE_MASTER, ITEM_MASTER } from '../../data/masters';
@@ -46,7 +46,7 @@ function ResultDisplay({ result }: { result: GambleResult }) {
       </div>
       {result.itemRewards.length > 0 && (
         <div style={{ marginTop: 6, fontSize: '0.8rem' }}>
-          {result.itemRewards.map(r => <span key={r.itemId}>{ITEM_MASTER[r.itemId]?.icon} {ITEM_MASTER[r.itemId]?.name} ×{r.amount} </span>)}
+          {result.itemRewards.map(r => <span key={r.itemId} style={{display:'inline-flex',alignItems:'center',gap:3}}><GameIcon id={ITEM_MASTER[r.itemId]?.icon ?? ''} size={14} /> {ITEM_MASTER[r.itemId]?.name} ×{r.amount} </span>)}
         </div>
       )}
     </div>
@@ -253,7 +253,7 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib }: { game: GambleM
       {result && !animating && <ResultDisplay result={result} />}
       <button onClick={play} disabled={animating}
         style={{ width: '100%', padding: 12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#5b8dee,#3a6fd0)', color: '#fff', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem' }}>
-        {animating ? '結果を出しています...' : `${game.icon} ${bet.toLocaleString()}G で挑戦`}
+        {animating ? '結果を出しています...' : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><GameIcon id={game.icon} size={18} /> {bet.toLocaleString()}G で挑戦</span>}
       </button>
     </div>
   );
@@ -447,13 +447,13 @@ function PokerPanel({ bet, onResult, onJackpotContrib }: { bet: number; onResult
 // ============================================================
 type GameTab = 'chohan'|'chinchiro'|'coin_flip'|'slot'|'poker'|'treasure_box'|'pvp';
 const GAME_TABS: { id: GameTab; label: string; icon: string }[] = [
-  { id:'chohan',       label:'丁半',     icon:'🎲' },
-  { id:'chinchiro',    label:'チンチロ', icon:'🎯' },
-  { id:'coin_flip',    label:'コイン',   icon:'🪙' },
-  { id:'slot',         label:'スロット', icon:'🎰' },
-  { id:'poker',        label:'ポーカー', icon:'🃏' },
-  { id:'treasure_box', label:'宝箱',     icon:'📦' },
-  { id:'pvp',          label:'対戦',     icon:'⚔️' },
+  { id:'chohan',       label:'丁半',     icon:'dice' },
+  { id:'chinchiro',    label:'チンチロ', icon:'target' },
+  { id:'coin_flip',    label:'コイン',   icon:'coin' },
+  { id:'slot',         label:'スロット', icon:'slot_machine' },
+  { id:'poker',        label:'ポーカー', icon:'joker_card' },
+  { id:'treasure_box', label:'宝箱',     icon:'box' },
+  { id:'pvp',          label:'対戦',     icon:'swords' },
 ];
 
 export function GambleScreen() {
@@ -510,7 +510,7 @@ export function GambleScreen() {
         {GAME_TABS.map(t => (
           <button key={t.id} onClick={() => setActiveGame(t.id)}
             style={{ flexShrink: 0, padding: '6px 10px', fontSize: '0.75rem', background: activeGame===t.id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${activeGame===t.id ? '#5b8dee' : '#2d3752'}`, color: activeGame===t.id ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer' }}>
-            {t.icon} {t.label}
+            <GameIcon id={t.icon} size={15} style={{marginRight:3}} /> {t.label}
           </button>
         ))}
       </div>
@@ -518,7 +518,7 @@ export function GambleScreen() {
       <div style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 10, padding: 14 }}>
         {activeGame !== 'pvp' && (
           <div style={{ marginBottom: 10 }}>
-            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{game.icon} {game.name}</div>
+            <div style={{ fontWeight: 700, fontSize: '1rem', display:'flex', alignItems:'center', gap:6 }}><GameIcon id={game.icon} size={20} /> {game.name}</div>
             <div style={{ fontSize: '0.78rem', color: '#8a92b2', marginTop: 2 }}>{game.description}</div>
           </div>
         )}

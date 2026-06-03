@@ -2,6 +2,7 @@
 // 採取画面：満腹度ペナルティ・スキルボーナス連動。
 
 import { useState, useCallback } from 'react';
+import { GameIcon } from '../icons';
 import { useGameStore } from '../../stores/gameStore';
 import { GATHER_NODE_MASTER, ITEM_MASTER } from '../../data/masters';
 import type { GatherNodeMaster } from '../../types/game';
@@ -129,7 +130,7 @@ export function GatheringScreen() {
           return (
             <div key={node.id} style={{background:'#1c2235', border:`1px solid ${!meetsLv ? '#2d3752' : '#2d3752'}`, borderRadius:10, padding:12, opacity: meetsLv ? 1 : 0.5}}>
               <div style={{display:'flex', gap:8, marginBottom:8}}>
-                <span style={{fontSize:'1.8rem'}}>{node.icon}</span>
+                <span style={{fontSize:'1.8rem'}}><GameIcon id={node.icon} size={36} /></span>
                 <div>
                   <div style={{fontWeight:700, fontSize:'0.9rem'}}>{node.name}</div>
                   <div style={{fontSize:'0.72rem', color:'#8a92b2'}}>{node.description}</div>
@@ -140,7 +141,7 @@ export function GatheringScreen() {
                   const rate = Math.min(100, Math.floor((d.baseRate + (d.skillRateBonus ?? 0) * skillLv) * 100));
                   return (
                     <span key={d.itemId} style={{background:'rgba(91,141,238,0.12)', border:'1px solid rgba(91,141,238,0.3)', borderRadius:20, padding:'2px 7px', fontSize:'0.68rem', color:'#5b8dee'}}>
-                      {ITEM_MASTER[d.itemId]?.icon} {ITEM_MASTER[d.itemId]?.name} ({rate}%)
+                      <GameIcon id={ITEM_MASTER[d.itemId]?.icon ?? ''} size={13} style={{marginRight:3}} /> {ITEM_MASTER[d.itemId]?.name} ({rate}%)
                     </span>
                   );
                 })}

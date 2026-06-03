@@ -2,6 +2,7 @@
 // 市場画面 - 売却後にFirebaseへ即時保存するよう修正
 
 import { useState } from 'react';
+import { GameIcon } from '../icons';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
 import { savePlayer } from '../../services/database';
@@ -86,7 +87,7 @@ export function MarketScreen() {
           ? <p style={{color:'#4a5070', fontSize:'0.85rem', textAlign:'center', padding:20}}>売れるアイテムがありません</p>
           : sellable.map(({ item, qty, id }) => (
             <div key={id} style={ROW}>
-              <span style={{fontSize:'1.4rem'}}>{item!.icon}</span>
+              <span style={{fontSize:'1.4rem'}}><GameIcon id={item!.icon} size={28} /></span>
               <div style={{flex:1}}>
                 <div style={{fontWeight:600, fontSize:'0.9rem'}}>{item!.name}</div>
                 <div style={{fontSize:'0.72rem', color:'#8a92b2'}}>所持: {qty}個</div>
@@ -100,7 +101,7 @@ export function MarketScreen() {
 
       {shopTab === 'buy' && buyable.map(item => (
         <div key={item.id} style={ROW}>
-          <span style={{fontSize:'1.4rem'}}>{item.icon}</span>
+          <span style={{fontSize:'1.4rem'}}><GameIcon id={item.icon} size={28} /></span>
           <div style={{flex:1}}>
             <div style={{fontWeight:600, fontSize:'0.9rem'}}>{item.name}</div>
             <div style={{fontSize:'0.72rem', color:'#8a92b2'}}>{item.description}</div>
@@ -119,7 +120,7 @@ export function MarketScreen() {
               const e = item!.useEffect!;
               return (
                 <div key={id} style={ROW}>
-                  <span style={{fontSize:'1.4rem'}}>{item!.icon}</span>
+                  <span style={{fontSize:'1.4rem'}}><GameIcon id={item!.icon} size={28} /></span>
                   <div style={{flex:1}}>
                     <div style={{fontWeight:600, fontSize:'0.9rem'}}>{item!.name}</div>
                     <div style={{fontSize:'0.72rem', color:'#8a92b2', display:'flex', gap:8}}>

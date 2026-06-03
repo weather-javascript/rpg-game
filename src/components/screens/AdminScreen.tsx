@@ -1,4 +1,5 @@
 // src/components/screens/AdminScreen.tsx
+import { GameIcon } from '../icons';
 import { useState, useEffect } from 'react';
 import {
   getAllPlayersAdmin, subscribeAllPlayersAdmin,
@@ -173,7 +174,7 @@ export function AdminScreen() {
         {SUB_TABS.map(t => (
           <button key={t.id} onClick={() => setSubTab(t.id)}
             style={{flexShrink:0, padding:'6px 10px', background: subTab===t.id ? 'rgba(224,85,85,0.2)' : '#1c2235', border:`1px solid ${subTab===t.id ? '#e05555' : '#2d3752'}`, color: subTab===t.id ? '#e8e6ff' : '#8a92b2', borderRadius:6, cursor:'pointer', fontSize:'0.78rem'}}>
-            {t.icon} {t.label}
+            <GameIcon id={t.icon} size={15} style={{marginRight:3}} /> {t.label}
           </button>
         ))}
       </div>
@@ -262,15 +263,15 @@ export function AdminScreen() {
         <div>
           <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:16}}>
             {[
-              { label:'総プレイヤー数', value:`${stats.total}人`, icon:'👥' },
-              { label:'BAN済み', value:`${stats.banned}人`, icon:'🚫' },
-              { label:'24h以内アクティブ', value:`${stats.active}人`, icon:'🟢' },
-              { label:'全プレイヤー総資産', value:`${stats.totalGold.toLocaleString()}G`, icon:'💰' },
-              { label:'平均レベル', value:`Lv.${stats.avgLevel}`, icon:'⚔️' },
-              { label:'最高レベル', value:`Lv.${stats.maxLevel}`, icon:'🏆' },
+              { label:'総プレイヤー数', value:`${stats.total}人`, icon:'users' },
+              { label:'BAN済み', value:`${stats.banned}人`, icon:'ban' },
+              { label:'24h以内アクティブ', value:`${stats.active}人`, icon:'dot_green' },
+              { label:'全プレイヤー総資産', value:`${stats.totalGold.toLocaleString()}G`, icon:'gold_bag' },
+              { label:'平均レベル', value:`Lv.${stats.avgLevel}`, icon:'swords' },
+              { label:'最高レベル', value:`Lv.${stats.maxLevel}`, icon:'trophy' },
             ].map(s => (
               <div key={s.label} style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'12px 14px', textAlign:'center'}}>
-                <div style={{fontSize:'1.5rem', marginBottom:4}}>{s.icon}</div>
+                <div style={{fontSize:'1.5rem', marginBottom:4}}><GameIcon id={s.icon} size={28} /></div>
                 <div style={{fontSize:'0.7rem', color:'#8a92b2', marginBottom:4}}>{s.label}</div>
                 <div style={{fontWeight:700, fontSize:'0.95rem', color:'#f0c060'}}>{s.value}</div>
               </div>
@@ -284,7 +285,7 @@ export function AdminScreen() {
               return (
                 <div key={d.id} style={{marginBottom:6}}>
                   <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.75rem', marginBottom:2}}>
-                    <span>{d.icon} {d.name}</span>
+                    <span style={{display:'flex',alignItems:'center',gap:4}}><GameIcon id={d.icon} size={14} /> {d.name}</span>
                     <span style={{color:'#4caf87'}}>{cleared}人 ({pct}%)</span>
                   </div>
                   <div style={{height:4, background:'#2d3752', borderRadius:2, overflow:'hidden'}}>
@@ -305,7 +306,7 @@ export function AdminScreen() {
           </p>
           {Object.values(GAMBLE_MASTER).map(g => (
             <div key={g.id} style={{display:'flex', alignItems:'center', gap:10, marginBottom:8, padding:'8px 10px', background:'#1c2235', border:'1px solid #2d3752', borderRadius:6}}>
-              <span style={{fontSize:'1.2rem'}}>{g.icon}</span>
+              <span style={{fontSize:'1.2rem'}}><GameIcon id={g.icon} size={22} /></span>
               <span style={{flex:1, fontSize:'0.85rem'}}>{g.name}</span>
               <input
                 type="number" step="0.1" min="0.1" max="10"

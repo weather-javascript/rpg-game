@@ -1,5 +1,6 @@
 // src/components/screens/StatusScreen.tsx
 import { useState } from 'react';
+import { GameIcon } from '../icons';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER, SKILL_MASTER, EXP_TABLE, SKILL_EXP_TABLE, CRAFT_RECIPES } from '../../data/masters';
 import { updateDoc, doc } from 'firebase/firestore';
@@ -55,7 +56,7 @@ function CraftingPanel() {
         return (
           <div key={recipe.id} style={{background: craftable ? 'rgba(76,175,135,0.08)' : '#161b26', border:`1px solid ${craftable ? '#4caf87' : '#2d3752'}`, borderRadius:8, padding:'10px 12px', marginBottom:8}}>
             <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:6}}>
-              <span style={{fontSize:'1.3rem'}}>{outItem?.icon}</span>
+              <span style={{fontSize:'1.3rem'}}><GameIcon id={outItem?.icon ?? ''} size={22} /></span>
               <div style={{flex:1}}>
                 <div style={{fontWeight:700, fontSize:'0.9rem', color: craftable ? '#4caf87' : '#e8e6ff'}}>{recipe.name}</div>
                 <div style={{fontSize:'0.72rem', color:'#8a92b2'}}>{recipe.description}</div>
@@ -71,12 +72,12 @@ function CraftingPanel() {
                 const ok = have >= inp.amount;
                 return (
                   <span key={inp.itemId} style={{fontSize:'0.72rem', padding:'2px 6px', borderRadius:4, background: ok ? 'rgba(76,175,135,0.15)' : 'rgba(224,85,85,0.15)', color: ok ? '#4caf87' : '#e05555'}}>
-                    {ITEM_MASTER[inp.itemId]?.icon} {ITEM_MASTER[inp.itemId]?.name} {have}/{inp.amount}
+                    <GameIcon id={ITEM_MASTER[inp.itemId]?.icon ?? ''} size={14} style={{marginRight:2}} /> {ITEM_MASTER[inp.itemId]?.name} {have}/{inp.amount}
                   </span>
                 );
               })}
               <span style={{fontSize:'0.72rem', padding:'2px 6px', borderRadius:4, background:'rgba(91,141,238,0.15)', color:'#5b8dee'}}>
-                → {outItem?.icon} {outItem?.name} ×{recipe.outputAmount}
+                → <GameIcon id={outItem?.icon ?? ''} size={14} style={{marginRight:2}} /> {outItem?.name} ×{recipe.outputAmount}
               </span>
             </div>
             <button
@@ -244,11 +245,11 @@ export function StatusScreen() {
   );
 
   const SECTION_TABS = [
-    { id:'stats', label:'基本', icon:'🧙' },
-    { id:'skills', label:'スキル', icon:'⚡' },
-    { id:'inventory', label:'所持', icon:'🎒' },
-    { id:'crafting', label:'製作', icon:'🔨' },
-    { id:'email', label:'通知', icon:'📧' },
+    { id:'stats', label:'基本', icon:'mage' },
+    { id:'skills', label:'スキル', icon:'lightning' },
+    { id:'inventory', label:'所持', icon:'backpack' },
+    { id:'crafting', label:'製作', icon:'hammer' },
+    { id:'email', label:'通知', icon:'mail' },
   ] as const;
 
   const inventoryEntries = Object.entries(player.inventory).filter(([, qty]) => qty > 0);
@@ -275,7 +276,7 @@ export function StatusScreen() {
         {SECTION_TABS.map(t => (
           <button key={t.id} onClick={() => setActiveSection(t.id)}
             style={{flexShrink:0, padding:'6px 10px', fontSize:'0.75rem', background: activeSection===t.id ? 'rgba(91,141,238,0.2)' : '#1c2235', border:`1px solid ${activeSection===t.id ? '#5b8dee' : '#2d3752'}`, color: activeSection===t.id ? '#e8e6ff' : '#8a92b2', borderRadius:6, cursor:'pointer'}}>
-            {t.icon} {t.label}
+            <GameIcon id={t.icon} size={16} style={{marginRight:4}} /> {t.label}
           </button>
         ))}
       </div>
@@ -335,7 +336,7 @@ export function StatusScreen() {
             return (
               <div key={skill.id} style={{marginBottom:10}}>
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.8rem'}}>
-                  <span>{skill.icon} {skill.name}</span>
+                  <span style={{display:'flex',alignItems:'center',gap:6}}><GameIcon id={skill.icon} size={20} /> {skill.name}</span>
                   <span style={{color:'#5b8dee', fontWeight:700}}>Lv.{lv.toLocaleString()}</span>
                 </div>
                 <div style={{fontSize:'0.7rem', color:'#4a5070', marginBottom:2}}>{skill.description}</div>
@@ -362,7 +363,7 @@ export function StatusScreen() {
               if (!item) return null;
               return (
                 <div key={id} style={{display:'flex', alignItems:'center', gap:8, padding:'6px 8px', background: RARITY_COLORS[item.rarity] ?? '#2d3752', borderRadius:6, marginBottom:3}}>
-                  <span style={{fontSize:'1.2rem'}}>{item.icon}</span>
+                  <span style={{fontSize:'1.2rem'}}><GameIcon id={item.icon} size={22} /></span>
                   <div style={{flex:1}}>
                     <div style={{fontSize:'0.82rem', fontWeight:700}}>{item.name}</div>
                     <div style={{fontSize:'0.68rem', color:'#8a92b2'}}>{item.rarity} | {item.sellPrice}G/個</div>

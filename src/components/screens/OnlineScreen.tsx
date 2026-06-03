@@ -2,6 +2,7 @@
 // オンライン画面：アクティビティフィード追加
 
 import { useState, useEffect, useCallback } from 'react';
+import { GameIcon } from '../icons';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
 import {
@@ -189,7 +190,7 @@ function AuctionPanel() {
             return (
               <div key={l.id} style={{background:'#1c2235', border:`1px solid ${isMine ? '#f0a830' : '#2d3752'}`, borderRadius:6, padding:'8px 10px', marginBottom:4}}>
                 <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:4}}>
-                  <span style={{fontSize:'1.2rem'}}>{item?.icon}</span>
+                  <span style={{fontSize:'1.2rem'}}><GameIcon id={item?.icon ?? ''} size={22} /></span>
                   <div style={{flex:1}}>
                     <div style={{fontWeight:700, fontSize:'0.85rem'}}>{item?.name ?? l.itemId}</div>
                     <div style={{fontSize:'0.7rem', color:'#8a92b2'}}>出品者: {l.sellerName} | ×{l.amount}</div>
@@ -333,11 +334,11 @@ export function OnlineScreen() {
   }, []);
 
   const SUB_TABS = [
-    { id:'online'   as SubTab, label:'オンライン', icon:'🟢' },
-    { id:'activity' as SubTab, label:'活動',       icon:'📡' },
-    { id:'board'    as SubTab, label:'掲示板',     icon:'💬' },
-    { id:'auction'  as SubTab, label:'オークション', icon:'🏷️' },
-    { id:'ranking'  as SubTab, label:'ランキング', icon:'🏆' },
+    { id:'online'   as SubTab, label:'オンライン', icon:'dot_green' },
+    { id:'activity' as SubTab, label:'活動',       icon:'radar' },
+    { id:'board'    as SubTab, label:'掲示板',     icon:'chat' },
+    { id:'auction'  as SubTab, label:'オークション', icon:'tag' },
+    { id:'ranking'  as SubTab, label:'ランキング', icon:'trophy' },
   ];
 
   return (
@@ -347,7 +348,7 @@ export function OnlineScreen() {
         {SUB_TABS.map(t => (
           <button key={t.id} onClick={() => setSubTab(t.id)}
             style={{flexShrink:0, padding:'6px 10px', fontSize:'0.75rem', background: subTab===t.id ? 'rgba(91,141,238,0.2)' : '#1c2235', border:`1px solid ${subTab===t.id ? '#5b8dee' : '#2d3752'}`, color: subTab===t.id ? '#e8e6ff' : '#8a92b2', borderRadius:6, cursor:'pointer'}}>
-            {t.icon} {t.label}
+            <GameIcon id={t.icon} size={15} style={{marginRight:3}} /> {t.label}
           </button>
         ))}
       </div>

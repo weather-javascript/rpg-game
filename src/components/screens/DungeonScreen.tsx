@@ -1,6 +1,6 @@
 // src/components/screens/DungeonScreen.tsx
 // ダンジョン画面：解放条件可視化・エリア別進行・ボス戦・空腹ペナルティ連動
-
+import { GameIcon } from '../icons';
 import { useState, useCallback } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { DUNGEON_MASTER, MONSTER_MASTER, ITEM_MASTER } from '../../data/masters';
@@ -120,7 +120,7 @@ function DungeonCard({ dungeon, selected, onSelect, playerLevel, clearedCount, i
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ fontSize: '1.8rem' }}>{dungeon.icon}</span>
+        <span style={{ fontSize: '1.8rem' }}><GameIcon id={dungeon.icon} size={36} /></span>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 6 }}>
             {dungeon.name}
@@ -159,7 +159,7 @@ function CombatLog({ result, onClose }: { result: CombatResult; onClose: () => v
           <div>✨ EXP +{result.expGained}</div>
           <div>💰 +{result.goldGained}G</div>
           {result.drops.map(d => (
-            <div key={d.itemId}>{ITEM_MASTER[d.itemId]?.icon} {ITEM_MASTER[d.itemId]?.name} ×{d.amount}</div>
+            <div key={d.itemId} style={{display:'flex',alignItems:'center',gap:4}}><GameIcon id={ITEM_MASTER[d.itemId]?.icon ?? ''} size={16} /> {ITEM_MASTER[d.itemId]?.name} ×{d.amount}</div>
           ))}
         </div>
       )}
@@ -355,7 +355,7 @@ export function DungeonScreen() {
             const cleared = ucMap ? (player.dungeonClearedCount?.[ucMap.dungeonId] ?? 0) : 0;
             return (
               <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, padding: '4px 0', borderBottom: '1px solid #2d3752' }}>
-                <span style={{ fontSize: '1.2rem' }}>{d.icon}</span>
+                <span style={{ fontSize: '1.2rem' }}><GameIcon id={d.icon} size={22} /></span>
                 <div style={{ flex: 1 }}>
                   <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>{d.name}</span>
                   {ucMap && prereq && (

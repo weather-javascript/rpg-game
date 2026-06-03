@@ -1,4 +1,5 @@
 // src/App.tsx
+import { GameIcon } from './components/icons';
 import { useGameStore } from './stores/gameStore';
 import { useAuth } from './hooks/useAuth';
 import { useAutoSave } from './hooks/useAutoSave';
@@ -18,13 +19,13 @@ import { db } from './services/firebase';
 import { ITEM_MASTER, VERSION_PATCHES } from './data/masters';
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id:'gathering', label:'採取',     icon:'⛏️' },
-  { id:'fishing',   label:'釣り',     icon:'🎣' },
-  { id:'market',    label:'市場',     icon:'🏪' },
-  { id:'dungeon',   label:'ダンジョン', icon:'⚔️' },
-  { id:'gamble',    label:'ギャンブル', icon:'🎰' },
-  { id:'online',    label:'オンライン', icon:'🌐' },
-  { id:'status',    label:'状態',     icon:'📊' },
+  { id:'gathering', label:'採取',     icon:'pickaxe' },
+  { id:'fishing',   label:'釣り',     icon:'fishing_rod' },
+  { id:'market',    label:'市場',     icon:'market' },
+  { id:'dungeon',   label:'ダンジョン', icon:'swords' },
+  { id:'gamble',    label:'ギャンブル', icon:'slot_machine' },
+  { id:'online',    label:'オンライン', icon:'globe' },
+  { id:'status',    label:'状態',     icon:'chart' },
 ];
 
 function LoadingScreen() {
@@ -140,7 +141,7 @@ function TabNav({ activeTab, setTab }: { activeTab: TabId; setTab: (t: TabId) =>
             cursor:'pointer', fontSize:'0.6rem', transition:'all 0.2s',
           }}
         >
-          <span style={{ fontSize:'1.1rem' }}>{tab.icon}</span>
+          <span style={{ display:'flex', alignItems:'center', justifyContent:'center' }}><GameIcon id={tab.icon} size={20} /></span>
           <span>{tab.label}</span>
         </button>
       ))}
