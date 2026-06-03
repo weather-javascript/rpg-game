@@ -1,7 +1,7 @@
 // src/components/screens/OnlineScreen.tsx
 // オンライン画面：アクティビティフィード追加
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
 import {

@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER, SKILL_MASTER, EXP_TABLE, SKILL_EXP_TABLE, CRAFT_RECIPES } from '../../data/masters';
-import { savePlayer } from '../../services/database';
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 

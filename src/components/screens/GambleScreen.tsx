@@ -141,7 +141,6 @@ function PvPPanel({ bet }: { bet: number }) {
       const { success, battle: result } = await joinGambleBattle(battle.id, player.uid, player.displayName);
       if (success && result) {
         const iWon = result.winnerId === player.uid;
-        const prize = battle.betAmount * 2;
         if (iWon) {
           changeGold(battle.betAmount); // 自分のbet + 相手のbet = 2倍 → netは+betAmount
           addNotification('success', `🏆 対戦勝利！+${battle.betAmount.toLocaleString()}G`);
@@ -334,7 +333,6 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib }: { bet: number; onRes
   const [choice, setChoice] = useState<'heads'|'tails'>('heads');
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
-  const game = GAMBLE_MASTER['coin_flip'];
 
   const play = async () => {
     if (!player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }

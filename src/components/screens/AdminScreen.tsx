@@ -1,7 +1,7 @@
 // src/components/screens/AdminScreen.tsx
 import { useState, useEffect } from 'react';
 import { getAllPlayersAdmin, updatePlayerAdmin, getGambleMultipliers, setGambleMultipliers } from '../../services/multiplayer';
-import { ITEM_MASTER, GAMBLE_MASTER } from '../../data/masters';
+import { GAMBLE_MASTER } from '../../data/masters';
 import { useGameStore } from '../../stores/gameStore';
 
 export function AdminScreen() {
