@@ -1,5 +1,5 @@
 // src/components/screens/AdminScreen.tsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   getAllPlayersAdmin, subscribeAllPlayersAdmin,
   updatePlayerAdmin, getGambleMultipliers, setGambleMultipliers,
@@ -7,7 +7,7 @@ import {
 import { GAMBLE_MASTER, DUNGEON_MASTER } from '../../data/masters';
 import { useGameStore } from '../../stores/gameStore';
 
-type SubTab = 'players' | 'gamble' | 'ranking' | 'announce' | 'stats';
+type SubTab = 'players' | 'gamble' | 'announce' | 'stats';
 
 export function AdminScreen() {
   const setActiveTab = useGameStore(s => s.setActiveTab);
@@ -23,7 +23,6 @@ export function AdminScreen() {
   const [multipliers, setMultipliers] = useState<Record<string, number>>({});
   const [subTab, setSubTab] = useState<SubTab>('players');
   const [saving, setSaving] = useState(false);
-  const [rankingType, setRankingType] = useState<'gold' | 'level' | 'fishing' | 'dungeon'>('gold');
   const [announceText, setAnnounceText] = useState('');
   const [playerFilter, setPlayerFilter] = useState('');
   const [confirmBan, setConfirmBan] = useState<string | null>(null);
@@ -141,21 +140,6 @@ export function AdminScreen() {
     setSaving(false);
   };
 
-  // ランキング計算
-  const getRanking = useCallback(() => {
-    const sorted = [...players].filter(p => !p.banned);
-    switch (rankingType) {
-      case 'gold':    return sorted.sort((a,b) => (b.gold ?? 0) - (a.gold ?? 0)).slice(0, 20);
-      case 'level':   return sorted.sort((a,b) => (b.stats?.level ?? 1) - (a.stats?.level ?? 1)).slice(0, 20);
-      case 'fishing': return sorted.sort((a,b) => (b.fishingScore ?? 0) - (a.fishingScore ?? 0)).slice(0, 20);
-      case 'dungeon': return sorted.sort((a,b) => {
-        const aTotal = Object.values((a.dungeonClearedCount ?? {}) as Record<string,number>).reduce((s:number,v)=>s+(v as number),0);
-        const bTotal = Object.values((b.dungeonClearedCount ?? {}) as Record<string,number>).reduce((s:number,v)=>s+(v as number),0);
-        return (bTotal as number) - (aTotal as number);
-      }).slice(0, 20);
-    }
-  }, [players, rankingType]);
-
   // 統計計算
   const stats = {
     total: players.length,
@@ -172,7 +156,6 @@ export function AdminScreen() {
 
   const SUB_TABS: { id: SubTab; label: string; icon: string }[] = [
     { id: 'players',  label: 'プレイヤー', icon: '👥' },
-    { id: 'ranking',  label: 'ランキング', icon: '🏆' },
     { id: 'stats',    label: '統計',       icon: '📊' },
     { id: 'gamble',   label: 'ギャンブル', icon: '🎰' },
     { id: 'announce', label: 'お知らせ',   icon: '📢' },
@@ -274,51 +257,6 @@ export function AdminScreen() {
         </div>
       )}
 
-      {/* ===== ランキング ===== */}
-      {subTab === 'ranking' && (
-        <div>
-          <div style={{display:'flex', gap:6, marginBottom:12, flexWrap:'wrap'}}>
-            {([['gold','💰 所持金'],['level','⚔️ レベル'],['fishing','🎣 釣りスコア'],['dungeon','🏰 ダンジョン']] as const).map(([k,l]) => (
-              <button key={k} onClick={() => setRankingType(k)}
-                style={{padding:'6px 10px', background: rankingType===k ? 'rgba(240,192,96,0.2)' : '#1c2235', border:`1px solid ${rankingType===k ? '#f0c060' : '#2d3752'}`, color: rankingType===k ? '#f0c060' : '#8a92b2', borderRadius:6, cursor:'pointer', fontSize:'0.78rem'}}>
-                {l}
-              </button>
-            ))}
-          </div>
-          {loading
-            ? <div style={{color:'#8a92b2', textAlign:'center', padding:16}}>読み込み中...</div>
-            : (
-              <div style={{display:'flex', flexDirection:'column', gap:4}}>
-                {getRanking().map((p, i) => {
-                  let value = '';
-                  const medals = ['🥇','🥈','🥉'];
-                  const rank = medals[i] ?? `${i+1}.`;
-                  switch (rankingType) {
-                    case 'gold':    value = `${(p.gold ?? 0).toLocaleString()}G`; break;
-                    case 'level':   value = `Lv.${p.stats?.level ?? 1}`; break;
-                    case 'fishing': value = `${(p.fishingScore ?? 0).toLocaleString()}pt`; break;
-                    case 'dungeon': {
-                      const total = Object.values((p.dungeonClearedCount ?? {}) as Record<string,number>).reduce((s,v)=>s+v,0);
-                      value = `${total}回クリア`; break;
-                    }
-                  }
-                  return (
-                    <div key={p.id} style={{display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background:'#1c2235', border:'1px solid #2d3752', borderRadius:6}}>
-                      <span style={{fontSize:'1.1rem', width:24, textAlign:'center'}}>{rank}</span>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:'0.85rem', fontWeight:700}}>{p.displayName ?? '名無し'}</div>
-                        <div style={{fontSize:'0.7rem', color:'#8a92b2'}}>Lv.{p.stats?.level ?? 1}</div>
-                      </div>
-                      <span style={{color:'#f0c060', fontSize:'0.85rem', fontWeight:700}}>{value}</span>
-                    </div>
-                  );
-                })}
-                {getRanking().length === 0 && <div style={{color:'#4a5070', textAlign:'center', padding:16}}>データなし</div>}
-              </div>
-            )}
-        </div>
-      )}
-
       {/* ===== サーバー統計 ===== */}
       {subTab === 'stats' && (
         <div>
@@ -410,6 +348,7 @@ export function AdminScreen() {
                 const { db } = await import('../../services/firebase');
                 await setDoc(doc(db, 'shared', 'announcement'), {
                   text: announceText,
+                  timestamp: Date.now(),
                   createdAt: Date.now(),
                   type: 'admin',
                 });

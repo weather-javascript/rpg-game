@@ -5,6 +5,7 @@ import { useState, useCallback } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { GATHER_NODE_MASTER, ITEM_MASTER } from '../../data/masters';
 import type { GatherNodeMaster } from '../../types/game';
+import { savePlayer } from '../../services/database';
 
 function calcGatherResult(node: GatherNodeMaster, skillLevel: number, toolBonus: number = 1) {
   const drops: { itemId: string; amount: number }[] = [];
@@ -70,6 +71,10 @@ export function GatheringScreen() {
       ? result.drops.map(d => `${ITEM_MASTER[d.itemId]?.icon} ${ITEM_MASTER[d.itemId]?.name} ×${d.amount}`).join('、')
       : '何も手に入らなかった...';
     setLog(prev => [`[${node.name}] ${msgs}`, ...prev].slice(0, 20));
+
+    // 採取後にFirebase即時保存（リログで消えるバグを防ぐ）
+    const latestPlayer = useGameStore.getState().player;
+    if (latestPlayer) savePlayer(latestPlayer).catch(() => {});
 
     // クールダウン
     setCooldowns(prev => ({ ...prev, [nodeId]: node.cooldownMs }));

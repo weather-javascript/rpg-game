@@ -1,16 +1,17 @@
 // src/components/screens/OnlineScreen.tsx
 // オンライン画面：アクティビティフィード追加
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
 import {
   subscribeOnlineUsers, subscribeBoardMessages, postBoardMessage,
   subscribeAuctions, createAuction, buyAuction, cancelAuction,
+  subscribeAllPlayersAdmin,
 } from '../../services/multiplayer';
 import type { OnlineUser, BoardMessage, AuctionListing } from '../../types/game';
 
-type SubTab = 'online' | 'board' | 'auction' | 'activity';
+type SubTab = 'online' | 'board' | 'auction' | 'activity' | 'ranking';
 
 function OnlinePanel({ users }: { users: OnlineUser[] }) {
   return (
@@ -245,6 +246,83 @@ function AuctionPanel() {
   );
 }
 
+// ============================================================
+// ランキングパネル
+// ============================================================
+function RankingPanel() {
+  const [players, setPlayers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [rankingType, setRankingType] = useState<'gold' | 'level' | 'fishing' | 'dungeon'>('gold');
+
+  useEffect(() => {
+    setLoading(true);
+    const unsub = subscribeAllPlayersAdmin(ps => {
+      setPlayers(ps.filter(p => !p.banned));
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  const getRanking = useCallback(() => {
+    const sorted = [...players];
+    switch (rankingType) {
+      case 'gold':    return sorted.sort((a,b) => (b.gold ?? 0) - (a.gold ?? 0)).slice(0, 20);
+      case 'level':   return sorted.sort((a,b) => (b.stats?.level ?? 1) - (a.stats?.level ?? 1)).slice(0, 20);
+      case 'fishing': return sorted.sort((a,b) => (b.fishingScore ?? 0) - (a.fishingScore ?? 0)).slice(0, 20);
+      case 'dungeon': return sorted.sort((a,b) => {
+        const aTotal = Object.values((a.dungeonClearedCount ?? {}) as Record<string,number>).reduce((s,v)=>s+v,0);
+        const bTotal = Object.values((b.dungeonClearedCount ?? {}) as Record<string,number>).reduce((s,v)=>s+v,0);
+        return bTotal - aTotal;
+      }).slice(0, 20);
+    }
+  }, [players, rankingType]);
+
+  return (
+    <div>
+      <div style={{display:'flex', gap:6, marginBottom:12, flexWrap:'wrap'}}>
+        {([['gold','💰 所持金'],['level','⚔️ レベル'],['fishing','🎣 釣りスコア'],['dungeon','🏰 ダンジョン']] as const).map(([k,l]) => (
+          <button key={k} onClick={() => setRankingType(k)}
+            style={{padding:'6px 10px', background: rankingType===k ? 'rgba(240,192,96,0.2)' : '#1c2235', border:`1px solid ${rankingType===k ? '#f0c060' : '#2d3752'}`, color: rankingType===k ? '#f0c060' : '#8a92b2', borderRadius:6, cursor:'pointer', fontSize:'0.78rem'}}>
+            {l}
+          </button>
+        ))}
+      </div>
+      {loading
+        ? <div style={{color:'#8a92b2', textAlign:'center', padding:16}}>読み込み中...</div>
+        : (
+          <div style={{display:'flex', flexDirection:'column', gap:4}}>
+            {getRanking().map((p, i) => {
+              const medals = ['🥇','🥈','🥉'];
+              const rank = medals[i] ?? `${i+1}.`;
+              let value = '';
+              switch (rankingType) {
+                case 'gold':    value = `${(p.gold ?? 0).toLocaleString()}G`; break;
+                case 'level':   value = `Lv.${p.stats?.level ?? 1}`; break;
+                case 'fishing': value = `${(p.fishingScore ?? 0).toLocaleString()}pt`; break;
+                case 'dungeon': {
+                  const total = Object.values((p.dungeonClearedCount ?? {}) as Record<string,number>).reduce((s,v)=>s+v,0);
+                  value = `${total}回クリア`; break;
+                }
+              }
+              return (
+                <div key={p.id} style={{display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background:'#1c2235', border:'1px solid #2d3752', borderRadius:6}}>
+                  <span style={{fontSize:'1.1rem', width:24, textAlign:'center'}}>{rank}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'0.85rem', fontWeight:700}}>{p.displayName ?? '名無し'}</div>
+                    <div style={{fontSize:'0.7rem', color:'#8a92b2'}}>Lv.{p.stats?.level ?? 1}</div>
+                  </div>
+                  <span style={{color:'#f0c060', fontSize:'0.85rem', fontWeight:700}}>{value}</span>
+                </div>
+              );
+            })}
+            {getRanking().length === 0 && <div style={{color:'#4a5070', textAlign:'center', padding:16}}>データなし</div>}
+          </div>
+        )
+      }
+    </div>
+  );
+}
+
 export function OnlineScreen() {
   const [subTab, setSubTab] = useState<SubTab>('online');
   const [users, setUsers] = useState<OnlineUser[]>([]);
@@ -259,6 +337,7 @@ export function OnlineScreen() {
     { id:'activity' as SubTab, label:'活動',       icon:'📡' },
     { id:'board'    as SubTab, label:'掲示板',     icon:'💬' },
     { id:'auction'  as SubTab, label:'オークション', icon:'🏷️' },
+    { id:'ranking'  as SubTab, label:'ランキング', icon:'🏆' },
   ];
 
   return (
@@ -276,6 +355,7 @@ export function OnlineScreen() {
       {subTab === 'activity' && <ActivityPanel users={users} />}
       {subTab === 'board'    && <BoardPanel />}
       {subTab === 'auction'  && <AuctionPanel />}
+      {subTab === 'ranking'  && <RankingPanel />}
     </div>
   );
 }

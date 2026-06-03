@@ -13,10 +13,11 @@ import { OnlineScreen }    from './components/screens/OnlineScreen';
 import { FishingScreen }   from './components/screens/FishingScreen';
 import { AdminScreen }     from './components/screens/AdminScreen';
 import { subscribeSoldNotifications, markSoldNotificationRead } from './services/multiplayer';
+import { onSnapshot, doc } from 'firebase/firestore';
+import { db } from './services/firebase';
 import { ITEM_MASTER, VERSION_PATCHES } from './data/masters';
 
 const LATEST_VERSION = VERSION_PATCHES[0]?.version ?? '1.0.0';
-const VERSION_STORAGE_KEY = 'rpg_seen_version';
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id:'gathering', label:'採取',     icon:'⛏️' },
@@ -247,18 +248,36 @@ export default function App() {
   const changeGold = useGameStore(s => s.changeGold);
   const applyPassiveRegen = useGameStore(s => s.applyPassiveRegen);
 
-  // バージョン更新ポップアップ
+  // バージョン更新ポップアップ（毎回表示）
   const [showVersionPopup, setShowVersionPopup] = useState(false);
   useEffect(() => {
     if (!player) return;
-    const seen = localStorage.getItem(VERSION_STORAGE_KEY);
-    if (seen !== LATEST_VERSION) setShowVersionPopup(true);
+    setShowVersionPopup(true);
   }, [player?.uid]);
 
   const handleCloseVersionPopup = () => {
-    localStorage.setItem(VERSION_STORAGE_KEY, LATEST_VERSION);
     setShowVersionPopup(false);
   };
+
+  // お知らせ購読（Firestoreのshared/announcementをリアルタイム監視）
+  useEffect(() => {
+    if (!player) return;
+    const ref = doc(db, 'shared', 'announcement');
+    let lastSeen = '';
+    const unsub = onSnapshot(ref, (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      const text = data?.text ?? '';
+      const timestamp = data?.timestamp ?? 0;
+      const key = `${text}_${timestamp}`;
+      if (text && key !== lastSeen) {
+        lastSeen = key;
+        addNotification('info', `📢 お知らせ: ${text}`);
+      }
+    });
+    return unsub;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player?.uid]);
 
   // 自動HP/満腹度回復（5秒に1HP、放置でも回復）
   useEffect(() => {

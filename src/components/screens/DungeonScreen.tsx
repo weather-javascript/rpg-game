@@ -125,12 +125,12 @@ function DungeonCard({ dungeon, selected, onSelect, playerLevel, clearedCount, i
           <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 6 }}>
             {dungeon.name}
             {!isUnlocked && <span style={{ fontSize: '1rem' }}>🔒</span>}
-            {!meetsLevel && isUnlocked && <span style={{ fontSize: '0.7rem', color: '#e05555', background: 'rgba(224,85,85,0.15)', padding: '1px 5px', borderRadius: 4 }}>Lv不足</span>}
+            {!meetsLevel && isUnlocked && <span style={{ fontSize: '0.7rem', color: '#e05555', background: 'rgba(224,85,85,0.15)', padding: '1px 5px', borderRadius: 4 }}>戦闘Lv不足</span>}
           </div>
           <div style={{ fontSize: '0.72rem', color: '#8a92b2', marginTop: 2 }}>{dungeon.description}</div>
           <div style={{ fontSize: '0.7rem', marginTop: 3, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ color }}>★ {dungeon.tier.toUpperCase()}</span>
-            <span style={{ color: meetsLevel ? '#4caf87' : '#e05555' }}>Lv.{dungeon.requiredLevel}〜</span>
+            <span style={{ color: meetsLevel ? '#4caf87' : '#e05555' }}>戦闘Lv.{dungeon.requiredLevel}〜</span>
             <span style={{ color: '#f0c060' }}>EXP×{dungeon.expBonus} G×{dungeon.goldBonus}</span>
             {clearedCount > 0 && <span style={{ color: '#4caf87' }}>✓ {clearedCount}回クリア</span>}
           </div>
@@ -204,8 +204,9 @@ export function DungeonScreen() {
   const startDungeon = useCallback(() => {
     if (!player || !selectedId) return;
     const dungeon = DUNGEON_MASTER[selectedId];
-    if (!dungeon || player.stats.level < dungeon.requiredLevel) {
-      addNotification('warning', `Lv.${dungeon?.requiredLevel}以上が必要です`);
+    const combatLv = player.skillLevels['combat'] ?? 1;
+    if (!dungeon || combatLv < dungeon.requiredLevel) {
+      addNotification('warning', `戦闘スキルLv.${dungeon?.requiredLevel}以上が必要です（現在: Lv.${combatLv}）`);
       return;
     }
     if (!isDungeonUnlocked(selectedId)) {
@@ -383,7 +384,7 @@ export function DungeonScreen() {
                   key={d.id} dungeon={d}
                   selected={selectedId === d.id}
                   onSelect={() => setSelectedId(d.id)}
-                  playerLevel={player.stats.level}
+                  playerLevel={player.skillLevels['combat'] ?? 1}
                   clearedCount={player.dungeonClearedCount?.[d.id] ?? 0}
                   isUnlocked={isDungeonUnlocked(d.id)}
                 />
@@ -391,24 +392,30 @@ export function DungeonScreen() {
             })}
           </div>
 
-          {selectedId && (
+          {selectedId && (() => {
+            const combatLv = player.skillLevels['combat'] ?? 1;
+            const reqLv = DUNGEON_MASTER[selectedId]?.requiredLevel ?? 0;
+            const unlocked = isDungeonUnlocked(selectedId);
+            const meetsLv = combatLv >= reqLv;
+            return (
             <button
               onClick={startDungeon}
-              disabled={!isDungeonUnlocked(selectedId) || player.stats.level < (DUNGEON_MASTER[selectedId]?.requiredLevel ?? 0)}
+              disabled={!unlocked || !meetsLv}
               style={{
                 width: '100%', padding: '12px', fontWeight: 700, fontSize: '1rem',
-                background: isDungeonUnlocked(selectedId) && player.stats.level >= (DUNGEON_MASTER[selectedId]?.requiredLevel ?? 0) ? 'linear-gradient(135deg,#e05555,#c03030)' : '#2d3752',
-                color: '#fff', border: 'none', borderRadius: 8, cursor: isDungeonUnlocked(selectedId) && player.stats.level >= (DUNGEON_MASTER[selectedId]?.requiredLevel ?? 0) ? 'pointer' : 'not-allowed',
+                background: unlocked && meetsLv ? 'linear-gradient(135deg,#e05555,#c03030)' : '#2d3752',
+                color: '#fff', border: 'none', borderRadius: 8, cursor: unlocked && meetsLv ? 'pointer' : 'not-allowed',
               }}
             >
-              {!isDungeonUnlocked(selectedId)
+              {!unlocked
                 ? '🔒 このダンジョンは解放されていません'
-                : player.stats.level < (DUNGEON_MASTER[selectedId]?.requiredLevel ?? 0)
-                  ? `⛔ Lv.${DUNGEON_MASTER[selectedId]?.requiredLevel}以上が必要です`
+                : !meetsLv
+                  ? `⛔ 戦闘Lv.${reqLv}以上が必要です（現在: Lv.${combatLv}）`
                   : `⚔️ ${DUNGEON_MASTER[selectedId]?.name} に挑む！`
               }
             </button>
-          )}
+            );
+          })()}
         </>
       ) : (
         <>

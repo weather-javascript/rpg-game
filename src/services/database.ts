@@ -143,7 +143,8 @@ export async function savePlayer(playerData: PlayerData): Promise<void> {
     ...playerData,
     lastSavedAt: Date.now(),
   };
-  await setDoc(ref, dataToSave, { merge: true });
+  // merge:trueだとネストオブジェクトが部分更新される恐れがあるため完全上書き
+  await setDoc(ref, dataToSave);
 }
 
 /**

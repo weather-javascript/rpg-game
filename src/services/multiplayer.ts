@@ -177,19 +177,18 @@ export async function createGambleBattle(
 }
 
 export function subscribeGambleBattles(cb: (battles: GambleBattle[]) => void): Unsubscribe {
-  // 複合インデックス不要なシンプルなクエリに変更
-  // status=='waiting'のみでフィルタ、期限切れはクライアント側でフィルタ
+  // orderByを外してインデックス不要に。クライアント側でソート＆フィルタ
   const q = query(
     collection(db, COLLECTIONS.BATTLES),
     where('status', '==', 'waiting'),
-    orderBy('createdAt', 'desc'),
-    limit(30)
+    limit(50)
   );
   return onSnapshot(q, snap => {
     const now = Date.now();
     const battles = snap.docs
       .map(d => ({ id: d.id, ...(d.data() as Omit<GambleBattle,'id'>) }))
-      .filter(b => b.expiresAt > now); // 期限切れをクライアント側で除外
+      .filter(b => b.expiresAt > now) // 期限切れをクライアント側で除外
+      .sort((a, b) => b.createdAt - a.createdAt); // クライアント側でソート
     cb(battles);
   });
 }
