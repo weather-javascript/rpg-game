@@ -118,7 +118,10 @@ function PvPPanel({ bet }: { bet: number }) {
       const id = await createGambleBattle(player.uid, player.displayName, player.stats.level, selectedGame, bet);
       setMyBattleId(id);
       addNotification('success', `⚔️ 対戦を募集開始しました！ (${bet.toLocaleString()}G)`);
-    } catch { addNotification('error', '募集に失敗しました'); }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      addNotification('error', `募集に失敗しました: ${msg.slice(0, 60)}`);
+    }
     setLoading(false);
   };
 

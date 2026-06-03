@@ -35,9 +35,12 @@ export async function unregisterOnline(uid: string) {
 }
 
 export function subscribeOnlineUsers(cb: (users: OnlineUser[]) => void): Unsubscribe {
+  // where+orderByの複合インデックス不要にするためorderByのみ使用、クライアント側でフィルタ
+  const q = query(collection(db, COLLECTIONS.ONLINE), orderBy('lastSeen', 'desc'), limit(50));
   const cutoff = Date.now() - 5 * 60 * 1000;
-  const q = query(collection(db, COLLECTIONS.ONLINE), where('lastSeen', '>', cutoff), orderBy('lastSeen', 'desc'), limit(50));
-  return onSnapshot(q, snap => { cb(snap.docs.map(d => d.data() as OnlineUser)); });
+  return onSnapshot(q, snap => {
+    cb(snap.docs.map(d => d.data() as OnlineUser).filter(u => u.lastSeen > cutoff));
+  });
 }
 
 export async function postBoardMessage(uid: string, displayName: string, level: number, text: string) {
@@ -82,14 +85,23 @@ export async function cancelAuction(listingId: string, sellerUid: string): Promi
 }
 
 export function subscribeAuctions(cb: (listings: AuctionListing[]) => void): Unsubscribe {
-  const q = query(collection(db, COLLECTIONS.AUCTIONS), where('expiresAt', '>', Date.now()), orderBy('expiresAt', 'asc'), limit(50));
-  return onSnapshot(q, snap => { cb(snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<AuctionListing,'id'>) }))); });
+  // where+orderByの複合インデックス不要にするためcreatedAtでソート、クライアント側で期限フィルタ
+  const q = query(collection(db, COLLECTIONS.AUCTIONS), orderBy('createdAt', 'desc'), limit(50));
+  return onSnapshot(q, snap => {
+    const now = Date.now();
+    cb(snap.docs
+      .map(d => ({ id: d.id, ...(d.data() as Omit<AuctionListing,'id'>) }))
+      .filter(l => l.expiresAt > now));
+  });
 }
 
 export function subscribeSoldNotifications(uid: string, cb: (notifications: { id: string; itemId: string; amount: number; totalGold: number }[]) => void): Unsubscribe {
-  const q = query(collection(db, 'sold_notifications'), where('sellerUid', '==', uid), where('read', '==', false), orderBy('createdAt', 'desc'), limit(20));
+  // sellerUid==uid のみでクエリ、read==falseはクライアント側でフィルタ
+  const q = query(collection(db, 'sold_notifications'), where('sellerUid', '==', uid), orderBy('createdAt', 'desc'), limit(20));
   return onSnapshot(q, snap => {
-    cb(snap.docs.map(d => ({ id: d.id, itemId: d.data()['itemId'] as string, amount: d.data()['amount'] as number, totalGold: d.data()['totalGold'] as number })));
+    cb(snap.docs
+      .filter(d => d.data()['read'] === false)
+      .map(d => ({ id: d.id, itemId: d.data()['itemId'] as string, amount: d.data()['amount'] as number, totalGold: d.data()['totalGold'] as number })));
   });
 }
 
@@ -165,15 +177,20 @@ export async function createGambleBattle(
 }
 
 export function subscribeGambleBattles(cb: (battles: GambleBattle[]) => void): Unsubscribe {
+  // 複合インデックス不要なシンプルなクエリに変更
+  // status=='waiting'のみでフィルタ、期限切れはクライアント側でフィルタ
   const q = query(
     collection(db, COLLECTIONS.BATTLES),
     where('status', '==', 'waiting'),
-    where('expiresAt', '>', Date.now()),
-    orderBy('expiresAt', 'asc'),
-    limit(20)
+    orderBy('createdAt', 'desc'),
+    limit(30)
   );
   return onSnapshot(q, snap => {
-    cb(snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<GambleBattle,'id'>) })));
+    const now = Date.now();
+    const battles = snap.docs
+      .map(d => ({ id: d.id, ...(d.data() as Omit<GambleBattle,'id'>) }))
+      .filter(b => b.expiresAt > now); // 期限切れをクライアント側で除外
+    cb(battles);
   });
 }
 
