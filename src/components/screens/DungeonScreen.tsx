@@ -96,7 +96,9 @@ function DungeonCard({ dungeon, selected, onSelect, playerLevel, clearedCount, i
   isUnlocked: boolean;
 }) {
   const meetsLevel = playerLevel >= dungeon.requiredLevel;
+  // 解放済みならLv不足でもカードを選択できる（スタートボタン側でLvチェック）
   const canEnter = meetsLevel && isUnlocked;
+  const canSelect = isUnlocked; // 解放済みなら選択可
 
   const tierColors: Record<string, string> = {
     beginner: '#4caf87', intermediate: '#5b8dee', advanced: '#f0a830',
@@ -107,14 +109,14 @@ function DungeonCard({ dungeon, selected, onSelect, playerLevel, clearedCount, i
 
   return (
     <button
-      onClick={() => canEnter && onSelect()}
+      onClick={() => canSelect && onSelect()}
       style={{
         display: 'flex', flexDirection: 'column', gap: 4,
         background: selected ? 'rgba(91,141,238,0.15)' : '#1c2235',
-        border: `2px solid ${selected ? color : canEnter ? '#2d3752' : '#1c2235'}`,
+        border: `2px solid ${selected ? color : canEnter ? '#2d3752' : canSelect ? 'rgba(240,168,48,0.3)' : '#1c2235'}`,
         borderRadius: 10, padding: '10px 14px', textAlign: 'left',
-        color: '#e8e6ff', cursor: canEnter ? 'pointer' : 'not-allowed',
-        opacity: canEnter ? 1 : 0.6, transition: 'all 0.2s', width: '100%',
+        color: '#e8e6ff', cursor: canSelect ? 'pointer' : 'not-allowed',
+        opacity: canSelect ? 1 : 0.6, transition: 'all 0.2s', width: '100%',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

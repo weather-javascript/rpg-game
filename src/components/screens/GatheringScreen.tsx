@@ -87,6 +87,11 @@ export function GatheringScreen() {
   }, [player, addItems, changeSatiety, changeHp, addSkillExp, addNotification]);
 
   const nodes = Object.values(GATHER_NODE_MASTER);
+  const miningNodes = nodes.filter(n => n.requiredSkill.skillId === 'mining');
+  const woodcuttingNodes = nodes.filter(n => n.requiredSkill.skillId === 'woodcutting');
+  const [activeCategory, setActiveCategory] = useState<'mining'|'woodcutting'>('mining');
+
+  const displayNodes = activeCategory === 'mining' ? miningNodes : woodcuttingNodes;
 
   return (
     <div style={{padding:'12px 8px'}}>
@@ -98,8 +103,20 @@ export function GatheringScreen() {
         </div>
       )}
 
+      {/* カテゴリ切り替え */}
+      <div style={{display:'flex', gap:6, marginBottom:12}}>
+        <button onClick={() => setActiveCategory('mining')}
+          style={{flex:1, padding:'8px', background: activeCategory==='mining' ? 'rgba(91,141,238,0.2)' : '#1c2235', border:`1px solid ${activeCategory==='mining' ? '#5b8dee' : '#2d3752'}`, color: activeCategory==='mining' ? '#e8e6ff' : '#8a92b2', borderRadius:6, cursor:'pointer', fontSize:'0.82rem', fontWeight: activeCategory==='mining' ? 700 : 400}}>
+          ⛏️ 採掘 ({miningNodes.length})
+        </button>
+        <button onClick={() => setActiveCategory('woodcutting')}
+          style={{flex:1, padding:'8px', background: activeCategory==='woodcutting' ? 'rgba(76,175,135,0.2)' : '#1c2235', border:`1px solid ${activeCategory==='woodcutting' ? '#4caf87' : '#2d3752'}`, color: activeCategory==='woodcutting' ? '#e8e6ff' : '#8a92b2', borderRadius:6, cursor:'pointer', fontSize:'0.82rem', fontWeight: activeCategory==='woodcutting' ? 700 : 400}}>
+          🪓 伐採 ({woodcuttingNodes.length})
+        </button>
+      </div>
+
       <div style={{display:'grid', gap:10, gridTemplateColumns:'1fr 1fr'}}>
-        {nodes.map(node => {
+        {displayNodes.map(node => {
           const skillLv = player?.skillLevels[node.requiredSkill.skillId] ?? 1;
           const meetsLv = skillLv >= node.requiredSkill.minLevel;
           const cd = cooldowns[node.id] ?? 0;

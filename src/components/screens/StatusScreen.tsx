@@ -269,15 +269,7 @@ export function StatusScreen() {
         </button>
       </div>
 
-      {isStruggling && (
-        <div style={{background:'rgba(224,85,85,0.15)', border:'2px solid #e05555', borderRadius:10, padding:'10px 14px', marginBottom:12, textAlign:'center'}}>
-          <div style={{color:'#e05555', fontWeight:700, marginBottom:4}}>⚠️ ピンチ状態！</div>
-          {reliefCheck.canUse
-            ? <button onClick={useRelief} style={{padding:'8px 20px', background:'linear-gradient(135deg,#e05555,#c03030)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700}}>🆘 緊急救済措置</button>
-            : <div style={{fontSize:'0.78rem', color:'#4a5070'}}>{reliefCheck.reason}</div>
-          }
-        </div>
-      )}
+      {/* 危険状態はポップアップで表示するためここでは非表示 */}
 
       {/* セクションタブ */}
       <div style={{display:'flex', gap:4, marginBottom:12, overflowX:'auto'}}>

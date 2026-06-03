@@ -172,28 +172,52 @@ function ReliefPanel() {
   const player = useGameStore(s => s.player);
   const canUseRelief = useGameStore(s => s.canUseRelief);
   const useRelief = useGameStore(s => s.useRelief);
+  const [dismissed, setDismissed] = useState(false);
+  const [lastDangerKey, setLastDangerKey] = useState('');
+
   if (!player) return null;
   const { canUse, reason } = canUseRelief();
-  const isDanger = player.stats.hp <= 50 || player.stats.satiety <= 20 || player.gold < 1000;
-  if (!isDanger) return null;
+  const isStruggling = player.stats.hp <= 30 && player.stats.satiety <= 10 && player.gold < 500;
+  const dangerKey = `${Math.floor(player.stats.hp/10)}-${Math.floor(player.stats.satiety/5)}-${Math.floor(player.gold/100)}`;
+
+  // 危険状態が新しく変化したら再表示
+  if (dangerKey !== lastDangerKey && isStruggling) {
+    setLastDangerKey(dangerKey);
+    setDismissed(false);
+  }
+
+  if (!isStruggling || dismissed) return null;
+
   return (
     <div style={{
-      position: 'fixed', bottom: 72, left: '50%', transform: 'translateX(-50%)',
-      width: 'calc(100% - 24px)', maxWidth: 876, zIndex: 90,
-      background: canUse ? 'rgba(224,85,85,0.95)' : 'rgba(29,34,50,0.95)',
-      border: `1px solid ${canUse ? '#e05555' : '#2d3752'}`,
-      borderRadius: 8, padding: '8px 12px',
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+      position: 'fixed', inset: 0, zIndex: 200,
+      background: 'rgba(0,0,0,0.7)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
     }}>
-      <div style={{ fontSize: '0.78rem', color: canUse ? '#fff' : '#8a92b2' }}>
-        {canUse ? '🆘 ピンチ！救済措置が利用できます' : `⚠️ 危険状態 | ${reason}`}
+      <div style={{
+        background: '#1c2235', border: '2px solid #e05555', borderRadius: 14,
+        padding: 20, width: '100%', maxWidth: 360, textAlign: 'center',
+      }}>
+        <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>⚠️</div>
+        <div style={{ color: '#e05555', fontWeight: 700, fontSize: '1.1rem', marginBottom: 6 }}>ピンチ状態！</div>
+        <div style={{ fontSize: '0.82rem', color: '#8a92b2', marginBottom: 14 }}>
+          HP・満腹度・所持金が危機的な状態です。
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {canUse ? (
+            <button onClick={() => { useRelief(); setDismissed(true); }}
+              style={{ padding: '10px', background: 'linear-gradient(135deg,#e05555,#c03030)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+              🆘 緊急救済措置を使う
+            </button>
+          ) : (
+            <div style={{ fontSize: '0.78rem', color: '#4a5070', padding: '8px', background: '#161b26', borderRadius: 6 }}>{reason}</div>
+          )}
+          <button onClick={() => setDismissed(true)}
+            style={{ padding: '8px', background: '#2d3752', color: '#8a92b2', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: '0.85rem' }}>
+            閉じる
+          </button>
+        </div>
       </div>
-      <button onClick={useRelief} disabled={!canUse}
-        style={{ padding: '5px 12px', fontWeight: 700, fontSize: '0.8rem', whiteSpace: 'nowrap',
-          background: canUse ? '#fff' : '#2d3752', color: canUse ? '#e05555' : '#4a5070',
-          border: 'none', borderRadius: 6, cursor: canUse ? 'pointer' : 'not-allowed' }}>
-        🆘 救済
-      </button>
     </div>
   );
 }

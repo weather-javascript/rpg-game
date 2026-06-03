@@ -231,6 +231,18 @@ export async function getAllPlayersAdmin(): Promise<any[]> {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
+export function subscribeAllPlayersAdmin(cb: (players: any[]) => void): () => void {
+  // onSnapshotでリアルタイム更新（管理者権限が必要）
+  try {
+    const unsub = onSnapshot(collection(db, 'players'), snap => {
+      cb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  } catch {
+    return () => {};
+  }
+}
+
 export async function updatePlayerAdmin(uid: string, data: Partial<any>): Promise<void> {
   await updateDoc(doc(db, 'players', uid), data);
 }
