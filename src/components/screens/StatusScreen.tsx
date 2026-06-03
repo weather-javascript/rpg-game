@@ -1,7 +1,224 @@
 // src/components/screens/StatusScreen.tsx
+import { useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
-import { ITEM_MASTER, SKILL_MASTER, EXP_TABLE, SKILL_EXP_TABLE } from '../../data/masters';
+import { ITEM_MASTER, SKILL_MASTER, EXP_TABLE, SKILL_EXP_TABLE, CRAFT_RECIPES } from '../../data/masters';
+import { savePlayer } from '../../services/database';
+import { updateDoc, doc } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 
+// ============================================================
+// 製作パネル
+// ============================================================
+function CraftingPanel() {
+  const player = useGameStore(s => s.player);
+  const addItems = useGameStore(s => s.addItems);
+  const consumeItem = useGameStore(s => s.consumeItem);
+  const addSkillExp = useGameStore(s => s.addSkillExp);
+  const addNotification = useGameStore(s => s.addNotification);
+  const [filter, setFilter] = useState('');
+
+  if (!player) return null;
+  const craftingLv = player.skillLevels['crafting'] ?? 1;
+
+  const canCraft = (recipe: typeof CRAFT_RECIPES[0]) => {
+    if (craftingLv < recipe.requiredCraftingLevel) return false;
+    return recipe.inputs.every(inp => (player.inventory[inp.itemId] ?? 0) >= inp.amount);
+  };
+
+  const handleCraft = (recipe: typeof CRAFT_RECIPES[0]) => {
+    if (!canCraft(recipe)) return;
+    for (const inp of recipe.inputs) consumeItem(inp.itemId, inp.amount);
+    addItems([{ itemId: recipe.outputItemId, amount: recipe.outputAmount }]);
+    addSkillExp('crafting', recipe.craftingExpGain);
+    addNotification('success', `🔨 ${recipe.name} → ${ITEM_MASTER[recipe.outputItemId]?.name} ×${recipe.outputAmount} 製作成功！`);
+  };
+
+  const filtered = CRAFT_RECIPES.filter(r =>
+    r.name.includes(filter) || ITEM_MASTER[r.outputItemId]?.name.includes(filter)
+  );
+
+  return (
+    <div>
+      <input
+        value={filter} onChange={e => setFilter(e.target.value)}
+        placeholder="レシピを検索..."
+        style={{width:'100%', padding:'6px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.85rem', boxSizing:'border-box', marginBottom:10}}
+      />
+      <div style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:8}}>製作スキル Lv.{craftingLv}</div>
+      {filtered.map(recipe => {
+        const craftable = canCraft(recipe);
+        const levelOk = craftingLv >= recipe.requiredCraftingLevel;
+        const outItem = ITEM_MASTER[recipe.outputItemId];
+        return (
+          <div key={recipe.id} style={{background: craftable ? 'rgba(76,175,135,0.08)' : '#161b26', border:`1px solid ${craftable ? '#4caf87' : '#2d3752'}`, borderRadius:8, padding:'10px 12px', marginBottom:8}}>
+            <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:6}}>
+              <span style={{fontSize:'1.3rem'}}>{outItem?.icon}</span>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700, fontSize:'0.9rem', color: craftable ? '#4caf87' : '#e8e6ff'}}>{recipe.name}</div>
+                <div style={{fontSize:'0.72rem', color:'#8a92b2'}}>{recipe.description}</div>
+              </div>
+              <div style={{textAlign:'right', fontSize:'0.75rem'}}>
+                <div style={{color:'#5b8dee'}}>Lv.{recipe.requiredCraftingLevel}〜</div>
+                <div style={{color:'#f0c060'}}>EXP+{recipe.craftingExpGain}</div>
+              </div>
+            </div>
+            <div style={{display:'flex', flexWrap:'wrap', gap:4, marginBottom:8}}>
+              {recipe.inputs.map(inp => {
+                const have = player.inventory[inp.itemId] ?? 0;
+                const ok = have >= inp.amount;
+                return (
+                  <span key={inp.itemId} style={{fontSize:'0.72rem', padding:'2px 6px', borderRadius:4, background: ok ? 'rgba(76,175,135,0.15)' : 'rgba(224,85,85,0.15)', color: ok ? '#4caf87' : '#e05555'}}>
+                    {ITEM_MASTER[inp.itemId]?.icon} {ITEM_MASTER[inp.itemId]?.name} {have}/{inp.amount}
+                  </span>
+                );
+              })}
+              <span style={{fontSize:'0.72rem', padding:'2px 6px', borderRadius:4, background:'rgba(91,141,238,0.15)', color:'#5b8dee'}}>
+                → {outItem?.icon} {outItem?.name} ×{recipe.outputAmount}
+              </span>
+            </div>
+            <button
+              onClick={() => handleCraft(recipe)}
+              disabled={!craftable}
+              style={{width:'100%', padding:'6px', background: craftable ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752', color: craftable ? '#fff' : '#4a5070', border:'none', borderRadius:6, cursor: craftable ? 'pointer' : 'not-allowed', fontSize:'0.82rem', fontWeight:700}}
+            >
+              {!levelOk ? `🔒 Lv.${recipe.requiredCraftingLevel}が必要` : craftable ? '🔨 製作する' : '素材が足りない'}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ============================================================
+// 名前変更パネル
+// ============================================================
+function RenamePanel({ onClose }: { onClose: () => void }) {
+  const player = useGameStore(s => s.player);
+  const changeDisplayName = useGameStore(s => s.changeDisplayName);
+  const saveGame = useGameStore(s => s.saveGame);
+  const [name, setName] = useState(player?.displayName ?? '');
+
+  const handleRename = async () => {
+    if (changeDisplayName(name)) {
+      await saveGame();
+      // Firestoreのオンラインユーザーも更新
+      if (player) {
+        try { await updateDoc(doc(db, 'online_users', player.uid), { displayName: name }); } catch { /* ignore */ }
+      }
+      onClose();
+    }
+  };
+
+  return (
+    <div style={{background:'rgba(0,0,0,0.8)', position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center'}}>
+      <div style={{background:'#1c2235', border:'2px solid #5b8dee', borderRadius:12, padding:24, width:'90%', maxWidth:360}}>
+        <h3 style={{color:'#f0c060', marginBottom:16}}>✏️ 名前変更</h3>
+        <p style={{fontSize:'0.82rem', color:'#8a92b2', marginBottom:12}}>変更には100Gが必要です。現在: {player?.gold ?? 0}G</p>
+        <input
+          value={name} onChange={e => setName(e.target.value)} maxLength={20}
+          placeholder="新しい名前 (1〜20文字)"
+          style={{width:'100%', padding:'8px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.9rem', boxSizing:'border-box', marginBottom:12}}
+        />
+        <div style={{display:'flex', gap:8}}>
+          <button onClick={handleRename} disabled={(player?.gold ?? 0) < 100}
+            style={{flex:1, padding:'8px', background: (player?.gold ?? 0) >= 100 ? '#5b8dee' : '#2d3752', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700}}>
+            変更する (100G)
+          </button>
+          <button onClick={onClose} style={{flex:1, padding:'8px', background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:6, cursor:'pointer'}}>
+            キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// メール設定パネル
+// ============================================================
+function EmailSettingsPanel() {
+  const player = useGameStore(s => s.player);
+  const saveGame = useGameStore(s => s.saveGame);
+  const addNotification = useGameStore(s => s.addNotification);
+  const [email, setEmail] = useState(player?.emailAddress ?? '');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { useGameStore: store } = await import('../../stores/gameStore');
+      const p = store.getState().player;
+      if (p) {
+        store.setState({ player: { ...p, emailAddress: email, emailNotifications: { auction: true, events: true, updates: true } } });
+        await saveGame();
+        addNotification('success', '📧 メール設定を保存しました');
+      }
+    } catch { addNotification('error', '保存に失敗しました'); }
+    setSaving(false);
+  };
+
+  return (
+    <div style={{background:'#161b26', border:'1px solid #2d3752', borderRadius:8, padding:12}}>
+      <div style={{fontSize:'0.82rem', color:'#8a92b2', marginBottom:8}}>
+        オークションで売れたとき・イベント開始・バージョン更新時にメール通知が届きます。
+        Googleアカウントの場合はGmailに届きます。
+      </div>
+      <input
+        type="email" value={email} onChange={e => setEmail(e.target.value)}
+        placeholder="メールアドレスを入力"
+        style={{width:'100%', padding:'7px 10px', background:'#1c2235', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.85rem', boxSizing:'border-box', marginBottom:8}}
+      />
+      <button onClick={handleSave} disabled={saving}
+        style={{width:'100%', padding:'7px', background:'#5b8dee', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:'0.85rem', fontWeight:700}}>
+        {saving ? '保存中...' : '📧 メール設定を保存'}
+      </button>
+    </div>
+  );
+}
+
+// ============================================================
+// ADMINパネル入口
+// ============================================================
+function AdminEntry({ onEnter }: { onEnter: () => void }) {
+  const [show, setShow] = useState(false);
+  const [pw, setPw] = useState('');
+  const [err, setErr] = useState(false);
+
+  const handleCheck = () => {
+    if (pw === 'ysmgd') { onEnter(); setShow(false); setPw(''); setErr(false); }
+    else { setErr(true); setPw(''); }
+  };
+
+  return (
+    <>
+      <button onClick={() => setShow(true)}
+        style={{width:'100%', padding:'10px', background:'rgba(224,85,85,0.1)', border:'2px solid #e05555', color:'#e05555', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'0.9rem'}}>
+        🔐 ADMIN専用パネル
+      </button>
+      {show && (
+        <div style={{background:'rgba(0,0,0,0.85)', position:'fixed', inset:0, zIndex:400, display:'flex', alignItems:'center', justifyContent:'center'}}>
+          <div style={{background:'#1c2235', border:'2px solid #e05555', borderRadius:12, padding:24, width:'90%', maxWidth:340}}>
+            <h3 style={{color:'#e05555', marginBottom:12}}>🔐 管理者認証</h3>
+            <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="パスワード"
+              onKeyDown={e => e.key === 'Enter' && handleCheck()}
+              style={{width:'100%', padding:'8px 10px', background:'#161b26', border:`1px solid ${err ? '#e05555' : '#2d3752'}`, color:'#e8e6ff', borderRadius:6, fontSize:'0.9rem', boxSizing:'border-box', marginBottom:8}}
+            />
+            {err && <div style={{color:'#e05555', fontSize:'0.8rem', marginBottom:8}}>パスワードが違います</div>}
+            <div style={{display:'flex', gap:8}}>
+              <button onClick={handleCheck} style={{flex:1, padding:'8px', background:'#e05555', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700}}>認証</button>
+              <button onClick={() => { setShow(false); setPw(''); setErr(false); }} style={{flex:1, padding:'8px', background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:6, cursor:'pointer'}}>閉じる</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ============================================================
+// メインステータス画面
+// ============================================================
 export function StatusScreen() {
   const player = useGameStore(s => s.player);
   const saveGame = useGameStore(s => s.saveGame);
@@ -9,16 +226,14 @@ export function StatusScreen() {
   const useItem = useGameStore(s => s.useItem);
   const canUseRelief = useGameStore(s => s.canUseRelief);
   const useRelief = useGameStore(s => s.useRelief);
+  const setActiveTab = useGameStore(s => s.setActiveTab);
+  const [activeSection, setActiveSection] = useState<'stats'|'skills'|'inventory'|'crafting'|'email'>('stats');
+  const [showRename, setShowRename] = useState(false);
+
   if (!player) return null;
 
   const reliefCheck = canUseRelief();
   const isStruggling = player.stats.hp <= 30 && player.stats.satiety <= 10 && player.gold < 500;
-
-  const inventoryEntries = Object.entries(player.inventory).filter(([, qty]) => qty > 0);
-
-  const RARITY_COLORS: Record<string, string> = {
-    common:'#2d3752', uncommon:'#2d6644', rare:'#2d4488', epic:'#6030a0', legendary:'#a06020',
-  };
 
   const hpPct = (player.stats.hp / player.stats.maxHp) * 100;
   const satPct = (player.stats.satiety / player.stats.maxSatiety) * 100;
@@ -30,172 +245,164 @@ export function StatusScreen() {
     </div>
   );
 
+  const SECTION_TABS = [
+    { id:'stats', label:'基本', icon:'🧙' },
+    { id:'skills', label:'スキル', icon:'⚡' },
+    { id:'inventory', label:'所持', icon:'🎒' },
+    { id:'crafting', label:'製作', icon:'🔨' },
+    { id:'email', label:'通知', icon:'📧' },
+  ] as const;
+
+  const inventoryEntries = Object.entries(player.inventory).filter(([, qty]) => qty > 0);
+  const RARITY_COLORS: Record<string, string> = {
+    common:'#2d3752', uncommon:'#2d6644', rare:'#2d4488', epic:'#6030a0', legendary:'#a06020',
+  };
+
   return (
     <div style={{padding:'12px 8px 80px'}}>
-      <h2 style={{fontFamily:'Cinzel,serif', color:'#f0c060', marginBottom:12, borderBottom:'1px solid #2d3752', paddingBottom:8}}>📊 ステータス</h2>
+      {showRename && <RenamePanel onClose={() => setShowRename(false)} />}
 
-      {/* 救済措置アラート */}
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12, borderBottom:'1px solid #2d3752', paddingBottom:8}}>
+        <h2 style={{fontFamily:'Cinzel,serif', color:'#f0c060', margin:0}}>📊 ステータス</h2>
+        <button onClick={saveGame} disabled={isSaving}
+          style={{padding:'5px 12px', background:'#1c2235', color: isSaving ? '#4a5070' : '#5b8dee', border:'1px solid #2d3752', borderRadius:6, cursor:'pointer', fontSize:'0.8rem'}}>
+          {isSaving ? '保存中...' : '💾 保存'}
+        </button>
+      </div>
+
       {isStruggling && (
         <div style={{background:'rgba(224,85,85,0.15)', border:'2px solid #e05555', borderRadius:10, padding:'10px 14px', marginBottom:12, textAlign:'center'}}>
-          <div style={{color:'#e05555', fontWeight:700, marginBottom:4}}>⚠️ ピンチ状態を検出！</div>
-          <div style={{fontSize:'0.8rem', color:'#8a92b2', marginBottom:8}}>HP・満腹度・所持金が全て低下しています。救済措置が利用可能です。</div>
-          {reliefCheck.canUse ? (
-            <button onClick={useRelief}
-              style={{padding:'8px 20px', background:'linear-gradient(135deg,#e05555,#c03030)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700}}>
-              🆘 緊急救済措置を使う
-            </button>
-          ) : (
-            <div style={{fontSize:'0.78rem', color:'#4a5070'}}>{reliefCheck.reason}</div>
-          )}
+          <div style={{color:'#e05555', fontWeight:700, marginBottom:4}}>⚠️ ピンチ状態！</div>
+          {reliefCheck.canUse
+            ? <button onClick={useRelief} style={{padding:'8px 20px', background:'linear-gradient(135deg,#e05555,#c03030)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700}}>🆘 緊急救済措置</button>
+            : <div style={{fontSize:'0.78rem', color:'#4a5070'}}>{reliefCheck.reason}</div>
+          }
         </div>
       )}
 
+      {/* セクションタブ */}
+      <div style={{display:'flex', gap:4, marginBottom:12, overflowX:'auto'}}>
+        {SECTION_TABS.map(t => (
+          <button key={t.id} onClick={() => setActiveSection(t.id)}
+            style={{flexShrink:0, padding:'6px 10px', fontSize:'0.75rem', background: activeSection===t.id ? 'rgba(91,141,238,0.2)' : '#1c2235', border:`1px solid ${activeSection===t.id ? '#5b8dee' : '#2d3752'}`, color: activeSection===t.id ? '#e8e6ff' : '#8a92b2', borderRadius:6, cursor:'pointer'}}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
       {/* 基本情報 */}
-      <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
-        <h3 style={{fontSize:'0.9rem', color:'#f0c060', marginBottom:10}}>🧙 基本情報</h3>
-        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:6}}>
-          {[
-            ['名前', player.displayName],
-            ['レベル', `Lv.${player.stats.level}`],
-            ['経験値', `${player.stats.exp} / ${EXP_TABLE[player.stats.level + 1] ?? 'MAX'}`],
-            ['所持金', `💰 ${player.gold.toLocaleString()}G`],
-            ['攻撃力', `⚔️ ${player.stats.attack}`],
-            ['防御力', `🛡️ ${player.stats.defense}`],
-          ].map(([label, value]) => (
-            <div key={label} style={{background:'#161b26', borderRadius:6, padding:'6px 10px'}}>
-              <div style={{fontSize:'0.68rem', color:'#4a5070', marginBottom:2}}>{label}</div>
-              <div style={{fontSize:'0.88rem', color:'#e8e6ff', fontWeight:700}}>{value}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{marginTop:10}}>
-          <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.75rem', color:'#8a92b2'}}>
-            <span>❤️ HP {player.stats.hp}/{player.stats.maxHp}</span>
+      {activeSection === 'stats' && (
+        <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}}>
+            <h3 style={{fontSize:'0.9rem', color:'#f0c060', margin:0}}>🧙 基本情報</h3>
+            <button onClick={() => setShowRename(true)}
+              style={{padding:'3px 8px', background:'#1c2235', border:'1px solid #5b8dee', color:'#5b8dee', borderRadius:4, cursor:'pointer', fontSize:'0.7rem'}}>
+              ✏️ 名前変更(100G)
+            </button>
           </div>
-          {bar(hpPct, '#e05555')}
-          <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.75rem', color:'#8a92b2', marginTop:6}}>
-            <span>🍖 満腹度 {player.stats.satiety}/{player.stats.maxSatiety}</span>
-          </div>
-          {bar(satPct, satPct < 20 ? '#e05555' : '#f0a830')}
-          <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.75rem', color:'#8a92b2', marginTop:6}}>
-            <span>✨ EXP {player.stats.exp}/{player.stats.expToNextLevel}</span>
-          </div>
-          {bar(expPct, '#5b8dee')}
-        </div>
-      </section>
-
-      {/* スキル */}
-      <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
-        <h3 style={{fontSize:'0.9rem', color:'#f0c060', marginBottom:10}}>⚡ スキル</h3>
-        {Object.values(SKILL_MASTER).map(skill => {
-          const lv = player.skillLevels[skill.id] ?? 1;
-          const exp = player.skillExp[skill.id] ?? 0;
-          const nextExp = SKILL_EXP_TABLE[lv + 1] ?? Infinity;
-          const pct = nextExp !== Infinity ? Math.min(100, (exp / nextExp) * 100) : 100;
-          return (
-            <div key={skill.id} style={{marginBottom:8}}>
-              <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.8rem'}}>
-                <span>{skill.icon} {skill.name}</span>
-                <span style={{color:'#5b8dee', fontWeight:700}}>Lv.{lv}</span>
-              </div>
-              <div style={{height:4, background:'#2d3752', borderRadius:2, overflow:'hidden', marginTop:3}}>
-                <div style={{height:'100%', background:'#5b8dee', width:`${pct}%`, transition:'width 0.3s'}} />
-              </div>
-            </div>
-          );
-        })}
-      </section>
-
-      {/* 装備・バフ情報 */}
-      <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
-        <h3 style={{fontSize:'0.9rem', color:'#f0c060', marginBottom:8}}>🎣 装備・状態</h3>
-        <div style={{fontSize:'0.82rem', color:'#8a92b2', display:'flex', flexDirection:'column', gap:5}}>
-          <span>釣り竿: <span style={{color:'#e8e6ff'}}>{ITEM_MASTER[player.equippedRodId ?? 'basic_rod']?.name ?? '基本の釣り竿'}</span></span>
-          <span>ジョブ: <span style={{color:'#e8e6ff'}}>{player.activeJob ?? 'なし'}</span></span>
-          <span>釣りスコア: <span style={{color:'#5b8dee'}}>{player.fishingScore ?? 0}</span>（1000ごとに上位鱗確定）</span>
-          <span>ダンジョンクリア: {Object.entries(player.dungeonClearedCount ?? {}).map(([id, n]) => `${id}:${n}回`).join('、') || 'なし'}</span>
-        </div>
-        {(player.activeBuffs ?? []).filter(b => b.expiry > Date.now()).length > 0 && (
-          <div style={{marginTop:8}}>
-            <div style={{fontSize:'0.8rem', fontWeight:700, color:'#f0a830', marginBottom:4}}>✨ アクティブバフ</div>
-            {(player.activeBuffs ?? []).filter(b => b.expiry > Date.now()).map((b, i) => (
-              <div key={i} style={{display:'flex', justifyContent:'space-between', fontSize:'0.78rem', color:'#8a92b2'}}>
-                <span>{b.name}</span>
-                <span style={{color:'#4caf87'}}>残り{Math.ceil((b.expiry - Date.now()) / 60000)}分</span>
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:6}}>
+            {[
+              ['名前', player.displayName],
+              ['レベル', `Lv.${player.stats.level}`],
+              ['経験値', `${player.stats.exp} / ${EXP_TABLE[player.stats.level + 1] ?? 'MAX'}`],
+              ['所持金', `💰 ${player.gold.toLocaleString()}G`],
+              ['攻撃力', `⚔️ ${player.stats.attack}`],
+              ['防御力', `🛡️ ${player.stats.defense}`],
+            ].map(([label, value]) => (
+              <div key={label} style={{background:'#161b26', borderRadius:6, padding:'6px 10px'}}>
+                <div style={{fontSize:'0.68rem', color:'#4a5070', marginBottom:2}}>{label}</div>
+                <div style={{fontSize:'0.88rem', color:'#e8e6ff', fontWeight:700}}>{value}</div>
               </div>
             ))}
           </div>
-        )}
-      </section>
-
-      {/* 救済措置 */}
-      <section style={{background: isStruggling ? 'rgba(224,85,85,0.08)' : '#1c2235', border:`1px solid ${isStruggling ? '#e05555' : '#2d3752'}`, borderRadius:10, padding:14, marginBottom:12}}>
-        <h3 style={{fontSize:'0.9rem', color:'#8a92b2', marginBottom:8}}>🆘 緊急救済措置</h3>
-        <div style={{fontSize:'0.78rem', color:'#4a5070', marginBottom:8}}>
-          以下の条件を全て満たすと使用可能（1日3回・30分クールダウン）
-        </div>
-        <div style={{fontSize:'0.8rem', display:'flex', flexDirection:'column', gap:3, marginBottom:8}}>
-          <span>HP 30以下: <span style={{color: player.stats.hp <= 30 ? '#4caf87' : '#4a5070'}}>{player.stats.hp <= 30 ? '✅ 達成' : `❌ 現在${player.stats.hp}`}</span></span>
-          <span>満腹度 10以下: <span style={{color: player.stats.satiety <= 10 ? '#4caf87' : '#4a5070'}}>{player.stats.satiety <= 10 ? '✅ 達成' : `❌ 現在${player.stats.satiety}`}</span></span>
-          <span>所持金 500G未満: <span style={{color: player.gold < 500 ? '#4caf87' : '#4a5070'}}>{player.gold < 500 ? '✅ 達成' : `❌ 現在${player.gold}G`}</span></span>
-        </div>
-        {reliefCheck.canUse ? (
-          <button onClick={useRelief}
-            style={{width:'100%', padding:'10px', background:'linear-gradient(135deg,#e05555,#c03030)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700}}>
-            🆘 使用する（HP+30・満腹+30・緊急食料×2・回復薬×1）
-          </button>
-        ) : (
-          <div style={{padding:'6px 10px', background:'#161b26', borderRadius:6, fontSize:'0.78rem', color:'#4a5070'}}>
-            {reliefCheck.reason}
+          <div style={{marginTop:10}}>
+            <div style={{fontSize:'0.75rem', color:'#8a92b2'}}>❤️ HP {player.stats.hp}/{player.stats.maxHp}</div>
+            {bar(hpPct, '#e05555')}
+            <div style={{fontSize:'0.75rem', color:'#8a92b2', marginTop:6}}>🍖 満腹度 {player.stats.satiety}/{player.stats.maxSatiety}</div>
+            {bar(satPct, satPct < 20 ? '#e05555' : '#f0a830')}
+            <div style={{fontSize:'0.75rem', color:'#8a92b2', marginTop:6}}>✨ EXP {player.stats.exp}/{player.stats.expToNextLevel}</div>
+            {bar(expPct, '#5b8dee')}
           </div>
-        )}
-        {(player.reliefUsedCount ?? 0) > 0 && (
-          <div style={{marginTop:4, fontSize:'0.72rem', color:'#4a5070'}}>本日使用: {player.reliefUsedCount ?? 0}/3回</div>
-        )}
-      </section>
+          <div style={{marginTop:10, fontSize:'0.72rem', color:'#4a5070', background:'#161b26', borderRadius:6, padding:'6px 8px'}}>
+            💡 HPは5秒ごとに1自動回復します。ゲームを閉じていても回復します。
+          </div>
+          {/* ADMIN入口 */}
+          <div style={{marginTop:12}}>
+            <AdminEntry onEnter={() => setActiveTab('admin')} />
+          </div>
+        </section>
+      )}
+
+      {/* スキル */}
+      {activeSection === 'skills' && (
+        <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
+          <h3 style={{fontSize:'0.9rem', color:'#f0c060', marginBottom:10}}>⚡ スキル <span style={{fontSize:'0.72rem', color:'#4a5070'}}>(最大Lv.100000)</span></h3>
+          {Object.values(SKILL_MASTER).map(skill => {
+            const lv = player.skillLevels[skill.id] ?? 1;
+            const exp = player.skillExp[skill.id] ?? 0;
+            const nextExp = SKILL_EXP_TABLE[lv + 1];
+            const pct = nextExp !== undefined ? Math.min(100, (exp / nextExp) * 100) : 100;
+            return (
+              <div key={skill.id} style={{marginBottom:10}}>
+                <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.8rem'}}>
+                  <span>{skill.icon} {skill.name}</span>
+                  <span style={{color:'#5b8dee', fontWeight:700}}>Lv.{lv.toLocaleString()}</span>
+                </div>
+                <div style={{fontSize:'0.7rem', color:'#4a5070', marginBottom:2}}>{skill.description}</div>
+                <div style={{height:5, background:'#2d3752', borderRadius:3, overflow:'hidden'}}>
+                  <div style={{height:'100%', background:'#5b8dee', width:`${pct}%`, transition:'width 0.3s'}} />
+                </div>
+                <div style={{fontSize:'0.68rem', color:'#4a5070', marginTop:1}}>
+                  {exp.toLocaleString()} / {nextExp?.toLocaleString() ?? 'MAX'} EXP
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
 
       {/* インベントリ */}
-      <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
-        <h3 style={{fontSize:'0.9rem', color:'#f0c060', marginBottom:10}}>🎒 インベントリ ({inventoryEntries.length}種)</h3>
-        {inventoryEntries.length === 0 ? (
-          <p style={{color:'#4a5070', fontSize:'0.85rem', textAlign:'center'}}>アイテムがありません</p>
-        ) : (
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:6}}>
-            {inventoryEntries.map(([id, qty]) => {
+      {activeSection === 'inventory' && (
+        <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
+          <h3 style={{fontSize:'0.9rem', color:'#f0c060', marginBottom:10}}>🎒 所持品 ({inventoryEntries.length}種)</h3>
+          {inventoryEntries.length === 0
+            ? <p style={{color:'#4a5070', fontSize:'0.85rem', textAlign:'center', padding:20}}>アイテムがありません</p>
+            : inventoryEntries.map(([id, qty]) => {
               const item = ITEM_MASTER[id];
               if (!item) return null;
               return (
-                <div key={id} style={{background:RARITY_COLORS[item.rarity] ?? '#2d3752', borderRadius:6, padding:'6px 8px', display:'flex', alignItems:'center', gap:6}}>
+                <div key={id} style={{display:'flex', alignItems:'center', gap:8, padding:'6px 8px', background: RARITY_COLORS[item.rarity] ?? '#2d3752', borderRadius:6, marginBottom:3}}>
                   <span style={{fontSize:'1.2rem'}}>{item.icon}</span>
-                  <div style={{flex:1, minWidth:0}}>
-                    <div style={{fontSize:'0.75rem', color:'#e8e6ff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{item.name}</div>
-                    <div style={{fontSize:'0.7rem', color:'#8a92b2'}}>×{qty.toLocaleString()}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'0.82rem', fontWeight:700}}>{item.name}</div>
+                    <div style={{fontSize:'0.68rem', color:'#8a92b2'}}>{item.rarity} | {item.sellPrice}G/個</div>
                   </div>
+                  <span style={{color:'#f0c060', fontWeight:700, fontSize:'0.9rem'}}>×{qty}</span>
                   {item.useEffect && (
-                    <button onClick={() => useItem(id)}
-                      style={{padding:'2px 6px', background:'rgba(76,175,135,0.3)', color:'#4caf87', border:'1px solid #4caf87', borderRadius:3, cursor:'pointer', fontSize:'0.65rem'}}>
-                      使用
-                    </button>
+                    <button onClick={() => useItem(id)} style={{padding:'3px 7px', background:'#9b6df0', color:'#fff', border:'none', borderRadius:4, cursor:'pointer', fontSize:'0.7rem'}}>使用</button>
                   )}
                 </div>
               );
-            })}
-          </div>
-        )}
-      </section>
+            })
+          }
+        </section>
+      )}
 
-      {/* セーブ */}
-      <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
-        <h3 style={{fontSize:'0.9rem', color:'#f0c060', marginBottom:10}}>💾 セーブ</h3>
-        <button
-          onClick={saveGame} disabled={isSaving}
-          style={{width:'100%', padding:'10px', background: isSaving ? '#2d3752' : 'linear-gradient(135deg,#4caf87,#2d8f6f)', color:'#fff', border:'none', borderRadius:8, cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight:700}}>
-          {isSaving ? '💾 保存中...' : '💾 データをセーブする'}
-        </button>
-        <p style={{fontSize:'0.72rem', color:'#4a5070', marginTop:8}}>
-          最終セーブ: {player.lastSavedAt ? new Date(player.lastSavedAt).toLocaleString('ja-JP') : '未セーブ'}
-        </p>
-      </div>
+      {/* 製作 */}
+      {activeSection === 'crafting' && (
+        <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
+          <h3 style={{fontSize:'0.9rem', color:'#f0c060', marginBottom:10}}>🔨 製作</h3>
+          <CraftingPanel />
+        </section>
+      )}
+
+      {/* メール通知設定 */}
+      {activeSection === 'email' && (
+        <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
+          <h3 style={{fontSize:'0.9rem', color:'#f0c060', marginBottom:10}}>📧 メール通知設定</h3>
+          <EmailSettingsPanel />
+        </section>
+      )}
     </div>
   );
 }

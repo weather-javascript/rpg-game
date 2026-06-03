@@ -138,18 +138,19 @@ export interface PokerState {
   bet: number;
 }
 
-export function dealPoker(bet: number): PokerState {
+export function dealPoker(): PokerState {
   const deck = shuffle(buildDeck());
-  return { hand: deck.slice(0, 5), held: [false,false,false,false,false], phase: 'deal', bet };
+  return { hand: deck.slice(0, 5), held: [false,false,false,false,false], phase: 'deal', bet: 0 };
 }
 
-export function drawPoker(state: PokerState): PokerState {
+export function drawPoker(state: PokerState, hold: boolean[]): { result: GambleResult; newState: PokerState } {
   const deck = shuffle(buildDeck());
   const usedLabels = new Set(state.hand.map(c => c.label));
   const remaining = deck.filter(c => !usedLabels.has(c.label));
-  const newHand = state.hand.map((c, i) => state.held[i] ? c : remaining.shift()!);
+  const newHand = state.hand.map((c, i) => hold[i] ? c : remaining.shift()!);
   const result = evaluatePokerHand(newHand, state.bet);
-  return { ...state, hand: newHand, phase: 'result', result };
+  const newState: PokerState = { ...state, hand: newHand, held: hold, phase: 'result', result };
+  return { result, newState };
 }
 
 function evaluatePokerHand(hand: Card[], bet: number): GambleResult {

@@ -395,11 +395,16 @@ export function DungeonScreen() {
               disabled={!isDungeonUnlocked(selectedId) || player.stats.level < (DUNGEON_MASTER[selectedId]?.requiredLevel ?? 0)}
               style={{
                 width: '100%', padding: '12px', fontWeight: 700, fontSize: '1rem',
-                background: isDungeonUnlocked(selectedId) ? 'linear-gradient(135deg,#e05555,#c03030)' : '#2d3752',
-                color: '#fff', border: 'none', borderRadius: 8, cursor: isDungeonUnlocked(selectedId) ? 'pointer' : 'not-allowed',
+                background: isDungeonUnlocked(selectedId) && player.stats.level >= (DUNGEON_MASTER[selectedId]?.requiredLevel ?? 0) ? 'linear-gradient(135deg,#e05555,#c03030)' : '#2d3752',
+                color: '#fff', border: 'none', borderRadius: 8, cursor: isDungeonUnlocked(selectedId) && player.stats.level >= (DUNGEON_MASTER[selectedId]?.requiredLevel ?? 0) ? 'pointer' : 'not-allowed',
               }}
             >
-              {isDungeonUnlocked(selectedId) ? `⚔️ ${DUNGEON_MASTER[selectedId]?.name} に挑む！` : '🔒 このダンジョンは解放されていません'}
+              {!isDungeonUnlocked(selectedId)
+                ? '🔒 このダンジョンは解放されていません'
+                : player.stats.level < (DUNGEON_MASTER[selectedId]?.requiredLevel ?? 0)
+                  ? `⛔ Lv.${DUNGEON_MASTER[selectedId]?.requiredLevel}以上が必要です`
+                  : `⚔️ ${DUNGEON_MASTER[selectedId]?.name} に挑む！`
+              }
             </button>
           )}
         </>

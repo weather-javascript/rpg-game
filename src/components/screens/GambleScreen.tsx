@@ -1,76 +1,71 @@
 // src/components/screens/GambleScreen.tsx
-// ギャンブル画面：還元率改善済み＋収支レポート機能
+// ジャックポットは他のギャンブルで蓄積する仕様に変更
+// PvP対戦機能追加
 
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { GAMBLE_MASTER, ITEM_MASTER } from '../../data/masters';
 import { playChohan, playChinchiro, dealPoker, drawPoker } from '../../systems/minigames';
-import { contributeAndRollJackpot, subscribeJackpotPool } from '../../services/multiplayer';
+import {
+  contributeToJackpot, checkJackpotWin, subscribeJackpotPool,
+  createGambleBattle, subscribeGambleBattles, joinGambleBattle, cancelGambleBattle,
+} from '../../services/multiplayer';
 import type { GambleResult, GambleMaster } from '../../types/game';
 import type { PokerState } from '../../systems/minigames';
+import type { GambleBattle } from '../../types/game';
 
-// ============================================================
-// 収支トラッカー（セッション内）
-// ============================================================
 interface SessionStats {
-  totalBet: number;
-  totalWon: number;
-  gamesPlayed: number;
-  wins: number;
-  biggestWin: number;
-  biggestLoss: number;
+  totalBet: number; totalWon: number; gamesPlayed: number; wins: number; biggestWin: number; biggestLoss: number;
 }
-
 const initStats = (): SessionStats => ({ totalBet: 0, totalWon: 0, gamesPlayed: 0, wins: 0, biggestWin: 0, biggestLoss: 0 });
 
-// ============================================================
-// 共通ギャンブルロジック
-// ============================================================
-function resolveGenericGamble(game: GambleMaster, bet: number): GambleResult {
+function resolveGenericGamble(game: GambleMaster, bet: number, multiplierBonus = 1.0): GambleResult {
   const rand = Math.random();
   let cum = 0;
   for (const r of game.rewardTable) {
     cum += r.probability;
     if (rand < cum) {
-      const goldDelta = Math.floor(bet * r.multiplier) - bet;
-      return { rewardLabel: r.label, multiplier: r.multiplier, goldDelta, itemRewards: r.itemRewards ?? [], symbols: r.symbols };
+      const effectiveMult = r.multiplier > 0 ? r.multiplier * multiplierBonus : 0;
+      const goldDelta = Math.floor(bet * effectiveMult) - bet;
+      return { rewardLabel: r.label, multiplier: effectiveMult, goldDelta, itemRewards: r.itemRewards ?? [], symbols: r.symbols };
     }
   }
   const last = game.rewardTable[game.rewardTable.length - 1];
   return { rewardLabel: last.label, multiplier: last.multiplier, goldDelta: Math.floor(bet * last.multiplier) - bet, itemRewards: last.itemRewards ?? [], symbols: last.symbols };
 }
 
-// ============================================================
-// 収支レポートパネル
-// ============================================================
-function SessionReport({ stats }: { stats: SessionStats }) {
-  const netProfit = stats.totalWon - stats.totalBet;
-  const rr = stats.totalBet > 0 ? ((stats.totalWon / stats.totalBet) * 100).toFixed(1) : '0.0';
-  const winRate = stats.gamesPlayed > 0 ? ((stats.wins / stats.gamesPlayed) * 100).toFixed(1) : '0.0';
-
+function ResultDisplay({ result }: { result: GambleResult }) {
+  const isWin = result.goldDelta >= 0;
   return (
-    <div style={{ background: '#161b26', border: '1px solid #2d3752', borderRadius: 8, padding: 10, marginBottom: 10, fontSize: '0.78rem' }}>
-      <div style={{ fontWeight: 700, color: '#8a92b2', marginBottom: 6 }}>📊 セッション収支</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-        <span style={{ color: '#4a5070' }}>ゲーム数: <span style={{ color: '#e8e6ff' }}>{stats.gamesPlayed}</span></span>
-        <span style={{ color: '#4a5070' }}>勝率: <span style={{ color: '#5b8dee' }}>{winRate}%</span></span>
-        <span style={{ color: '#4a5070' }}>総賭け: <span style={{ color: '#f0c060' }}>{stats.totalBet.toLocaleString()}G</span></span>
-        <span style={{ color: '#4a5070' }}>実還元率: <span style={{ color: Number(rr) >= 95 ? '#4caf87' : '#e05555' }}>{rr}%</span></span>
-        <span style={{ color: '#4a5070' }}>最大勝利: <span style={{ color: '#4caf87' }}>+{stats.biggestWin.toLocaleString()}G</span></span>
-        <span style={{ color: '#4a5070' }}>最大損失: <span style={{ color: '#e05555' }}>-{stats.biggestLoss.toLocaleString()}G</span></span>
+    <div style={{ padding: '10px', background: isWin ? 'rgba(76,175,135,0.1)' : 'rgba(224,85,85,0.1)', border: `1px solid ${isWin ? '#4caf87' : '#e05555'}`, borderRadius: 8, marginBottom: 10, textAlign: 'center' }}>
+      <div style={{ fontSize: '1.2rem', fontWeight: 700, color: isWin ? '#4caf87' : '#e05555', marginBottom: 4 }}>
+        {result.symbols?.join(' ') ?? ''} {result.rewardLabel}
       </div>
-      <div style={{ marginTop: 6, padding: '4px 8px', background: netProfit >= 0 ? 'rgba(76,175,135,0.1)' : 'rgba(224,85,85,0.1)', borderRadius: 4, textAlign: 'center' }}>
-        <span style={{ fontWeight: 700, color: netProfit >= 0 ? '#4caf87' : '#e05555' }}>
-          セッション収支: {netProfit >= 0 ? '+' : ''}{netProfit.toLocaleString()}G
-        </span>
+      <div style={{ fontSize: '1rem', fontWeight: 700, color: isWin ? '#4caf87' : '#e05555' }}>
+        {isWin ? `+${result.goldDelta.toLocaleString()}G` : `${result.goldDelta.toLocaleString()}G`}
       </div>
+      {result.itemRewards.length > 0 && (
+        <div style={{ marginTop: 6, fontSize: '0.8rem' }}>
+          {result.itemRewards.map(r => <span key={r.itemId}>{ITEM_MASTER[r.itemId]?.icon} {ITEM_MASTER[r.itemId]?.name} ×{r.amount} </span>)}
+        </div>
+      )}
     </div>
   );
 }
 
-// ============================================================
+// ジャックポット表示（蓄積のみ、対戦中に偶然発生）
+function JackpotBanner({ pool }: { pool: number }) {
+  if (pool <= 0) return null;
+  return (
+    <div style={{ background: 'linear-gradient(135deg,rgba(240,192,96,0.15),rgba(240,168,48,0.15))', border: '2px solid #f0c060', borderRadius: 10, padding: '10px 14px', marginBottom: 12, textAlign: 'center' }}>
+      <div style={{ fontSize: '0.8rem', color: '#8a92b2', marginBottom: 2 }}>🌟 現在のジャックポットプール</div>
+      <div style={{ fontSize: '2rem', fontWeight: 700, color: '#f0c060' }}>{pool.toLocaleString()}G</div>
+      <div style={{ fontSize: '0.72rem', color: '#4a5070', marginTop: 4 }}>他のギャンブルをプレイするたびに蓄積されます。超低確率で自動当選！</div>
+    </div>
+  );
+}
+
 // 賭け金入力
-// ============================================================
 function BetInput({ game, bet, setBet }: { game: GambleMaster; bet: number; setBet: (v: number) => void }) {
   const player = useGameStore(s => s.player);
   const presets = [game.minBet, Math.floor(game.maxBet * 0.1), Math.floor(game.maxBet * 0.25), game.maxBet].filter((v, i, a) => a.indexOf(v) === i);
@@ -84,346 +79,364 @@ function BetInput({ game, bet, setBet }: { game: GambleMaster; bet: number; setB
           </button>
         ))}
         <button onClick={() => setBet(Math.min(player?.gold ?? 0, game.maxBet))}
-          style={{ padding: '3px 8px', background: '#1c2235', color: '#f0c060', border: '1px solid #f0c060', borderRadius: 4, cursor: 'pointer', fontSize: '0.75rem' }}>
-          MAX
-        </button>
+          style={{ padding: '3px 8px', background: '#1c2235', color: '#f0c060', border: '1px solid #f0c060', borderRadius: 4, cursor: 'pointer', fontSize: '0.75rem' }}>MAX</button>
       </div>
-      <input
-        type="number" value={bet} min={game.minBet} max={Math.min(game.maxBet, player?.gold ?? 0)}
+      <input type="number" value={bet} min={game.minBet} max={Math.min(game.maxBet, player?.gold ?? 0)}
         onChange={e => setBet(Math.max(game.minBet, Math.min(game.maxBet, Number(e.target.value))))}
-        style={{ width: '100%', padding: '6px 10px', background: '#1c2235', border: '1px solid #2d3752', color: '#e8e6ff', borderRadius: 6, fontSize: '0.9rem', boxSizing: 'border-box' }}
+        style={{ width: '100%', padding: '6px 10px', background: '#1c2235', border: '1px solid #2d3752', color: '#e8e6ff', borderRadius: 6, fontSize: '0.9rem', boxSizing: 'border-box' as const }}
       />
-      <div style={{ fontSize: '0.72rem', color: '#4a5070', marginTop: 3 }}>
-        期待還元率: <span style={{ color: game.returnRate >= 0.96 ? '#4caf87' : '#f0a830' }}>{(game.returnRate * 100).toFixed(0)}%</span>
-        　最小: {game.minBet.toLocaleString()}G 〜 最大: {game.maxBet.toLocaleString()}G
-      </div>
     </div>
   );
 }
 
 // ============================================================
-// 結果表示
+// PvP対戦パネル
 // ============================================================
-function ResultDisplay({ result }: { result: GambleResult }) {
-  return (
-    <div style={{
-      background: result.goldDelta >= 0 ? 'rgba(76,175,135,0.15)' : 'rgba(224,85,85,0.1)',
-      border: `1px solid ${result.goldDelta >= 0 ? '#4caf87' : '#e05555'}`,
-      borderRadius: 8, padding: 10, marginBottom: 10, textAlign: 'center',
-    }}>
-      {result.symbols && <div style={{ fontSize: '1.8rem', marginBottom: 4 }}>{result.symbols.join(' ')}</div>}
-      <div style={{ fontWeight: 700 }}>{result.rewardLabel}</div>
-      <div style={{ color: result.goldDelta >= 0 ? '#4caf87' : '#e05555', fontWeight: 700, fontSize: '1.1rem' }}>
-        {result.goldDelta >= 0 ? `+${result.goldDelta.toLocaleString()}G` : `${result.goldDelta.toLocaleString()}G`}
-      </div>
-      {result.itemRewards.length > 0 && (
-        <div style={{ fontSize: '0.8rem', color: '#f0c060', marginTop: 4 }}>
-          {result.itemRewards.map(r => `${ITEM_MASTER[r.itemId]?.icon} ${ITEM_MASTER[r.itemId]?.name} ×${r.amount}`).join('　')}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// 丁半
-// ============================================================
-function ChohanPanel({ bet, onResult }: { bet: number; onResult: (r: GambleResult) => void }) {
-  const { changeGold, addNotification } = useGameStore();
+function PvPPanel({ bet }: { bet: number }) {
   const player = useGameStore(s => s.player);
-  const [result, setResult] = useState<(GambleResult & { dice: number[] }) | null>(null);
-  const [animating, setAnimating] = useState(false);
-
-  const play = (choice: 'cho' | 'han') => {
-    if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
-    setAnimating(true);
-    changeGold(-bet);
-    setTimeout(() => {
-      const r = playChohan(bet, choice);
-      if (r.goldDelta > 0) changeGold(r.goldDelta + bet);
-      else if (r.multiplier > 0) changeGold(Math.floor(bet * r.multiplier));
-      setResult(r);
-      onResult(r);
-      setAnimating(false);
-    }, 600);
-  };
-
-  return (
-    <div>
-      {animating && <div style={{ textAlign: 'center', fontSize: '2rem', margin: '12px 0' }}>🎲🎲</div>}
-      {result && !animating && <ResultDisplay result={result} />}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={() => play('cho')} disabled={animating}
-          style={{ flex: 1, padding: 10, background: 'linear-gradient(135deg,#5b8dee,#3d6fd0)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>
-          丁（偶数）
-        </button>
-        <button onClick={() => play('han')} disabled={animating}
-          style={{ flex: 1, padding: 10, background: 'linear-gradient(135deg,#e05555,#c03030)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>
-          半（奇数）
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// チンチロリン
-// ============================================================
-function ChinchiroPanel({ bet, onResult }: { bet: number; onResult: (r: GambleResult) => void }) {
-  const { changeGold, addNotification } = useGameStore();
-  const player = useGameStore(s => s.player);
-  const [result, setResult] = useState<(GambleResult & { dice: number[] }) | null>(null);
-  const [animating, setAnimating] = useState(false);
-  const DICE_FACES = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-
-  const play = () => {
-    if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
-    setAnimating(true);
-    changeGold(-bet);
-    setTimeout(() => {
-      const r = playChinchiro(bet);
-      if (r.goldDelta + bet > 0) changeGold(r.goldDelta + bet);
-      setResult(r);
-      onResult(r);
-      setAnimating(false);
-    }, 700);
-  };
-
-  return (
-    <div>
-      {animating && <div style={{ textAlign: 'center', fontSize: '2.5rem', margin: '12px 0' }}>🎲🎲🎲</div>}
-      {result && !animating && (
-        <>
-          <div style={{ textAlign: 'center', fontSize: '2rem', marginBottom: 4 }}>
-            {result.dice?.map(d => DICE_FACES[d]).join(' ')}
-          </div>
-          <ResultDisplay result={result} />
-        </>
-      )}
-      <button onClick={play} disabled={animating}
-        style={{ width: '100%', padding: 10, background: 'linear-gradient(135deg,#9b6df0,#7b4dd0)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>
-        🎲 サイコロを振る
-      </button>
-    </div>
-  );
-}
-
-// ============================================================
-// スロット / 宝箱（汎用）
-// ============================================================
-function GenericPanel({ game, bet, onResult }: { game: GambleMaster; bet: number; onResult: (r: GambleResult) => void }) {
-  const { changeGold, addItems, addNotification } = useGameStore();
-  const player = useGameStore(s => s.player);
-  const [result, setResult] = useState<GambleResult | null>(null);
-  const [animating, setAnimating] = useState(false);
-
-  const play = () => {
-    if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
-    setAnimating(true);
-    changeGold(-bet);
-    setTimeout(() => {
-      const r = resolveGenericGamble(game, bet);
-      if (r.goldDelta + bet > 0) changeGold(r.goldDelta + bet);
-      if (r.itemRewards.length > 0) addItems(r.itemRewards);
-      setResult(r);
-      onResult(r);
-      setAnimating(false);
-    }, 600);
-  };
-
-  return (
-    <div>
-      {animating && <div style={{ textAlign: 'center', fontSize: '2rem', margin: '12px 0' }}>{'✨'.repeat(3)}</div>}
-      {result && !animating && <ResultDisplay result={result} />}
-      <button onClick={play} disabled={animating}
-        style={{ width: '100%', padding: 10, background: 'linear-gradient(135deg,#f0a830,#c08020)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>
-        {game.icon} {game.name}
-      </button>
-    </div>
-  );
-}
-
-// ============================================================
-// コインフリップ
-// ============================================================
-function CoinFlipPanel({ bet, onResult }: { bet: number; onResult: (r: GambleResult) => void }) {
-  const { changeGold, addNotification } = useGameStore();
-  const player = useGameStore(s => s.player);
-  const game = GAMBLE_MASTER['coin_flip'];
-  const [result, setResult] = useState<GambleResult | null>(null);
-  const [animating, setAnimating] = useState(false);
-
-  const play = () => {
-    if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
-    setAnimating(true);
-    changeGold(-bet);
-    setTimeout(() => {
-      const r = resolveGenericGamble(game, bet);
-      if (r.goldDelta + bet > 0) changeGold(r.goldDelta + bet);
-      setResult(r);
-      onResult(r);
-      setAnimating(false);
-    }, 500);
-  };
-
-  return (
-    <div>
-      {animating && <div style={{ textAlign: 'center', fontSize: '3rem', margin: '10px 0' }}>🪙</div>}
-      {result && !animating && <ResultDisplay result={result} />}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={play} disabled={animating}
-          style={{ flex: 1, padding: 10, background: 'linear-gradient(135deg,#4caf87,#2d8f6f)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>
-          🪙 コインを投げる
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// ポーカー
-// ============================================================
-function PokerPanel({ bet, onResult }: { bet: number; onResult: (r: GambleResult) => void }) {
-  const { changeGold, addNotification } = useGameStore();
-  const player = useGameStore(s => s.player);
-  const [pokerState, setPokerState] = useState<PokerState | null>(null);
-  const [result, setResult] = useState<GambleResult | null>(null);
-  const [phase, setPhase] = useState<'idle' | 'discard' | 'done'>('idle');
-
-  const deal = () => {
-    if (!player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
-    changeGold(-bet);
-    const ps = dealPoker(bet);
-    setPokerState(ps);
-    setPhase('discard');
-    setResult(null);
-  };
-
-  const toggleHeld = (i: number) => {
-    if (!pokerState || phase !== 'discard') return;
-    const newHeld = [...pokerState.held];
-    newHeld[i] = !newHeld[i];
-    setPokerState({ ...pokerState, held: newHeld });
-  };
-
-  const draw = () => {
-    if (!pokerState) return;
-    const finalState = drawPoker(pokerState);
-    setPokerState(finalState);
-    if (finalState.result) {
-      const r = finalState.result;
-      if (r.goldDelta + bet > 0) changeGold(r.goldDelta + bet);
-      setResult(r);
-      onResult(r);
-    }
-    setPhase('done');
-  };
-
-  const SUIT_COLORS: Record<string, string> = { '♥': '#e05555', '♦': '#e05555', '♠': '#e8e6ff', '♣': '#e8e6ff' };
-
-  return (
-    <div>
-      {phase === 'idle' && (
-        <button onClick={deal}
-          style={{ width: '100%', padding: 10, background: 'linear-gradient(135deg,#5b8dee,#3d6fd0)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>
-          🃏 ディール（{bet.toLocaleString()}G）
-        </button>
-      )}
-      {(phase === 'discard' || phase === 'done') && pokerState && (
-        <div>
-          <div style={{ display: 'flex', gap: 4, marginBottom: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-            {pokerState.hand.map((card, i) => (
-              <button key={i} onClick={() => toggleHeld(i)}
-                style={{
-                  width: 50, height: 70, background: pokerState.held[i] ? 'rgba(76,175,135,0.3)' : '#e8e6ff',
-                  border: `2px solid ${pokerState.held[i] ? '#4caf87' : '#2d3752'}`,
-                  borderRadius: 6, cursor: phase === 'discard' ? 'pointer' : 'default',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  color: SUIT_COLORS[card.suit] ?? '#333',
-                  fontWeight: 700, fontSize: '0.85rem', padding: 2,
-                }}>
-                <div style={{ fontSize: '0.8rem' }}>{card.rank <= 10 ? card.rank : ['J','Q','K','A'][card.rank - 11]}</div>
-                <div style={{ fontSize: '1.2rem' }}>{card.suit}</div>
-                {pokerState.held[i] && phase === 'discard' && <div style={{ fontSize: '0.6rem', color: '#4caf87' }}>HOLD</div>}
-              </button>
-            ))}
-          </div>
-          {phase === 'discard' && (
-            <button onClick={draw}
-              style={{ width: '100%', padding: 10, background: 'linear-gradient(135deg,#4caf87,#2d8f6f)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>
-              🔄 チェンジ（{pokerState.held.filter(h => !h).length}枚交換）
-            </button>
-          )}
-          {phase === 'done' && result && (
-            <>
-              <ResultDisplay result={result} />
-              <button onClick={() => setPhase('idle')}
-                style={{ width: '100%', padding: 8, background: '#2d3752', color: '#8a92b2', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
-                もう一度
-              </button>
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// ジャックポット
-// ============================================================
-function JackpotPanel({ onResult }: { onResult: (r: GambleResult) => void }) {
-  const { changeGold, addNotification } = useGameStore();
-  const player = useGameStore(s => s.player);
-  const game = GAMBLE_MASTER['jackpot'];
-  const [pool, setPool] = useState(0);
-  const [result, setResult] = useState<GambleResult | null>(null);
-  const [animating, setAnimating] = useState(false);
+  const changeGold = useGameStore(s => s.changeGold);
+  const addNotification = useGameStore(s => s.addNotification);
+  const [battles, setBattles] = useState<GambleBattle[]>([]);
+  const [myBattleId, setMyBattleId] = useState<string | null>(null);
+  const [selectedGame, setSelectedGame] = useState('chohan');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const unsub = subscribeJackpotPool(setPool);
+    const unsub = subscribeGambleBattles(setBattles);
     return unsub;
   }, []);
 
-  const play = async () => {
-    if (animating || !player || player.gold < 100) { addNotification('error', 'ゴールドが足りません！'); return; }
-    setAnimating(true);
-    changeGold(-100);
+  const GAME_NAMES: Record<string, string> = {
+    chohan: '丁半', chinchiro: 'チンチロリン', coin_flip: 'コインフリップ', slot_machine: 'スロット',
+  };
+
+  const handleHost = async () => {
+    if (!player || player.gold < bet) { addNotification('error', 'ゴールドが足りません'); return; }
+    if (myBattleId) { addNotification('warning', '既に募集中です'); return; }
+    setLoading(true);
     try {
-      const { won: jackpotWon, pool: newPool } = await contributeAndRollJackpot(100);
-      setPool(newPool);
-      if (jackpotWon) {
-        changeGold(newPool);
-        const r: GambleResult = { rewardLabel: '🌟 JACKPOT!! 🌟', multiplier: newPool / 100, goldDelta: newPool - 100, itemRewards: [], symbols: ['🌟', '🌟', '🌟'] };
-        setResult(r);
-        onResult(r);
-        addNotification('success', `🌟 JACKPOT!! ${newPool.toLocaleString()}G獲得！`);
+      const id = await createGambleBattle(player.uid, player.displayName, player.stats.level, selectedGame, bet);
+      setMyBattleId(id);
+      addNotification('success', `⚔️ 対戦を募集開始しました！ (${bet.toLocaleString()}G)`);
+    } catch { addNotification('error', '募集に失敗しました'); }
+    setLoading(false);
+  };
+
+  const handleCancelHost = async () => {
+    if (!player || !myBattleId) return;
+    setLoading(true);
+    try {
+      await cancelGambleBattle(myBattleId, player.uid);
+      setMyBattleId(null);
+      addNotification('info', '募集をキャンセルしました');
+    } catch { addNotification('error', 'キャンセルに失敗しました'); }
+    setLoading(false);
+  };
+
+  const handleJoin = async (battle: GambleBattle) => {
+    if (!player) return;
+    if (player.gold < battle.betAmount) { addNotification('error', 'ゴールドが足りません'); return; }
+    setLoading(true);
+    try {
+      const { success, battle: result } = await joinGambleBattle(battle.id, player.uid, player.displayName);
+      if (success && result) {
+        const iWon = result.winnerId === player.uid;
+        const prize = battle.betAmount * 2;
+        if (iWon) {
+          changeGold(battle.betAmount); // 自分のbet + 相手のbet = 2倍 → netは+betAmount
+          addNotification('success', `🏆 対戦勝利！+${battle.betAmount.toLocaleString()}G`);
+        } else {
+          changeGold(-battle.betAmount);
+          addNotification('error', `💔 対戦敗北... -${battle.betAmount.toLocaleString()}G`);
+        }
       } else {
-        const r: GambleResult = { rewardLabel: 'はずれ', multiplier: 0, goldDelta: -100, itemRewards: [], symbols: ['💨', '💨', '💨'] };
-        setResult(r);
-        onResult(r);
+        addNotification('error', '参加に失敗しました（既に終了）');
       }
-    } catch {
-      const r = resolveGenericGamble(game, 100);
-      if (r.multiplier > 0) changeGold(r.multiplier > 1 ? pool : Math.floor(100 * r.multiplier));
-      setResult(r);
-      onResult(r);
-    }
+    } catch { addNotification('error', '参加に失敗しました'); }
+    setLoading(false);
+  };
+
+  const otherBattles = battles.filter(b => b.hostUid !== player?.uid);
+  const myBattle = battles.find(b => b.id === myBattleId);
+
+  return (
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: '0.85rem', color: '#f0c060', fontWeight: 700, marginBottom: 8 }}>⚔️ 対戦を募集する</div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          {Object.entries(GAME_NAMES).map(([id, name]) => (
+            <button key={id} onClick={() => setSelectedGame(id)}
+              style={{ flex: 1, padding: '5px 4px', fontSize: '0.72rem', background: selectedGame === id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${selectedGame === id ? '#5b8dee' : '#2d3752'}`, color: selectedGame === id ? '#e8e6ff' : '#8a92b2', borderRadius: 4, cursor: 'pointer' }}>
+              {name}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: '0.78rem', color: '#8a92b2', marginBottom: 8 }}>掛け金: {bet.toLocaleString()}G | ゲーム: {GAME_NAMES[selectedGame]}</div>
+        {myBattleId && myBattle ? (
+          <div style={{ background: 'rgba(91,141,238,0.1)', border: '1px solid #5b8dee', borderRadius: 6, padding: '8px 10px', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.82rem', color: '#5b8dee' }}>🔄 参加者募集中...</span>
+            <button onClick={handleCancelHost} disabled={loading} style={{ padding: '4px 10px', background: '#e05555', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.75rem' }}>取消</button>
+          </div>
+        ) : (
+          <button onClick={handleHost} disabled={loading || (player?.gold ?? 0) < bet}
+            style={{ width: '100%', padding: '8px', background: (player?.gold ?? 0) >= bet ? 'linear-gradient(135deg,#5b8dee,#3a6fd0)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
+            ⚔️ {bet.toLocaleString()}G で対戦を募集する
+          </button>
+        )}
+      </div>
+
+      <div style={{ fontSize: '0.85rem', color: '#f0c060', fontWeight: 700, marginBottom: 8 }}>🔍 募集中の対戦 ({otherBattles.length}件)</div>
+      {otherBattles.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#4a5070', fontSize: '0.82rem', padding: '16px 0' }}>現在募集中の対戦はありません</div>
+      ) : (
+        otherBattles.map(b => (
+          <div key={b.id} style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 8, padding: '10px 12px', marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <div>
+                <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>⚔️ {b.hostName}</span>
+                <span style={{ marginLeft: 6, fontSize: '0.72rem', color: '#5b8dee' }}>Lv.{b.hostLevel}</span>
+              </div>
+              <span style={{ color: '#f0c060', fontWeight: 700 }}>{b.betAmount.toLocaleString()}G</span>
+            </div>
+            <div style={{ fontSize: '0.78rem', color: '#8a92b2', marginBottom: 8 }}>
+              ゲーム: {GAME_NAMES[b.gambleType] ?? b.gambleType} | 勝者獲得: {(b.betAmount * 2).toLocaleString()}G
+            </div>
+            <button onClick={() => handleJoin(b)} disabled={loading || (player?.gold ?? 0) < b.betAmount}
+              style={{ width: '100%', padding: '6px', background: (player?.gold ?? 0) >= b.betAmount ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem' }}>
+              {(player?.gold ?? 0) >= b.betAmount ? `参加する (${b.betAmount.toLocaleString()}G)` : 'Gが足りない'}
+            </button>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// 各ゲームパネル（ジャックポット積立付き）
+// ============================================================
+function GenericPanel({ game, bet, onResult, onJackpotContrib }: { game: GambleMaster; bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void }) {
+  const { player, changeGold, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addItems: s.addItems, addNotification: s.addNotification }));
+  const [result, setResult] = useState<GambleResult | null>(null);
+  const [animating, setAnimating] = useState(false);
+
+  const play = async () => {
+    if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
+    setAnimating(true);
+    changeGold(-bet);
+    onJackpotContrib(bet); // ジャックポット積立
+
+    await new Promise(r => setTimeout(r, 400));
+    const r = resolveGenericGamble(game, bet);
+    if (r.multiplier > 0) changeGold(Math.floor(bet * r.multiplier));
+    if (r.itemRewards.length > 0) addItems(r.itemRewards);
+    setResult(r);
+    onResult(r);
+
+    // ジャックポット当選チェック
+    try {
+      const { won, pool } = await checkJackpotWin();
+      if (won && pool > 0) {
+        changeGold(pool);
+        addNotification('success', `🌟🌟🌟 JACKPOT!! ${pool.toLocaleString()}G獲得！！🌟🌟🌟`);
+      }
+    } catch { /* ignore */ }
+
     setAnimating(false);
   };
 
   return (
     <div>
-      <div style={{ textAlign: 'center', padding: '10px 0', marginBottom: 8 }}>
-        <div style={{ fontSize: '0.8rem', color: '#8a92b2' }}>現在のジャックポット</div>
-        <div style={{ fontSize: '2rem', fontWeight: 700, color: '#f0c060' }}>{pool.toLocaleString()}G</div>
-      </div>
-      {animating && <div style={{ textAlign: 'center', fontSize: '2rem' }}>🌟🌟🌟</div>}
+      {animating && <div style={{ textAlign: 'center', fontSize: '2rem', marginBottom: 8 }}>🎲🎲🎲</div>}
       {result && !animating && <ResultDisplay result={result} />}
       <button onClick={play} disabled={animating}
-        style={{ width: '100%', padding: 12, background: 'linear-gradient(135deg,#f0c060,#c09030)', color: '#000', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>
-        🌟 100G で挑戦
+        style={{ width: '100%', padding: 12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#5b8dee,#3a6fd0)', color: '#fff', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem' }}>
+        {animating ? '結果を出しています...' : `${game.icon} ${bet.toLocaleString()}G で挑戦`}
       </button>
+    </div>
+  );
+}
+
+function ChohanPanel({ bet, onResult, onJackpotContrib }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void }) {
+  const { player, changeGold, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addNotification: s.addNotification }));
+  const [choice, setChoice] = useState<'cho'|'han'>('cho');
+  const [result, setResult] = useState<GambleResult | null>(null);
+  const [animating, setAnimating] = useState(false);
+
+  const play = async () => {
+    if (!player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
+    setAnimating(true);
+    changeGold(-bet);
+    onJackpotContrib(bet);
+    await new Promise(r => setTimeout(r, 500));
+    const r = playChohan(bet, choice);
+    if (r.goldDelta > 0) changeGold(r.goldDelta + bet);
+    setResult(r); onResult(r);
+    try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
+    setAnimating(false);
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        {(['cho','han'] as const).map(c => (
+          <button key={c} onClick={() => setChoice(c)}
+            style={{ flex: 1, padding: '10px', background: choice === c ? (c==='cho' ? '#5b8dee' : '#e05555') : '#1c2235', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+            {c==='cho' ? '丁（偶数）' : '半（奇数）'}
+          </button>
+        ))}
+      </div>
+      {animating && <div style={{ textAlign: 'center', fontSize: '2rem', marginBottom: 8 }}>🎲🎲</div>}
+      {result && !animating && <ResultDisplay result={result} />}
+      <button onClick={play} disabled={animating}
+        style={{ width: '100%', padding: 12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#e05555,#c03030)', color: '#fff', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem' }}>
+        🎲 {bet.toLocaleString()}G で投じる
+      </button>
+    </div>
+  );
+}
+
+function ChinchiroPanel({ bet, onResult, onJackpotContrib }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void }) {
+  const { player, changeGold, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addNotification: s.addNotification }));
+  const [result, setResult] = useState<GambleResult | null>(null);
+  const [animating, setAnimating] = useState(false);
+
+  const play = async () => {
+    if (!player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
+    setAnimating(true); changeGold(-bet); onJackpotContrib(bet);
+    await new Promise(r => setTimeout(r, 600));
+    const r = playChinchiro(bet);
+    if (r.multiplier > 0) changeGold(Math.floor(bet * r.multiplier));
+    setResult(r); onResult(r);
+    try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
+    setAnimating(false);
+  };
+
+  return (
+    <div>
+      {animating && <div style={{ textAlign: 'center', fontSize: '2rem' }}>🎲🎲🎲</div>}
+      {result && !animating && (
+        <div>
+          <div style={{ textAlign: 'center', fontSize: '1.5rem', marginBottom: 6 }}>{result.dice?.join(' ') ?? ''}</div>
+          <ResultDisplay result={result} />
+        </div>
+      )}
+      <button onClick={play} disabled={animating}
+        style={{ width: '100%', padding: 12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#f0a830,#c08020)', color: '#000', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem' }}>
+        🎯 {bet.toLocaleString()}G でサイコロを振る
+      </button>
+    </div>
+  );
+}
+
+function CoinFlipPanel({ bet, onResult, onJackpotContrib }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void }) {
+  const { player, changeGold, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addNotification: s.addNotification }));
+  const [choice, setChoice] = useState<'heads'|'tails'>('heads');
+  const [result, setResult] = useState<GambleResult | null>(null);
+  const [animating, setAnimating] = useState(false);
+  const game = GAMBLE_MASTER['coin_flip'];
+
+  const play = async () => {
+    if (!player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
+    setAnimating(true); changeGold(-bet); onJackpotContrib(bet);
+    await new Promise(r => setTimeout(r, 500));
+    const rand = Math.random();
+    const win = (choice === 'heads' && rand < 0.49) || (choice === 'tails' && rand >= 0.49);
+    const r: GambleResult = win
+      ? { rewardLabel: '当たり！', multiplier: 2, goldDelta: bet, itemRewards: [], symbols: ['✨'] }
+      : { rewardLabel: 'ハズレ', multiplier: 0, goldDelta: -bet, itemRewards: [], symbols: ['💨'] };
+    if (win) changeGold(bet * 2);
+    setResult(r); onResult(r);
+    try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
+    setAnimating(false);
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        {(['heads','tails'] as const).map(c => (
+          <button key={c} onClick={() => setChoice(c)}
+            style={{ flex: 1, padding: '10px', background: choice === c ? '#5b8dee' : '#1c2235', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700 }}>
+            {c==='heads' ? '🌕 表' : '🌑 裏'}
+          </button>
+        ))}
+      </div>
+      {animating && <div style={{ textAlign: 'center', fontSize: '2rem', marginBottom: 8 }}>🪙</div>}
+      {result && !animating && <ResultDisplay result={result} />}
+      <button onClick={play} disabled={animating}
+        style={{ width: '100%', padding: 12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#4caf87,#2d8060)', color: '#fff', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem' }}>
+        🪙 {bet.toLocaleString()}G でコインを投げる
+      </button>
+    </div>
+  );
+}
+
+function PokerPanel({ bet, onResult, onJackpotContrib }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void }) {
+  const { player, changeGold, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addItems: s.addItems, addNotification: s.addNotification }));
+  const [pokerState, setPokerState] = useState<PokerState | null>(null);
+  const [hold, setHold] = useState<boolean[]>([false,false,false,false,false]);
+  const [phase, setPhase] = useState<'idle'|'deal'|'draw'|'result'>('idle');
+  const [result, setResult] = useState<GambleResult | null>(null);
+
+  const suitIcon = (s: string) => ({ S:'♠️',H:'♥️',D:'♦️',C:'♣️' }[s]??s);
+  const cardStyle = (selected: boolean) => ({
+    width:44, height:64, background: selected ? 'rgba(91,141,238,0.3)' : '#1c2235', border:`2px solid ${selected ? '#5b8dee' : '#2d3752'}`,
+    borderRadius:6, display:'flex', flexDirection:'column' as const, alignItems:'center', justifyContent:'center',
+    cursor:'pointer', fontSize:'0.9rem', fontWeight:700, transition:'all 0.15s',
+  });
+
+  const handleDeal = () => {
+    if (!player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
+    changeGold(-bet); onJackpotContrib(bet);
+    const state = dealPoker();
+    setPokerState(state);
+    setHold([false,false,false,false,false]);
+    setPhase('deal');
+  };
+
+  const handleDraw = async () => {
+    if (!pokerState) return;
+    const { result: r, newState } = drawPoker(pokerState, hold);
+    setPokerState(newState);
+    setPhase('result');
+    if (r.multiplier > 0) changeGold(Math.floor(bet * r.multiplier));
+    if (r.itemRewards.length > 0) addItems(r.itemRewards);
+    setResult(r); onResult(r);
+    try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
+  };
+
+  return (
+    <div>
+      {pokerState && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 8 }}>
+            {pokerState.hand.map((card, i) => (
+              <div key={i} onClick={() => phase==='deal' && setHold(prev => { const n=[...prev]; n[i]=!n[i]; return n; })} style={cardStyle(hold[i])}>
+                <span>{card.rank}</span>
+                <span>{suitIcon(card.suit)}</span>
+                {phase==='deal' && <span style={{fontSize:'0.55rem', color: hold[i] ? '#5b8dee' : '#4a5070'}}>{hold[i]?'HOLD':'　'}</span>}
+              </div>
+            ))}
+          </div>
+          {phase==='result' && result && <ResultDisplay result={result} />}
+        </div>
+      )}
+      {phase==='idle' && (
+        <button onClick={handleDeal} style={{ width:'100%', padding:12, background:'linear-gradient(135deg,#9b6df0,#7040c0)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'1rem' }}>
+          🃏 {bet.toLocaleString()}G でカードを引く
+        </button>
+      )}
+      {phase==='deal' && (
+        <button onClick={handleDraw} style={{ width:'100%', padding:12, background:'linear-gradient(135deg,#e05555,#c03030)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'1rem' }}>
+          🔄 チェンジ（HOLDしないカードを交換）
+        </button>
+      )}
+      {phase==='result' && (
+        <button onClick={() => { setPhase('idle'); setPokerState(null); setResult(null); }}
+          style={{ width:'100%', padding:10, background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:8, cursor:'pointer', marginTop:8 }}>
+          もう一度
+        </button>
+      )}
     </div>
   );
 }
@@ -431,27 +444,28 @@ function JackpotPanel({ onResult }: { onResult: (r: GambleResult) => void }) {
 // ============================================================
 // メイン画面
 // ============================================================
-type GameTab = 'chohan' | 'chinchiro' | 'slot' | 'coin_flip' | 'poker' | 'jackpot' | 'treasure_box';
-
+type GameTab = 'chohan'|'chinchiro'|'coin_flip'|'slot'|'poker'|'treasure_box'|'pvp';
 const GAME_TABS: { id: GameTab; label: string; icon: string }[] = [
-  { id: 'chohan',       label: '丁半',     icon: '🎲' },
-  { id: 'chinchiro',    label: 'チンチロ', icon: '🎯' },
-  { id: 'coin_flip',    label: 'コイン',   icon: '🪙' },
-  { id: 'slot',         label: 'スロット', icon: '🎰' },
-  { id: 'poker',        label: 'ポーカー', icon: '🃏' },
-  { id: 'treasure_box', label: '宝箱',     icon: '📦' },
-  { id: 'jackpot',      label: 'JP',       icon: '🌟' },
+  { id:'chohan',       label:'丁半',     icon:'🎲' },
+  { id:'chinchiro',    label:'チンチロ', icon:'🎯' },
+  { id:'coin_flip',    label:'コイン',   icon:'🪙' },
+  { id:'slot',         label:'スロット', icon:'🎰' },
+  { id:'poker',        label:'ポーカー', icon:'🃏' },
+  { id:'treasure_box', label:'宝箱',     icon:'📦' },
+  { id:'pvp',          label:'対戦',     icon:'⚔️' },
 ];
 
 export function GambleScreen() {
   const player = useGameStore(s => s.player);
   const [activeGame, setActiveGame] = useState<GameTab>('chohan');
   const [bet, setBet] = useState(100);
-  const [showReport, setShowReport] = useState(false);
   const [stats, setStats] = useState<SessionStats>(initStats());
-  const [showAdvice, setShowAdvice] = useState(false);
+  const [jackpotPool, setJackpotPool] = useState(0);
 
-  const game = GAMBLE_MASTER[activeGame] ?? GAMBLE_MASTER['chohan'];
+  useEffect(() => {
+    const unsub = subscribeJackpotPool(setJackpotPool);
+    return unsub;
+  }, []);
 
   const handleResult = (r: GambleResult) => {
     setStats(prev => {
@@ -467,116 +481,76 @@ export function GambleScreen() {
     });
   };
 
-  if (!player) return null;
+  const handleJackpotContrib = async (betAmt: number) => {
+    try { await contributeToJackpot(betAmt); } catch { /* ignore */ }
+  };
 
+  if (!player) return null;
+  const game = GAMBLE_MASTER[activeGame] ?? GAMBLE_MASTER['chohan'];
   const netProfit = stats.totalWon - stats.totalBet;
-  const realRR = stats.totalBet > 0 ? (stats.totalWon / stats.totalBet * 100).toFixed(1) : null;
 
   return (
     <div style={{ padding: '12px 8px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <h2 style={{ fontFamily: 'Cinzel,serif', color: '#f0c060', borderBottom: '1px solid #2d3752', paddingBottom: 8, flex: 1 }}>🎰 ギャンブル</h2>
-        <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
-          <button onClick={() => setShowReport(!showReport)}
-            style={{ padding: '4px 8px', background: '#1c2235', border: '1px solid #5b8dee', color: '#5b8dee', borderRadius: 5, cursor: 'pointer', fontSize: '0.72rem', whiteSpace: 'nowrap' }}>
-            📊 収支
-          </button>
-          <button onClick={() => setShowAdvice(!showAdvice)}
-            style={{ padding: '4px 8px', background: '#1c2235', border: '1px solid #f0a830', color: '#f0a830', borderRadius: 5, cursor: 'pointer', fontSize: '0.72rem' }}>
-            💡 改善
-          </button>
-        </div>
-      </div>
+      <h2 style={{ fontFamily: 'Cinzel,serif', color: '#f0c060', marginBottom: 8, borderBottom: '1px solid #2d3752', paddingBottom: 8 }}>🎰 ギャンブル</h2>
 
-      {/* 改善レポートパネル */}
-      {showAdvice && (
-        <div style={{ background: '#161b26', border: '2px solid #f0a830', borderRadius: 10, padding: 12, marginBottom: 12, fontSize: '0.8rem' }}>
-          <div style={{ fontWeight: 700, color: '#f0a830', marginBottom: 8 }}>💡 ギャンブル改善レポート（旧バージョンの問題と改善点）</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {[
-              { title: '🔴 コインフリップ (旧: 還元率 96%)', issue: '表48% vs 裏52% と非対称。長期では必ず損', fix: '→ 表49% / 裏51%に改善。還元率98%に向上' },
-              { title: '🔴 スロット (旧: 還元率 92%)', issue: '中間配当(×1.2)が少なく、ハズレ62.5%で資金が急速に減少', fix: '→ 2枚揃い確率28%・配当×1.3に改善。還元率96%' },
-              { title: '🔴 宝箱くじ (旧: 還元率 85%)', issue: 'ハズレ24%・空振り30%で約半分が無価値な報酬', fix: '→ 小G配当2.0倍・回復セット強化。還元率92%に改善' },
-              { title: '🟡 チンチロリン (旧: 還元率 93%)', issue: '目なし20%・通常配当×1.5が低すぎて期待値が低い', fix: '→ 通常×1.6・ヒフミ0.5倍返し。還元率96%' },
-              { title: '🟡 丁半 (旧: 還元率 95%)', issue: 'ゾロ目で賭け金半没収(×0.5)は引き分け扱いなのに損が大きい', fix: '→ ゾロ目を×0.7返しに改善。還元率97%' },
-              { title: '🟢 ポーカー', issue: 'ワンペアで1.0倍返し（損益ゼロ）のため長期で減りがち', fix: '→ JJ以上ワンペアを×1.5に改善。還元率99%' },
-            ].map((item, i) => (
-              <div key={i} style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 6, padding: '6px 8px' }}>
-                <div style={{ fontWeight: 700, color: '#e8e6ff', marginBottom: 2 }}>{item.title}</div>
-                <div style={{ color: '#e05555' }}>❌ 問題: {item.issue}</div>
-                <div style={{ color: '#4caf87' }}>✅ {item.fix}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ marginTop: 8, padding: '6px 8px', background: 'rgba(76,175,135,0.1)', borderRadius: 6, color: '#4caf87', fontSize: '0.75rem' }}>
-            💎 推奨: 長期安定ならコインフリップ(98%)・短期高リターンならポーカー(99%)。ジャックポットはロマン枠。
-          </div>
-        </div>
-      )}
+      <JackpotBanner pool={jackpotPool} />
 
-      {/* 収支レポート */}
-      {showReport && stats.gamesPlayed > 0 && <SessionReport stats={stats} />}
-
-      {/* セッション簡易インジケーター */}
       {stats.gamesPlayed > 0 && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 8, fontSize: '0.75rem' }}>
           <span style={{ color: '#4a5070' }}>収支:</span>
           <span style={{ color: netProfit >= 0 ? '#4caf87' : '#e05555', fontWeight: 700 }}>
             {netProfit >= 0 ? '+' : ''}{netProfit.toLocaleString()}G
           </span>
-          {realRR && <span style={{ color: '#8a92b2' }}>実還元率: {realRR}%</span>}
+          <span style={{ color: '#8a92b2' }}>{stats.gamesPlayed}戦 {stats.wins}勝</span>
         </div>
       )}
 
-      {/* ゲームタブ */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto', paddingBottom: 2 }}>
         {GAME_TABS.map(t => (
           <button key={t.id} onClick={() => setActiveGame(t.id)}
-            style={{
-              flexShrink: 0, padding: '6px 10px', fontSize: '0.75rem',
-              background: activeGame === t.id ? 'rgba(91,141,238,0.2)' : '#1c2235',
-              border: `1px solid ${activeGame === t.id ? '#5b8dee' : '#2d3752'}`,
-              color: activeGame === t.id ? '#e8e6ff' : '#8a92b2',
-              borderRadius: 6, cursor: 'pointer',
-            }}>
+            style={{ flexShrink: 0, padding: '6px 10px', fontSize: '0.75rem', background: activeGame===t.id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${activeGame===t.id ? '#5b8dee' : '#2d3752'}`, color: activeGame===t.id ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer' }}>
             {t.icon} {t.label}
           </button>
         ))}
       </div>
 
-      {/* ゲームパネル */}
       <div style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 10, padding: 14 }}>
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ fontWeight: 700, fontSize: '1rem' }}>{game.icon} {game.name}</div>
-          <div style={{ fontSize: '0.78rem', color: '#8a92b2', marginTop: 2 }}>{game.description}</div>
-        </div>
+        {activeGame !== 'pvp' && (
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{game.icon} {game.name}</div>
+            <div style={{ fontSize: '0.78rem', color: '#8a92b2', marginTop: 2 }}>{game.description}</div>
+          </div>
+        )}
+        {activeGame !== 'pvp' && <BetInput game={game} bet={bet} setBet={setBet} />}
 
-        {activeGame !== 'jackpot' && <BetInput game={game} bet={bet} setBet={setBet} />}
-
-        {activeGame === 'chohan'       && <ChohanPanel       bet={bet} onResult={handleResult} />}
-        {activeGame === 'chinchiro'    && <ChinchiroPanel    bet={bet} onResult={handleResult} />}
-        {activeGame === 'coin_flip'    && <CoinFlipPanel     bet={bet} onResult={handleResult} />}
-        {activeGame === 'slot'         && <GenericPanel game={GAMBLE_MASTER['slot_machine']}   bet={bet} onResult={handleResult} />}
-        {activeGame === 'treasure_box' && <GenericPanel game={GAMBLE_MASTER['treasure_box']}   bet={100} onResult={handleResult} />}
-        {activeGame === 'poker'        && <PokerPanel        bet={bet} onResult={handleResult} />}
-        {activeGame === 'jackpot'      && <JackpotPanel      onResult={handleResult} />}
+        {activeGame === 'chohan'       && <ChohanPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} />}
+        {activeGame === 'chinchiro'    && <ChinchiroPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} />}
+        {activeGame === 'coin_flip'    && <CoinFlipPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} />}
+        {activeGame === 'slot'         && <GenericPanel game={GAMBLE_MASTER['slot_machine']}  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} />}
+        {activeGame === 'treasure_box' && <GenericPanel game={GAMBLE_MASTER['treasure_box']}  bet={100} onResult={handleResult} onJackpotContrib={handleJackpotContrib} />}
+        {activeGame === 'poker'        && <PokerPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} />}
+        {activeGame === 'pvp'          && (
+          <>
+            <div style={{ fontWeight:700, fontSize:'1rem', marginBottom:8 }}>⚔️ PvP対戦</div>
+            <BetInput game={GAMBLE_MASTER['chohan']} bet={bet} setBet={setBet} />
+            <PvPPanel bet={bet} />
+          </>
+        )}
       </div>
 
-      {/* 配当表 */}
-      <details style={{ marginTop: 10 }}>
-        <summary style={{ cursor: 'pointer', color: '#8a92b2', fontSize: '0.8rem', padding: '6px 0' }}>📋 配当表を見る</summary>
-        <div style={{ background: '#161b26', border: '1px solid #2d3752', borderRadius: 8, padding: 10, marginTop: 6 }}>
-          {game.rewardTable.map((r, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', padding: '3px 0', borderBottom: '1px solid #2d3752', color: '#8a92b2' }}>
-              <span>{r.label}</span>
-              <span>
-                <span style={{ color: '#f0c060' }}>×{r.multiplier}</span>
-                <span style={{ color: '#4a5070', marginLeft: 8 }}>{(r.probability * 100).toFixed(2)}%</span>
-              </span>
-            </div>
-          ))}
-        </div>
-      </details>
+      {activeGame !== 'pvp' && (
+        <details style={{ marginTop: 10 }}>
+          <summary style={{ cursor: 'pointer', color: '#8a92b2', fontSize: '0.8rem', padding: '6px 0' }}>📋 配当表</summary>
+          <div style={{ background: '#161b26', border: '1px solid #2d3752', borderRadius: 8, padding: 10, marginTop: 6 }}>
+            {game.rewardTable.map((r, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', padding: '3px 0', borderBottom: '1px solid #2d3752', color: '#8a92b2' }}>
+                <span>{r.label}</span>
+                <span><span style={{ color: '#f0c060' }}>×{r.multiplier}</span><span style={{ color: '#4a5070', marginLeft: 8 }}>{(r.probability * 100).toFixed(2)}%</span></span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }

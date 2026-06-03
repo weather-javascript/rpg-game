@@ -6,13 +6,14 @@ import { useGameStore } from '../../stores/gameStore';
 import { GATHER_NODE_MASTER, ITEM_MASTER } from '../../data/masters';
 import type { GatherNodeMaster } from '../../types/game';
 
-function calcGatherResult(node: GatherNodeMaster, skillLevel: number) {
+function calcGatherResult(node: GatherNodeMaster, skillLevel: number, toolBonus: number = 1) {
   const drops: { itemId: string; amount: number }[] = [];
   const expGained: Record<string, number> = {};
   for (const drop of node.drops) {
     const rate = Math.min(1.0, drop.baseRate + (drop.skillRateBonus ?? 0) * skillLevel);
     if (Math.random() < rate) {
-      const amount = drop.minAmount + Math.floor(Math.random() * (drop.maxAmount - drop.minAmount + 1));
+      // 鉄のツルハシ・斧があれば採取量にボーナス倍率
+      const amount = Math.ceil((drop.minAmount + Math.floor(Math.random() * (drop.maxAmount - drop.minAmount + 1))) * toolBonus);
       drops.push({ itemId: drop.itemId, amount });
     }
   }
@@ -41,7 +42,16 @@ export function GatheringScreen() {
     }
 
     const skillLevel = player.skillLevels[node.requiredSkill.skillId] ?? 1;
-    const result = calcGatherResult(node, skillLevel);
+
+    // 鉄のツルハシ（採掘）・鉄の斧（伐採）の効果：採取量1.5倍
+    let toolBonus = 1;
+    if (node.requiredSkill.skillId === 'mining' && (player.inventory['iron_pickaxe'] ?? 0) > 0) {
+      toolBonus = 1.5;
+    } else if (node.requiredSkill.skillId === 'woodcutting' && (player.inventory['iron_axe'] ?? 0) > 0) {
+      toolBonus = 1.5;
+    }
+
+    const result = calcGatherResult(node, skillLevel, toolBonus);
 
     addItems(result.drops);
     changeSatiety(-result.staminaUsed);

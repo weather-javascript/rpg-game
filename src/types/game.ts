@@ -4,7 +4,7 @@ export type IdMap<T> = Record<string, T>;
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 export type ItemCategory = 'material' | 'tool' | 'consumable' | 'weapon' | 'armor' | 'treasure' | 'food' | 'potion';
 export type SkillId = 'mining' | 'woodcutting' | 'combat' | 'fishing' | 'crafting';
-export type TabId = 'gathering' | 'market' | 'dungeon' | 'gamble' | 'status' | 'online' | 'fishing';
+export type TabId = 'gathering' | 'market' | 'dungeon' | 'gamble' | 'status' | 'online' | 'fishing' | 'admin';
 export type GambleType = 'slot' | 'treasure_box' | 'coin_flip' | 'chohan' | 'chinchiro' | 'jackpot' | 'poker';
 export type DungeonTier = 'beginner' | 'intermediate' | 'advanced' | 'super' | 'extreme' | 'volcano';
 
@@ -21,7 +21,6 @@ export interface ItemMaster {
   buyPrice: number;
   maxStack: number;
   icon: string;
-  // 消費アイテム用フィールド
   useEffect?: {
     hpRestore?: number;
     satietyRestore?: number;
@@ -56,7 +55,6 @@ export interface GatherNodeMaster {
   staminaCost: number;
 }
 
-// ダンジョンのエリア（階層）定義
 export interface DungeonArea {
   name: string;
   description?: string;
@@ -77,7 +75,7 @@ export interface MonsterMaster {
   drops: DropEntry[];
   dungeonIds: string[];
   isBoss?: boolean;
-  specialAttack?: string; // 特殊攻撃名
+  specialAttack?: string;
 }
 
 export interface DungeonMaster {
@@ -91,11 +89,9 @@ export interface DungeonMaster {
   floors: number;
   areas?: DungeonArea[];
   bossId?: string;
-  // 報酬ボーナス係数
   expBonus: number;
   goldBonus: number;
-  // 解放条件（前のダンジョンをN回クリア）
-  unlockCondition?: { dungeonId: string; clearedCount: number };
+  unlockCondition?: { dungeonId: string; clearedCount: number; requiredLevel?: number };
 }
 
 export interface GambleReward {
@@ -115,7 +111,21 @@ export interface GambleMaster {
   minBet: number;
   maxBet: number;
   rewardTable: GambleReward[];
-  returnRate: number; // 期待還元率（表示用）
+  returnRate: number;
+}
+
+// ============================================================
+// クラフトレシピ型
+// ============================================================
+export interface CraftRecipe {
+  id: string;
+  name: string;
+  description: string;
+  outputItemId: string;
+  outputAmount: number;
+  inputs: { itemId: string; amount: number }[];
+  requiredCraftingLevel: number;
+  craftingExpGain: number;
 }
 
 // ============================================================
@@ -143,20 +153,28 @@ export interface PlayerData {
   skillExp: IdMap<number>;
   lastSavedAt: number;
   createdAt: number;
-  // ダンジョンクリア回数（解放条件追跡）
   dungeonClearedCount: IdMap<number>;
-  // 釣りスコア（FFGG Rank4+でのみ蓄積）
   fishingScore: number;
-  // 装備中の釣り竿ID
   equippedRodId: string;
-  // アクティブジョブ
   activeJob: string | null;
-  // 有効バフ
   activeBuffs: { id: string; name: string; expiry: number; fishingBonus?: number; miningBonus?: number }[];
-  // 救済措置使用回数
   reliefUsedCount: number;
-  // 救済措置最終使用時刻
   reliefLastUsed: number;
+  // HP/満腹度の自動回復用タイムスタンプ
+  lastRegenAt?: number;
+  // メール通知設定
+  emailAddress?: string;
+  emailNotifications?: { auction?: boolean; events?: boolean; updates?: boolean };
+  // アクティビティログ
+  activityLog?: ActivityEntry[];
+  // 設定
+  settings?: { gambleMultiplierBonus?: number };
+}
+
+export interface ActivityEntry {
+  type: 'dungeon_clear' | 'level_up' | 'crafting' | 'gamble_win' | 'online';
+  message: string;
+  timestamp: number;
 }
 
 // ============================================================
@@ -186,7 +204,6 @@ export interface CombatResult {
   escaped?: boolean;
 }
 
-// ダンジョン探索の進行状態
 export interface DungeonRunState {
   dungeonId: string;
   currentFloor: number;
@@ -205,10 +222,8 @@ export interface GambleResult {
   goldDelta: number;
   itemRewards: { itemId: string; amount: number }[];
   symbols?: string[];
-  // ポーカー用
   hand?: string[];
   handName?: string;
-  // チンチロリン用
   dice?: number[];
   roleName?: string;
 }
@@ -244,6 +259,26 @@ export interface OnlineUser {
   displayName: string;
   level: number;
   lastSeen: number;
+  currentActivity?: string;
+  lastDungeonCleared?: string;
+}
+
+// ============================================================
+// PvPギャンブル対戦型
+// ============================================================
+export interface GambleBattle {
+  id: string;
+  hostUid: string;
+  hostName: string;
+  hostLevel: number;
+  gambleType: string;
+  betAmount: number;
+  status: 'waiting' | 'active' | 'finished';
+  guestUid?: string;
+  guestName?: string;
+  winnerId?: string;
+  createdAt: number;
+  expiresAt: number;
 }
 
 // ============================================================
@@ -253,4 +288,13 @@ export interface Notification {
   id: string;
   type: 'success' | 'error' | 'info' | 'warning';
   message: string;
+}
+
+// ============================================================
+// バージョン更新情報型
+// ============================================================
+export interface VersionPatch {
+  version: string;
+  date: string;
+  changes: string[];
 }

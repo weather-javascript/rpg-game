@@ -99,6 +99,11 @@ function createNewPlayerData(uid: string): PlayerData {
     activeBuffs: [],
     reliefUsedCount: 0,
     reliefLastUsed: 0,
+    lastRegenAt: now,
+    emailAddress: '',
+    emailNotifications: { auction: true, events: true, updates: true },
+    activityLog: [],
+    settings: {},
   };
 }
 

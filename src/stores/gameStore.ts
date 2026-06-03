@@ -25,28 +25,20 @@ interface GameState {
   changeSatiety: (delta: number) => void;
   useItem: (itemId: string) => { success: boolean; message: string };
   applyHungerPenalty: () => void;
+  applyPassiveRegen: () => void;
 
-  // ダンジョンクリア記録
   recordDungeonClear: (dungeonId: string) => void;
   getDungeonClearedCount: (dungeonId: string) => number;
   isDungeonUnlocked: (dungeonId: string) => boolean;
 
-  // 釣りスコア
   addFishingScore: (amount: number) => void;
-
-  // 釣り竿装備
   equipRod: (rodId: string) => void;
-
-  // ジョブ
   setActiveJob: (jobId: string | null) => void;
-
-  // バフ管理
   addBuff: (buff: { id: string; name: string; durationMs: number; fishingBonus?: number; miningBonus?: number }) => void;
   getActiveBuffBonus: (type: 'fishing' | 'mining') => number;
-
-  // 詰み救済措置
   canUseRelief: () => { canUse: boolean; reason: string };
   useRelief: () => void;
+  changeDisplayName: (name: string) => boolean;
 
   saveGame: () => Promise<void>;
   setActiveTab: (tab: TabId) => void;
@@ -54,7 +46,6 @@ interface GameState {
   removeNotification: (id: string) => void;
 }
 
-// デフォルトプレイヤー初期値
 function ensureDefaults(player: PlayerData): PlayerData {
   return {
     ...player,
@@ -65,6 +56,11 @@ function ensureDefaults(player: PlayerData): PlayerData {
     activeBuffs: player.activeBuffs ?? [],
     reliefUsedCount: player.reliefUsedCount ?? 0,
     reliefLastUsed: player.reliefLastUsed ?? 0,
+    lastRegenAt: player.lastRegenAt ?? Date.now(),
+    emailAddress: player.emailAddress ?? '',
+    emailNotifications: player.emailNotifications ?? { auction: true, events: true, updates: true },
+    activityLog: player.activityLog ?? [],
+    settings: player.settings ?? {},
   };
 }
 
@@ -134,7 +130,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       const skillLevels = { ...state.player.skillLevels };
       skillExp[skillId] = (skillExp[skillId] ?? 0) + amount;
       let lv = skillLevels[skillId] ?? 1;
-      while (lv < SKILL_EXP_TABLE.length - 1 && skillExp[skillId] >= SKILL_EXP_TABLE[lv + 1]) lv++;
+      // スキルテーブルが100000まであるので安全にチェック
+      while (lv < 100000 && SKILL_EXP_TABLE[lv + 1] !== undefined && skillExp[skillId] >= SKILL_EXP_TABLE[lv + 1]) lv++;
       skillLevels[skillId] = lv;
       return { player: { ...state.player, skillExp, skillLevels } };
     });
@@ -156,6 +153,35 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
+  // 時間経過による自動回復（5秒で1HP）放置でも回復
+  applyPassiveRegen: () => {
+    const { player } = get();
+    if (!player) return;
+    const now = Date.now();
+    const lastRegen = player.lastRegenAt ?? now;
+    const elapsedSec = (now - lastRegen) / 1000;
+    if (elapsedSec < 1) return;
+
+    const hpToRegen = Math.floor(elapsedSec / 5); // 5秒で1HP
+    const satietyToRegen = Math.floor(elapsedSec / 60); // 60秒で1満腹度
+
+    if (hpToRegen <= 0 && satietyToRegen <= 0) return;
+
+    set((state) => {
+      if (!state.player) return state;
+      const stats = state.player.stats;
+      const newHp = Math.min(stats.maxHp, stats.hp + hpToRegen);
+      const newSatiety = Math.min(stats.maxSatiety, stats.satiety + satietyToRegen);
+      return {
+        player: {
+          ...state.player,
+          stats: { ...stats, hp: newHp, satiety: newSatiety },
+          lastRegenAt: now,
+        },
+      };
+    });
+  },
+
   useItem: (itemId) => {
     const { player, consumeItem, changeHp, changeSatiety, addNotification } = get();
     if (!player) return { success: false, message: 'プレイヤーデータがありません' };
@@ -169,7 +195,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const { hpRestore, satietyRestore, message } = item.useEffect;
     if (hpRestore && hpRestore > 0) changeHp(Math.min(hpRestore, player.stats.maxHp - player.stats.hp));
-    if (hpRestore && hpRestore < 0) changeHp(hpRestore); // ダメージ系
+    if (hpRestore && hpRestore < 0) changeHp(hpRestore);
     if (satietyRestore) changeSatiety(Math.min(satietyRestore, player.stats.maxSatiety - player.stats.satiety));
 
     const msg = message ?? `${item.name}を使用した！`;
@@ -186,15 +212,18 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  // ============================================================
-  // ダンジョンクリア記録
-  // ============================================================
   recordDungeonClear: (dungeonId) => {
     set((state) => {
       if (!state.player) return state;
       const dcc = { ...state.player.dungeonClearedCount };
       dcc[dungeonId] = (dcc[dungeonId] ?? 0) + 1;
-      return { player: { ...state.player, dungeonClearedCount: dcc } };
+      // アクティビティログ
+      const dungeon = DUNGEON_MASTER_DATA[dungeonId];
+      const log = [
+        ...(state.player.activityLog ?? []),
+        { type: 'dungeon_clear' as const, message: `${dungeon?.name ?? dungeonId}をクリア！`, timestamp: Date.now() },
+      ].slice(-50);
+      return { player: { ...state.player, dungeonClearedCount: dcc, activityLog: log } };
     });
   },
 
@@ -204,26 +233,23 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   isDungeonUnlocked: (dungeonId) => {
-    const DUNGEON_MASTER = DUNGEON_MASTER_DATA;
-    const dungeon = DUNGEON_MASTER[dungeonId];
+    const dungeon = DUNGEON_MASTER_DATA[dungeonId];
     if (!dungeon) return false;
+    // 解放条件なし = 最初から解放
     if (!dungeon.unlockCondition) return true;
     const { player } = get();
     if (!player) return false;
-    const cleared = player.dungeonClearedCount?.[dungeon.unlockCondition.dungeonId] ?? 0;
-    return cleared >= dungeon.unlockCondition.clearedCount;
+    const { dungeonId: prereqId, clearedCount } = dungeon.unlockCondition;
+    // クリア数のみで判定（レベル条件はstartDungeon側で別途チェック）
+    const cleared = player.dungeonClearedCount?.[prereqId] ?? 0;
+    return cleared >= clearedCount;
   },
 
-  // ============================================================
-  // 釣りスコア
-  // ============================================================
   addFishingScore: (amount) => {
     set((state) => {
       if (!state.player) return state;
-      const newScore = (state.player.fishingScore ?? 0) + amount;
-      return { player: { ...state.player, fishingScore: newScore } };
+      return { player: { ...state.player, fishingScore: (state.player.fishingScore ?? 0) + amount } };
     });
-    // スコア1000で上位鱗を付与
     const { player, addItems, addNotification } = get();
     if (!player) return;
     const score = player.fishingScore ?? 0;
@@ -237,9 +263,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  // ============================================================
-  // 釣り竿装備
-  // ============================================================
   equipRod: (rodId) => {
     const { player, addNotification } = get();
     if (!player) return;
@@ -252,28 +275,16 @@ export const useGameStore = create<GameState>((set, get) => ({
     addNotification('success', `🎣 ${item?.name} を装備した！`);
   },
 
-  // ============================================================
-  // ジョブ
-  // ============================================================
   setActiveJob: (jobId) => {
     set((state) => state.player ? { player: { ...state.player, activeJob: jobId } } : state);
   },
 
-  // ============================================================
-  // バフ管理
-  // ============================================================
   addBuff: (buff) => {
     set((state) => {
       if (!state.player) return state;
       const now = Date.now();
       const existing = (state.player.activeBuffs ?? []).filter(b => b.expiry > now && b.id !== buff.id);
-      const newBuff = {
-        id: buff.id,
-        name: buff.name,
-        expiry: now + buff.durationMs,
-        fishingBonus: buff.fishingBonus,
-        miningBonus: buff.miningBonus,
-      };
+      const newBuff = { id: buff.id, name: buff.name, expiry: now + buff.durationMs, fishingBonus: buff.fishingBonus, miningBonus: buff.miningBonus };
       return { player: { ...state.player, activeBuffs: [...existing, newBuff] } };
     });
   },
@@ -291,23 +302,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     return bonus;
   },
 
-  // ============================================================
-  // 詰み救済措置
-  // ============================================================
   canUseRelief: () => {
     const { player } = get();
     if (!player) return { canUse: false, reason: 'プレイヤーデータなし' };
-
     const now = Date.now();
-    const COOLDOWN_MS = 30 * 60 * 1000; // 30分クールダウン
+    const COOLDOWN_MS = 30 * 60 * 1000;
     const MAX_USES_PER_DAY = 3;
-
-    // HP30以下 かつ 満腹度10以下 かつ 所持金500未満
-    const isStruggling =
-      player.stats.hp <= 30 &&
-      player.stats.satiety <= 10 &&
-      player.gold < 500;
-
+    const isStruggling = player.stats.hp <= 30 && player.stats.satiety <= 10 && player.gold < 500;
     if (!isStruggling) {
       const reasons = [];
       if (player.stats.hp > 30) reasons.push(`HP${player.stats.hp}（30以下が条件）`);
@@ -315,20 +316,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (player.gold >= 500) reasons.push(`所持金${player.gold}G（500G未満が条件）`);
       return { canUse: false, reason: `条件未達成: ${reasons.join('、')}` };
     }
-
-    // クールダウンチェック
     if (now - (player.reliefLastUsed ?? 0) < COOLDOWN_MS) {
       const remaining = Math.ceil((COOLDOWN_MS - (now - player.reliefLastUsed)) / 60000);
       return { canUse: false, reason: `クールダウン中（あと${remaining}分）` };
     }
-
-    // 1日3回制限（簡易: reliefUsedCountが3以上かつ最後の使用が24時間以内）
     const DAILY_RESET_MS = 24 * 60 * 60 * 1000;
-    if ((player.reliefUsedCount ?? 0) >= MAX_USES_PER_DAY &&
-        now - (player.reliefLastUsed ?? 0) < DAILY_RESET_MS) {
+    if ((player.reliefUsedCount ?? 0) >= MAX_USES_PER_DAY && now - (player.reliefLastUsed ?? 0) < DAILY_RESET_MS) {
       return { canUse: false, reason: '本日の救済回数上限（3回）に達しました' };
     }
-
     return { canUse: true, reason: 'OK' };
   },
 
@@ -339,26 +334,36 @@ export const useGameStore = create<GameState>((set, get) => ({
       addNotification('error', `救済措置を使用できません: ${reason}`);
       return;
     }
-
     const now = Date.now();
     set((state) => {
       if (!state.player) return state;
       const prev = state.player.reliefUsedCount ?? 0;
       const DAILY_RESET_MS = 24 * 60 * 60 * 1000;
       const resetCount = now - (state.player.reliefLastUsed ?? 0) >= DAILY_RESET_MS ? 0 : prev;
-      return {
-        player: {
-          ...state.player,
-          reliefUsedCount: resetCount + 1,
-          reliefLastUsed: now,
-        },
-      };
+      return { player: { ...state.player, reliefUsedCount: resetCount + 1, reliefLastUsed: now } };
     });
-
     addItems([{ itemId: 'emergency_ration', amount: 2 }, { itemId: 'health_potion', amount: 1 }]);
     changeHp(30);
     changeSatiety(30);
     addNotification('success', '🆘 緊急救済措置発動！回復アイテムを受け取った。（1日3回まで）');
+  },
+
+  changeDisplayName: (name: string) => {
+    const { player, changeGold, addNotification } = get();
+    if (!player) return false;
+    const trimmed = name.trim();
+    if (!trimmed || trimmed.length < 1 || trimmed.length > 20) {
+      addNotification('error', '名前は1〜20文字で入力してください');
+      return false;
+    }
+    if (player.gold < 100) {
+      addNotification('error', '名前変更には100Gが必要です');
+      return false;
+    }
+    changeGold(-100);
+    set((state) => state.player ? { player: { ...state.player, displayName: trimmed } } : state);
+    addNotification('success', `名前を「${trimmed}」に変更しました（100G消費）`);
+    return true;
   },
 
   saveGame: async () => {
