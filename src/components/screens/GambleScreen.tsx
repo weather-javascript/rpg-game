@@ -264,7 +264,30 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
       )}
 
       {/* ユーザー選択フェーズ */}
-      {phase === 'choose' && (\n        <>\n          <div style={{ fontSize:'1.1rem', color:'#f0c060', fontWeight:700 }}>\n            {isFirst ? '🥇 先攻！' : '🥈 後攻'} — {gameNameJp}\n          </div>\n          <div style={{ fontSize:'0.9rem', color:'#8a92b2', textAlign:'center' }}>\n            {isFirst\n              ? 'あなたが先に選んでください（相手は逆が自動選択されます）'\n              : `${opponentName}が先に選びました。あなたは逆が自動で割り当てられます`}\n          </div>\n          <div style={{ display:'flex', gap:12, marginTop:8 }}>\n            {getChoices().map(c => (\n              <button key={c.id} onClick={() => handleChoose(c.id)}\n                style={{ padding:'14px 20px', background:`rgba(${c.color.replace('#','').match(/../g)!.map(h=>parseInt(h,16)).join(',')},0.2)`, border:`2px solid ${c.color}`, color:'#fff', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:'1rem', minWidth:100 }}>\n                {c.label}\n              </button>\n            ))}\n          </div>\n          {!isFirst && (gameName==='chohan'||gameName==='coin_flip') && (\n            <div style={{ fontSize:'0.8rem', color:'#4a5070', marginTop:4 }}>※ あなたは相手の選択の逆が自動割当されます</div>\n          )}\n          <div style={{ fontSize:'0.75rem', color:'#4a5070', marginTop:4 }}>vs {opponentName}</div>\n        </>\n      )}
+      {phase === 'choose' && (
+        <>
+          <div style={{ fontSize:'1.1rem', color:'#f0c060', fontWeight:700 }}>
+            {isFirst ? '🥇 先攻！' : '🥈 後攻'} — {gameNameJp}
+          </div>
+          <div style={{ fontSize:'0.9rem', color:'#8a92b2', textAlign:'center' }}>
+            {isFirst
+              ? 'あなたが先に選んでください（相手は逆が自動選択されます）'
+              : `${opponentName}が先に選びました。あなたは逆が自動で割り当てられます`}
+          </div>
+          <div style={{ display:'flex', gap:12, marginTop:8 }}>
+            {getChoices().map(c => (
+              <button key={c.id} onClick={() => handleChoose(c.id)}
+                style={{ padding:'14px 20px', background:`rgba(${c.color.replace('#','').match(/../g)!.map(h=>parseInt(h,16)).join(',')},0.2)`, border:`2px solid ${c.color}`, color:'#fff', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:'1rem', minWidth:100 }}>
+                {c.label}
+              </button>
+            ))}
+          </div>
+          {!isFirst && (gameName==='chohan'||gameName==='coin_flip') && (
+            <div style={{ fontSize:'0.8rem', color:'#4a5070', marginTop:4 }}>※ あなたは相手の選択の逆が自動割当されます</div>
+          )}
+          <div style={{ fontSize:'0.75rem', color:'#4a5070', marginTop:4 }}>vs {opponentName}</div>
+        </>
+      )}
 
       {/* 結果を見せるフェーズ */}
       {phase === 'reveal' && (
