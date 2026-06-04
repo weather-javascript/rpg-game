@@ -393,7 +393,6 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus =
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
   const [showAnim, setShowAnim] = useState(false);
-  const pendingResult = useState<GambleResult | null>(null);
   const pendingRef = useState<{ r: GambleResult | null }>({ r: null })[0];
 
   const play = async () => {
