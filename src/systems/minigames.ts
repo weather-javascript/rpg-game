@@ -2,7 +2,7 @@
 // ミニゲームの全ロジック。UI に依存しない純粋関数のみ。
 
 import type { GambleResult } from '../types/game';
-import { secureRandom, randomInt, randomIntRange, randomChance, drawFromTableSecure } from '../utils/random';
+import { randomInt, randomChance, drawFromTableSecure } from '../utils/random';
 
 // ============================================================
 // 共通ユーティリティ
