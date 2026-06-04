@@ -16,7 +16,6 @@ export function useAuth() {
         try {
           const playerData = await loadOrCreatePlayer(user.uid);
           setPlayer(playerData);
-          // オンライン登録
           await registerOnline(user.uid, playerData.displayName, playerData.stats.level);
         } catch (err) {
           console.error('Failed to load player:', err);
@@ -31,7 +30,6 @@ export function useAuth() {
       setAuthLoading(false);
     });
 
-    // タブを閉じる・リロード時にオンライン登録を削除
     const handleUnload = () => {
       const uid = auth.currentUser?.uid;
       if (uid) unregisterOnline(uid);
