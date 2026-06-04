@@ -92,6 +92,45 @@ function BetInput({ game, bet, setBet }: { game: GambleMaster; bet: number; setB
 }
 
 // ============================================================
+// ゲーム別アニメーション（連投防止用）
+// ============================================================
+function GameAnimation({ type, onDone }: { type: 'chohan'|'chinchiro'|'coin_flip'|'slot'|'poker'|'treasure_box'|'generic'; onDone: () => void }) {
+  const [frame, setFrame] = useState(0);
+
+  const configs: Record<string, { frames: string[][]; duration: number; label: string }> = {
+    chohan:      { frames: [['🎲','🎲'],['⬜','⬜'],['🎲','🎲'],['1️⃣','2️⃣'],['🎲','🎲'],['3️⃣','4️⃣'],['🎲','🎲'],['5️⃣','6️⃣']], duration: 80, label: 'サイコロを振っています...' },
+    chinchiro:   { frames: [['🎲','🎲','🎲'],['⬜','⬜','⬜'],['🎲','🎲','🎲'],['1️⃣','2️⃣','3️⃣'],['🎲','🎲','🎲'],['4️⃣','5️⃣','6️⃣'],['🎲','🎲','🎲'],['⬜','⬜','⬜']], duration: 80, label: 'サイコロを振っています...' },
+    coin_flip:   { frames: [['🌕'],['🌑'],['🌕'],['🌑'],['🌕'],['🌑'],['🌕'],['🌑'],['🌕'],['🌑']], duration: 90, label: 'コインを投げています...' },
+    slot:        { frames: [['🍒','💎','7️⃣'],['💰','🍋','🔔'],['7️⃣','🍒','💎'],['🔔','💰','🍋'],['🍋','7️⃣','🍒'],['💎','🔔','💰'],['🍒','🍋','7️⃣'],['💰','💎','🔔']], duration: 80, label: 'スロットが回っています...' },
+    poker:       { frames: [['🂠','🂠','🂠','🂠','🂠'],['🂠','🂠','🂠','🂠','🂡'],['🂠','🂠','🂠','🃁','🂡'],['🂠','🂠','🂱','🃁','🂡'],['🂠','🂢','🂱','🃁','🂡'],['🂲','🂢','🂱','🃁','🂡']], duration: 130, label: 'カードを配っています...' },
+    treasure_box:{ frames: [['📦'],['🔐'],['📦'],['🔐'],['📦'],['✨'],['🎁'],['✨']], duration: 100, label: '宝箱を開けています...' },
+    generic:     { frames: [['🎮'],['⭐'],['🎮'],['✨'],['🎮'],['⭐']], duration: 110, label: 'プレイ中...' },
+  };
+
+  const cfg = configs[type] ?? configs.generic;
+
+  useEffect(() => {
+    let idx = 0;
+    const t = setInterval(() => {
+      idx++;
+      setFrame(idx % cfg.frames.length);
+      if (idx >= cfg.frames.length * 3) { clearInterval(t); setTimeout(onDone, 150); }
+    }, cfg.duration);
+    return () => clearInterval(t);
+  }, []);
+
+  const icons = cfg.frames[frame];
+  return (
+    <div style={{ textAlign: 'center', padding: '10px 0 8px', minHeight: 60 }}>
+      <div style={{ fontSize: '2rem', letterSpacing: 6, marginBottom: 4, transition: 'all 0.07s' }}>
+        {icons.map((ic, i) => <span key={i}>{ic}</span>)}
+      </div>
+      <div style={{ fontSize: '0.78rem', color: '#8a92b2' }}>{cfg.label}</div>
+    </div>
+  );
+}
+
+// ============================================================
 // PvP対戦バトルアニメーション
 // ============================================================
 function BattleAnimation({ opponentName, gameName, result, onDone }: {
@@ -353,35 +392,42 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus =
   const { player, changeGold, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addItems: s.addItems, addNotification: s.addNotification }));
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
+  const [showAnim, setShowAnim] = useState(false);
+  const pendingResult = useState<GambleResult | null>(null);
+  const pendingRef = useState<{ r: GambleResult | null }>({ r: null })[0];
 
   const play = async () => {
     if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
     setAnimating(true);
+    setResult(null);
     changeGold(-bet);
     onJackpotContrib(bet); // ジャックポット積立
 
-    await new Promise(r => setTimeout(r, 400));
     const r = resolveGenericGamble(game, bet, multiplierBonus);
+    pendingRef.r = r;
+    setShowAnim(true);
+  };
+
+  const handleAnimDone = async () => {
+    setShowAnim(false);
+    const r = pendingRef.r;
+    if (!r) { setAnimating(false); return; }
     if (r.multiplier > 0) changeGold(Math.floor(bet * r.multiplier));
     if (r.itemRewards.length > 0) addItems(r.itemRewards);
     setResult(r);
     onResult(r);
-
-    // ジャックポット当選チェック
     try {
       const { won, pool } = await checkJackpotWin();
-      if (won && pool > 0) {
-        changeGold(pool);
-        addNotification('success', `🌟🌟🌟 JACKPOT!! ${pool.toLocaleString()}G獲得！！🌟🌟🌟`);
-      }
+      if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟🌟🌟 JACKPOT!! ${pool.toLocaleString()}G獲得！！🌟🌟🌟`); }
     } catch { /* ignore */ }
-
     setAnimating(false);
   };
 
+  const animType = game.type === 'slot' ? 'slot' : game.type === 'treasure_box' ? 'treasure_box' : 'generic';
+
   return (
     <div>
-      {animating && <div style={{ textAlign: 'center', fontSize: '2rem', marginBottom: 8 }}>🎲🎲🎲</div>}
+      {showAnim && <GameAnimation type={animType as 'slot'|'treasure_box'|'generic'} onDone={handleAnimDone} />}
       {result && !animating && <ResultDisplay result={result} />}
       <button onClick={play} disabled={animating}
         style={{ width: '100%', padding: 12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#5b8dee,#3a6fd0)', color: '#fff', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem' }}>
@@ -396,18 +442,27 @@ function ChohanPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }:
   const [choice, setChoice] = useState<'cho'|'han'>('cho');
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
+  const [showAnim, setShowAnim] = useState(false);
+  const pendingRef = useState<{ r: GambleResult | null }>({ r: null })[0];
 
   const play = async () => {
-    if (!player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
+    if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
     setAnimating(true);
+    setResult(null);
     changeGold(-bet);
     onJackpotContrib(bet);
-    await new Promise(r => setTimeout(r, 500));
     const r = playChohan(bet, choice);
     const adjustedDelta = r.goldDelta > 0 ? Math.floor(r.goldDelta * multiplierBonus) : r.goldDelta;
-    const adjustedResult = { ...r, goldDelta: adjustedDelta };
-    if (adjustedDelta > 0) changeGold(adjustedDelta + bet);
-    setResult(adjustedResult); onResult(adjustedResult);
+    pendingRef.r = { ...r, goldDelta: adjustedDelta };
+    setShowAnim(true);
+  };
+
+  const handleAnimDone = async () => {
+    setShowAnim(false);
+    const r = pendingRef.r;
+    if (!r) { setAnimating(false); return; }
+    if (r.goldDelta > 0) changeGold(r.goldDelta + bet);
+    setResult(r); onResult(r);
     try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
     setAnimating(false);
   };
@@ -422,7 +477,7 @@ function ChohanPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }:
           </button>
         ))}
       </div>
-      {animating && <div style={{ textAlign: 'center', fontSize: '2rem', marginBottom: 8 }}>🎲🎲</div>}
+      {showAnim && <GameAnimation type="chohan" onDone={handleAnimDone} />}
       {result && !animating && <ResultDisplay result={result} />}
       <button onClick={play} disabled={animating}
         style={{ width: '100%', padding: 12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#e05555,#c03030)', color: '#fff', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem' }}>
@@ -436,23 +491,31 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
   const { player, changeGold, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addNotification: s.addNotification }));
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
+  const [showAnim, setShowAnim] = useState(false);
+  const pendingRef = useState<{ r: GambleResult | null }>({ r: null })[0];
 
   const play = async () => {
-    if (!player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
-    setAnimating(true); changeGold(-bet); onJackpotContrib(bet);
-    await new Promise(r => setTimeout(r, 600));
+    if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
+    setAnimating(true); setResult(null); changeGold(-bet); onJackpotContrib(bet);
     const r = playChinchiro(bet);
     const effectiveMult = r.multiplier > 0 ? r.multiplier * multiplierBonus : 0;
-    const adjustedResult = { ...r, multiplier: effectiveMult, goldDelta: r.goldDelta > 0 ? Math.floor(bet * effectiveMult) - bet : r.goldDelta };
-    if (effectiveMult > 0) changeGold(Math.floor(bet * effectiveMult));
-    setResult(adjustedResult); onResult(adjustedResult);
+    pendingRef.r = { ...r, multiplier: effectiveMult, goldDelta: r.goldDelta > 0 ? Math.floor(bet * effectiveMult) - bet : r.goldDelta };
+    setShowAnim(true);
+  };
+
+  const handleAnimDone = async () => {
+    setShowAnim(false);
+    const r = pendingRef.r;
+    if (!r) { setAnimating(false); return; }
+    if (r.multiplier > 0) changeGold(Math.floor(bet * r.multiplier));
+    setResult(r); onResult(r);
     try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
     setAnimating(false);
   };
 
   return (
     <div>
-      {animating && <div style={{ textAlign: 'center', fontSize: '2rem' }}>🎲🎲🎲</div>}
+      {showAnim && <GameAnimation type="chinchiro" onDone={handleAnimDone} />}
       {result && !animating && (
         <div>
           <div style={{ textAlign: 'center', fontSize: '1.5rem', marginBottom: 6 }}>{result.dice?.join(' ') ?? ''}</div>
@@ -472,18 +535,26 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
   const [choice, setChoice] = useState<'heads'|'tails'>('heads');
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
+  const [showAnim, setShowAnim] = useState(false);
+  const pendingRef = useState<{ r: GambleResult | null }>({ r: null })[0];
 
   const play = async () => {
-    if (!player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
-    setAnimating(true); changeGold(-bet); onJackpotContrib(bet);
-    await new Promise(r => setTimeout(r, 500));
+    if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
+    setAnimating(true); setResult(null); changeGold(-bet); onJackpotContrib(bet);
     const rand = secureRandom();
     const win = (choice === 'heads' && rand < 0.49) || (choice === 'tails' && rand >= 0.49);
     const winAmount = win ? Math.floor(bet * multiplierBonus) : 0;
-    const r: GambleResult = win
+    pendingRef.r = win
       ? { rewardLabel: '当たり！', multiplier: 2 * multiplierBonus, goldDelta: winAmount, itemRewards: [], symbols: ['✨'] }
       : { rewardLabel: 'ハズレ', multiplier: 0, goldDelta: -bet, itemRewards: [], symbols: ['💨'] };
-    if (win) changeGold(bet + winAmount);
+    setShowAnim(true);
+  };
+
+  const handleAnimDone = async () => {
+    setShowAnim(false);
+    const r = pendingRef.r;
+    if (!r) { setAnimating(false); return; }
+    if (r.goldDelta > 0) changeGold(bet + r.goldDelta);
     setResult(r); onResult(r);
     try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
     setAnimating(false);
@@ -499,7 +570,7 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
           </button>
         ))}
       </div>
-      {animating && <div style={{ textAlign: 'center', fontSize: '2rem', marginBottom: 8 }}>🪙</div>}
+      {showAnim && <GameAnimation type="coin_flip" onDone={handleAnimDone} />}
       {result && !animating && <ResultDisplay result={result} />}
       <button onClick={play} disabled={animating}
         style={{ width: '100%', padding: 12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#4caf87,#2d8060)', color: '#fff', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem' }}>
@@ -513,8 +584,10 @@ function PokerPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: 
   const { player, changeGold, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addItems: s.addItems, addNotification: s.addNotification }));
   const [pokerState, setPokerState] = useState<PokerState | null>(null);
   const [hold, setHold] = useState<boolean[]>([false,false,false,false,false]);
-  const [phase, setPhase] = useState<'idle'|'deal'|'draw'|'result'>('idle');
+  const [phase, setPhase] = useState<'idle'|'dealing'|'deal'|'drawing'|'result'>('idle');
   const [result, setResult] = useState<GambleResult | null>(null);
+  const pendingRef = useState<{ state: PokerState | null }>({ state: null })[0];
+  const pendingDrawRef = useState<{ r: GambleResult | null; state: PokerState | null }>({ r: null, state: null })[0];
 
   const suitIcon = (s: string) => ({ S:'♠️',H:'♥️',D:'♦️',C:'♣️' }[s]??s);
   const cardStyle = (selected: boolean) => ({
@@ -527,14 +600,28 @@ function PokerPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: 
     if (!player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
     changeGold(-bet); onJackpotContrib(bet);
     const state = dealPoker();
-    setPokerState(state);
+    pendingRef.state = state;
     setHold([false,false,false,false,false]);
+    setPhase('dealing');
+  };
+
+  const handleDealAnimDone = () => {
+    setPokerState(pendingRef.state);
     setPhase('deal');
   };
 
   const handleDraw = async () => {
     if (!pokerState) return;
     const { result: r, newState } = drawPoker(pokerState, hold);
+    pendingDrawRef.r = r;
+    pendingDrawRef.state = newState;
+    setPhase('drawing');
+  };
+
+  const handleDrawAnimDone = async () => {
+    const r = pendingDrawRef.r;
+    const newState = pendingDrawRef.state;
+    if (!r || !newState) { setPhase('result'); return; }
     setPokerState(newState);
     setPhase('result');
     const effectiveMult = r.multiplier > 0 ? r.multiplier * multiplierBonus : 0;
@@ -547,7 +634,9 @@ function PokerPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: 
 
   return (
     <div>
-      {pokerState && (
+      {phase === 'dealing' && <GameAnimation type="poker" onDone={handleDealAnimDone} />}
+      {phase === 'drawing' && <GameAnimation type="poker" onDone={handleDrawAnimDone} />}
+      {(phase === 'deal' || phase === 'result') && pokerState && (
         <div style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 8 }}>
             {pokerState.hand.map((card, i) => (

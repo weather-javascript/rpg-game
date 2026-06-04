@@ -190,7 +190,7 @@ function evaluatePokerHand(hand: Card[], bet: number): GambleResult {
 // プールへの積立・当選チェックはここで計算し、
 // 実際のFirestore 読み書きは multiplayer.ts が担う。
 // ============================================================
-export const JACKPOT_POOL_RATE = 0.30;  // 賭け金の30%をプールへ
+export const JACKPOT_POOL_RATE = 0.20;  // 賭け金の20%をプールへ
 export const JACKPOT_WIN_PROB  = 0.001; // 当選確率 0.1%
 
 export function calcJackpotContrib(bet: number): number {
