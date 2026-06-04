@@ -6,6 +6,7 @@ import { useGameStore } from '../../stores/gameStore';
 import { secureRandom, randomInt, randomIntRange, randomChance } from '../../utils/random';
 import { DUNGEON_MASTER, MONSTER_MASTER, ITEM_MASTER } from '../../data/masters';
 import type { MonsterMaster, CombatResult, CombatTurn, DungeonRunState, DungeonMaster } from '../../types/game';
+import { postActivityFeed } from '../../services/multiplayer';
 
 // ============================================================
 // 戦闘ロジック
@@ -292,6 +293,7 @@ export function DungeonScreen() {
           isComplete = true;
           recordDungeonClear(runState.dungeonId);
           addNotification('success', `🏆 ${dungeon.name} 攻略完了！`);
+          if (player) postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'dungeon_clear', message: `が「${dungeon.name}」をクリアしました！` }).catch(() => {});
           // 解放チェック
           const justUnlocked = dungeons.find(d => {
             const ucCheck = (d as any).unlockCondition as { dungeonId: string; clearedCount: number } | undefined;

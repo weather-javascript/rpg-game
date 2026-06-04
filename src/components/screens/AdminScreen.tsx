@@ -14,6 +14,7 @@ import { useGameStore } from '../../stores/gameStore';
 type SubTab = 'players' | 'gamble' | 'announce' | 'stats' | 'system';
 
 export function AdminScreen() {
+  const player = useGameStore(s => s.player);
   const setActiveTab = useGameStore(s => s.setActiveTab);
   const addNotification = useGameStore(s => s.addNotification);
   const [players, setPlayers] = useState<any[]>([]);
@@ -33,6 +34,7 @@ export function AdminScreen() {
   const [jackpotRate, setJackpotRateState] = useState(0.20);
   const [maintenanceActive, setMaintenanceActive] = useState(false);
   const [maintenanceMinutes, setMaintenanceMinutes] = useState(30);
+  const [maintenanceMessage, setMaintenanceMessage] = useState('');
   const [announceHistory, setAnnounceHistory] = useState<Array<{ id: string; text: string; timestamp: number }>>([]);
 
   // リアルタイム購読でプレイヤー一覧を取得
@@ -86,14 +88,24 @@ export function AdminScreen() {
       const updates: any = {
         gold: Number(editGold),
         displayName: editName,
-        'stats.level': Number(editLevel),
-        'stats.hp': Number(editHp),
+        stats: { ...(selectedPlayer.stats ?? {}), level: Number(editLevel), hp: Number(editHp) },
       };
       await updatePlayerAdmin(selectedPlayer.id, updates);
       setPlayers(prev => prev.map(p => p.id === selectedPlayer.id
         ? { ...p, gold: Number(editGold), displayName: editName, stats: { ...p.stats, level: Number(editLevel), hp: Number(editHp) } }
         : p));
-      addNotification('success', `${editName} のデータを更新しました`);
+      // 自分自身を編集した場合はローカルstoreも強制更新
+      if (player && player.uid === selectedPlayer.id) {
+        useGameStore.setState(s => ({
+          player: s.player ? {
+            ...s.player,
+            gold: Number(editGold),
+            displayName: editName,
+            stats: { ...s.player.stats, level: Number(editLevel), hp: Number(editHp) },
+          } : s.player
+        }));
+      }
+      addNotification('success', `${editName} のデータを強制更新しました`);
     } catch (e: any) {
       addNotification('error', `更新に失敗: ${e?.message ?? e}`);
     }
@@ -434,10 +446,19 @@ export function AdminScreen() {
                   onChange={e => setMaintenanceMinutes(Number(e.target.value))}
                   style={{width:100, padding:'6px 8px', background:'#1c2235', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.9rem', marginBottom:10}}
                 />
+                <div style={{fontSize:'0.78rem', color:'#8a92b2', marginBottom:4, marginTop:4}}>メンテナンス概要（プレイヤーに表示）</div>
+                <textarea
+                  value={maintenanceMessage}
+                  onChange={e => setMaintenanceMessage(e.target.value.slice(0, 200))}
+                  rows={3}
+                  placeholder="例: サーバーメンテナンスのため一時停止中です。ご不便をおかけします。"
+                  style={{width:'100%', padding:'8px 10px', background:'#1c2235', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', boxSizing:'border-box', resize:'vertical', marginBottom:10}}
+                />
+                <div style={{fontSize:'0.72rem', color:'#4a5070', textAlign:'right', marginBottom:8}}>{maintenanceMessage.length}/200</div>
                 <button onClick={async () => {
                   setSaving(true);
                   try {
-                    await setMaintenanceStatus({ active: true, startedAt: Date.now(), estimatedMinutes: maintenanceMinutes });
+                    await setMaintenanceStatus({ active: true, startedAt: Date.now(), estimatedMinutes: maintenanceMinutes, message: maintenanceMessage });
                     setMaintenanceActive(true);
                     addNotification('success', 'メンテナンスモードを開始しました');
                   } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
@@ -451,8 +472,9 @@ export function AdminScreen() {
               <button onClick={async () => {
                 setSaving(true);
                 try {
-                  await setMaintenanceStatus({ active: false, startedAt: 0, estimatedMinutes: 0 });
+                  await setMaintenanceStatus({ active: false, startedAt: 0, estimatedMinutes: 0, message: '' });
                   setMaintenanceActive(false);
+                  setMaintenanceMessage('');
                   addNotification('success', 'メンテナンスモードを終了しました');
                 } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
                 setSaving(false);

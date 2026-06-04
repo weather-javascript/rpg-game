@@ -40,6 +40,13 @@ export function useAutoSave() {
   // 保存処理（isSaving フラグ付き）
   const doSave = async (p: PlayerData, silent = true) => {
     if (isSavingRef.current) return;
+    // 管理者が10秒以内に強制上書きした場合はローカル保存のみ行い、Firebaseへの書き込みをスキップ
+    const adminOverrideAt = (p as PlayerData & { adminOverrideAt?: number }).adminOverrideAt ?? 0;
+    const adminOverrideRecent = Date.now() - adminOverrideAt < 30_000;
+    if (adminOverrideRecent) {
+      backupToLocalStorage(p);
+      return;
+    }
     isSavingRef.current = true;
     useGameStore.setState({ isSaving: true });
     try {

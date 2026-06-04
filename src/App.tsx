@@ -76,7 +76,7 @@ const ADMIN_UIDS = ['jJ7BrZ0HhpeC5WYsdZbjRlQBRzK2', '49yFkciBJLhFbFq7YJrbg8dI8rf
 // ============================================================
 // メンテナンス画面
 // ============================================================
-function MaintenanceScreen({ startedAt, estimatedMinutes }: { startedAt: number; estimatedMinutes: number }) {
+function MaintenanceScreen({ startedAt, estimatedMinutes, message }: { startedAt: number; estimatedMinutes: number; message?: string }) {
   const startTime = new Date(startedAt).toLocaleString('ja-JP');
   const endTime = new Date(startedAt + estimatedMinutes * 60 * 1000).toLocaleString('ja-JP');
   return (
@@ -84,6 +84,11 @@ function MaintenanceScreen({ startedAt, estimatedMinutes }: { startedAt: number;
       <div style={{ textAlign:'center', color:'#e8e6ff' }}>
         <div style={{ fontSize:'3rem', marginBottom:16 }}>🔧</div>
         <h2 style={{ color:'#f0c060', fontFamily:'Cinzel,serif', marginBottom:12 }}>メンテナンス中です</h2>
+        {message && (
+          <div style={{ background:'rgba(240,192,96,0.1)', border:'1px solid rgba(240,192,96,0.3)', borderRadius:8, padding:'10px 16px', marginBottom:12, color:'#f0c060', fontSize:'0.9rem', lineHeight:1.7 }}>
+            {message}
+          </div>
+        )}
         <p style={{ color:'#8a92b2', lineHeight:1.8 }}>
           メンテナンス終了までしばらくお待ち下さい<br />
           メンテナンス開始時間「{startTime}」<br />
@@ -387,7 +392,7 @@ export default function App() {
   // バージョン更新ポップアップ（毎回表示）
   const [showVersionPopup, setShowVersionPopup] = useState(false);
   const [showAdminAnnounce, setShowAdminAnnounce] = useState(false);
-  const [maintenanceStatus, setMaintenanceStatus] = useState<{ active: boolean; startedAt: number; estimatedMinutes: number } | null>(null);
+  const [maintenanceStatus, setMaintenanceStatus] = useState<{ active: boolean; startedAt: number; estimatedMinutes: number; message?: string } | null>(null);
   const [soldPopup, setSoldPopup] = useState<SoldPopupInfo | null>(null);
   useEffect(() => {
     if (!player) return;
@@ -457,7 +462,7 @@ export default function App() {
 
   // メンテナンス中チェック（ADMIN除く）
   if (maintenanceStatus?.active && !ADMIN_UIDS.includes(player.uid)) {
-    return <MaintenanceScreen startedAt={maintenanceStatus.startedAt} estimatedMinutes={maintenanceStatus.estimatedMinutes} />;
+    return <MaintenanceScreen startedAt={maintenanceStatus.startedAt} estimatedMinutes={maintenanceStatus.estimatedMinutes} message={maintenanceStatus.message} />;
   }
 
   return (

@@ -5,7 +5,6 @@ import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER, SKILL_MASTER, EXP_TABLE, SKILL_EXP_TABLE, CRAFT_RECIPES } from '../../data/masters';
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { savePlayer } from '../../services/database';
 
 // ============================================================
 // 製作パネル
@@ -32,9 +31,11 @@ function CraftingPanel() {
     addItems([{ itemId: recipe.outputItemId, amount: recipe.outputAmount }]);
     addSkillExp('crafting', recipe.craftingExpGain);
     addNotification('success', `🔨 ${recipe.name} → ${ITEM_MASTER[recipe.outputItemId]?.name} ×${recipe.outputAmount} 製作成功！`);
-    // クラフト後にFirebase即時保存（素材が復活するバグを防ぐ）
+    // クラフト後はlocalStorageのみバックアップ（次回自動保存でFirebase同期）
     const latestPlayer = useGameStore.getState().player;
-    if (latestPlayer) savePlayer(latestPlayer).catch(() => {});
+    if (latestPlayer) {
+      try { localStorage.setItem('rpg_backup', JSON.stringify({ data: latestPlayer, savedAt: Date.now() })); } catch { /* ignore */ }
+    }
   };
 
   const filtered = CRAFT_RECIPES.filter(r =>

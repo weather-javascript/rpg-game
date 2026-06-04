@@ -11,6 +11,7 @@ import {
   contributeToJackpot, checkJackpotWin, subscribeJackpotPool,
   createGambleBattle, subscribeGambleBattles, joinGambleBattle, cancelGambleBattle,
   subscribeGambleMultipliers, subscribeGambleBattle,
+  postActivityFeed,
 } from '../../services/multiplayer';
 import type { GambleResult, GambleMaster } from '../../types/game';
 import type { PokerState } from '../../systems/minigames';
@@ -406,6 +407,7 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus =
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
   const [showAnim, setShowAnim] = useState(false);
+  const pendingResult = useState<GambleResult | null>(null);
   const pendingRef = useState<{ r: GambleResult | null }>({ r: null })[0];
 
   const play = async () => {
@@ -428,9 +430,22 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus =
     if (r.itemRewards.length > 0) addItems(r.itemRewards);
     setResult(r);
     onResult(r);
+    // アクティビティフィードに投稿
+    if (player) {
+      const winGold = Math.floor(bet * r.multiplier);
+      const type = r.multiplier > 0 ? 'gamble_win' : 'gamble_lose';
+      const msg = r.multiplier > 0
+        ? `が${game.name}で${(winGold - bet).toLocaleString()}G勝利しました！`
+        : `が${game.name}で${bet.toLocaleString()}G負けました`;
+      postActivityFeed({ uid: player.uid, displayName: player.displayName, type, message: msg }).catch(() => {});
+    }
     try {
       const { won, pool } = await checkJackpotWin();
-      if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟🌟🌟 JACKPOT!! ${pool.toLocaleString()}G獲得！！🌟🌟🌟`); }
+      if (won && pool > 0) {
+        changeGold(pool);
+        addNotification('success', `🌟🌟🌟 JACKPOT!! ${pool.toLocaleString()}G獲得！！🌟🌟🌟`);
+        if (player) postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'gamble_win', message: `が🌟JACKPOTで${pool.toLocaleString()}G獲得！！` }).catch(() => {});
+      }
     } catch { /* ignore */ }
     setAnimating(false);
   };

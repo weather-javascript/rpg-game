@@ -5,7 +5,6 @@ import { useState } from 'react';
 import { GameIcon } from '../icons';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
-import { savePlayer } from '../../services/database';
 
 type ShopTab = 'sell' | 'buy' | 'use';
 
@@ -17,7 +16,6 @@ export function MarketScreen() {
   const useItem = useGameStore(s => s.useItem);
   const addNotification = useGameStore(s => s.addNotification);
   const [shopTab, setShopTab] = useState<ShopTab>('sell');
-  const [saving, setSaving] = useState(false);
 
   // 売却: アイテム消費 → Gold加算 → Firebase即時保存（バグ修正）
   const handleSell = async (itemId: string, amount: number) => {
@@ -26,13 +24,11 @@ export function MarketScreen() {
     if (!consumeItem(itemId, amount)) return;
     changeGold(item.sellPrice * amount);
     addNotification('success', `${item.icon} ${item.name} ×${amount} を ${(item.sellPrice * amount).toLocaleString()}G で売却しました`);
-    // 売却後にFirebaseへ即時保存（インベントリが元に戻るバグを防ぐ）
-    setSaving(true);
-    try {
-      const currentPlayer = useGameStore.getState().player;
-      if (currentPlayer) await savePlayer(currentPlayer);
-    } catch { /* ignore */ }
-    setSaving(false);
+    // localStorageのみバックアップ（自動保存でFirebase同期）
+    const currentPlayer = useGameStore.getState().player;
+    if (currentPlayer) {
+      try { localStorage.setItem('rpg_backup', JSON.stringify({ data: currentPlayer, savedAt: Date.now() })); } catch { /* ignore */ }
+    }
   };
 
   const handleBuy = async (itemId: string, amount: number) => {
@@ -42,12 +38,11 @@ export function MarketScreen() {
     if (changeGold(-total)) {
       addItems([{ itemId, amount }]);
       addNotification('success', `${item.icon} ${item.name} ×${amount} を ${total.toLocaleString()}G で購入しました`);
-      setSaving(true);
-      try {
-        const currentPlayer = useGameStore.getState().player;
-        if (currentPlayer) await savePlayer(currentPlayer);
-      } catch { /* ignore */ }
-      setSaving(false);
+      // localStorageのみバックアップ（自動保存でFirebase同期）
+      const cp = useGameStore.getState().player;
+      if (cp) {
+        try { localStorage.setItem('rpg_backup', JSON.stringify({ data: cp, savedAt: Date.now() })); } catch { /* ignore */ }
+      }
     } else {
       addNotification('error', 'ゴールドが足りません！');
     }
@@ -65,7 +60,6 @@ export function MarketScreen() {
     <div style={{padding:'12px 8px'}}>
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12, borderBottom:'1px solid #2d3752', paddingBottom:8}}>
         <h2 style={{fontFamily:'Cinzel,serif', color:'#f0c060', margin:0}}>🏪 市場</h2>
-        {saving && <span style={{fontSize:'0.75rem', color:'#5b8dee'}}>💾 保存中...</span>}
       </div>
 
       <div style={{display:'flex', gap:6, marginBottom:14}}>

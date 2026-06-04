@@ -104,6 +104,16 @@ export function FishingScreen() {
       const msgs = result.drops.map(d => `${ITEM_MASTER[d.itemId]?.icon ?? '?'} ${ITEM_MASTER[d.itemId]?.name ?? d.itemId} ×${d.amount}`).join('、');
       const feverTag = fever.active ? '🔥' : '';
       setLog(prev => [`${feverTag}[${node.name}] ${msgs}`, ...prev].slice(0, 25));
+      // レアアイテム取得時のみフィードに投稿（頻度を抑える）
+      const hasRare = result.drops.some(d => {
+        const item = ITEM_MASTER[d.itemId];
+        return item && (item.rarity === 'rare' || item.rarity === 'epic' || item.rarity === 'legendary' || d.itemId.includes('reactor') || d.itemId.includes('totem'));
+      });
+      if (hasRare && player) {
+        import('../../services/multiplayer').then(({ postActivityFeed }) => {
+          postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'fishing', message: `が釣りで${msgs}を手に入れました！` }).catch(() => {});
+        });
+      }
     } else {
       setLog(prev => [`[${node.name}] 何も釣れなかった...`, ...prev].slice(0, 25));
     }

@@ -356,7 +356,21 @@ export function subscribeAllPlayersAdmin(cb: (players: AdminPlayerData[]) => voi
 }
 
 export async function updatePlayerAdmin(uid: string, data: Partial<AdminPlayerData>): Promise<void> {
-  await updateDoc(doc(db, 'players', uid), data);
+  // updateDocではなくsetDoc(merge:false)で完全上書きし、オンラインプレイヤーの
+  // 自動保存で上書きされないよう adminOverrideAt タイムスタンプを付与する
+  const ref = doc(db, 'players', uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    await updateDoc(ref, { ...data, adminOverrideAt: Date.now() });
+    return;
+  }
+  const current = snap.data();
+  // ネストフィールド（stats.level など）を展開してマージ
+  const flatData: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(data)) {
+    flatData[k] = v;
+  }
+  await setDoc(ref, { ...current, ...flatData, adminOverrideAt: Date.now() });
 }
 
 export async function getGambleMultipliers(): Promise<Record<string, number>> {
@@ -447,4 +461,36 @@ export async function getAnnouncementHistory(): Promise<AnnouncementRecord[]> {
 export async function saveAnnouncementToHistory(text: string): Promise<void> {
   const { addDoc, collection: col } = await import('firebase/firestore');
   await addDoc(col(db, 'announcements'), { text, timestamp: Date.now() });
+}
+
+// ============================================================
+// グローバルアクティビティフィード（Firebase節約版）
+// shared/activity_feed ドキュメント1本に最新50件を配列で保持
+// ============================================================
+export interface ActivityFeedEntry {
+  uid: string;
+  displayName: string;
+  type: string;   // 'mining'|'fishing'|'dungeon'|'gamble_win'|'gamble_lose'|'auction'|'level_up'|'crafting'
+  message: string;
+  timestamp: number;
+}
+
+const FEED_REF = () => doc(db, 'shared', 'activity_feed');
+
+/** アクティビティをフィードに追記（最新50件を保持） */
+export async function postActivityFeed(entry: Omit<ActivityFeedEntry, 'timestamp'>): Promise<void> {
+  try {
+    const snap = await getDoc(FEED_REF());
+    const prev: ActivityFeedEntry[] = snap.exists() ? ((snap.data()['entries'] ?? []) as ActivityFeedEntry[]) : [];
+    const next = [{ ...entry, timestamp: Date.now() }, ...prev].slice(0, 50);
+    await setDoc(FEED_REF(), { entries: next, updatedAt: Date.now() });
+  } catch { /* ignore */ }
+}
+
+/** アクティビティフィードをリアルタイム購読（onSnapshot 1本） */
+export function subscribeActivityFeed(cb: (entries: ActivityFeedEntry[]) => void): Unsubscribe {
+  return onSnapshot(FEED_REF(), snap => {
+    if (!snap.exists()) { cb([]); return; }
+    cb((snap.data()['entries'] ?? []) as ActivityFeedEntry[]);
+  });
 }

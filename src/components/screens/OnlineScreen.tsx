@@ -10,7 +10,8 @@ import { ITEM_MASTER } from '../../data/masters';
 import {
   subscribeOnlineUsers, subscribeBoardMessages, postBoardMessage,
   subscribeAuctions, createAuction, buyAuction, cancelAuction,
-  subscribeAllPlayersAdmin, getPlayerActivityLog,
+  subscribeAllPlayersAdmin,
+  subscribeActivityFeed, ActivityFeedEntry,
 } from '../../services/multiplayer';
 import type { OnlineUser, BoardMessage, AuctionListing } from '../../types/game';
 
@@ -41,105 +42,62 @@ function OnlinePanel({ users }: { users: OnlineUser[] }) {
   );
 }
 
-// アクティビティ詳細モーダル
-function ActivityDetailModal({ user, onClose }: { user: OnlineUser; onClose: () => void }) {
-  const [logs, setLogs] = useState<Array<{ type: string; message: string; timestamp: number }>>([]);
+const ACTIVITY_STYLE: Record<string, { emoji: string; color: string }> = {
+  dungeon_clear: { emoji: '🏰', color: '#f0c060' },
+  dungeon_enter: { emoji: '⚔️', color: '#e05555' },
+  level_up:      { emoji: '⬆️', color: '#5b8dee' },
+  crafting:      { emoji: '🔨', color: '#9b6df0' },
+  gamble_win:    { emoji: '🎰', color: '#4caf87' },
+  gamble_lose:   { emoji: '🎰', color: '#e05555' },
+  fishing:       { emoji: '🎣', color: '#5b8dee' },
+  mining:        { emoji: '⛏️', color: '#f0a830' },
+  auction:       { emoji: '🏷️', color: '#f0c060' },
+  online:        { emoji: '🌐', color: '#4caf87' },
+};
+
+function ActivityPanel() {
+  const [entries, setEntries] = useState<ActivityFeedEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getPlayerActivityLog(user.uid).then(l => {
-      setLogs([...l].reverse()); // 最新順
+    const unsub = subscribeActivityFeed(es => {
+      setEntries(es);
       setLoading(false);
     });
-  }, [user.uid]);
-
-  const TYPE_LABELS: Record<string, { emoji: string; color: string }> = {
-    dungeon_clear: { emoji: '🏰', color: '#f0c060' },
-    level_up:      { emoji: '⬆️', color: '#5b8dee' },
-    crafting:      { emoji: '🔨', color: '#9b6df0' },
-    gamble_win:    { emoji: '🎰', color: '#4caf87' },
-    online:        { emoji: '🌐', color: '#8a92b2' },
-  };
-
-  return (
-    <div style={{ position:'fixed', inset:0, zIndex:500, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-      <div style={{ background:'#1c2235', border:'2px solid #5b8dee', borderRadius:14, padding:20, width:'100%', maxWidth:420, maxHeight:'80vh', display:'flex', flexDirection:'column' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-          <div>
-            <h3 style={{ color:'#e8e6ff', margin:0, fontSize:'1rem' }}>⚔️ {user.displayName} の活動履歴</h3>
-            <div style={{ color:'#4a5070', fontSize:'0.72rem', marginTop:2 }}>Lv.{user.level} | 最終確認: {new Date(user.lastSeen).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</div>
-          </div>
-          <button onClick={onClose} style={{ background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontSize:'0.85rem' }}>✕</button>
-        </div>
-
-        <div style={{ fontSize:'0.82rem', color:'#e8e6ff', marginBottom:10, padding:'6px 10px', background:'rgba(91,141,238,0.1)', borderRadius:6 }}>
-          🎮 現在: {user.currentActivity ?? 'オンライン'}
-          {user.lastDungeonCleared && <span style={{ marginLeft:8, color:'#f0c060' }}>🏆 最近クリア: {user.lastDungeonCleared}</span>}
-        </div>
-
-        <div style={{ overflowY:'auto', flex:1 }}>
-          {loading ? (
-            <div style={{ color:'#8a92b2', textAlign:'center', padding:20 }}>読み込み中...</div>
-          ) : logs.length === 0 ? (
-            <div style={{ color:'#4a5070', textAlign:'center', padding:20, fontSize:'0.85rem' }}>記録された活動がありません</div>
-          ) : (
-            logs.map((log, i) => {
-              const style = TYPE_LABELS[log.type] ?? { emoji: '📌', color: '#8a92b2' };
-              return (
-                <div key={i} style={{ display:'flex', gap:10, padding:'7px 0', borderBottom:'1px solid #2d3752' }}>
-                  <span style={{ fontSize:'1.1rem', minWidth:24, textAlign:'center' }}>{style.emoji}</span>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:'0.82rem', color: style.color }}>{log.message}</div>
-                    <div style={{ fontSize:'0.68rem', color:'#4a5070', marginTop:1 }}>
-                      {new Date(log.timestamp).toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ActivityPanel({ users }: { users: OnlineUser[] }) {
-  const [detailUser, setDetailUser] = useState<OnlineUser | null>(null);
+    return unsub;
+  }, []);
 
   return (
     <div>
-      {detailUser && <ActivityDetailModal user={detailUser} onClose={() => setDetailUser(null)} />}
-      <h3 style={{color:'#9b6df0', marginBottom:8, fontSize:'0.95rem'}}>📡 プレイヤーアクティビティ</h3>
-      <p style={{fontSize:'0.75rem', color:'#4a5070', marginBottom:10}}>現在オンラインのプレイヤーが何をしているか確認できます。</p>
-      {users.length === 0
-        ? <p style={{color:'#4a5070', fontSize:'0.85rem', textAlign:'center', padding:20}}>オンラインのプレイヤーがいません</p>
-        : users.map(u => (
-          <div key={u.uid} style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'10px 12px', marginBottom:6}}>
-            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6}}>
-              <div style={{fontWeight:700, fontSize:'0.9rem'}}>⚔️ {u.displayName}</div>
-              <div style={{fontSize:'0.72rem', color:'#5b8dee', background:'rgba(91,141,238,0.1)', padding:'2px 7px', borderRadius:10}}>Lv.{u.level}</div>
-            </div>
-            <div style={{fontSize:'0.8rem', color:'#e8e6ff', marginBottom:u.lastDungeonCleared ? 4 : 6}}>
-              {u.currentActivity ? `🎮 ${u.currentActivity}` : '🟢 オンライン'}
-            </div>
-            {u.lastDungeonCleared && (
-              <div style={{fontSize:'0.72rem', color:'#f0c060', marginBottom:6}}>🏆 最近クリア: {u.lastDungeonCleared}</div>
-            )}
-            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-              <div style={{fontSize:'0.65rem', color:'#4a5070'}}>
-                最終確認: {new Date(u.lastSeen).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}
+      <h3 style={{color:'#9b6df0', marginBottom:4, fontSize:'0.95rem'}}>📡 プレイヤーアクティビティ</h3>
+      <p style={{fontSize:'0.72rem', color:'#4a5070', marginBottom:10}}>全プレイヤーの行動がリアルタイムで流れます</p>
+      <div style={{display:'flex', flexDirection:'column', gap:0, background:'#161b26', border:'1px solid #2d3752', borderRadius:10, overflow:'hidden', maxHeight:480, overflowY:'auto'}}>
+        {loading && (
+          <div style={{color:'#8a92b2', textAlign:'center', padding:24, fontSize:'0.85rem'}}>読み込み中...</div>
+        )}
+        {!loading && entries.length === 0 && (
+          <div style={{color:'#4a5070', textAlign:'center', padding:24, fontSize:'0.85rem'}}>まだ記録がありません</div>
+        )}
+        {entries.map((e, i) => {
+          const style = ACTIVITY_STYLE[e.type] ?? { emoji: '📌', color: '#8a92b2' };
+          const now = Date.now();
+          const diff = now - e.timestamp;
+          const timeLabel = diff < 60_000 ? 'たった今'
+            : diff < 3_600_000 ? `${Math.floor(diff/60_000)}分前`
+            : diff < 86_400_000 ? `${Math.floor(diff/3_600_000)}時間前`
+            : new Date(e.timestamp).toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' });
+          return (
+            <div key={i} style={{display:'flex', alignItems:'flex-start', gap:10, padding:'9px 12px', borderBottom: i < entries.length-1 ? '1px solid #1c2235' : 'none', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)'}}>
+              <span style={{fontSize:'1.1rem', minWidth:22, textAlign:'center', marginTop:1}}>{style.emoji}</span>
+              <div style={{flex:1, minWidth:0}}>
+                <span style={{fontSize:'0.8rem', color: style.color, fontWeight:600}}>{e.displayName} </span>
+                <span style={{fontSize:'0.8rem', color:'#c0bcd8'}}>{e.message}</span>
               </div>
-              <button
-                onClick={() => setDetailUser(u)}
-                style={{padding:'3px 10px', background:'rgba(155,109,240,0.15)', color:'#9b6df0', border:'1px solid rgba(155,109,240,0.4)', borderRadius:4, cursor:'pointer', fontSize:'0.72rem', fontWeight:600}}
-              >
-                📋 最近の活動を見る
-              </button>
+              <span style={{fontSize:'0.65rem', color:'#4a5070', whiteSpace:'nowrap', marginTop:3}}>{timeLabel}</span>
             </div>
-          </div>
-        ))
-      }
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -242,6 +200,7 @@ function AuctionPanel() {
       expiresAt: Date.now() + 24 * 60 * 60 * 1000,
     });
     addNotification('success', `${item.name} を出品しました！`);
+    postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'auction', message: `が「${item.name}」×${sellAmount}を${sellPrice.toLocaleString()}G/個で出品しました` }).catch(() => {});
   };
 
   return (
@@ -429,7 +388,7 @@ export function OnlineScreen() {
         ))}
       </div>
       {subTab === 'online'   && <OnlinePanel users={users} />}
-      {subTab === 'activity' && <ActivityPanel users={users} />}
+      {subTab === 'activity' && <ActivityPanel />}
       {subTab === 'board'    && <BoardPanel />}
       {subTab === 'auction'  && <AuctionPanel />}
       {subTab === 'ranking'  && <RankingPanel />}

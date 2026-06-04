@@ -6,7 +6,6 @@ import { GameIcon } from '../icons';
 import { useGameStore } from '../../stores/gameStore';
 import { GATHER_NODE_MASTER, ITEM_MASTER } from '../../data/masters';
 import type { GatherNodeMaster } from '../../types/game';
-import { savePlayer } from '../../services/database';
 import { randomChance, randomIntRange } from '../../utils/random';
 
 function calcGatherResult(node: GatherNodeMaster, skillLevel: number, toolBonus: number = 1) {
@@ -74,9 +73,22 @@ export function GatheringScreen() {
       : '何も手に入らなかった...';
     setLog(prev => [`[${node.name}] ${msgs}`, ...prev].slice(0, 20));
 
-    // 採取後にFirebase即時保存（リログで消えるバグを防ぐ）
+    // レアドロップ時のみフィードに投稿
+    const hasRare = result.drops.some(d => {
+      const item = ITEM_MASTER[d.itemId];
+      return item && (item.rarity === 'rare' || item.rarity === 'epic' || item.rarity === 'legendary');
+    });
+    if (hasRare && player) {
+      import('../../services/multiplayer').then(({ postActivityFeed }) => {
+        postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'mining', message: `が採掘で${msgs}を手に入れました！` }).catch(() => {});
+      });
+    }
+
+    // 採取後はlocalStorageのみバックアップ（Firebaseへの即時書き込みを廃止）
     const latestPlayer = useGameStore.getState().player;
-    if (latestPlayer) savePlayer(latestPlayer).catch(() => {});
+    if (latestPlayer) {
+      try { localStorage.setItem('rpg_backup', JSON.stringify({ data: latestPlayer, savedAt: Date.now() })); } catch { /* ignore */ }
+    }
 
     // クールダウン
     setCooldowns(prev => ({ ...prev, [nodeId]: node.cooldownMs }));
