@@ -132,7 +132,7 @@ function GameAnimation({ type, onDone }: { type: 'chohan'|'chinchiro'|'coin_flip
 }
 
 // ============================================================
-// PvP対戦バトルアニメーション
+// PvP対戦バトルアニメーション（インタラクティブ版）
 // ============================================================
 function BattleAnimation({ opponentName, gameName, result, onDone }: {
   opponentName: string;
@@ -140,66 +140,162 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
   result: { won: boolean; amount: number };
   onDone: () => void;
 }) {
-  const [phase, setPhase] = useState<'countdown' | 'fighting' | 'result'>('countdown');
-  const [count, setCount] = useState(3);
-  const [shakeDir, setShakeDir] = useState(1);
-
-  useEffect(() => {
-    const t1 = setInterval(() => {
-      setCount(c => {
-        if (c <= 1) { clearInterval(t1); setPhase('fighting'); return 0; }
-        return c - 1;
-      });
-    }, 700);
-    return () => clearInterval(t1);
-  }, []);
-
-  useEffect(() => {
-    if (phase !== 'fighting') return;
-    let cnt = 0;
-    const t = setInterval(() => {
-      setShakeDir(d => -d);
-      cnt++;
-      if (cnt >= 10) { clearInterval(t); setTimeout(() => setPhase('result'), 200); }
-    }, 180);
-    return () => clearInterval(t);
-  }, [phase]);
-
-  const GAME_EMOJIS: Record<string, string> = {
-    chohan: '🎲', chinchiro: '🎯', coin_flip: '🪙', slot_machine: '🎰',
-  };
   const GAME_NAMES_JP: Record<string, string> = {
     chohan: '丁半', chinchiro: 'チンチロリン', coin_flip: 'コインフリップ', slot_machine: 'スロット',
   };
-  const emoji = GAME_EMOJIS[gameName] ?? '🎮';
   const gameNameJp = GAME_NAMES_JP[gameName] ?? gameName;
 
+  // フェーズ: dice_roll（先攻決め） → choose（ユーザー選択） → reveal（結果表示） → result（勝敗）
+  type Phase = 'dice_roll' | 'choose' | 'reveal' | 'result';
+  const [phase, setPhase] = useState<Phase>('dice_roll');
+
+  // 先攻決めサイコロ
+  const [myDice, setMyDice] = useState(0);
+  const [oppDice, setOppDice] = useState(0);
+  const [diceFrame, setDiceFrame] = useState(0);
+  const [isFirst, setIsFirst] = useState(true); // 自分が先攻か
+
+  // ユーザー選択
+  const [userChoice, setUserChoice] = useState<string | null>(null);
+  const [revealResult, setRevealResult] = useState<string>('');
+
+  const DICE_EMOJI = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+
+  // サイコロアニメーション
+  useEffect(() => {
+    let cnt = 0;
+    const t = setInterval(() => {
+      setDiceFrame(f => (f + 1) % 6);
+      cnt++;
+      if (cnt >= 18) {
+        clearInterval(t);
+        const my = Math.floor(secureRandom() * 6) + 1;
+        // 引き分けを避ける
+        let opp = Math.floor(secureRandom() * 6) + 1;
+        while (opp === my) opp = Math.floor(secureRandom() * 6) + 1;
+        setMyDice(my);
+        setOppDice(opp);
+        setIsFirst(my > opp);
+        setTimeout(() => setPhase('choose'), 900);
+      }
+    }, 80);
+    return () => clearInterval(t);
+  }, []);
+
+  const handleChoose = (choice: string) => {
+    setUserChoice(choice);
+    // 結果に基づいてreveal表示
+    let reveal = '';
+    if (gameName === 'chohan') {
+      // resultのwon/lostをそのまま使う（サーバー側で決定済み）
+      const diceSum = Math.floor(secureRandom() * 5) + 2 + Math.floor(secureRandom() * 5);
+      const isEven = diceSum % 2 === 0;
+      const playerPicked = choice; // 'cho' or 'han'
+      reveal = `🎲 合計 ${diceSum}（${isEven ? '偶数＝丁' : '奇数＝半'}）`;
+    } else if (gameName === 'coin_flip') {
+      reveal = result.won
+        ? (choice === 'heads' ? '🌕 表が出た！' : '🌑 裏が出た！')
+        : (choice === 'heads' ? '🌑 裏が出た...' : '🌕 表が出た...');
+    } else if (gameName === 'chinchiro') {
+      const d = [Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1];
+      reveal = `🎲 ${d[0]} ${d[1]} ${d[2]}`;
+    } else if (gameName === 'slot_machine') {
+      const slots = result.won ? ['🍒','🍒','🍒'] : ['🍒','💎','🍋'];
+      reveal = slots.join(' ');
+    }
+    setRevealResult(reveal);
+    setPhase('reveal');
+    setTimeout(() => setPhase('result'), 1800);
+  };
+
+  // 選択肢定義
+  const getChoices = () => {
+    if (gameName === 'chohan') return [
+      { id: 'cho', label: '丁（偶数）', color: '#5b8dee' },
+      { id: 'han', label: '半（奇数）', color: '#e05555' },
+    ];
+    if (gameName === 'coin_flip') return [
+      { id: 'heads', label: '🌕 表', color: '#f0c060' },
+      { id: 'tails', label: '🌑 裏', color: '#8a92b2' },
+    ];
+    if (gameName === 'chinchiro') return [
+      { id: 'high', label: '🔼 ゾロ目・456', color: '#4caf87' },
+      { id: 'low',  label: '🔽 それ以外', color: '#e05555' },
+    ];
+    if (gameName === 'slot_machine') return [
+      { id: 'lucky', label: '🍒 ラッキー狙い', color: '#f0c060' },
+      { id: 'safe',  label: '💎 安定狙い', color: '#5b8dee' },
+    ];
+    return [{ id: 'go', label: '勝負！', color: '#5b8dee' }];
+  };
+
+  const overlayStyle: React.CSSProperties = {
+    position:'fixed', inset:0, zIndex:600, background:'rgba(0,0,0,0.95)',
+    display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:16,
+    padding:'0 24px',
+  };
+
   return (
-    <div style={{ position:'fixed', inset:0, zIndex:600, background:'rgba(0,0,0,0.93)', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:18 }}>
-      {phase === 'countdown' && (
+    <div style={overlayStyle}>
+      {/* 先攻決めサイコロ */}
+      {phase === 'dice_roll' && (
         <>
           <div style={{ fontSize:'0.9rem', color:'#8a92b2' }}>⚔️ {opponentName} との対戦</div>
-          <div style={{ fontSize:'6rem', fontWeight:900, color:'#f0c060', textShadow:'0 0 50px rgba(240,192,96,0.9)', lineHeight:1 }}>{count}</div>
-          <div style={{ fontSize:'0.85rem', color:'#4a5070' }}>{gameNameJp} で決着をつけろ！</div>
+          <div style={{ fontSize:'1rem', color:'#f0c060', fontWeight:700 }}>先攻を決めるサイコロを振っています...</div>
+          <div style={{ display:'flex', gap:32, alignItems:'center', marginTop:8 }}>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontSize:'0.8rem', color:'#5b8dee', marginBottom:4 }}>あなた</div>
+              <div style={{ fontSize:'3.5rem' }}>{myDice ? DICE_EMOJI[myDice-1] : DICE_EMOJI[diceFrame]}</div>
+              {myDice > 0 && <div style={{ fontSize:'1.2rem', fontWeight:700, color:'#e8e6ff' }}>{myDice}</div>}
+            </div>
+            <div style={{ fontSize:'1.5rem', color:'#4a5070' }}>VS</div>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontSize:'0.8rem', color:'#e05555', marginBottom:4 }}>{opponentName}</div>
+              <div style={{ fontSize:'3.5rem' }}>{oppDice ? DICE_EMOJI[oppDice-1] : DICE_EMOJI[(diceFrame+3)%6]}</div>
+              {oppDice > 0 && <div style={{ fontSize:'1.2rem', fontWeight:700, color:'#e8e6ff' }}>{oppDice}</div>}
+            </div>
+          </div>
+          {myDice > 0 && (
+            <div style={{ fontSize:'1rem', color: isFirst ? '#4caf87' : '#f0c060', fontWeight:700, marginTop:4 }}>
+              {isFirst ? '🥇 あなたの先攻！' : '🥈 相手の先攻...'}
+            </div>
+          )}
         </>
       )}
-      {phase === 'fighting' && (
+
+      {/* ユーザー選択フェーズ */}
+      {phase === 'choose' && (
         <>
-          <div style={{ fontSize:'3.5rem', transition:'transform 0.12s', transform: `translateX(${shakeDir * 14}px) rotate(${shakeDir * 6}deg)` }}>{emoji}</div>
-          <div style={{ fontSize:'1.3rem', fontWeight:700, color:'#e8e6ff' }}>対戦中...</div>
-          <div style={{ display:'flex', gap:24, alignItems:'center' }}>
-            <div style={{ textAlign:'center' }}>
-              <div style={{ fontSize:'1.8rem' }}>😤</div>
-              <div style={{ fontSize:'0.9rem', color:'#5b8dee', fontWeight:700 }}>あなた</div>
-            </div>
-            <div style={{ fontSize:'2rem' }}>⚡</div>
-            <div style={{ textAlign:'center' }}>
-              <div style={{ fontSize:'1.8rem' }}>😈</div>
-              <div style={{ fontSize:'0.9rem', color:'#e05555', fontWeight:700 }}>{opponentName}</div>
-            </div>
+          <div style={{ fontSize:'1.1rem', color:'#f0c060', fontWeight:700 }}>
+            {isFirst ? '🥇 先攻！' : '🥈 後攻'} — {gameNameJp}
+          </div>
+          <div style={{ fontSize:'0.9rem', color:'#8a92b2', textAlign:'center' }}>
+            {isFirst ? 'あなたが先に選んでください' : `${opponentName}が選びました。あなたも選んでください`}
+          </div>
+          <div style={{ display:'flex', gap:12, marginTop:8 }}>
+            {getChoices().map(c => (
+              <button key={c.id} onClick={() => handleChoose(c.id)}
+                style={{ padding:'14px 20px', background:`rgba(${c.color.replace('#','').match(/../g)!.map(h=>parseInt(h,16)).join(',')},0.2)`, border:`2px solid ${c.color}`, color:'#fff', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:'1rem', minWidth:100 }}>
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize:'0.75rem', color:'#4a5070', marginTop:4 }}>vs {opponentName}</div>
+        </>
+      )}
+
+      {/* 結果を見せるフェーズ */}
+      {phase === 'reveal' && (
+        <>
+          <div style={{ fontSize:'2rem' }}>{result.won ? '✨' : '💨'}</div>
+          <div style={{ fontSize:'1.5rem', fontWeight:700, color:'#e8e6ff', textAlign:'center' }}>{revealResult}</div>
+          <div style={{ fontSize:'1rem', color: result.won ? '#4caf87' : '#e05555', fontWeight:700 }}>
+            {result.won ? '勝ち！' : '負け...'}
           </div>
         </>
       )}
+
+      {/* 最終勝敗 */}
       {phase === 'result' && (
         <>
           <div style={{ fontSize:'4rem' }}>{result.won ? '🏆' : '💔'}</div>
@@ -209,7 +305,7 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
           <div style={{ fontSize:'1.3rem', color: result.won ? '#4caf87' : '#e05555', fontWeight:700 }}>
             {result.won ? `+${result.amount.toLocaleString()}G` : `-${result.amount.toLocaleString()}G`}
           </div>
-          <div style={{ fontSize:'0.82rem', color:'#8a92b2' }}>vs {opponentName}</div>
+          <div style={{ fontSize:'0.82rem', color:'#8a92b2' }}>vs {opponentName} / {gameNameJp}</div>
           <button onClick={onDone} style={{ marginTop:10, padding:'11px 32px', background: result.won ? 'linear-gradient(135deg,#4caf87,#2d8060)' : 'linear-gradient(135deg,#555,#333)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'0.95rem' }}>
             閉じる
           </button>
