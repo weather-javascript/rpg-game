@@ -156,7 +156,6 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
   const [isFirst, setIsFirst] = useState(true); // 自分が先攻か
 
   // ユーザー選択
-  const [userChoice, setUserChoice] = useState<string | null>(null);
   const [revealResult, setRevealResult] = useState<string>('');
 
   const DICE_EMOJI = ['⚀','⚁','⚂','⚃','⚄','⚅'];
@@ -183,7 +182,6 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
   }, []);
 
   const handleChoose = (choice: string) => {
-    setUserChoice(choice);
     let reveal = '';
     if (gameName === 'chohan' || gameName === 'coin_flip') {
       // 先攻が選択 → 後攻は自動で逆が割り当てられる
