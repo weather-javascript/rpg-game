@@ -11,7 +11,7 @@ import {
   subscribeOnlineUsers, subscribeBoardMessages, postBoardMessage,
   subscribeAuctions, createAuction, buyAuction, cancelAuction,
   subscribeAllPlayersAdmin,
-  subscribeActivityFeed, ActivityFeedEntry,
+  subscribeActivityFeed, ActivityFeedEntry, postActivityFeed,
 } from '../../services/multiplayer';
 import type { OnlineUser, BoardMessage, AuctionListing } from '../../types/game';
 
