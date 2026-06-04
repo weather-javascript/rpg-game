@@ -224,6 +224,7 @@ export interface DungeonRunState {
   dungeonId: string;
   currentFloor: number;
   currentAreaName: string;
+  currentAreaIdx?: number;
   monstersDefeated: number;
   totalExp: number;
   totalGold: number;

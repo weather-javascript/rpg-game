@@ -53,7 +53,7 @@ function HotbarPanel({ equipment, inventory, onSlotClick }: {
   inventory: Record<string, number>;
   onSlotClick: (slot: string, idx?: number) => void;
 }) {
-  const usableItems = Object.entries(inventory)
+  const _usableItems = Object.entries(inventory)
     .filter(([id, qty]) => qty > 0 && ITEM_MASTER[id] && ['consumable','potion','food'].includes(ITEM_MASTER[id].category))
     .map(([id]) => id);
 
@@ -263,7 +263,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape }: {
     if (!item?.useEffect) { addNotification('warning', `${item?.name}は使用できません`); return; }
     const ok = consumeItem(itemId, 1);
     if (!ok) { addNotification('warning', `${item.name}が足りません`); return; }
-    const { hpRestore, satietyRestore, message } = item.useEffect;
+    const { hpRestore, satietyRestore: _satietyRestore, message } = item.useEffect;
     if (hpRestore && hpRestore > 0) changeHp(Math.min(hpRestore, player.stats.maxHp - player.stats.hp));
     const logMsg = message ?? `${item.name}を使用した`;
     const log = [...battle.log, { text: `🧪 ${logMsg}`, color: '#9b6df0' }];
@@ -489,7 +489,7 @@ function DungeonCard({ dungeon, selected, onSelect, playerLevel, clearedCount, i
 // ============================================================
 export function DungeonScreen() {
   const player = useGameStore(s => s.player);
-  const changeHp = useGameStore(s => s.changeHp);
+  const _changeHp = useGameStore(s => s.changeHp);
   const addItems = useGameStore(s => s.addItems);
   const changeGold = useGameStore(s => s.changeGold);
   const addExp = useGameStore(s => s.addExp);
@@ -501,10 +501,10 @@ export function DungeonScreen() {
   const isDungeonUnlocked = useGameStore(s => s.isDungeonUnlocked);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [runState, setRunState] = useState<DungeonRunState & { currentAreaIdx?: number } | null>(null);
+  const [runState, setRunState] = useState<DungeonRunState | null>(null);
   const [inBattle, setInBattle] = useState(false);
   const [battleKey, setBattleKey] = useState(0); // バトルコンポーネント再生成用
-  const [equipment, setEquipment] = useState<EquipmentSlots>(() => player?.equipment ?? defaultEquipmentSlots());
+  const [equipment, _setEquipment] = useState<EquipmentSlots>(() => player?.equipment ?? defaultEquipmentSlots());
   const [showUnlockGuide, setShowUnlockGuide] = useState(false);
   const [runLog, setRunLog] = useState<string[]>([]);
 
