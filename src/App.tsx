@@ -13,7 +13,7 @@ import { StatusScreen }    from './components/screens/StatusScreen';
 import { OnlineScreen }    from './components/screens/OnlineScreen';
 import { FishingScreen }   from './components/screens/FishingScreen';
 import { AdminScreen }     from './components/screens/AdminScreen';
-import { subscribeSoldNotifications, markSoldNotificationRead } from './services/multiplayer';
+import { subscribeSoldNotifications, markSoldNotificationRead, subscribeMaintenanceStatus } from './services/multiplayer';
 import { onSnapshot, doc } from 'firebase/firestore';
 import { db } from './services/firebase';
 import { ITEM_MASTER, VERSION_PATCHES } from './data/masters';
@@ -64,6 +64,69 @@ function LoadingScreen() {
           <div style={{ height:'100%', background:'linear-gradient(90deg,#5b8dee,#f0c060)', width:`${progress}%`, transition:'width 0.3s ease', borderRadius:2 }} />
         </div>
         <p style={{ color:'#8a92b2', fontSize:'0.82rem', margin:0, textAlign:'center', minHeight:20 }}>{hint}{dots}</p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// 管理者UID（メンテナンス免除）
+const ADMIN_UIDS = ['jJ7BrZ0HhpeC5WYsdZbjRlQBRzK2', '49yFkciBJLhFbFq7YJrbg8dI8rf2'];
+
+// ============================================================
+// メンテナンス画面
+// ============================================================
+function MaintenanceScreen({ startedAt, estimatedMinutes }: { startedAt: number; estimatedMinutes: number }) {
+  const startTime = new Date(startedAt).toLocaleString('ja-JP');
+  const endTime = new Date(startedAt + estimatedMinutes * 60 * 1000).toLocaleString('ja-JP');
+  return (
+    <div style={{ minHeight:'100vh', background:'#0d0f14', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div style={{ textAlign:'center', color:'#e8e6ff' }}>
+        <div style={{ fontSize:'3rem', marginBottom:16 }}>🔧</div>
+        <h2 style={{ color:'#f0c060', fontFamily:'Cinzel,serif', marginBottom:12 }}>メンテナンス中です</h2>
+        <p style={{ color:'#8a92b2', lineHeight:1.8 }}>
+          メンテナンス終了までしばらくお待ち下さい<br />
+          メンテナンス開始時間「{startTime}」<br />
+          メンテナンス終了予定時刻「{endTime}」
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ADMINからのお知らせポップアップ
+// ============================================================
+function AdminAnnouncementPopup({ onClose }: { onClose: () => void }) {
+  const [announcements, setAnnouncements] = useState<Array<{ id: string; text: string; timestamp: number }>>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    import('./services/multiplayer').then(m => {
+      m.getAnnouncementHistory().then(list => { setAnnouncements(list); setLoading(false); });
+    });
+  }, []);
+  return (
+    <div style={{ background:'rgba(0,0,0,0.85)', position:'fixed', inset:0, zIndex:600, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <div style={{ background:'#1c2235', border:'2px solid #5b8dee', borderRadius:14, padding:20, width:'100%', maxWidth:460, maxHeight:'80vh', overflowY:'auto' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+          <h2 style={{ color:'#5b8dee', fontFamily:'Cinzel,serif', margin:0, fontSize:'1.1rem' }}>📢 ADMINからのお知らせ</h2>
+          <button onClick={onClose} style={{ background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontSize:'0.85rem' }}>✕ 閉じる</button>
+        </div>
+        {loading ? (
+          <div style={{ textAlign:'center', color:'#4a5070', padding:'20px 0' }}>読み込み中...</div>
+        ) : announcements.length === 0 ? (
+          <div style={{ textAlign:'center', color:'#4a5070', padding:'20px 0' }}>お知らせはありません</div>
+        ) : (
+          announcements.map(a => (
+            <div key={a.id} style={{ background:'#161b26', border:'1px solid #2d3752', borderRadius:8, padding:'10px 12px', marginBottom:8 }}>
+              <div style={{ fontSize:'0.72rem', color:'#4a5070', marginBottom:4 }}>{new Date(a.timestamp).toLocaleString('ja-JP')}</div>
+              <div style={{ fontSize:'0.88rem', color:'#e8e6ff' }}>{a.text}</div>
+            </div>
+          ))
+        )}
+        <button onClick={onClose} style={{ width:'100%', padding:'10px', background:'linear-gradient(135deg,#5b8dee,#3a6fd0)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, marginTop:8 }}>
+          閉じる
+        </button>
       </div>
     </div>
   );
@@ -323,14 +386,23 @@ export default function App() {
 
   // バージョン更新ポップアップ（毎回表示）
   const [showVersionPopup, setShowVersionPopup] = useState(false);
+  const [showAdminAnnounce, setShowAdminAnnounce] = useState(false);
+  const [maintenanceStatus, setMaintenanceStatus] = useState<{ active: boolean; startedAt: number; estimatedMinutes: number } | null>(null);
   const [soldPopup, setSoldPopup] = useState<SoldPopupInfo | null>(null);
   useEffect(() => {
     if (!player) return;
     setShowVersionPopup(true);
   }, [player?.uid]);
 
+  // メンテナンス監視
+  useEffect(() => {
+    const unsub = subscribeMaintenanceStatus(s => setMaintenanceStatus(s));
+    return unsub;
+  }, []);
+
   const handleCloseVersionPopup = () => {
     setShowVersionPopup(false);
+    setShowAdminAnnounce(true);
   };
 
   // お知らせ購読（Firestoreのshared/announcementをリアルタイム監視）
@@ -383,9 +455,15 @@ export default function App() {
 
   if (isAuthLoading || !player) return <LoadingScreen />;
 
+  // メンテナンス中チェック（ADMIN除く）
+  if (maintenanceStatus?.active && !ADMIN_UIDS.includes(player.uid)) {
+    return <MaintenanceScreen startedAt={maintenanceStatus.startedAt} estimatedMinutes={maintenanceStatus.estimatedMinutes} />;
+  }
+
   return (
     <div style={{ maxWidth:900, margin:'0 auto', minHeight:'100vh', background:'#0d0f14' }}>
       {showVersionPopup && <VersionPopup onClose={handleCloseVersionPopup} />}
+      {showAdminAnnounce && <AdminAnnouncementPopup onClose={() => setShowAdminAnnounce(false)} />}
       {soldPopup && <SoldPopup info={soldPopup} onClose={() => setSoldPopup(null)} />}
       <StatusBar />
       <main style={{ paddingBottom:72 }}>

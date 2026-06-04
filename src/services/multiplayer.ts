@@ -193,6 +193,73 @@ export function subscribeGambleBattles(cb: (battles: GambleBattle[]) => void): U
   });
 }
 
+function _rollDice(n = 6) { return Math.floor(Math.random() * n) + 1; }
+
+function _resolveChohan(): boolean {
+  // 先行決め: 出目が多い方が丁か半を選べる（ここではホストが先行）
+  const hostOrder = _rollDice() + _rollDice();
+  const guestOrder = _rollDice() + _rollDice();
+  const hostGoesFirst = hostOrder >= guestOrder; // ホストが先行なら丁（偶数）を選択
+  const d1 = _rollDice(), d2 = _rollDice();
+  const sum = d1 + d2;
+  const isEven = sum % 2 === 0;
+  // 先行が丁を選ぶ
+  return hostGoesFirst ? isEven : !isEven;
+}
+
+function _chinchiroScore(dice: number[]): number {
+  const d = dice.slice().sort((a,b)=>a-b);
+  if (d[0]===1 && d[1]===1 && d[2]===1) return 1000; // ピンゾロ
+  if (d[0]===4 && d[1]===5 && d[2]===6) return 500;  // シゴロ
+  if (d[0]===d[1] && d[1]===d[2]) return 300 + d[0]; // ゾロ目
+  if (d[0]===1 && d[1]===2 && d[2]===3) return -1;   // ヒフミ（負け）
+  // 数字目: 連番なら最大値
+  if (d[2]-d[0]===2 && new Set(d).size===3) return d[2] >= 4 ? d[2] : 0;
+  return 0; // 目なし（振り直し扱い → 0点）
+}
+
+function _resolveChinchiro(): boolean {
+  // 3サイコロ × 最大3回振り直し、スコアが高い方が勝ち
+  const roll = () => [_rollDice(),_rollDice(),_rollDice()];
+  let hostScore = 0, guestScore = 0;
+  for (let i = 0; i < 3 && hostScore === 0; i++) hostScore = _chinchiroScore(roll());
+  for (let i = 0; i < 3 && guestScore === 0; i++) guestScore = _chinchiroScore(roll());
+  if (hostScore === guestScore) return Math.random() < 0.5;
+  return hostScore > guestScore;
+}
+
+function _resolveCoinFlip(): boolean {
+  // 先行決めサイコロ → 先行がコインを選ぶ
+  const hostFirst = _rollDice() >= _rollDice();
+  // 先行が表を選ぶ、コインはランダム
+  return hostFirst ? (Math.random() < 0.5) : (Math.random() >= 0.5);
+}
+
+const SLOT_SYMBOLS = ['🍒','🍋','💎','7️⃣','🔔','💰'];
+function _slotRank(reels: string[]): number {
+  if (reels[0]===reels[1] && reels[1]===reels[2]) {
+    return reels[0]==='7️⃣' ? 100 : reels[0]==='💎' ? 50 : SLOT_SYMBOLS.indexOf(reels[0]) + 10;
+  }
+  if (reels[0]===reels[1] || reels[1]===reels[2]) return 1;
+  return 0;
+}
+
+function _resolveSlot(): boolean {
+  // 先行決めサイコロ → スロットを回して役が出るまで（最大5回）
+  const spinUntilRoll = (): number => {
+    for (let i = 0; i < 5; i++) {
+      const reels = [0,1,2].map(() => SLOT_SYMBOLS[Math.floor(Math.random()*SLOT_SYMBOLS.length)]);
+      const rank = _slotRank(reels);
+      if (rank > 0) return rank;
+    }
+    return 0;
+  };
+  const hostRank = spinUntilRoll();
+  const guestRank = spinUntilRoll();
+  if (hostRank === guestRank) return Math.random() < 0.5;
+  return hostRank > guestRank;
+}
+
 export async function joinGambleBattle(
   battleId: string,
   guestUid: string, guestName: string
@@ -204,8 +271,15 @@ export async function joinGambleBattle(
   if (battle.status !== 'waiting') return { success: false, battle };
   if (battle.hostUid === guestUid) return { success: false, battle };
 
-  // 勝敗を決定（50/50）
-  const hostWins = Math.random() < 0.5;
+  // ゲームタイプに応じた対戦ロジック
+  let hostWins: boolean;
+  const gt = battle.gambleType;
+  if (gt === 'chohan') hostWins = _resolveChohan();
+  else if (gt === 'chinchiro') hostWins = _resolveChinchiro();
+  else if (gt === 'coin_flip') hostWins = _resolveCoinFlip();
+  else if (gt === 'slot_machine') hostWins = _resolveSlot();
+  else hostWins = Math.random() < 0.5;
+
   const winnerId = hostWins ? battle.hostUid : guestUid;
   await updateDoc(ref, { status: 'finished', guestUid, guestName, winnerId });
 
@@ -310,4 +384,67 @@ export async function getPlayerActivityLog(uid: string): Promise<Array<{ type: s
   } catch {
     return [];
   }
+}
+
+// ============================================================
+// メンテナンスモード & ジャックポット率
+// ============================================================
+export interface MaintenanceStatus {
+  active: boolean;
+  startedAt: number;
+  estimatedMinutes: number;
+  message?: string;
+}
+
+export async function getMaintenanceStatus(): Promise<MaintenanceStatus | null> {
+  const snap = await getDoc(doc(db, 'admin', 'maintenance'));
+  if (!snap.exists()) return null;
+  return snap.data() as MaintenanceStatus;
+}
+
+export function subscribeMaintenanceStatus(cb: (s: MaintenanceStatus | null) => void): Unsubscribe {
+  return onSnapshot(doc(db, 'admin', 'maintenance'), snap => {
+    cb(snap.exists() ? (snap.data() as MaintenanceStatus) : null);
+  });
+}
+
+export async function setMaintenanceStatus(status: MaintenanceStatus): Promise<void> {
+  await setDoc(doc(db, 'admin', 'maintenance'), status);
+}
+
+export async function getJackpotRate(): Promise<number> {
+  const snap = await getDoc(doc(db, 'admin', 'jackpot_settings'));
+  if (!snap.exists()) return 0.20;
+  return (snap.data() as { rate: number }).rate ?? 0.20;
+}
+
+export async function setJackpotRate(rate: number): Promise<void> {
+  await setDoc(doc(db, 'admin', 'jackpot_settings'), { rate });
+}
+
+export function subscribeJackpotRate(cb: (rate: number) => void): Unsubscribe {
+  return onSnapshot(doc(db, 'admin', 'jackpot_settings'), snap => {
+    cb(snap.exists() ? ((snap.data() as { rate: number }).rate ?? 0.20) : 0.20);
+  });
+}
+
+// お知らせ履歴
+export interface AnnouncementRecord {
+  id: string;
+  text: string;
+  timestamp: number;
+}
+
+export async function getAnnouncementHistory(): Promise<AnnouncementRecord[]> {
+  try {
+    const { query, collection: col, orderBy: ob, limit: lim, getDocs } = await import('firebase/firestore');
+    const q = query(col(db, 'announcements'), ob('timestamp', 'desc'), lim(30));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<AnnouncementRecord,'id'>) }));
+  } catch { return []; }
+}
+
+export async function saveAnnouncementToHistory(text: string): Promise<void> {
+  const { addDoc, collection: col } = await import('firebase/firestore');
+  await addDoc(col(db, 'announcements'), { text, timestamp: Date.now() });
 }

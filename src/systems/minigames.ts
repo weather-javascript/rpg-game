@@ -34,8 +34,12 @@ export function playChohan(bet: number, choice: 'cho' | 'han'): GambleResult & {
   let label: string;
 
   if (isDouble) {
-    multiplier = 0.5;
-    label = `ゾロ目（${d1}-${d2}）引き分け`;
+    // ゾロ目は必ず偶数になるため丁（偶数）扱い
+    const wonAsCho = choice === 'cho';
+    multiplier = wonAsCho ? 2.0 : 0;
+    label = wonAsCho
+      ? `ゾロ目（${d1}-${d2}）偶数 → 丁当たり！`
+      : `ゾロ目（${d1}-${d2}）偶数 → 丁なのでハズレ`;
   } else if ((isEven && choice === 'cho') || (!isEven && choice === 'han')) {
     multiplier = 2.0;
     label = `${choice === 'cho' ? '丁（偶数）' : '半（奇数）'} 当たり！ (${d1}+${d2}=${sum})`;

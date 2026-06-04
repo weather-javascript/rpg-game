@@ -4,11 +4,14 @@ import { useState, useEffect } from 'react';
 import {
   getAllPlayersAdmin, subscribeAllPlayersAdmin,
   updatePlayerAdmin, getGambleMultipliers, setGambleMultipliers,
+  setMaintenanceStatus, getMaintenanceStatus,
+  setJackpotRate, getJackpotRate,
+  saveAnnouncementToHistory, getAnnouncementHistory,
 } from '../../services/multiplayer';
 import { GAMBLE_MASTER, DUNGEON_MASTER } from '../../data/masters';
 import { useGameStore } from '../../stores/gameStore';
 
-type SubTab = 'players' | 'gamble' | 'announce' | 'stats';
+type SubTab = 'players' | 'gamble' | 'announce' | 'stats' | 'system';
 
 export function AdminScreen() {
   const setActiveTab = useGameStore(s => s.setActiveTab);
@@ -27,6 +30,10 @@ export function AdminScreen() {
   const [announceText, setAnnounceText] = useState('');
   const [playerFilter, setPlayerFilter] = useState('');
   const [confirmBan, setConfirmBan] = useState<string | null>(null);
+  const [jackpotRate, setJackpotRateState] = useState(0.20);
+  const [maintenanceActive, setMaintenanceActive] = useState(false);
+  const [maintenanceMinutes, setMaintenanceMinutes] = useState(30);
+  const [announceHistory, setAnnounceHistory] = useState<Array<{ id: string; text: string; timestamp: number }>>([]);
 
   // リアルタイム購読でプレイヤー一覧を取得
   useEffect(() => {
@@ -51,6 +58,9 @@ export function AdminScreen() {
 
     // ギャンブル倍率取得
     getGambleMultipliers().then(m => setMultipliers(m)).catch(() => {});
+    getJackpotRate().then(r => setJackpotRateState(r)).catch(() => {});
+    getMaintenanceStatus().then(s => { if (s) setMaintenanceActive(s.active); }).catch(() => {});
+    getAnnouncementHistory().then(h => setAnnounceHistory(h)).catch(() => {});
 
     // onSnapshotでリアルタイム更新も試みる
     const unsub = subscribeAllPlayersAdmin(ps => {
@@ -157,9 +167,10 @@ export function AdminScreen() {
 
   const SUB_TABS: { id: SubTab; label: string; icon: string }[] = [
     { id: 'players',  label: 'プレイヤー', icon: '👥' },
-    { id: 'stats',    label: '統計',       icon: '📊' },
     { id: 'gamble',   label: 'ギャンブル', icon: '🎰' },
     { id: 'announce', label: 'お知らせ',   icon: '📢' },
+    { id: 'system',   label: 'システム',   icon: '⚙️' },
+    { id: 'stats',    label: '統計',       icon: '📊' },
   ];
 
   return (
@@ -353,6 +364,9 @@ export function AdminScreen() {
                   createdAt: Date.now(),
                   type: 'admin',
                 });
+                await saveAnnouncementToHistory(announceText);
+                const h = await getAnnouncementHistory();
+                setAnnounceHistory(h);
                 addNotification('success', 'お知らせを配信しました');
                 setAnnounceText('');
               } catch (e: any) {
@@ -364,8 +378,89 @@ export function AdminScreen() {
             style={{width:'100%', padding:'10px', background: announceText.trim() ? 'linear-gradient(135deg,#5b8dee,#3d6fd0)' : '#2d3752', color:'#fff', border:'none', borderRadius:8, cursor: announceText.trim() ? 'pointer' : 'not-allowed', fontWeight:700, fontSize:'0.9rem'}}>
             {saving ? '配信中...' : '📢 全プレイヤーに配信'}
           </button>
-          <div style={{marginTop:16, background:'#161b26', border:'1px solid #2d3752', borderRadius:8, padding:10, fontSize:'0.75rem', color:'#4a5070'}}>
-            💡 配信したお知らせはゲームを開いたプレイヤーの画面に通知として表示されます。
+          <div style={{marginTop:16}}>
+            <div style={{fontSize:'0.82rem', color:'#f0c060', fontWeight:700, marginBottom:8}}>📋 過去のお知らせ一覧</div>
+            {announceHistory.length === 0 ? (
+              <div style={{color:'#4a5070', fontSize:'0.78rem', textAlign:'center', padding:'10px 0'}}>履歴なし</div>
+            ) : announceHistory.map(a => (
+              <div key={a.id} style={{background:'#161b26', border:'1px solid #2d3752', borderRadius:6, padding:'8px 10px', marginBottom:6}}>
+                <div style={{fontSize:'0.68rem', color:'#4a5070', marginBottom:3}}>{new Date(a.timestamp).toLocaleString('ja-JP')}</div>
+                <div style={{fontSize:'0.82rem', color:'#e8e6ff'}}>{a.text}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ===== システム設定 ===== */}
+      {subTab === 'system' && (
+        <div>
+          {/* ジャックポット率 */}
+          <div style={{marginBottom:18, background:'#161b26', border:'1px solid #2d3752', borderRadius:8, padding:14}}>
+            <div style={{fontSize:'0.9rem', fontWeight:700, color:'#f0c060', marginBottom:10}}>🌟 ジャックポット積立率</div>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:10}}>
+              <input
+                type="number" step="0.01" min="0" max="1"
+                value={jackpotRate}
+                onChange={e => setJackpotRateState(Number(e.target.value))}
+                style={{width:90, padding:'6px 8px', background:'#1c2235', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.9rem'}}
+              />
+              <span style={{color:'#8a92b2', fontSize:'0.85rem'}}>（平常時: 0.20 = 20%）</span>
+            </div>
+            <button onClick={async () => {
+              setSaving(true);
+              try {
+                await setJackpotRate(jackpotRate);
+                addNotification('success', `ジャックポット率を${(jackpotRate*100).toFixed(0)}%に設定しました`);
+              } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
+              setSaving(false);
+            }} disabled={saving}
+              style={{padding:'8px 16px', background:'linear-gradient(135deg,#f0a830,#c08020)', color:'#000', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.85rem'}}>
+              💾 保存
+            </button>
+          </div>
+
+          {/* メンテナンスモード */}
+          <div style={{background:'#161b26', border:`1px solid ${maintenanceActive ? '#e05555' : '#2d3752'}`, borderRadius:8, padding:14}}>
+            <div style={{fontSize:'0.9rem', fontWeight:700, color: maintenanceActive ? '#e05555' : '#f0c060', marginBottom:10}}>
+              🔧 メンテナンスモード {maintenanceActive ? '【稼働中】' : '【オフ】'}
+            </div>
+            {!maintenanceActive ? (
+              <div>
+                <div style={{fontSize:'0.78rem', color:'#8a92b2', marginBottom:6}}>メンテナンス予定時間（分）</div>
+                <input
+                  type="number" min="1" max="1440"
+                  value={maintenanceMinutes}
+                  onChange={e => setMaintenanceMinutes(Number(e.target.value))}
+                  style={{width:100, padding:'6px 8px', background:'#1c2235', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.9rem', marginBottom:10}}
+                />
+                <button onClick={async () => {
+                  setSaving(true);
+                  try {
+                    await setMaintenanceStatus({ active: true, startedAt: Date.now(), estimatedMinutes: maintenanceMinutes });
+                    setMaintenanceActive(true);
+                    addNotification('success', 'メンテナンスモードを開始しました');
+                  } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
+                  setSaving(false);
+                }} disabled={saving}
+                  style={{display:'block', width:'100%', padding:'10px', background:'linear-gradient(135deg,#e05555,#c03030)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'0.9rem'}}>
+                  🔧 メンテナンス開始
+                </button>
+              </div>
+            ) : (
+              <button onClick={async () => {
+                setSaving(true);
+                try {
+                  await setMaintenanceStatus({ active: false, startedAt: 0, estimatedMinutes: 0 });
+                  setMaintenanceActive(false);
+                  addNotification('success', 'メンテナンスモードを終了しました');
+                } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
+                setSaving(false);
+              }} disabled={saving}
+                style={{width:'100%', padding:'10px', background:'linear-gradient(135deg,#4caf87,#2d8060)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'0.9rem'}}>
+                ✅ メンテナンス終了（平常運転に戻す）
+              </button>
+            )}
           </div>
         </div>
       )}
