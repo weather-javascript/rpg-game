@@ -143,6 +143,20 @@ export interface PlayerStats {
   defense: number;
 }
 
+// ホットバー（9スロット）+ 防具枠 + オフハンド
+export interface EquipmentSlots {
+  hotbar: (string | null)[];   // length 9, itemId or null
+  helmet: string | null;
+  chestplate: string | null;
+  leggings: string | null;
+  boots: string | null;
+  offhand: string | null;
+}
+
+export function defaultEquipmentSlots(): EquipmentSlots {
+  return { hotbar: Array(9).fill(null), helmet: null, chestplate: null, leggings: null, boots: null, offhand: null };
+}
+
 export interface PlayerData {
   uid: string;
   displayName: string;
@@ -160,6 +174,8 @@ export interface PlayerData {
   activeBuffs: { id: string; name: string; expiry: number; fishingBonus?: number; miningBonus?: number }[];
   reliefUsedCount: number;
   reliefLastUsed: number;
+  // ホットバー・装備枠
+  equipment?: EquipmentSlots;
   // HP/満腹度の自動回復用タイムスタンプ
   lastRegenAt?: number;
   // メール通知設定

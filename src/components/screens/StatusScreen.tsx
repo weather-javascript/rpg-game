@@ -6,6 +6,164 @@ import { ITEM_MASTER, SKILL_MASTER, EXP_TABLE, SKILL_EXP_TABLE, CRAFT_RECIPES } 
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 
+// src/components/screens/StatusScreen.tsx
+import { useState } from 'react';
+import { GameIcon } from '../icons';
+import { useGameStore } from '../../stores/gameStore';
+import { ITEM_MASTER, SKILL_MASTER, EXP_TABLE, SKILL_EXP_TABLE, CRAFT_RECIPES } from '../../data/masters';
+import { updateDoc, doc } from 'firebase/firestore';
+import { db } from '../../services/firebase';
+import type { EquipmentSlots } from '../../types/game';
+import { defaultEquipmentSlots } from '../../types/game';
+
+// ============================================================
+// 装備・ホットバーパネル
+// ============================================================
+const ARMOR_SLOTS = [
+  { key: 'helmet',     label: '🪖 ヘルメット' },
+  { key: 'chestplate', label: '🛡️ チェストプレート' },
+  { key: 'leggings',   label: '👖 レギンス' },
+  { key: 'boots',      label: '👟 ブーツ' },
+  { key: 'offhand',    label: '✋ オフハンド' },
+] as const;
+
+function EquipmentPanel() {
+  const player = useGameStore(s => s.player);
+  const addNotification = useGameStore(s => s.addNotification);
+  const [equipment, setEquipment] = useState<EquipmentSlots>(() => player?.equipment ?? defaultEquipmentSlots());
+  const [selectingSlot, setSelectingSlot] = useState<{ slot: string; idx?: number } | null>(null);
+
+  if (!player) return null;
+
+  const eligibleFor = (slot: string) => {
+    const isArmor = ARMOR_SLOTS.some(s => s.key === slot);
+    return Object.entries(player.inventory)
+      .filter(([id, qty]) => qty > 0 && ITEM_MASTER[id] && (isArmor
+        ? ['armor','weapon'].includes(ITEM_MASTER[id].category)
+        : ['consumable','potion','food','weapon','armor'].includes(ITEM_MASTER[id].category)))
+      .map(([id]) => id);
+  };
+
+  const setSlot = (slot: string, idx: number | undefined, itemId: string | null) => {
+    setEquipment(prev => {
+      const next = { ...prev, hotbar: [...prev.hotbar] };
+      if (slot === 'hotbar' && idx !== undefined) next.hotbar[idx] = itemId;
+      else (next as any)[slot] = itemId;
+      return next;
+    });
+    // playerのequipmentに保存
+    useGameStore.setState(s => ({
+      player: s.player ? { ...s.player, equipment: (() => {
+        const next = { ...(s.player.equipment ?? defaultEquipmentSlots()), hotbar: [...(s.player.equipment?.hotbar ?? Array(9).fill(null))] };
+        if (slot === 'hotbar' && idx !== undefined) next.hotbar[idx] = itemId;
+        else (next as any)[slot] = itemId;
+        return next;
+      })() } : s.player
+    }));
+    addNotification('info', itemId ? `${ITEM_MASTER[itemId]?.name} をセットしました` : 'スロットを空にしました');
+  };
+
+  return (
+    <div>
+      <div style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:8}}>
+        ホットバーや防具枠にアイテムをセットしておくと、ダンジョンで素早く使用できます。
+      </div>
+
+      {/* ホットバー */}
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:'0.82rem', fontWeight:700, color:'#5b8dee', marginBottom:6}}>🎒 ホットバー（9スロット）</div>
+        <div style={{display:'flex', gap:5, flexWrap:'wrap'}}>
+          {equipment.hotbar.map((itemId, i) => {
+            const item = itemId ? ITEM_MASTER[itemId] : null;
+            const qty = itemId ? (player.inventory[itemId] ?? 0) : 0;
+            return (
+              <button key={i} onClick={() => setSelectingSlot({ slot:'hotbar', idx:i })}
+                title={item?.name ?? `スロット${i+1}`}
+                style={{
+                  width:44, height:44, background: item ? 'rgba(91,141,238,0.15)' : '#161b26',
+                  border:`1px solid ${item ? '#5b8dee' : '#2d3752'}`, borderRadius:8, cursor:'pointer',
+                  position:'relative', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                }}>
+                {item
+                  ? <><GameIcon id={item.icon} size={20} /><span style={{fontSize:'0.55rem', color:'#f0c060'}}>×{qty}</span></>
+                  : <span style={{fontSize:'0.7rem', color:'#4a5070'}}>{i+1}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 防具枠 */}
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:'0.82rem', fontWeight:700, color:'#4caf87', marginBottom:6}}>🛡️ 防具・オフハンド枠</div>
+        <div style={{display:'flex', flexDirection:'column', gap:6}}>
+          {ARMOR_SLOTS.map(({ key, label }) => {
+            const itemId = equipment[key as keyof EquipmentSlots] as string | null;
+            const item = itemId ? ITEM_MASTER[itemId] : null;
+            return (
+              <button key={key} onClick={() => setSelectingSlot({ slot: key })}
+                style={{
+                  display:'flex', alignItems:'center', gap:10, padding:'8px 12px',
+                  background: item ? 'rgba(76,175,135,0.12)' : '#161b26',
+                  border:`1px solid ${item ? '#4caf87' : '#2d3752'}`, borderRadius:8, cursor:'pointer', color:'#e8e6ff', textAlign:'left',
+                }}>
+                <span style={{width:28, textAlign:'center', fontSize:'1.2rem'}}>{label.split(' ')[0]}</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:'0.75rem', color:'#8a92b2'}}>{label.split(' ').slice(1).join(' ')}</div>
+                  {item
+                    ? <div style={{fontSize:'0.85rem', fontWeight:700, color:'#4caf87'}}><GameIcon id={item.icon} size={14} style={{marginRight:4}} />{item.name}</div>
+                    : <div style={{fontSize:'0.82rem', color:'#4a5070'}}>未装備（クリックでセット）</div>}
+                </div>
+                {item && (
+                  <button onClick={e => { e.stopPropagation(); setSlot(key, undefined, null); }}
+                    style={{padding:'3px 8px', background:'rgba(224,85,85,0.15)', color:'#e05555', border:'1px solid #e05555', borderRadius:4, cursor:'pointer', fontSize:'0.72rem'}}>
+                    外す
+                  </button>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* アイテム選択モーダル */}
+      {selectingSlot && (
+        <div style={{position:'fixed', inset:0, zIndex:400, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center'}}>
+          <div style={{background:'#1c2235', border:'2px solid #5b8dee', borderRadius:12, padding:16, width:'90%', maxWidth:340, maxHeight:'70vh', overflowY:'auto'}}>
+            <div style={{display:'flex', justifyContent:'space-between', marginBottom:10}}>
+              <span style={{fontWeight:700, color:'#5b8dee', fontSize:'0.9rem'}}>
+                {selectingSlot.slot === 'hotbar' ? `ホットバー ${(selectingSlot.idx??0)+1}` : selectingSlot.slot} にセット
+              </span>
+              <button onClick={() => setSelectingSlot(null)} style={{background:'none', border:'none', color:'#8a92b2', cursor:'pointer', fontSize:'1.2rem'}}>×</button>
+            </div>
+            <button onClick={() => { setSlot(selectingSlot.slot, selectingSlot.idx, null); setSelectingSlot(null); }}
+              style={{width:'100%', padding:'7px', background:'rgba(224,85,85,0.1)', color:'#e05555', border:'1px solid #e05555', borderRadius:6, cursor:'pointer', fontSize:'0.8rem', marginBottom:8}}>
+              🗑️ スロットを空にする
+            </button>
+            {eligibleFor(selectingSlot.slot).length === 0
+              ? <div style={{color:'#4a5070', textAlign:'center', padding:16}}>セットできるアイテムなし</div>
+              : eligibleFor(selectingSlot.slot).map(id => {
+                  const item = ITEM_MASTER[id];
+                  const qty = player.inventory[id];
+                  return (
+                    <button key={id} onClick={() => { setSlot(selectingSlot.slot, selectingSlot.idx, id); setSelectingSlot(null); }}
+                      style={{width:'100%', display:'flex', alignItems:'center', gap:8, padding:'8px 10px', background:'#161b26', border:'1px solid #2d3752', borderRadius:6, cursor:'pointer', color:'#e8e6ff', marginBottom:4, textAlign:'left'}}>
+                      <GameIcon id={item.icon} size={20} />
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:'0.85rem', fontWeight:700}}>{item.name}</div>
+                        <div style={{fontSize:'0.68rem', color:'#8a92b2'}}>{item.description}</div>
+                      </div>
+                      <span style={{fontSize:'0.75rem', color:'#f0c060'}}>×{qty}</span>
+                    </button>
+                  );
+                })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============================================================
 // 製作パネル
 // ============================================================
@@ -230,7 +388,7 @@ export function StatusScreen() {
   const isSaving = useGameStore(s => s.isSaving);
   const useItem = useGameStore(s => s.useItem);
   const setActiveTab = useGameStore(s => s.setActiveTab);
-  const [activeSection, setActiveSection] = useState<'stats'|'skills'|'inventory'|'crafting'|'email'>('stats');
+  const [activeSection, setActiveSection] = useState<'stats'|'skills'|'inventory'|'crafting'|'email'|'equipment'>('stats');
   const [showRename, setShowRename] = useState(false);
 
   if (!player) return null;
@@ -249,6 +407,7 @@ export function StatusScreen() {
     { id:'stats', label:'基本', icon:'mage' },
     { id:'skills', label:'スキル', icon:'lightning' },
     { id:'inventory', label:'所持', icon:'backpack' },
+    { id:'equipment', label:'装備', icon:'swords' },
     { id:'crafting', label:'製作', icon:'hammer' },
     { id:'email', label:'通知', icon:'mail' },
   ] as const;
@@ -377,6 +536,14 @@ export function StatusScreen() {
               );
             })
           }
+        </section>
+      )}
+
+      {/* 装備・ホットバー */}
+      {activeSection === 'equipment' && (
+        <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
+          <h3 style={{fontSize:'0.9rem', color:'#f0c060', marginBottom:10}}>⚔️ 装備・ホットバー</h3>
+          <EquipmentPanel />
         </section>
       )}
 
