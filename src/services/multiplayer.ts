@@ -299,3 +299,15 @@ export function subscribeGambleMultipliers(cb: (m: Record<string, number>) => vo
     cb(snap.exists() ? (snap.data() as Record<string, number>) : {});
   });
 }
+
+// プレイヤーのアクティビティログを取得（詳細表示用）
+export async function getPlayerActivityLog(uid: string): Promise<Array<{ type: string; message: string; timestamp: number }>> {
+  try {
+    const snap = await getDoc(doc(db, 'players', uid));
+    if (!snap.exists()) return [];
+    const data = snap.data() as Partial<AdminPlayerData>;
+    return data.activityLog ?? [];
+  } catch {
+    return [];
+  }
+}

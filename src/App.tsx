@@ -112,6 +112,45 @@ function VersionPopup({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ============================================================
+// オークション売却成功ポップアップ
+// ============================================================
+interface SoldPopupInfo { itemName: string; itemIcon: string; amount: number; totalGold: number }
+function SoldPopup({ info, onClose }: { info: SoldPopupInfo; onClose: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 4000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:550, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}>
+      <div onClick={onClose} style={{
+        pointerEvents:'auto',
+        background:'linear-gradient(135deg,rgba(28,34,53,0.98),rgba(22,27,38,0.98))',
+        border:'2px solid #f0c060',
+        borderRadius:16,
+        padding:'24px 32px',
+        textAlign:'center',
+        animation:'soldPopIn 0.4s ease',
+        boxShadow:'0 0 40px rgba(240,192,96,0.4)',
+        maxWidth:300,
+        cursor:'pointer',
+      }}>
+        <div style={{ fontSize:'2.5rem', marginBottom:8 }}>🏷️</div>
+        <div style={{ fontSize:'0.85rem', color:'#8a92b2', marginBottom:8 }}>オークションで売れました！</div>
+        <div style={{ fontSize:'1.3rem', fontWeight:700, color:'#e8e6ff', marginBottom:4 }}>
+          {info.itemIcon} {info.itemName} ×{info.amount}
+        </div>
+        <div style={{ fontSize:'1.8rem', fontWeight:900, color:'#f0c060', textShadow:'0 0 20px rgba(240,192,96,0.6)' }}>
+          +{info.totalGold.toLocaleString()}G
+        </div>
+        <div style={{ fontSize:'0.7rem', color:'#4a5070', marginTop:8 }}>タップで閉じる</div>
+      </div>
+      <style>{`@keyframes soldPopIn { from { transform: scale(0.7) translateY(20px); opacity:0; } to { transform: scale(1) translateY(0); opacity:1; } }`}</style>
+    </div>
+  );
+}
+
 function StatusBar() {
   const player = useGameStore(s => s.player);
   const isSaving = useGameStore(s => s.isSaving);
@@ -284,6 +323,7 @@ export default function App() {
 
   // バージョン更新ポップアップ（毎回表示）
   const [showVersionPopup, setShowVersionPopup] = useState(false);
+  const [soldPopup, setSoldPopup] = useState<SoldPopupInfo | null>(null);
   useEffect(() => {
     if (!player) return;
     setShowVersionPopup(true);
@@ -331,8 +371,9 @@ export default function App() {
       for (const n of notifications) {
         const itemName = ITEM_MASTER[n.itemId]?.name ?? n.itemId;
         const itemIcon = ITEM_MASTER[n.itemId]?.icon ?? '📦';
-        addNotification('success', `🏷️ ${itemIcon} ${itemName} ×${n.amount} が購入されました！+${n.totalGold.toLocaleString()}G`);
         changeGold(n.totalGold);
+        // 売れましたポップアップ表示（通知トーストの代わり）
+        setSoldPopup({ itemName, itemIcon, amount: n.amount, totalGold: n.totalGold });
         try { await markSoldNotificationRead(n.id); } catch { /* ignore */ }
       }
     });
@@ -345,6 +386,7 @@ export default function App() {
   return (
     <div style={{ maxWidth:900, margin:'0 auto', minHeight:'100vh', background:'#0d0f14' }}>
       {showVersionPopup && <VersionPopup onClose={handleCloseVersionPopup} />}
+      {soldPopup && <SoldPopup info={soldPopup} onClose={() => setSoldPopup(null)} />}
       <StatusBar />
       <main style={{ paddingBottom:72 }}>
         <ActiveScreen tab={activeTab} />

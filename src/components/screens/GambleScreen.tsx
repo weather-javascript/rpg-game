@@ -92,6 +92,94 @@ function BetInput({ game, bet, setBet }: { game: GambleMaster; bet: number; setB
 }
 
 // ============================================================
+// PvP対戦バトルアニメーション
+// ============================================================
+function BattleAnimation({ opponentName, gameName, result, onDone }: {
+  opponentName: string;
+  gameName: string;
+  result: { won: boolean; amount: number };
+  onDone: () => void;
+}) {
+  const [phase, setPhase] = useState<'countdown' | 'fighting' | 'result'>('countdown');
+  const [count, setCount] = useState(3);
+  const [shakeDir, setShakeDir] = useState(1);
+
+  useEffect(() => {
+    const t1 = setInterval(() => {
+      setCount(c => {
+        if (c <= 1) { clearInterval(t1); setPhase('fighting'); return 0; }
+        return c - 1;
+      });
+    }, 700);
+    return () => clearInterval(t1);
+  }, []);
+
+  useEffect(() => {
+    if (phase !== 'fighting') return;
+    let cnt = 0;
+    const t = setInterval(() => {
+      setShakeDir(d => -d);
+      cnt++;
+      if (cnt >= 10) { clearInterval(t); setTimeout(() => setPhase('result'), 200); }
+    }, 180);
+    return () => clearInterval(t);
+  }, [phase]);
+
+  const GAME_EMOJIS: Record<string, string> = {
+    chohan: '🎲', chinchiro: '🎯', coin_flip: '🪙', slot_machine: '🎰',
+  };
+  const GAME_NAMES_JP: Record<string, string> = {
+    chohan: '丁半', chinchiro: 'チンチロリン', coin_flip: 'コインフリップ', slot_machine: 'スロット',
+  };
+  const emoji = GAME_EMOJIS[gameName] ?? '🎮';
+  const gameNameJp = GAME_NAMES_JP[gameName] ?? gameName;
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:600, background:'rgba(0,0,0,0.93)', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:18 }}>
+      {phase === 'countdown' && (
+        <>
+          <div style={{ fontSize:'0.9rem', color:'#8a92b2' }}>⚔️ {opponentName} との対戦</div>
+          <div style={{ fontSize:'6rem', fontWeight:900, color:'#f0c060', textShadow:'0 0 50px rgba(240,192,96,0.9)', lineHeight:1 }}>{count}</div>
+          <div style={{ fontSize:'0.85rem', color:'#4a5070' }}>{gameNameJp} で決着をつけろ！</div>
+        </>
+      )}
+      {phase === 'fighting' && (
+        <>
+          <div style={{ fontSize:'3.5rem', transition:'transform 0.12s', transform: `translateX(${shakeDir * 14}px) rotate(${shakeDir * 6}deg)` }}>{emoji}</div>
+          <div style={{ fontSize:'1.3rem', fontWeight:700, color:'#e8e6ff' }}>対戦中...</div>
+          <div style={{ display:'flex', gap:24, alignItems:'center' }}>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontSize:'1.8rem' }}>😤</div>
+              <div style={{ fontSize:'0.9rem', color:'#5b8dee', fontWeight:700 }}>あなた</div>
+            </div>
+            <div style={{ fontSize:'2rem' }}>⚡</div>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontSize:'1.8rem' }}>😈</div>
+              <div style={{ fontSize:'0.9rem', color:'#e05555', fontWeight:700 }}>{opponentName}</div>
+            </div>
+          </div>
+        </>
+      )}
+      {phase === 'result' && (
+        <>
+          <div style={{ fontSize:'4rem' }}>{result.won ? '🏆' : '💔'}</div>
+          <div style={{ fontSize:'2rem', fontWeight:900, color: result.won ? '#4caf87' : '#e05555', textShadow:`0 0 30px ${result.won ? 'rgba(76,175,135,0.7)' : 'rgba(224,85,85,0.7)'}` }}>
+            {result.won ? '勝利！' : '敗北...'}
+          </div>
+          <div style={{ fontSize:'1.3rem', color: result.won ? '#4caf87' : '#e05555', fontWeight:700 }}>
+            {result.won ? `+${result.amount.toLocaleString()}G` : `-${result.amount.toLocaleString()}G`}
+          </div>
+          <div style={{ fontSize:'0.82rem', color:'#8a92b2' }}>vs {opponentName}</div>
+          <button onClick={onDone} style={{ marginTop:10, padding:'11px 32px', background: result.won ? 'linear-gradient(135deg,#4caf87,#2d8060)' : 'linear-gradient(135deg,#555,#333)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'0.95rem' }}>
+            閉じる
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 // PvP対戦パネル
 // ============================================================
 function PvPPanel({ bet }: { bet: number }) {
@@ -102,6 +190,7 @@ function PvPPanel({ bet }: { bet: number }) {
   const [myBattleId, setMyBattleId] = useState<string | null>(null);
   const [selectedGame, setSelectedGame] = useState('chohan');
   const [loading, setLoading] = useState(false);
+  const [battleAnim, setBattleAnim] = useState<{ opponentName: string; gameName: string; result: { won: boolean; amount: number } } | null>(null);
 
   useEffect(() => {
     const unsub = subscribeGambleBattles(setBattles);
@@ -121,11 +210,15 @@ function PvPPanel({ bet }: { bet: number }) {
         const iWon = battle.winnerId === player.uid;
         if (iWon) {
           changeGold(battle.betAmount);
-          addNotification('success', `🏆 対戦勝利！ vs ${battle.guestName ?? '相手'} +${battle.betAmount.toLocaleString()}G`);
         } else {
           changeGold(-battle.betAmount);
-          addNotification('error', `💔 対戦敗北... vs ${battle.guestName ?? '相手'} -${battle.betAmount.toLocaleString()}G`);
         }
+        // アニメーション表示
+        setBattleAnim({
+          opponentName: battle.guestName ?? '相手',
+          gameName: battle.gambleType,
+          result: { won: iWon, amount: battle.betAmount },
+        });
         setMyBattleId(null);
       }
     });
@@ -172,12 +265,16 @@ function PvPPanel({ bet }: { bet: number }) {
       if (success && result) {
         const iWon = result.winnerId === player.uid;
         if (iWon) {
-          changeGold(battle.betAmount); // 自分のbet + 相手のbet = 2倍 → netは+betAmount
-          addNotification('success', `🏆 対戦勝利！+${battle.betAmount.toLocaleString()}G`);
+          changeGold(battle.betAmount);
         } else {
           changeGold(-battle.betAmount);
-          addNotification('error', `💔 対戦敗北... -${battle.betAmount.toLocaleString()}G`);
         }
+        // アニメーション表示
+        setBattleAnim({
+          opponentName: battle.hostName,
+          gameName: battle.gambleType,
+          result: { won: iWon, amount: battle.betAmount },
+        });
       } else {
         addNotification('error', '参加に失敗しました（既に終了）');
       }
@@ -190,6 +287,14 @@ function PvPPanel({ bet }: { bet: number }) {
 
   return (
     <div>
+      {battleAnim && (
+        <BattleAnimation
+          opponentName={battleAnim.opponentName}
+          gameName={battleAnim.gameName}
+          result={battleAnim.result}
+          onDone={() => setBattleAnim(null)}
+        />
+      )}
       <div style={{ marginBottom: 12 }}>
         <div style={{ fontSize: '0.85rem', color: '#f0c060', fontWeight: 700, marginBottom: 8 }}>⚔️ 対戦を募集する</div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>

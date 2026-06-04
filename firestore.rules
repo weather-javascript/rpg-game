@@ -1,65 +1,59 @@
 // firestore.rules
-// Firestore セキュリティルール
 // デプロイ: firebase deploy --only firestore:rules
 
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ============================================================
-    // 共通ヘルパー関数
-    // ============================================================
-
-    // 認証済みユーザーか
     function isAuthed() {
       return request.auth != null;
     }
 
-    // 自分自身のドキュメントか
     function isOwner(uid) {
       return request.auth.uid == uid;
     }
 
-    // 管理者か（カスタムクレームで管理）
+    // 管理者判定: Firestoreの admins/{uid} ドキュメントの存在で判定
+    // （Sparkプランでは Cloud Functions が使えないためトークンクレーム方式は不使用）
     function isAdmin() {
-      return isAuthed() && request.auth.token.admin == true;
+      return isAuthed()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
-    // 数値かつ範囲内か
-    function inRange(val, min, max) {
-      return val is int && val >= min && val <= max;
+    // ============================================================
+    // admins/{uid} — 管理者リスト
+    // 最初の管理者は Firebase Console から手動で作成すること
+    // ============================================================
+    match /admins/{uid} {
+      // 自分が管理者かどうかは自分だけ読める（isAdmin()の判定に必要）
+      allow read: if isAuthed() && isOwner(uid);
+      // 管理者の追加・削除は既存管理者のみ可能
+      allow write: if isAdmin();
     }
 
     // ============================================================
     // players/{uid} — プレイヤーデータ
     // ============================================================
     match /players/{uid} {
-      // 読み取り: 本人 or 管理者
       allow read: if isOwner(uid) || isAdmin();
 
-      // 作成: 本人のみ・必須フィールド検証
       allow create: if isOwner(uid)
         && request.resource.data.uid == uid
         && request.resource.data.gold is int
         && request.resource.data.gold >= 0
         && request.resource.data.gold <= 999999999;
 
-      // 更新: 本人のみ・不正値ガード（管理者は制限なし）
+      // 管理者は制限なし、本人は gold 増加上限・不変フィールドを保護
       allow update: if isAdmin()
         || (isOwner(uid)
-        && request.resource.data.uid == uid
-        // gold は 0 以上・1億G 以下（サーバーで大きな変動は審査）
-        && request.resource.data.gold is int
-        && request.resource.data.gold >= 0
-        && request.resource.data.gold <= 100000000
-        // 1回の更新でgoldが5万G以上増えていたら拒否（チート対策）
-        && (request.resource.data.gold - resource.data.gold) <= 50000
-        // uid は変更不可
-        && request.resource.data.uid == resource.data.uid
-        // createdAt は変更不可
-        && request.resource.data.createdAt == resource.data.createdAt);
+          && request.resource.data.uid == uid
+          && request.resource.data.gold is int
+          && request.resource.data.gold >= 0
+          && request.resource.data.gold <= 100000000
+          && (request.resource.data.gold - resource.data.gold) <= 50000
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.createdAt == resource.data.createdAt);
 
-      // 削除: 管理者のみ
       allow delete: if isAdmin();
     }
 
@@ -67,10 +61,7 @@ service cloud.firestore {
     // auctions/{listingId} — オークション出品
     // ============================================================
     match /auctions/{listingId} {
-      // 読み取り: 認証済み全員
       allow read: if isAuthed();
-
-      // 作成: 本人の出品のみ・価格上限チェック
       allow create: if isAuthed()
         && request.resource.data.sellerUid == request.auth.uid
         && request.resource.data.pricePerUnit is int
@@ -80,14 +71,9 @@ service cloud.firestore {
         && request.resource.data.amount >= 1
         && request.resource.data.amount <= 9999
         && request.resource.data.expiresAt is int
-        // 最長7日 = 604800000ms
         && request.resource.data.expiresAt <= request.time.toMillis() + 604800001;
-
-      // 削除: 出品者本人 or 管理者
       allow delete: if isAuthed()
         && (resource.data.sellerUid == request.auth.uid || isAdmin());
-
-      // 更新: 不可（購入はCloud Functionsで処理）
       allow update: if isAdmin();
     }
 
@@ -96,21 +82,15 @@ service cloud.firestore {
     // ============================================================
     match /gamble_battles/{battleId} {
       allow read: if isAuthed();
-
-      // 作成: ホスト本人のみ
       allow create: if isAuthed()
         && request.resource.data.hostUid == request.auth.uid
         && request.resource.data.betAmount is int
         && request.resource.data.betAmount >= 10
         && request.resource.data.betAmount <= 100000;
-
-      // 更新: ホスト or ゲスト or 管理者
       allow update: if isAuthed()
         && (resource.data.hostUid == request.auth.uid
           || resource.data.guestUid == request.auth.uid
           || isAdmin());
-
-      // 削除: ホスト or 管理者
       allow delete: if isAuthed()
         && (resource.data.hostUid == request.auth.uid || isAdmin());
     }
@@ -151,7 +131,9 @@ service cloud.firestore {
     // ============================================================
     match /sold_notifications/{notifId} {
       allow read: if isAuthed()
-        && (resource.data.sellerUid == request.auth.uid || resource.data.buyerUid == request.auth.uid || isAdmin());
+        && (resource.data.sellerUid == request.auth.uid
+          || resource.data.buyerUid == request.auth.uid
+          || isAdmin());
       allow create: if isAuthed();
       allow update: if isAuthed()
         && (resource.data.sellerUid == request.auth.uid || isAdmin());
@@ -166,9 +148,6 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // ============================================================
-    // それ以外は全拒否
-    // ============================================================
     match /{document=**} {
       allow read, write: if false;
     }

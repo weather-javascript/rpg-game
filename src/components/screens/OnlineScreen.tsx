@@ -1,5 +1,7 @@
 // src/components/screens/OnlineScreen.tsx
 // オンライン画面：アクティビティフィード追加
+// 【変更履歴を更新する際の注意】
+// このファイルを変更したら必ず src/data/masters.ts の VERSION_PATCHES[0] に変更内容を追記すること。
 
 import { useState, useEffect, useCallback } from 'react';
 import { GameIcon } from '../icons';
@@ -8,7 +10,7 @@ import { ITEM_MASTER } from '../../data/masters';
 import {
   subscribeOnlineUsers, subscribeBoardMessages, postBoardMessage,
   subscribeAuctions, createAuction, buyAuction, cancelAuction,
-  subscribeAllPlayersAdmin,
+  subscribeAllPlayersAdmin, getPlayerActivityLog,
 } from '../../services/multiplayer';
 import type { OnlineUser, BoardMessage, AuctionListing } from '../../types/game';
 
@@ -39,9 +41,75 @@ function OnlinePanel({ users }: { users: OnlineUser[] }) {
   );
 }
 
+// アクティビティ詳細モーダル
+function ActivityDetailModal({ user, onClose }: { user: OnlineUser; onClose: () => void }) {
+  const [logs, setLogs] = useState<Array<{ type: string; message: string; timestamp: number }>>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getPlayerActivityLog(user.uid).then(l => {
+      setLogs([...l].reverse()); // 最新順
+      setLoading(false);
+    });
+  }, [user.uid]);
+
+  const TYPE_LABELS: Record<string, { emoji: string; color: string }> = {
+    dungeon_clear: { emoji: '🏰', color: '#f0c060' },
+    level_up:      { emoji: '⬆️', color: '#5b8dee' },
+    crafting:      { emoji: '🔨', color: '#9b6df0' },
+    gamble_win:    { emoji: '🎰', color: '#4caf87' },
+    online:        { emoji: '🌐', color: '#8a92b2' },
+  };
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:500, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <div style={{ background:'#1c2235', border:'2px solid #5b8dee', borderRadius:14, padding:20, width:'100%', maxWidth:420, maxHeight:'80vh', display:'flex', flexDirection:'column' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+          <div>
+            <h3 style={{ color:'#e8e6ff', margin:0, fontSize:'1rem' }}>⚔️ {user.displayName} の活動履歴</h3>
+            <div style={{ color:'#4a5070', fontSize:'0.72rem', marginTop:2 }}>Lv.{user.level} | 最終確認: {new Date(user.lastSeen).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</div>
+          </div>
+          <button onClick={onClose} style={{ background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontSize:'0.85rem' }}>✕</button>
+        </div>
+
+        <div style={{ fontSize:'0.82rem', color:'#e8e6ff', marginBottom:10, padding:'6px 10px', background:'rgba(91,141,238,0.1)', borderRadius:6 }}>
+          🎮 現在: {user.currentActivity ?? 'オンライン'}
+          {user.lastDungeonCleared && <span style={{ marginLeft:8, color:'#f0c060' }}>🏆 最近クリア: {user.lastDungeonCleared}</span>}
+        </div>
+
+        <div style={{ overflowY:'auto', flex:1 }}>
+          {loading ? (
+            <div style={{ color:'#8a92b2', textAlign:'center', padding:20 }}>読み込み中...</div>
+          ) : logs.length === 0 ? (
+            <div style={{ color:'#4a5070', textAlign:'center', padding:20, fontSize:'0.85rem' }}>記録された活動がありません</div>
+          ) : (
+            logs.map((log, i) => {
+              const style = TYPE_LABELS[log.type] ?? { emoji: '📌', color: '#8a92b2' };
+              return (
+                <div key={i} style={{ display:'flex', gap:10, padding:'7px 0', borderBottom:'1px solid #2d3752' }}>
+                  <span style={{ fontSize:'1.1rem', minWidth:24, textAlign:'center' }}>{style.emoji}</span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:'0.82rem', color: style.color }}>{log.message}</div>
+                    <div style={{ fontSize:'0.68rem', color:'#4a5070', marginTop:1 }}>
+                      {new Date(log.timestamp).toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ActivityPanel({ users }: { users: OnlineUser[] }) {
+  const [detailUser, setDetailUser] = useState<OnlineUser | null>(null);
+
   return (
     <div>
+      {detailUser && <ActivityDetailModal user={detailUser} onClose={() => setDetailUser(null)} />}
       <h3 style={{color:'#9b6df0', marginBottom:8, fontSize:'0.95rem'}}>📡 プレイヤーアクティビティ</h3>
       <p style={{fontSize:'0.75rem', color:'#4a5070', marginBottom:10}}>現在オンラインのプレイヤーが何をしているか確認できます。</p>
       {users.length === 0
@@ -52,14 +120,22 @@ function ActivityPanel({ users }: { users: OnlineUser[] }) {
               <div style={{fontWeight:700, fontSize:'0.9rem'}}>⚔️ {u.displayName}</div>
               <div style={{fontSize:'0.72rem', color:'#5b8dee', background:'rgba(91,141,238,0.1)', padding:'2px 7px', borderRadius:10}}>Lv.{u.level}</div>
             </div>
-            <div style={{fontSize:'0.8rem', color:'#e8e6ff', marginBottom:u.lastDungeonCleared ? 4 : 0}}>
+            <div style={{fontSize:'0.8rem', color:'#e8e6ff', marginBottom:u.lastDungeonCleared ? 4 : 6}}>
               {u.currentActivity ? `🎮 ${u.currentActivity}` : '🟢 オンライン'}
             </div>
             {u.lastDungeonCleared && (
-              <div style={{fontSize:'0.72rem', color:'#f0c060'}}>🏆 最近クリア: {u.lastDungeonCleared}</div>
+              <div style={{fontSize:'0.72rem', color:'#f0c060', marginBottom:6}}>🏆 最近クリア: {u.lastDungeonCleared}</div>
             )}
-            <div style={{fontSize:'0.65rem', color:'#4a5070', marginTop:4}}>
-              最終確認: {new Date(u.lastSeen).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <div style={{fontSize:'0.65rem', color:'#4a5070'}}>
+                最終確認: {new Date(u.lastSeen).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}
+              </div>
+              <button
+                onClick={() => setDetailUser(u)}
+                style={{padding:'3px 10px', background:'rgba(155,109,240,0.15)', color:'#9b6df0', border:'1px solid rgba(155,109,240,0.4)', borderRadius:4, cursor:'pointer', fontSize:'0.72rem', fontWeight:600}}
+              >
+                📋 最近の活動を見る
+              </button>
             </div>
           </div>
         ))
