@@ -156,6 +156,7 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
   const [isFirst, setIsFirst] = useState(true); // 自分が先攻か
 
   // ユーザー選択
+  const [userChoice, setUserChoice] = useState<string | null>(null);
   const [revealResult, setRevealResult] = useState<string>('');
 
   const DICE_EMOJI = ['⚀','⚁','⚂','⚃','⚄','⚅'];
@@ -182,23 +183,32 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
   }, []);
 
   const handleChoose = (choice: string) => {
-    // 結果に基づいてreveal表示
+    setUserChoice(choice);
     let reveal = '';
-    if (gameName === 'chohan') {
-      // resultのwon/lostをそのまま使う（サーバー側で決定済み）
-      const diceSum = Math.floor(secureRandom() * 5) + 2 + Math.floor(secureRandom() * 5);
-      const isEven = diceSum % 2 === 0;
-      reveal = `🎲 合計 ${diceSum}（${isEven ? '偶数＝丁' : '奇数＝半'}）`;
-    } else if (gameName === 'coin_flip') {
-      reveal = result.won
-        ? (choice === 'heads' ? '🌕 表が出た！' : '🌑 裏が出た！')
-        : (choice === 'heads' ? '🌑 裏が出た...' : '🌕 表が出た...');
+    if (gameName === 'chohan' || gameName === 'coin_flip') {
+      // 先攻が選択 → 後攻は自動で逆が割り当てられる
+      // サイコロを振って勝敗決定（result.won はサーバー決定済みを使う）
+      const d1 = Math.floor(secureRandom() * 6) + 1;
+      const d2 = Math.floor(secureRandom() * 6) + 1;
+      const sum = d1 + d2;
+      const isEven = sum % 2 === 0;
+      if (gameName === 'chohan') {
+        const oppChoice = choice === 'cho' ? '半（奇数）' : '丁（偶数）';
+        reveal = `🎲 ${d1}+${d2}=${sum}（${isEven ? '偶数＝丁' : '奇数＝半'}）\n相手は${oppChoice}を自動選択`;
+      } else {
+        // コイントス: 丁/半ベース
+        const oppChoice = choice === 'cho' ? '半' : '丁';
+        reveal = `🪙 ${isEven ? '表（丁）' : '裏（半）'} が出た！\n相手は${oppChoice}を自動選択`;
+      }
     } else if (gameName === 'chinchiro') {
-      const d = [Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1];
-      reveal = `🎲 ${d[0]} ${d[1]} ${d[2]}`;
+      // 役が出るまで交互に振った結果（サーバー決定済み勝敗を反映）
+      reveal = result.won
+        ? '🎲 あなたの役 ＞ 相手の役'
+        : '🎲 相手の役 ≥ あなたの役';
     } else if (gameName === 'slot_machine') {
-      const slots = result.won ? ['🍒','🍒','🍒'] : ['🍒','💎','🍋'];
-      reveal = slots.join(' ');
+      // 役が出るまで交互
+      const slots = result.won ? ['🍒','🍒','🍒'] : ['🍋','💎','🍒'];
+      reveal = `🎰 ${slots.join(' ')} ${result.won ? '高い役！' : '...'}`;
     }
     setRevealResult(reveal);
     setPhase('reveal');
@@ -212,17 +222,10 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
       { id: 'han', label: '半（奇数）', color: '#e05555' },
     ];
     if (gameName === 'coin_flip') return [
-      { id: 'heads', label: '🌕 表', color: '#f0c060' },
-      { id: 'tails', label: '🌑 裏', color: '#8a92b2' },
+      { id: 'cho', label: '🌕 丁（表）', color: '#f0c060' },
+      { id: 'han', label: '🌑 半（裏）', color: '#8a92b2' },
     ];
-    if (gameName === 'chinchiro') return [
-      { id: 'high', label: '🔼 ゾロ目・456', color: '#4caf87' },
-      { id: 'low',  label: '🔽 それ以外', color: '#e05555' },
-    ];
-    if (gameName === 'slot_machine') return [
-      { id: 'lucky', label: '🍒 ラッキー狙い', color: '#f0c060' },
-      { id: 'safe',  label: '💎 安定狙い', color: '#5b8dee' },
-    ];
+    // チンチロ・スロットは選択肢なし（役が出るまで交互に振るため）
     return [{ id: 'go', label: '勝負！', color: '#5b8dee' }];
   };
 
@@ -261,25 +264,7 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
       )}
 
       {/* ユーザー選択フェーズ */}
-      {phase === 'choose' && (
-        <>
-          <div style={{ fontSize:'1.1rem', color:'#f0c060', fontWeight:700 }}>
-            {isFirst ? '🥇 先攻！' : '🥈 後攻'} — {gameNameJp}
-          </div>
-          <div style={{ fontSize:'0.9rem', color:'#8a92b2', textAlign:'center' }}>
-            {isFirst ? 'あなたが先に選んでください' : `${opponentName}が選びました。あなたも選んでください`}
-          </div>
-          <div style={{ display:'flex', gap:12, marginTop:8 }}>
-            {getChoices().map(c => (
-              <button key={c.id} onClick={() => handleChoose(c.id)}
-                style={{ padding:'14px 20px', background:`rgba(${c.color.replace('#','').match(/../g)!.map(h=>parseInt(h,16)).join(',')},0.2)`, border:`2px solid ${c.color}`, color:'#fff', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:'1rem', minWidth:100 }}>
-                {c.label}
-              </button>
-            ))}
-          </div>
-          <div style={{ fontSize:'0.75rem', color:'#4a5070', marginTop:4 }}>vs {opponentName}</div>
-        </>
-      )}
+      {phase === 'choose' && (\n        <>\n          <div style={{ fontSize:'1.1rem', color:'#f0c060', fontWeight:700 }}>\n            {isFirst ? '🥇 先攻！' : '🥈 後攻'} — {gameNameJp}\n          </div>\n          <div style={{ fontSize:'0.9rem', color:'#8a92b2', textAlign:'center' }}>\n            {isFirst\n              ? 'あなたが先に選んでください（相手は逆が自動選択されます）'\n              : `${opponentName}が先に選びました。あなたは逆が自動で割り当てられます`}\n          </div>\n          <div style={{ display:'flex', gap:12, marginTop:8 }}>\n            {getChoices().map(c => (\n              <button key={c.id} onClick={() => handleChoose(c.id)}\n                style={{ padding:'14px 20px', background:`rgba(${c.color.replace('#','').match(/../g)!.map(h=>parseInt(h,16)).join(',')},0.2)`, border:`2px solid ${c.color}`, color:'#fff', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:'1rem', minWidth:100 }}>\n                {c.label}\n              </button>\n            ))}\n          </div>\n          {!isFirst && (gameName==='chohan'||gameName==='coin_flip') && (\n            <div style={{ fontSize:'0.8rem', color:'#4a5070', marginTop:4 }}>※ あなたは相手の選択の逆が自動割当されます</div>\n          )}\n          <div style={{ fontSize:'0.75rem', color:'#4a5070', marginTop:4 }}>vs {opponentName}</div>\n        </>\n      )}
 
       {/* 結果を見せるフェーズ */}
       {phase === 'reveal' && (

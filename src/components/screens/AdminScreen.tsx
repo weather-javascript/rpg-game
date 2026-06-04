@@ -411,7 +411,82 @@ export function AdminScreen() {
       {subTab === 'system' && (
         <div>
       {/* ジャックポット積立率 */}
-          <div style={{marginBottom:18, background:'#161b26', border:'1px solid #2d3752', borderRadius:8, padding:14}}>\n            <div style={{fontSize:'0.9rem', fontWeight:700, color:'#f0c060', marginBottom:10}}>🌟 ジャックポット積立率</div>\n            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:10}}>\n              <input\n                type=\"number\" step=\"0.01\" min=\"0\" max=\"1\"\n                value={jackpotRate}\n                onChange={e => setJackpotRateState(Number(e.target.value))}\n                style={{width:90, padding:'6px 8px', background:'#1c2235', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.9rem'}}\n              />\n              <span style={{color:'#8a92b2', fontSize:'0.85rem'}}>（平常時: 0.20 = 20%）</span>\n            </div>\n            <button onClick={async () => {\n              setSaving(true);\n              try {\n                await setJackpotRate(jackpotRate);\n                addNotification('success', `ジャックポット率を${(jackpotRate*100).toFixed(0)}%に設定しました`);\n              } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }\n              setSaving(false);\n            }} disabled={saving}\n              style={{padding:'8px 16px', background:'linear-gradient(135deg,#f0a830,#c08020)', color:'#000', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.85rem'}}>\n              💾 保存\n            </button>\n          </div>\n\n          {/* ジャックポットプール直接編集 */}\n          <div style={{marginBottom:18, background:'#161b26', border:'1px solid #f0c060', borderRadius:8, padding:14}}>\n            <div style={{fontSize:'0.9rem', fontWeight:700, color:'#f0c060', marginBottom:4}}>💰 ジャックポットプール残高</div>\n            <div style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:10}}>現在のプール金額を直接変更できます（不正対策・イベント用）</div>\n            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:10}}>\n              <span style={{fontSize:'1.5rem', color:'#f0c060', fontWeight:900}}>{jackpotPool.toLocaleString()}G</span>\n              <span style={{fontSize:'0.75rem', color:'#4a5070'}}>現在値</span>\n            </div>\n            <div style={{display:'flex', gap:8, marginBottom:8}}>\n              <input\n                type=\"number\" min=\"0\" step=\"1000\"\n                value={editJackpotPool}\n                onChange={e => setEditJackpotPool(e.target.value)}\n                placeholder=\"新しい金額を入力\"\n                style={{flex:1, padding:'6px 8px', background:'#1c2235', border:'1px solid #f0c060', color:'#e8e6ff', borderRadius:4, fontSize:'0.9rem'}}\n              />\n              <span style={{color:'#8a92b2', lineHeight:'34px', fontSize:'0.85rem'}}>G</span>\n            </div>\n            <div style={{display:'flex', gap:6}}>\n              <button onClick={async () => {\n                const val = Number(editJackpotPool);\n                if (isNaN(val) || val < 0) { addNotification('error', '正しい金額を入力してください'); return; }\n                setSaving(true);\n                try {\n                  const { setDoc, doc } = await import('firebase/firestore');\n                  const { db } = await import('../../services/firebase');\n                  await setDoc(doc(db, 'shared', 'jackpot'), { pool: val });\n                  setJackpotPool(val);\n                  addNotification('success', `ジャックポットプールを ${val.toLocaleString()}G に設定しました`);\n                  setEditJackpotPool('');\n                } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }\n                setSaving(false);\n              }} disabled={saving || editJackpotPool === ''}\n                style={{flex:1, padding:'8px', background: editJackpotPool ? 'linear-gradient(135deg,#f0c060,#c08020)' : '#2d3752', color: editJackpotPool ? '#000' : '#4a5070', border:'none', borderRadius:6, cursor: editJackpotPool ? 'pointer' : 'not-allowed', fontWeight:700, fontSize:'0.82rem'}}>\n                💾 プールを設定\n              </button>\n              <button onClick={async () => {\n                setSaving(true);\n                try {\n                  const { setDoc, doc } = await import('firebase/firestore');\n                  const { db } = await import('../../services/firebase');\n                  await setDoc(doc(db, 'shared', 'jackpot'), { pool: 0 });\n                  setJackpotPool(0);\n                  addNotification('success', 'ジャックポットプールをリセットしました');\n                } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }\n                setSaving(false);\n              }} disabled={saving}\n                style={{padding:'8px 12px', background:'rgba(224,85,85,0.2)', color:'#e05555', border:'1px solid #e05555', borderRadius:6, cursor:'pointer', fontSize:'0.78rem'}}>\n                🗑️ リセット\n              </button>\n            </div>\n          </div>
+          <div style={{marginBottom:18, background:'#161b26', border:'1px solid #2d3752', borderRadius:8, padding:14}}>
+            <div style={{fontSize:'0.9rem', fontWeight:700, color:'#f0c060', marginBottom:10}}>🌟 ジャックポット積立率</div>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:10}}>
+              <input
+                type="number" step="0.01" min="0" max="1"
+                value={jackpotRate}
+                onChange={e => setJackpotRateState(Number(e.target.value))}
+                style={{width:90, padding:'6px 8px', background:'#1c2235', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.9rem'}}
+              />
+              <span style={{color:'#8a92b2', fontSize:'0.85rem'}}>（平常時: 0.20 = 20%）</span>
+            </div>
+            <button onClick={async () => {
+              setSaving(true);
+              try {
+                await setJackpotRate(jackpotRate);
+                addNotification('success', `ジャックポット率を${(jackpotRate*100).toFixed(0)}%に設定しました`);
+              } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
+              setSaving(false);
+            }} disabled={saving}
+              style={{padding:'8px 16px', background:'linear-gradient(135deg,#f0a830,#c08020)', color:'#000', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.85rem'}}>
+              💾 保存
+            </button>
+          </div>
+
+          {/* ジャックポットプール直接編集 */}
+          <div style={{marginBottom:18, background:'#161b26', border:'1px solid #f0c060', borderRadius:8, padding:14}}>
+            <div style={{fontSize:'0.9rem', fontWeight:700, color:'#f0c060', marginBottom:4}}>💰 ジャックポットプール残高</div>
+            <div style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:10}}>現在のプール金額を直接変更できます（不正対策・イベント用）</div>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:10}}>
+              <span style={{fontSize:'1.5rem', color:'#f0c060', fontWeight:900}}>{jackpotPool.toLocaleString()}G</span>
+              <span style={{fontSize:'0.75rem', color:'#4a5070'}}>現在値</span>
+            </div>
+            <div style={{display:'flex', gap:8, marginBottom:8}}>
+              <input
+                type="number" min="0" step="1000"
+                value={editJackpotPool}
+                onChange={e => setEditJackpotPool(e.target.value)}
+                placeholder="新しい金額を入力"
+                style={{flex:1, padding:'6px 8px', background:'#1c2235', border:'1px solid #f0c060', color:'#e8e6ff', borderRadius:4, fontSize:'0.9rem'}}
+              />
+              <span style={{color:'#8a92b2', lineHeight:'34px', fontSize:'0.85rem'}}>G</span>
+            </div>
+            <div style={{display:'flex', gap:6}}>
+              <button onClick={async () => {
+                const val = Number(editJackpotPool);
+                if (isNaN(val) || val < 0) { addNotification('error', '正しい金額を入力してください'); return; }
+                setSaving(true);
+                try {
+                  const { setDoc, doc } = await import('firebase/firestore');
+                  const { db } = await import('../../services/firebase');
+                  await setDoc(doc(db, 'shared', 'jackpot'), { pool: val });
+                  setJackpotPool(val);
+                  addNotification('success', `ジャックポットプールを ${val.toLocaleString()}G に設定しました`);
+                  setEditJackpotPool('');
+                } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
+                setSaving(false);
+              }} disabled={saving || editJackpotPool === ''}
+                style={{flex:1, padding:'8px', background: editJackpotPool ? 'linear-gradient(135deg,#f0c060,#c08020)' : '#2d3752', color: editJackpotPool ? '#000' : '#4a5070', border:'none', borderRadius:6, cursor: editJackpotPool ? 'pointer' : 'not-allowed', fontWeight:700, fontSize:'0.82rem'}}>
+                💾 プールを設定
+              </button>
+              <button onClick={async () => {
+                setSaving(true);
+                try {
+                  const { setDoc, doc } = await import('firebase/firestore');
+                  const { db } = await import('../../services/firebase');
+                  await setDoc(doc(db, 'shared', 'jackpot'), { pool: 0 });
+                  setJackpotPool(0);
+                  addNotification('success', 'ジャックポットプールをリセットしました');
+                } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
+                setSaving(false);
+              }} disabled={saving}
+                style={{padding:'8px 12px', background:'rgba(224,85,85,0.2)', color:'#e05555', border:'1px solid #e05555', borderRadius:6, cursor:'pointer', fontSize:'0.78rem'}}>
+                🗑️ リセット
+              </button>
+            </div>
+          </div>
 
           {/* メンテナンスモード */}
           <div style={{background:'#161b26', border:`1px solid ${maintenanceActive ? '#e05555' : '#2d3752'}`, borderRadius:8, padding:14}}>

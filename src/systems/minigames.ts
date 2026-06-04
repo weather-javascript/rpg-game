@@ -62,42 +62,72 @@ export function playChohan(bet: number, choice: 'cho' | 'han'): GambleResult & {
 // ============================================================
 // 2. チンチロリン
 // ============================================================
-const CHINCHIRO_ROLES = [
-  { name: 'ピンゾロ (1-1-1)',  multiplier: 10, check: (d: number[]) => d[0]===1 && d[1]===1 && d[2]===1 },
-  { name: 'シゴロ (4-5-6)',    multiplier: 5,  check: (d: number[]) => { const s=d.slice().sort(); return s[0]===4&&s[1]===5&&s[2]===6; } },
-  { name: 'ゾロ目',            multiplier: 3,  check: (d: number[]) => d[0]===d[1] && d[1]===d[2] },
-  { name: 'ヒフミ (1-2-3)',    multiplier: 0,  check: (d: number[]) => { const s=d.slice().sort(); return s[0]===1&&s[1]===2&&s[2]===3; } },
-];
+// チンチロリン役の強さを数値で返す（比較用）。role が無い場合は -1
+// 戻り値: { rank: number, multiplier: number, name: string, isInstantLoss: boolean }
+export interface ChinchiroRole {
+  name: string;
+  rank: number;       // 比較用強さ（高いほど強い）
+  multiplier: number; // 払い戻し倍率（0=負け）
+  isInstantWin: boolean;
+  isInstantLoss: boolean;
+}
 
-export function playChinchiro(bet: number): GambleResult & { dice: number[] } {
-  const dice = [rollDice(), rollDice(), rollDice()];
-  const sorted = dice.slice().sort((a, b) => a - b);
-
-  for (const role of CHINCHIRO_ROLES) {
-    if (role.check(dice)) {
-      const goldDelta = Math.floor(bet * role.multiplier) - bet;
-      return {
-        rewardLabel: role.name,
-        multiplier: role.multiplier,
-        goldDelta,
-        itemRewards: [],
-        symbols: dice.map(String),
-        dice,
-        roleName: role.name,
-      };
-    }
+export function getChinchiroRole(dice: number[]): ChinchiroRole | null {
+  const s = dice.slice().sort((a, b) => a - b);
+  // ピンゾロ 1-1-1
+  if (s[0]===1 && s[1]===1 && s[2]===1) {
+    return { name: 'ピンゾロ (1-1-1)', rank: 100, multiplier: 5, isInstantWin: true, isInstantLoss: false };
   }
-
-  // 目なし（どの出目も揃わない）or 通常目
-  const hasSequence = (sorted[2] - sorted[0] === 2) && (new Set(sorted).size === 3);
-  if (hasSequence) {
-    const max = sorted[2];
-    const multiplier = max >= 4 ? 1.5 : 0;
-    const goldDelta = Math.floor(bet * multiplier) - bet;
-    return { rewardLabel: `数字目 ${max}`, multiplier, goldDelta, itemRewards: [], symbols: dice.map(String), dice, roleName: `目 ${max}` };
+  // ヒフミ 1-2-3
+  if (s[0]===1 && s[1]===2 && s[2]===3) {
+    return { name: 'ヒフミ (1-2-3)', rank: -1, multiplier: 0, isInstantWin: false, isInstantLoss: true };
   }
+  // シゴロ 4-5-6
+  if (s[0]===4 && s[1]===5 && s[2]===6) {
+    return { name: 'シゴロ (4-5-6)', rank: 90, multiplier: 2, isInstantWin: false, isInstantLoss: false };
+  }
+  // アラシ（ピンゾロ以外のゾロ目）
+  if (s[0]===s[1] && s[1]===s[2]) {
+    return { name: `アラシ (${s[0]}-${s[0]}-${s[0]})`, rank: 10 + s[0] * 10, multiplier: 3, isInstantWin: false, isInstantLoss: false };
+  }
+  // 通常目: 2つ被り + 残り1つ。残りの1つが目
+  const counts: Record<number, number> = {};
+  for (const d of dice) counts[d] = (counts[d] ?? 0) + 1;
+  const pairs = Object.entries(counts).filter(([, c]) => c === 2);
+  const singles = Object.entries(counts).filter(([, c]) => c === 1);
+  if (pairs.length === 1 && singles.length === 1) {
+    const pip = Number(singles[0][0]);
+    return { name: `通常目 ${pip}`, rank: pip, multiplier: 1, isInstantWin: false, isInstantLoss: false };
+  }
+  // 目なし（3つとも別々 & 役なし）
+  return null;
+}
 
-  return { rewardLabel: '目なし（ハズレ）', multiplier: 0, goldDelta: -bet, itemRewards: [], symbols: dice.map(String), dice, roleName: '目なし' };
+export function playChinchiro(bet: number): GambleResult & { dice: number[]; roleName: string } {
+  // 役が出るまで最大3回振る（1人プレイ版）
+  let dice: number[] = [];
+  let role: ChinchiroRole | null = null;
+  let roll_count = 0;
+  while (roll_count < 3) {
+    dice = [rollDice(), rollDice(), rollDice()];
+    role = getChinchiroRole(dice);
+    roll_count++;
+    if (role !== null) break;
+  }
+  // 3回振っても役なし → 目なし負け
+  if (!role) {
+    return { rewardLabel: '目なし（ハズレ）', multiplier: 0, goldDelta: -bet, itemRewards: [], symbols: dice.map(String), dice, roleName: '目なし' };
+  }
+  const goldDelta = role.multiplier > 0 ? Math.floor(bet * role.multiplier) - bet : -bet;
+  return {
+    rewardLabel: role.name,
+    multiplier: role.multiplier,
+    goldDelta,
+    itemRewards: [],
+    symbols: dice.map(String),
+    dice,
+    roleName: role.name,
+  };
 }
 
 // ============================================================

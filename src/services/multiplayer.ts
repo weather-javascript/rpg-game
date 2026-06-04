@@ -196,43 +196,64 @@ export function subscribeGambleBattles(cb: (battles: GambleBattle[]) => void): U
 function _rollDice(n = 6) { return Math.floor(Math.random() * n) + 1; }
 
 function _resolveChohan(): boolean {
-  // 先行決め: 出目が多い方が丁か半を選べる（ここではホストが先行）
-  const hostOrder = _rollDice() + _rollDice();
-  const guestOrder = _rollDice() + _rollDice();
-  const hostGoesFirst = hostOrder >= guestOrder; // ホストが先行なら丁（偶数）を選択
+  // 先行決め: 1個ずつ振って出目が大きい方が先攻（丁/半を選べる）
+  let hostOrder = _rollDice(), guestOrder = _rollDice();
+  while (hostOrder === guestOrder) { hostOrder = _rollDice(); guestOrder = _rollDice(); }
+  const hostGoesFirst = hostOrder > guestOrder;
   const d1 = _rollDice(), d2 = _rollDice();
-  const sum = d1 + d2;
-  const isEven = sum % 2 === 0;
-  // 先行が丁を選ぶ
+  const isEven = (d1 + d2) % 2 === 0;
+  // 先行が丁を選ぶ、後攻は半が自動選択
   return hostGoesFirst ? isEven : !isEven;
 }
 
 function _chinchiroScore(dice: number[]): number {
   const d = dice.slice().sort((a,b)=>a-b);
   if (d[0]===1 && d[1]===1 && d[2]===1) return 1000; // ピンゾロ
-  if (d[0]===4 && d[1]===5 && d[2]===6) return 500;  // シゴロ
-  if (d[0]===d[1] && d[1]===d[2]) return 300 + d[0]; // ゾロ目
   if (d[0]===1 && d[1]===2 && d[2]===3) return -1;   // ヒフミ（負け）
-  // 数字目: 連番なら最大値
-  if (d[2]-d[0]===2 && new Set(d).size===3) return d[2] >= 4 ? d[2] : 0;
+  if (d[0]===4 && d[1]===5 && d[2]===6) return 500;  // シゴロ
+  if (d[0]===d[1] && d[1]===d[2]) return 300 + d[0]; // アラシ（ゾロ目）数字大きい方が強い
+  // 通常目: 2つ被り + 残り1つ。残りの1つが目 (6が最強、1が最弱)
+  const counts: Record<number,number> = {};
+  for (const v of d) counts[v] = (counts[v]??0)+1;
+  const singles = Object.entries(counts).filter(([,c])=>c===1).map(([v])=>Number(v));
+  const pairs = Object.entries(counts).filter(([,c])=>c===2);
+  if (pairs.length === 1 && singles.length === 1) return singles[0]; // 1〜6
   return 0; // 目なし（振り直し扱い → 0点）
 }
 
 function _resolveChinchiro(): boolean {
-  // 3サイコロ × 最大3回振り直し、スコアが高い方が勝ち
+  // 役が出るまで最大3回振り、スコアが高い方が勝ち
+  // ヒフミ(-1)は即負け、0は目なし（振り直し）
   const roll = () => [_rollDice(),_rollDice(),_rollDice()];
-  let hostScore = 0, guestScore = 0;
-  for (let i = 0; i < 3 && hostScore === 0; i++) hostScore = _chinchiroScore(roll());
-  for (let i = 0; i < 3 && guestScore === 0; i++) guestScore = _chinchiroScore(roll());
+  let hostScore = 0;
+  let hostInstantLoss = false;
+  for (let i = 0; i < 3; i++) {
+    hostScore = _chinchiroScore(roll());
+    if (hostScore !== 0) break;
+  }
+  if (hostScore === -1) hostInstantLoss = true;
+  // 親の一発終了ルール: ピンゾロ(1000)/シゴロ(500)/アラシ(300+) → 親総取り
+  // ヒフミ(-1)/目なし3投目(0) → 親総負け
+  if (hostScore >= 300 || hostScore === 500 || hostScore === 1000) return true;  // 親の即勝ち
+  if (hostInstantLoss || hostScore === 0) return false; // 親の即負け
+  // 通常目(1-6): 子もサイコロを振る
+  let guestScore = 0;
+  for (let i = 0; i < 3; i++) {
+    guestScore = _chinchiroScore(roll());
+    if (guestScore !== 0) break;
+  }
+  if (guestScore === -1 || guestScore === 0) return true; // 子がヒフミ/目なし → 親勝ち
   if (hostScore === guestScore) return Math.random() < 0.5;
   return hostScore > guestScore;
 }
 
 function _resolveCoinFlip(): boolean {
-  // 先行決めサイコロ → 先行がコインを選ぶ
+  // 先行決めサイコロ → 先行が丁（偶数）を選ぶ、コインはランダム（丁半と同じロジック）
   const hostFirst = _rollDice() >= _rollDice();
-  // 先行が表を選ぶ、コインはランダム
-  return hostFirst ? (Math.random() < 0.5) : (Math.random() >= 0.5);
+  const d1 = _rollDice(), d2 = _rollDice();
+  const isEven = (d1 + d2) % 2 === 0;
+  // 先行が丁（偶数）を選ぶ
+  return hostFirst ? isEven : !isEven;
 }
 
 const SLOT_SYMBOLS = ['🍒','🍋','💎','7️⃣','🔔','💰'];
