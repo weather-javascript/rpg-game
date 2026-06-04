@@ -6,9 +6,13 @@ import type { GameState } from '../gameStore';
 import { ITEM_MASTER } from '../../data/masters';
 import { randomInt } from '../../utils/random';
 
-export type FishingSlice = Pick<GameState,
-  'addFishingScore' | 'equipRod' | 'setActiveJob' | 'addBuff' | 'getActiveBuffBonus'
->;
+export interface FishingSlice {
+  addFishingScore:  (amount: number) => void;
+  equipRod:         (rodId: string) => void;
+  setActiveJob:     (jobId: string | null) => void;
+  addBuff:          (buff: { id: string; name: string; durationMs: number; fishingBonus?: number; miningBonus?: number }) => void;
+  getActiveBuffBonus:(type: 'fishing' | 'mining') => number;
+}
 
 export const createFishingSlice: StateCreator<GameState, [], [], FishingSlice> = (set, get) => ({
   addFishingScore: (amount) => {

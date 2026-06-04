@@ -5,13 +5,20 @@ import type { StateCreator } from 'zustand';
 import type { GameState } from '../gameStore';
 import type { IdMap } from '../../types/game';
 import { EXP_TABLE, SKILL_EXP_TABLE, ITEM_MASTER } from '../../data/masters';
-import { randomInt } from '../../utils/random';
 
-export type PlayerSlice = Pick<GameState,
-  | 'addItems' | 'consumeItem' | 'changeGold' | 'addExp' | 'addSkillExp'
-  | 'changeHp' | 'changeSatiety' | 'applyPassiveRegen' | 'applyHungerPenalty'
-  | 'useItem' | 'changeDisplayName'
->;
+export interface PlayerSlice {
+  addItems:           (drops: { itemId: string; amount: number }[]) => void;
+  consumeItem:        (itemId: string, amount: number) => boolean;
+  changeGold:         (delta: number) => boolean;
+  addExp:             (amount: number) => void;
+  addSkillExp:        (skillId: string, amount: number) => void;
+  changeHp:           (delta: number) => void;
+  changeSatiety:      (delta: number) => void;
+  applyPassiveRegen:  () => void;
+  applyHungerPenalty: () => void;
+  useItem:            (itemId: string) => { success: boolean; message: string };
+  changeDisplayName:  (name: string) => boolean;
+}
 
 export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (set, get) => ({
   addItems: (drops) => {

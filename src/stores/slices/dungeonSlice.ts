@@ -5,9 +5,11 @@ import type { StateCreator } from 'zustand';
 import type { GameState } from '../gameStore';
 import { DUNGEON_MASTER as DUNGEON_MASTER_DATA } from '../../data/masters';
 
-export type DungeonSlice = Pick<GameState,
-  'recordDungeonClear' | 'getDungeonClearedCount' | 'isDungeonUnlocked'
->;
+export interface DungeonSlice {
+  recordDungeonClear:    (dungeonId: string) => void;
+  getDungeonClearedCount:(dungeonId: string) => number;
+  isDungeonUnlocked:     (dungeonId: string) => boolean;
+}
 
 export const createDungeonSlice: StateCreator<GameState, [], [], DungeonSlice> = (set, get) => ({
   recordDungeonClear: (dungeonId) => {

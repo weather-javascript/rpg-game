@@ -4,7 +4,10 @@
 import type { StateCreator } from 'zustand';
 import type { GameState } from '../gameStore';
 
-export type ReliefSlice = Pick<GameState, 'canUseRelief' | 'useRelief'>;
+export interface ReliefSlice {
+  canUseRelief: () => { canUse: boolean; reason: string };
+  useRelief:    () => void;
+}
 
 const COOLDOWN_MS = 30 * 60 * 1000;
 const MAX_USES_PER_DAY = 3;

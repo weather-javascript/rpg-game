@@ -1,0 +1,176 @@
+// firestore.rules
+// Firestore セキュリティルール
+// デプロイ: firebase deploy --only firestore:rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    // 共通ヘルパー関数
+    // ============================================================
+
+    // 認証済みユーザーか
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    // 自分自身のドキュメントか
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    // 管理者か（カスタムクレームで管理）
+    function isAdmin() {
+      return isAuthed() && request.auth.token.admin == true;
+    }
+
+    // 数値かつ範囲内か
+    function inRange(val, min, max) {
+      return val is int && val >= min && val <= max;
+    }
+
+    // ============================================================
+    // players/{uid} — プレイヤーデータ
+    // ============================================================
+    match /players/{uid} {
+      // 読み取り: 本人 or 管理者
+      allow read: if isOwner(uid) || isAdmin();
+
+      // 作成: 本人のみ・必須フィールド検証
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.gold is int
+        && request.resource.data.gold >= 0
+        && request.resource.data.gold <= 999999999;
+
+      // 更新: 本人のみ・不正値ガード（管理者は制限なし）
+      allow update: if isAdmin()
+        || (isOwner(uid)
+        && request.resource.data.uid == uid
+        // gold は 0 以上・1億G 以下（サーバーで大きな変動は審査）
+        && request.resource.data.gold is int
+        && request.resource.data.gold >= 0
+        && request.resource.data.gold <= 100000000
+        // 1回の更新でgoldが5万G以上増えていたら拒否（チート対策）
+        && (request.resource.data.gold - resource.data.gold) <= 50000
+        // uid は変更不可
+        && request.resource.data.uid == resource.data.uid
+        // createdAt は変更不可
+        && request.resource.data.createdAt == resource.data.createdAt);
+
+      // 削除: 管理者のみ
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
+    // auctions/{listingId} — オークション出品
+    // ============================================================
+    match /auctions/{listingId} {
+      // 読み取り: 認証済み全員
+      allow read: if isAuthed();
+
+      // 作成: 本人の出品のみ・価格上限チェック
+      allow create: if isAuthed()
+        && request.resource.data.sellerUid == request.auth.uid
+        && request.resource.data.pricePerUnit is int
+        && request.resource.data.pricePerUnit >= 1
+        && request.resource.data.pricePerUnit <= 10000000
+        && request.resource.data.amount is int
+        && request.resource.data.amount >= 1
+        && request.resource.data.amount <= 9999
+        && request.resource.data.expiresAt is int
+        // 最長7日 = 604800000ms
+        && request.resource.data.expiresAt <= request.time.toMillis() + 604800001;
+
+      // 削除: 出品者本人 or 管理者
+      allow delete: if isAuthed()
+        && (resource.data.sellerUid == request.auth.uid || isAdmin());
+
+      // 更新: 不可（購入はCloud Functionsで処理）
+      allow update: if isAdmin();
+    }
+
+    // ============================================================
+    // gamble_battles/{battleId} — ギャンブル対戦
+    // ============================================================
+    match /gamble_battles/{battleId} {
+      allow read: if isAuthed();
+
+      // 作成: ホスト本人のみ
+      allow create: if isAuthed()
+        && request.resource.data.hostUid == request.auth.uid
+        && request.resource.data.betAmount is int
+        && request.resource.data.betAmount >= 10
+        && request.resource.data.betAmount <= 100000;
+
+      // 更新: ホスト or ゲスト or 管理者
+      allow update: if isAuthed()
+        && (resource.data.hostUid == request.auth.uid
+          || resource.data.guestUid == request.auth.uid
+          || isAdmin());
+
+      // 削除: ホスト or 管理者
+      allow delete: if isAuthed()
+        && (resource.data.hostUid == request.auth.uid || isAdmin());
+    }
+
+    // ============================================================
+    // board/{messageId} — 掲示板
+    // ============================================================
+    match /board/{messageId} {
+      allow read: if isAuthed();
+      allow create: if isAuthed()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() >= 1
+        && request.resource.data.text.size() <= 200;
+      allow delete: if isAuthed()
+        && (resource.data.uid == request.auth.uid || isAdmin());
+      allow update: if isAdmin();
+    }
+
+    // ============================================================
+    // online_users/{uid} — オンライン状態
+    // ============================================================
+    match /online_users/{uid} {
+      allow read: if isAuthed();
+      allow write: if isOwner(uid);
+    }
+
+    // ============================================================
+    // admin/{docId} — 管理者設定（ギャンブル倍率など）
+    // ============================================================
+    match /admin/{docId} {
+      allow read: if isAuthed();
+      allow write: if isAdmin();
+    }
+
+    // ============================================================
+    // sold_notifications/{notifId} — 売却通知
+    // ============================================================
+    match /sold_notifications/{notifId} {
+      allow read: if isAuthed()
+        && (resource.data.sellerUid == request.auth.uid || resource.data.buyerUid == request.auth.uid || isAdmin());
+      allow create: if isAuthed();
+      allow update: if isAuthed()
+        && (resource.data.sellerUid == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
+    // shared/{docId} — 共有設定（お知らせ等）
+    // ============================================================
+    match /shared/{docId} {
+      allow read: if isAuthed();
+      allow write: if isAdmin();
+    }
+
+    // ============================================================
+    // それ以外は全拒否
+    // ============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
