@@ -230,29 +230,27 @@ function PvPPanel({ bet }: { bet: number }) {
   const [selectedGame, setSelectedGame] = useState('chohan');
   const [loading, setLoading] = useState(false);
   const [battleAnim, setBattleAnim] = useState<{ opponentName: string; gameName: string; result: { won: boolean; amount: number } } | null>(null);
+  // ホスト側：既に金を処理済みかフラグ管理
+  const processedBattleRef = useState<Set<string>>(() => new Set())[0];
 
   useEffect(() => {
     const unsub = subscribeGambleBattles(setBattles);
     return unsub;
   }, []);
 
-  // ホストが自分のバトルをリアルタイム監視して、ゲストが参加したら結果を処理
+  // ホストが自分のバトルをリアルタイム監視
   useEffect(() => {
     if (!myBattleId || !player) return;
     const unsub = subscribeGambleBattle(myBattleId, (battle) => {
-      if (!battle) {
-        // バトルが消えた（キャンセルされた）
-        setMyBattleId(null);
-        return;
-      }
-      if (battle.status === 'finished' && battle.winnerId) {
+      if (!battle) { setMyBattleId(null); return; }
+      if (battle.status === 'finished' && battle.winnerId && !processedBattleRef.has(battle.id)) {
+        processedBattleRef.add(battle.id);
         const iWon = battle.winnerId === player.uid;
+        // ホストは募集時に金を引いていないので、勝ちなら+betAmount×2、負けなら-betAmount
         if (iWon) {
-          changeGold(battle.betAmount);
-        } else {
-          changeGold(-battle.betAmount);
+          changeGold(battle.betAmount * 2); // 自分の掛け金 + 相手の掛け金
         }
-        // アニメーション表示
+        // 負けの場合は handleHost で既に -betAmount してあるので追加処理なし
         setBattleAnim({
           opponentName: battle.guestName ?? '相手',
           gameName: battle.gambleType,
@@ -274,10 +272,14 @@ function PvPPanel({ bet }: { bet: number }) {
     if (myBattleId) { addNotification('warning', '既に募集中です'); return; }
     setLoading(true);
     try {
+      // 募集時に掛け金を先払い（エスクロー）
+      changeGold(-bet);
       const id = await createGambleBattle(player.uid, player.displayName, player.stats.level, selectedGame, bet);
       setMyBattleId(id);
       addNotification('success', `⚔️ 対戦を募集開始しました！ (${bet.toLocaleString()}G)`);
     } catch (e) {
+      // 失敗したら返金
+      changeGold(bet);
       const msg = e instanceof Error ? e.message : String(e);
       addNotification('error', `募集に失敗しました: ${msg.slice(0, 60)}`);
     }
@@ -289,8 +291,10 @@ function PvPPanel({ bet }: { bet: number }) {
     setLoading(true);
     try {
       await cancelGambleBattle(myBattleId, player.uid);
+      // キャンセル時は返金
+      changeGold(bet);
       setMyBattleId(null);
-      addNotification('info', '募集をキャンセルしました');
+      addNotification('info', '募集をキャンセルしました（返金済み）');
     } catch { addNotification('error', 'キャンセルに失敗しました'); }
     setLoading(false);
   };
@@ -300,24 +304,30 @@ function PvPPanel({ bet }: { bet: number }) {
     if (player.gold < battle.betAmount) { addNotification('error', 'ゴールドが足りません'); return; }
     setLoading(true);
     try {
+      // 参加時に掛け金を払う
+      changeGold(-battle.betAmount);
       const { success, battle: result } = await joinGambleBattle(battle.id, player.uid, player.displayName);
       if (success && result) {
         const iWon = result.winnerId === player.uid;
         if (iWon) {
-          changeGold(battle.betAmount);
-        } else {
-          changeGold(-battle.betAmount);
+          // 勝ちなら自分の掛け金 + 相手の掛け金を受取
+          changeGold(battle.betAmount * 2);
         }
-        // アニメーション表示
+        // 負けの場合は既に -betAmount 済みなので追加処理なし
         setBattleAnim({
           opponentName: battle.hostName,
           gameName: battle.gambleType,
           result: { won: iWon, amount: battle.betAmount },
         });
       } else {
+        // 参加失敗→返金
+        changeGold(battle.betAmount);
         addNotification('error', '参加に失敗しました（既に終了）');
       }
-    } catch { addNotification('error', '参加に失敗しました'); }
+    } catch {
+      changeGold(battle.betAmount);
+      addNotification('error', '参加に失敗しました');
+    }
     setLoading(false);
   };
 
@@ -344,10 +354,13 @@ function PvPPanel({ bet }: { bet: number }) {
             </button>
           ))}
         </div>
-        <div style={{ fontSize: '0.78rem', color: '#8a92b2', marginBottom: 8 }}>掛け金: {bet.toLocaleString()}G | ゲーム: {GAME_NAMES[selectedGame]}</div>
+        <div style={{ fontSize: '0.75rem', color: '#8a92b2', marginBottom: 8 }}>
+          掛け金: {bet.toLocaleString()}G | ゲーム: {GAME_NAMES[selectedGame]}<br />
+          <span style={{ color: '#4a5070' }}>※ 募集時に掛け金が引かれます。キャンセルで返金。</span>
+        </div>
         {myBattleId && myBattle ? (
           <div style={{ background: 'rgba(91,141,238,0.1)', border: '1px solid #5b8dee', borderRadius: 6, padding: '8px 10px', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.82rem', color: '#5b8dee' }}>🔄 参加者募集中...</span>
+            <span style={{ fontSize: '0.82rem', color: '#5b8dee' }}>🔄 参加者募集中... ({bet.toLocaleString()}G エスクロー中)</span>
             <button onClick={handleCancelHost} disabled={loading} style={{ padding: '4px 10px', background: '#e05555', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.75rem' }}>取消</button>
           </div>
         ) : (
@@ -393,6 +406,7 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus =
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
   const [showAnim, setShowAnim] = useState(false);
+  const pendingResult = useState<GambleResult | null>(null);
   const pendingRef = useState<{ r: GambleResult | null }>({ r: null })[0];
 
   const play = async () => {
@@ -477,7 +491,19 @@ function ChohanPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }:
         ))}
       </div>
       {showAnim && <GameAnimation type="chohan" onDone={handleAnimDone} />}
-      {result && !animating && <ResultDisplay result={result} />}
+      {result && !animating && (
+        <div>
+          {'dice' in result && Array.isArray((result as any).dice) && (
+            <div style={{ textAlign: 'center', fontSize: '1.8rem', marginBottom: 4, letterSpacing: 8 }}>
+              🎲{(result as any).dice[0]} 🎲{(result as any).dice[1]}
+              <span style={{ fontSize: '0.85rem', color: '#8a92b2', marginLeft: 8 }}>
+                合計{(result as any).dice[0] + (result as any).dice[1]}（{((result as any).dice[0] + (result as any).dice[1]) % 2 === 0 ? '偶数＝丁' : '奇数＝半'}）
+              </span>
+            </div>
+          )}
+          <ResultDisplay result={result} />
+        </div>
+      )}
       <button onClick={play} disabled={animating}
         style={{ width: '100%', padding: 12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#e05555,#c03030)', color: '#fff', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem' }}>
         🎲 {bet.toLocaleString()}G で投じる
@@ -720,7 +746,8 @@ export function GambleScreen() {
   };
 
   if (!player) return null;
-  const game = GAMBLE_MASTER[activeGame] ?? GAMBLE_MASTER['chohan'];
+  const gameMasterKey = activeGame === 'slot' ? 'slot_machine' : activeGame;
+  const game = GAMBLE_MASTER[gameMasterKey] ?? GAMBLE_MASTER['chohan'];
   const netProfit = stats.totalWon - stats.totalBet;
 
   return (
