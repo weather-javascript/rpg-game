@@ -252,14 +252,28 @@ export async function getAllPlayersAdmin(): Promise<AdminPlayerData[]> {
   const snap = await import('firebase/firestore').then(({ getDocs }) =>
     getDocs(collection(db, 'players'))
   );
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => {
+    const data = d.data() as Partial<AdminPlayerData>;
+    return {
+      id: d.id,
+      uid: data.uid ?? d.id,
+      ...data,
+    } as AdminPlayerData;
+  });
 }
 
 export function subscribeAllPlayersAdmin(cb: (players: AdminPlayerData[]) => void): () => void {
   // onSnapshotでリアルタイム更新（管理者権限が必要）
   try {
     const unsub = onSnapshot(collection(db, 'players'), snap => {
-      cb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      cb(snap.docs.map(d => {
+        const data = d.data() as Partial<AdminPlayerData>;
+        return {
+          id: d.id,
+          uid: data.uid ?? d.id,
+          ...data,
+        } as AdminPlayerData;
+      }));
     });
     return unsub;
   } catch {

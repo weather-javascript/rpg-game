@@ -3,7 +3,7 @@
 
 import { useState, useCallback } from 'react';
 import { useGameStore } from '../../stores/gameStore';
-import { secureRandom, randomIntRange, randomChance, drawFromTableSecure } from '../../utils/random';
+import { randomIntRange, randomChance, drawFromTableSecure } from '../../utils/random';
 import { GATHER_NODE_MASTER, ITEM_MASTER, FISHING_RODS } from '../../data/masters';
 import type { GatherNodeMaster } from '../../types/game';
 

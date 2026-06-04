@@ -281,7 +281,6 @@ export default function App() {
   const addNotification = useGameStore(s => s.addNotification);
   const changeGold = useGameStore(s => s.changeGold);
   const applyPassiveRegen = useGameStore(s => s.applyPassiveRegen);
-  const isSaving = useGameStore(s => s.isSaving);
 
   // バージョン更新ポップアップ（毎回表示）
   const [showVersionPopup, setShowVersionPopup] = useState(false);
