@@ -2,6 +2,7 @@
 // ジャックポットは他のギャンブルで蓄積する仕様に変更
 // PvP対戦機能追加
 import { GameIcon } from '../icons';
+import { secureRandom } from '../../utils/random';
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { GAMBLE_MASTER, ITEM_MASTER } from '../../data/masters';
@@ -9,6 +10,7 @@ import { playChohan, playChinchiro, dealPoker, drawPoker } from '../../systems/m
 import {
   contributeToJackpot, checkJackpotWin, subscribeJackpotPool,
   createGambleBattle, subscribeGambleBattles, joinGambleBattle, cancelGambleBattle,
+  subscribeGambleMultipliers, subscribeGambleBattle,
 } from '../../services/multiplayer';
 import type { GambleResult, GambleMaster } from '../../types/game';
 import type { PokerState } from '../../systems/minigames';
@@ -20,7 +22,7 @@ interface SessionStats {
 const initStats = (): SessionStats => ({ totalBet: 0, totalWon: 0, gamesPlayed: 0, wins: 0, biggestWin: 0, biggestLoss: 0 });
 
 function resolveGenericGamble(game: GambleMaster, bet: number, multiplierBonus = 1.0): GambleResult {
-  const rand = Math.random();
+  const rand = secureRandom();
   let cum = 0;
   for (const r of game.rewardTable) {
     cum += r.probability;
@@ -105,6 +107,31 @@ function PvPPanel({ bet }: { bet: number }) {
     const unsub = subscribeGambleBattles(setBattles);
     return unsub;
   }, []);
+
+  // ホストが自分のバトルをリアルタイム監視して、ゲストが参加したら結果を処理
+  useEffect(() => {
+    if (!myBattleId || !player) return;
+    const unsub = subscribeGambleBattle(myBattleId, (battle) => {
+      if (!battle) {
+        // バトルが消えた（キャンセルされた）
+        setMyBattleId(null);
+        return;
+      }
+      if (battle.status === 'finished' && battle.winnerId) {
+        const iWon = battle.winnerId === player.uid;
+        if (iWon) {
+          changeGold(battle.betAmount);
+          addNotification('success', `🏆 対戦勝利！ vs ${battle.guestName ?? '相手'} +${battle.betAmount.toLocaleString()}G`);
+        } else {
+          changeGold(-battle.betAmount);
+          addNotification('error', `💔 対戦敗北... vs ${battle.guestName ?? '相手'} -${battle.betAmount.toLocaleString()}G`);
+        }
+        setMyBattleId(null);
+      }
+    });
+    return unsub;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myBattleId, player?.uid]);
 
   const GAME_NAMES: Record<string, string> = {
     chohan: '丁半', chinchiro: 'チンチロリン', coin_flip: 'コインフリップ', slot_machine: 'スロット',
@@ -217,7 +244,7 @@ function PvPPanel({ bet }: { bet: number }) {
 // ============================================================
 // 各ゲームパネル（ジャックポット積立付き）
 // ============================================================
-function GenericPanel({ game, bet, onResult, onJackpotContrib }: { game: GambleMaster; bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void }) {
+function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { game: GambleMaster; bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
   const { player, changeGold, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addItems: s.addItems, addNotification: s.addNotification }));
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
@@ -229,7 +256,7 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib }: { game: GambleM
     onJackpotContrib(bet); // ジャックポット積立
 
     await new Promise(r => setTimeout(r, 400));
-    const r = resolveGenericGamble(game, bet);
+    const r = resolveGenericGamble(game, bet, multiplierBonus);
     if (r.multiplier > 0) changeGold(Math.floor(bet * r.multiplier));
     if (r.itemRewards.length > 0) addItems(r.itemRewards);
     setResult(r);
@@ -259,7 +286,7 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib }: { game: GambleM
   );
 }
 
-function ChohanPanel({ bet, onResult, onJackpotContrib }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void }) {
+function ChohanPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
   const { player, changeGold, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addNotification: s.addNotification }));
   const [choice, setChoice] = useState<'cho'|'han'>('cho');
   const [result, setResult] = useState<GambleResult | null>(null);
@@ -272,8 +299,10 @@ function ChohanPanel({ bet, onResult, onJackpotContrib }: { bet: number; onResul
     onJackpotContrib(bet);
     await new Promise(r => setTimeout(r, 500));
     const r = playChohan(bet, choice);
-    if (r.goldDelta > 0) changeGold(r.goldDelta + bet);
-    setResult(r); onResult(r);
+    const adjustedDelta = r.goldDelta > 0 ? Math.floor(r.goldDelta * multiplierBonus) : r.goldDelta;
+    const adjustedResult = { ...r, goldDelta: adjustedDelta };
+    if (adjustedDelta > 0) changeGold(adjustedDelta + bet);
+    setResult(adjustedResult); onResult(adjustedResult);
     try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
     setAnimating(false);
   };
@@ -298,7 +327,7 @@ function ChohanPanel({ bet, onResult, onJackpotContrib }: { bet: number; onResul
   );
 }
 
-function ChinchiroPanel({ bet, onResult, onJackpotContrib }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void }) {
+function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
   const { player, changeGold, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addNotification: s.addNotification }));
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
@@ -308,8 +337,10 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib }: { bet: number; onRe
     setAnimating(true); changeGold(-bet); onJackpotContrib(bet);
     await new Promise(r => setTimeout(r, 600));
     const r = playChinchiro(bet);
-    if (r.multiplier > 0) changeGold(Math.floor(bet * r.multiplier));
-    setResult(r); onResult(r);
+    const effectiveMult = r.multiplier > 0 ? r.multiplier * multiplierBonus : 0;
+    const adjustedResult = { ...r, multiplier: effectiveMult, goldDelta: r.goldDelta > 0 ? Math.floor(bet * effectiveMult) - bet : r.goldDelta };
+    if (effectiveMult > 0) changeGold(Math.floor(bet * effectiveMult));
+    setResult(adjustedResult); onResult(adjustedResult);
     try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
     setAnimating(false);
   };
@@ -331,7 +362,7 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib }: { bet: number; onRe
   );
 }
 
-function CoinFlipPanel({ bet, onResult, onJackpotContrib }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void }) {
+function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
   const { player, changeGold, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addNotification: s.addNotification }));
   const [choice, setChoice] = useState<'heads'|'tails'>('heads');
   const [result, setResult] = useState<GambleResult | null>(null);
@@ -341,12 +372,13 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib }: { bet: number; onRes
     if (!player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
     setAnimating(true); changeGold(-bet); onJackpotContrib(bet);
     await new Promise(r => setTimeout(r, 500));
-    const rand = Math.random();
+    const rand = secureRandom();
     const win = (choice === 'heads' && rand < 0.49) || (choice === 'tails' && rand >= 0.49);
+    const winAmount = win ? Math.floor(bet * multiplierBonus) : 0;
     const r: GambleResult = win
-      ? { rewardLabel: '当たり！', multiplier: 2, goldDelta: bet, itemRewards: [], symbols: ['✨'] }
+      ? { rewardLabel: '当たり！', multiplier: 2 * multiplierBonus, goldDelta: winAmount, itemRewards: [], symbols: ['✨'] }
       : { rewardLabel: 'ハズレ', multiplier: 0, goldDelta: -bet, itemRewards: [], symbols: ['💨'] };
-    if (win) changeGold(bet * 2);
+    if (win) changeGold(bet + winAmount);
     setResult(r); onResult(r);
     try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
     setAnimating(false);
@@ -372,7 +404,7 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib }: { bet: number; onRes
   );
 }
 
-function PokerPanel({ bet, onResult, onJackpotContrib }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void }) {
+function PokerPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
   const { player, changeGold, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addItems: s.addItems, addNotification: s.addNotification }));
   const [pokerState, setPokerState] = useState<PokerState | null>(null);
   const [hold, setHold] = useState<boolean[]>([false,false,false,false,false]);
@@ -400,9 +432,11 @@ function PokerPanel({ bet, onResult, onJackpotContrib }: { bet: number; onResult
     const { result: r, newState } = drawPoker(pokerState, hold);
     setPokerState(newState);
     setPhase('result');
-    if (r.multiplier > 0) changeGold(Math.floor(bet * r.multiplier));
+    const effectiveMult = r.multiplier > 0 ? r.multiplier * multiplierBonus : 0;
+    const adjustedResult = { ...r, multiplier: effectiveMult, goldDelta: r.multiplier > 0 ? Math.floor(bet * effectiveMult) - bet : r.goldDelta };
+    if (effectiveMult > 0) changeGold(Math.floor(bet * effectiveMult));
     if (r.itemRewards.length > 0) addItems(r.itemRewards);
-    setResult(r); onResult(r);
+    setResult(adjustedResult); onResult(adjustedResult);
     try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
   };
 
@@ -462,9 +496,15 @@ export function GambleScreen() {
   const [bet, setBet] = useState(100);
   const [stats, setStats] = useState<SessionStats>(initStats());
   const [jackpotPool, setJackpotPool] = useState(0);
+  const [gambleMultipliers, setGambleMultipliers] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const unsub = subscribeJackpotPool(setJackpotPool);
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeGambleMultipliers(setGambleMultipliers);
     return unsub;
   }, []);
 
@@ -524,12 +564,38 @@ export function GambleScreen() {
         )}
         {activeGame !== 'pvp' && <BetInput game={game} bet={bet} setBet={setBet} />}
 
-        {activeGame === 'chohan'       && <ChohanPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} />}
-        {activeGame === 'chinchiro'    && <ChinchiroPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} />}
-        {activeGame === 'coin_flip'    && <CoinFlipPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} />}
-        {activeGame === 'slot'         && <GenericPanel game={GAMBLE_MASTER['slot_machine']}  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} />}
-        {activeGame === 'treasure_box' && <GenericPanel game={GAMBLE_MASTER['treasure_box']}  bet={100} onResult={handleResult} onJackpotContrib={handleJackpotContrib} />}
-        {activeGame === 'poker'        && <PokerPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} />}
+        {activeGame === 'chohan'       && <ChohanPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['chohan'] ?? 1.0} />}
+        {activeGame === 'chinchiro'    && <ChinchiroPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['chinchiro'] ?? 1.0} />}
+        {activeGame === 'coin_flip'    && <CoinFlipPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['coin_flip'] ?? 1.0} />}
+        {activeGame === 'slot'         && <GenericPanel game={GAMBLE_MASTER['slot_machine']}  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['slot_machine'] ?? 1.0} />}
+        {activeGame === 'treasure_box' && <GenericPanel game={GAMBLE_MASTER['treasure_box']}  bet={100} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['treasure_box'] ?? 1.0} />}
+        {activeGame === 'treasure_box' && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#f0c060', marginBottom: 8 }}>📦 宝箱の中身一覧</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {GAMBLE_MASTER['treasure_box'].rewardTable.map((r, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#161b26', border: '1px solid #2d3752', borderRadius: 6, padding: '7px 10px' }}>
+                  <span style={{ fontSize: '1.1rem', minWidth: 24, textAlign: 'center' }}>{r.symbols?.[0] ?? '?'}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#e8e6ff' }}>{r.label}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#8a92b2', marginTop: 1 }}>
+                      {r.multiplier > 0 && <span>💰 {r.multiplier}倍ゴールド</span>}
+                      {r.itemRewards && r.itemRewards.length > 0 && r.itemRewards.map(ir => (
+                        <span key={ir.itemId} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, marginRight: 4 }}>
+                          <GameIcon id={ITEM_MASTER[ir.itemId]?.icon ?? ''} size={12} />
+                          {ITEM_MASTER[ir.itemId]?.name ?? ir.itemId} ×{ir.amount}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '0.72rem', color: '#4a5070', flexShrink: 0 }}>{(r.probability * 100).toFixed(0)}%</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#4a5070', marginTop: 6, textAlign: 'center' }}>1回 100G固定</div>
+          </div>
+        )}
+        {activeGame === 'poker'        && <PokerPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['poker'] ?? 1.0} />}
         {activeGame === 'pvp'          && (
           <>
             <div style={{ fontWeight:700, fontSize:'1rem', marginBottom:8 }}>⚔️ PvP対戦</div>

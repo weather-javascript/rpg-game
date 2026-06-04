@@ -2,11 +2,12 @@
 // ミニゲームの全ロジック。UI に依存しない純粋関数のみ。
 
 import type { GambleResult } from '../types/game';
+import { secureRandom, randomInt, randomIntRange, randomChance, drawFromTableSecure } from '../utils/random';
 
 // ============================================================
 // 共通ユーティリティ
 // ============================================================
-const roll = (n: number) => Math.floor(Math.random() * n) + 1;
+const roll = (n: number) => randomInt(n) + 1;
 const rollDice = (sides = 6) => roll(sides);
 
 /**
@@ -14,13 +15,7 @@ const rollDice = (sides = 6) => roll(sides);
  * rewardTable の probability 合計が 1.0 になるよう設計すること。
  */
 export function drawFromTable<T extends { probability: number }>(table: T[]): T {
-  const rand = Math.random();
-  let cum = 0;
-  for (const entry of table) {
-    cum += entry.probability;
-    if (rand < cum) return entry;
-  }
-  return table[table.length - 1];
+  return drawFromTableSecure(table);
 }
 
 // ============================================================
@@ -124,7 +119,7 @@ function buildDeck(): Card[] {
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = randomInt(i + 1);
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
@@ -203,5 +198,5 @@ export function calcJackpotContrib(bet: number): number {
 }
 
 export function rollJackpot(): boolean {
-  return Math.random() < JACKPOT_WIN_PROB;
+  return randomChance(JACKPOT_WIN_PROB);
 }

@@ -69,7 +69,7 @@ export async function buyAuction(listingId: string, buyerUid: string, buyerGold:
   try { await updateDoc(doc(db, 'players', listing.sellerUid), { gold: increment(totalCost) }); } catch { /* ignore */ }
   try {
     await addDoc(collection(db, 'sold_notifications'), {
-      sellerUid: listing.sellerUid, itemId: listing.itemId, amount: listing.amount,
+      sellerUid: listing.sellerUid, buyerUid, itemId: listing.itemId, amount: listing.amount,
       totalGold: totalCost, createdAt: Date.now(), read: false,
     });
   } catch { /* ignore */ }
@@ -212,6 +212,14 @@ export async function joinGambleBattle(
   return { success: true, battle: { ...battle, guestUid, guestName, winnerId, status: 'finished' } };
 }
 
+// ホストが自分のバトルの状態変化（finished）を監視するための購読
+export function subscribeGambleBattle(battleId: string, cb: (battle: GambleBattle | null) => void): Unsubscribe {
+  return onSnapshot(doc(db, COLLECTIONS.BATTLES, battleId), snap => {
+    if (!snap.exists()) { cb(null); return; }
+    cb({ id: snap.id, ...(snap.data() as Omit<GambleBattle, 'id'>) });
+  });
+}
+
 export async function cancelGambleBattle(battleId: string, hostUid: string): Promise<boolean> {
   const ref = doc(db, COLLECTIONS.BATTLES, battleId);
   const snap = await getDoc(ref);
@@ -223,14 +231,31 @@ export async function cancelGambleBattle(battleId: string, hostUid: string): Pro
 // ============================================================
 // 管理者機能
 // ============================================================
-export async function getAllPlayersAdmin(): Promise<any[]> {
+// 管理者向けプレイヤーデータ型（全フィールドをPartialで安全に扱う）
+export interface AdminPlayerData {
+  id: string;
+  uid: string;
+  displayName?: string;
+  gold?: number;
+  banned?: boolean;
+  banReason?: string;
+  stats?: { level: number; hp: number; maxHp: number; satiety: number; maxSatiety: number; exp: number; expToNextLevel: number };
+  fishingScore?: number;
+  dungeonClearedCount?: Record<string, number>;
+  skillLevels?: Record<string, number>;
+  activityLog?: Array<{ type: string; message: string; timestamp: number }>;
+  lastSavedAt?: number;
+  createdAt?: number;
+}
+
+export async function getAllPlayersAdmin(): Promise<AdminPlayerData[]> {
   const snap = await import('firebase/firestore').then(({ getDocs }) =>
     getDocs(collection(db, 'players'))
   );
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-export function subscribeAllPlayersAdmin(cb: (players: any[]) => void): () => void {
+export function subscribeAllPlayersAdmin(cb: (players: AdminPlayerData[]) => void): () => void {
   // onSnapshotでリアルタイム更新（管理者権限が必要）
   try {
     const unsub = onSnapshot(collection(db, 'players'), snap => {
@@ -242,7 +267,7 @@ export function subscribeAllPlayersAdmin(cb: (players: any[]) => void): () => vo
   }
 }
 
-export async function updatePlayerAdmin(uid: string, data: Partial<any>): Promise<void> {
+export async function updatePlayerAdmin(uid: string, data: Partial<AdminPlayerData>): Promise<void> {
   await updateDoc(doc(db, 'players', uid), data);
 }
 

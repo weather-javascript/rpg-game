@@ -28,12 +28,43 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
   { id:'status',    label:'状態',     icon:'chart' },
 ];
 
+const LOADING_HINTS = [
+  '⚔️ ダンジョンを生成しています...',
+  '🪨 鉱脈を配置しています...',
+  '🐉 モンスターを召喚しています...',
+  '🎣 釣り場に魚を放流しています...',
+  '💰 宝箱を配置しています...',
+  '🌲 森を育てています...',
+  '🔥 炎を灯しています...',
+  '⚗️ 魔法陣を描いています...',
+  '🗝️ 扉を開いています...',
+  '🌟 星を配置しています...',
+];
+
 function LoadingScreen() {
+  const [hint, setHint] = useState(() => LOADING_HINTS[Math.floor(Date.now() % LOADING_HINTS.length)]);
+  const [dots, setDots] = useState('');
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const hintTimer = setInterval(() => {
+      setHint(LOADING_HINTS[Math.floor(Date.now() % LOADING_HINTS.length)]);
+    }, 1800);
+    const dotTimer = setInterval(() => setDots(d => d.length >= 3 ? '' : d + '.'), 400);
+    const progTimer = setInterval(() => setProgress(p => Math.min(95, p + Math.random() * 12 + 2)), 300);
+    return () => { clearInterval(hintTimer); clearInterval(dotTimer); clearInterval(progTimer); };
+  }, []);
+
   return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', flexDirection:'column', gap:16 }}>
-      <div style={{ fontSize:'3rem' }}>⚔️</div>
-      <h1 style={{ fontFamily:'Cinzel,serif', fontSize:'2rem', color:'#f0c060', letterSpacing:'0.2em', textShadow:'0 0 30px rgba(240,192,96,0.4)' }}>RPG LIFE</h1>
-      <p style={{ color:'#8a92b2', fontSize:'0.9rem' }}>データを読み込んでいます...</p>
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', flexDirection:'column', gap:20, background:'#0e1118' }}>
+      <div style={{ fontSize:'3.5rem', filter:'drop-shadow(0 0 20px rgba(240,192,96,0.6))', animation:'none' }}>⚔️</div>
+      <h1 style={{ fontFamily:'Cinzel,serif', fontSize:'2rem', color:'#f0c060', letterSpacing:'0.2em', margin:0, textShadow:'0 0 30px rgba(240,192,96,0.4)' }}>RPG LIFE</h1>
+      <div style={{ width:260, display:'flex', flexDirection:'column', gap:8 }}>
+        <div style={{ height:4, background:'#1c2235', borderRadius:2, overflow:'hidden' }}>
+          <div style={{ height:'100%', background:'linear-gradient(90deg,#5b8dee,#f0c060)', width:`${progress}%`, transition:'width 0.3s ease', borderRadius:2 }} />
+        </div>
+        <p style={{ color:'#8a92b2', fontSize:'0.82rem', margin:0, textAlign:'center', minHeight:20 }}>{hint}{dots}</p>
+      </div>
     </div>
   );
 }
@@ -119,9 +150,13 @@ function StatusBar() {
       </div>
       <button
         onClick={saveGame} disabled={isSaving}
-        style={{ background:'#1c2235', color:isSaving ? '#4a5070' : '#8a92b2', border:'1px solid #2d3752', borderRadius:6, padding:'3px 9px', fontSize:'0.75rem', cursor:'pointer', flexShrink:0 }}
+        style={{ background:'#1c2235', color:isSaving ? '#4a5070' : '#8a92b2', border:`1px solid ${isSaving ? '#2d3752' : '#3d4762'}`, borderRadius:6, padding:'3px 9px', fontSize:'0.75rem', cursor: isSaving ? 'not-allowed' : 'pointer', flexShrink:0, display:'flex', alignItems:'center', gap:4 }}
+        title={isSaving ? '保存中...' : 'セーブ'}
       >
-        {isSaving ? '...' : '💾'}
+        {isSaving
+          ? <><span style={{display:'inline-block', animation:'spin 1s linear infinite', fontSize:'0.75rem'}}>⟳</span><span>保存中</span></>
+          : '💾'
+        }
       </button>
     </header>
   );
@@ -246,6 +281,7 @@ export default function App() {
   const addNotification = useGameStore(s => s.addNotification);
   const changeGold = useGameStore(s => s.changeGold);
   const applyPassiveRegen = useGameStore(s => s.applyPassiveRegen);
+  const isSaving = useGameStore(s => s.isSaving);
 
   // バージョン更新ポップアップ（毎回表示）
   const [showVersionPopup, setShowVersionPopup] = useState(false);

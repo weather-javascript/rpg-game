@@ -3,6 +3,7 @@
 
 import { useState, useCallback } from 'react';
 import { useGameStore } from '../../stores/gameStore';
+import { secureRandom, randomIntRange, randomChance, drawFromTableSecure } from '../../utils/random';
 import { GATHER_NODE_MASTER, ITEM_MASTER, FISHING_RODS } from '../../data/masters';
 import type { GatherNodeMaster } from '../../types/game';
 
@@ -23,8 +24,8 @@ function calcFishingResult(node: GatherNodeMaster, fishingLv: number, buffBonus:
   const drops: { itemId: string; amount: number }[] = [];
   for (const drop of node.drops) {
     const rate = Math.min(1.0, (drop.baseRate + (drop.skillRateBonus ?? 0) * fishingLv) * buffBonus);
-    if (Math.random() < rate) {
-      const amount = drop.minAmount + Math.floor(Math.random() * (drop.maxAmount - drop.minAmount + 1));
+    if (randomChance(rate)) {
+      const amount = randomIntRange(drop.minAmount, drop.maxAmount);
       drops.push({ itemId: drop.itemId, amount });
     }
   }
@@ -70,7 +71,7 @@ export function FishingScreen() {
     if (fever.active) return;
     // ミス回数が増えるほど発生しやすく（最大30%）
     const feverRate = Math.min(0.30, 0.02 + feverMissCount * 0.005);
-    if (Math.random() < feverRate) {
+    if (randomChance(feverRate)) {
       setFever({ active: true, remaining: 100, scoreBonus: 2 });
       setFeverMissCount(0);
       addNotification('success', '🔥 釣りフィーバー発動！スコア2倍・特別ドロップ確率UP！');
@@ -109,7 +110,7 @@ export function FishingScreen() {
 
     // FFGGロッドRank4以上かつFFGG釣り場で釣りスコア加算
     if ((equippedRodId === 'ffgg_rod_r6' || equippedRodId === 'ffggr_rod') && nodeId === 'fishing_ffgg_pond') {
-      const scoreGain = fever.active ? 3 : (Math.random() < 0.3 ? 2 : 1);
+      const scoreGain = fever.active ? 3 : (randomChance(0.3) ? 2 : 1);
       addFishingScore(scoreGain * fever.scoreBonus);
     }
 
@@ -243,10 +244,7 @@ export function FishingScreen() {
     };
 
     const table = tables[crateId] ?? tables['crate_leather'];
-    const rand = Math.random();
-    let cum = 0;
-    let reward = table[table.length - 1];
-    for (const r of table) { cum += r.prob; if (rand < cum) { reward = r; break; } }
+    const reward = drawFromTableSecure(table.map(r => ({ ...r, probability: r.prob })));
 
     if (reward.items.length > 0) addItems(reward.items);
     if (reward.gold > 0) changeGold(reward.gold);

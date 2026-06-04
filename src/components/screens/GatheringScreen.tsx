@@ -7,15 +7,16 @@ import { useGameStore } from '../../stores/gameStore';
 import { GATHER_NODE_MASTER, ITEM_MASTER } from '../../data/masters';
 import type { GatherNodeMaster } from '../../types/game';
 import { savePlayer } from '../../services/database';
+import { randomChance, randomIntRange } from '../../utils/random';
 
 function calcGatherResult(node: GatherNodeMaster, skillLevel: number, toolBonus: number = 1) {
   const drops: { itemId: string; amount: number }[] = [];
   const expGained: Record<string, number> = {};
   for (const drop of node.drops) {
     const rate = Math.min(1.0, drop.baseRate + (drop.skillRateBonus ?? 0) * skillLevel);
-    if (Math.random() < rate) {
+    if (randomChance(rate)) {
       // 鉄のツルハシ・斧があれば採取量にボーナス倍率
-      const amount = Math.ceil((drop.minAmount + Math.floor(Math.random() * (drop.maxAmount - drop.minAmount + 1))) * toolBonus);
+      const amount = Math.ceil(randomIntRange(drop.minAmount, drop.maxAmount) * toolBonus);
       drops.push({ itemId: drop.itemId, amount });
     }
   }

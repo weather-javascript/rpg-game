@@ -3,6 +3,7 @@
 import { GameIcon } from '../icons';
 import { useState, useCallback } from 'react';
 import { useGameStore } from '../../stores/gameStore';
+import { secureRandom, randomInt, randomIntRange, randomChance } from '../../utils/random';
 import { DUNGEON_MASTER, MONSTER_MASTER, ITEM_MASTER } from '../../data/masters';
 import type { MonsterMaster, CombatResult, CombatTurn, DungeonRunState, DungeonMaster } from '../../types/game';
 
@@ -11,16 +12,16 @@ import type { MonsterMaster, CombatResult, CombatTurn, DungeonRunState, DungeonM
 // ============================================================
 function calcDamage(atk: number, def: number): number {
   const base = Math.max(1, atk - def);
-  return base + Math.floor(Math.random() * Math.ceil(base * 0.2));
+  return base + randomInt(Math.ceil(base * 0.2) + 1);
 }
 
 function calcMonsterDrops(monster: MonsterMaster, combatLv: number) {
   return monster.drops.filter(d => {
     const rate = Math.min(1, d.baseRate + (d.skillRateBonus ?? 0) * combatLv * 0.01);
-    return Math.random() < rate;
+    return randomChance(rate);
   }).map(d => ({
     itemId: d.itemId,
-    amount: d.minAmount + Math.floor(Math.random() * (d.maxAmount - d.minAmount + 1)),
+    amount: randomIntRange(d.minAmount, d.maxAmount),
   }));
 }
 
@@ -37,7 +38,7 @@ function simulateCombat(
   for (let i = 0; i < MAX_TURNS; i++) {
     const pDmg = calcDamage(pAtk, monster.defense);
     mHp = Math.max(0, mHp - pDmg);
-    const isSpecial = monster.isBoss && Math.random() < 0.2;
+    const isSpecial = monster.isBoss && randomChance(0.2);
     const mDmg = isSpecial
       ? Math.floor(calcDamage(monster.attack, pDef) * 1.5)
       : calcDamage(monster.attack, pDef);
@@ -50,7 +51,7 @@ function simulateCombat(
   const victory = mHp <= 0;
   const drops = victory ? calcMonsterDrops(monster, combatLv) : [];
   const expGained = victory ? Math.floor(monster.baseExp * dungeonExpBonus * (1 + combatLv * 0.01)) : 0;
-  const goldGained = victory ? Math.floor(monster.baseGold * dungeonGoldBonus * (0.8 + Math.random() * 0.4)) : 0;
+  const goldGained = victory ? Math.floor(monster.baseGold * dungeonGoldBonus * (0.8 + secureRandom() * 0.4)) : 0;
   return { victory, turns, expGained, goldGained, drops };
 }
 
@@ -246,10 +247,10 @@ export function DungeonScreen() {
     if (areas && areas[currentAreaIdx]) {
       const area = areas[currentAreaIdx];
       const pool = area.monsters.flatMap(m => Array(m.count).fill(m.monsterId));
-      monsterId = pool[Math.floor(Math.random() * pool.length)];
+      monsterId = pool[randomInt(pool.length)];
     } else {
       const pool = dungeon.monsterIds;
-      monsterId = pool[Math.floor(Math.random() * pool.length)];
+      monsterId = pool[randomInt(pool.length)];
     }
 
     const monster = MONSTER_MASTER[monsterId];
