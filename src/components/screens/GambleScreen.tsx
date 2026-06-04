@@ -156,7 +156,6 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
   const [isFirst, setIsFirst] = useState(true); // 自分が先攻か
 
   // ユーザー選択
-  const [userChoice, setUserChoice] = useState<string | null>(null);
   const [revealResult, setRevealResult] = useState<string>('');
 
   const DICE_EMOJI = ['⚀','⚁','⚂','⚃','⚄','⚅'];
@@ -183,14 +182,12 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
   }, []);
 
   const handleChoose = (choice: string) => {
-    setUserChoice(choice);
     // 結果に基づいてreveal表示
     let reveal = '';
     if (gameName === 'chohan') {
       // resultのwon/lostをそのまま使う（サーバー側で決定済み）
       const diceSum = Math.floor(secureRandom() * 5) + 2 + Math.floor(secureRandom() * 5);
       const isEven = diceSum % 2 === 0;
-      const playerPicked = choice; // 'cho' or 'han'
       reveal = `🎲 合計 ${diceSum}（${isEven ? '偶数＝丁' : '奇数＝半'}）`;
     } else if (gameName === 'coin_flip') {
       reveal = result.won
