@@ -5,14 +5,6 @@ import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER, SKILL_MASTER, EXP_TABLE, SKILL_EXP_TABLE, CRAFT_RECIPES } from '../../data/masters';
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-
-// src/components/screens/StatusScreen.tsx
-import { useState } from 'react';
-import { GameIcon } from '../icons';
-import { useGameStore } from '../../stores/gameStore';
-import { ITEM_MASTER, SKILL_MASTER, EXP_TABLE, SKILL_EXP_TABLE, CRAFT_RECIPES } from '../../data/masters';
-import { updateDoc, doc } from 'firebase/firestore';
-import { db } from '../../services/firebase';
 import type { EquipmentSlots } from '../../types/game';
 import { defaultEquipmentSlots } from '../../types/game';
 
