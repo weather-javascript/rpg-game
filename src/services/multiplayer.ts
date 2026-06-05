@@ -1,10 +1,10 @@
 // src/services/multiplayer.ts
 import {
   doc, setDoc, deleteDoc, collection, query, orderBy, limit,
-  onSnapshot, addDoc, getDoc, updateDoc, where, Unsubscribe, increment,
+  onSnapshot, addDoc, getDoc, updateDoc, where, Unsubscribe, increment, getDocs,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { OnlineUser, BoardMessage, AuctionListing, GambleBattle, PokerTable, PokerCard, PokerPlayer } from '../types/game';
+import type { OnlineUser, BoardMessage, AuctionListing, GambleBattle, GambleBattleData, PokerTable, PokerCard, PokerPlayer } from '../types/game';
 import { calcJackpotContrib, rollJackpot } from '../systems/minigames';
 
 const COLLECTIONS = {
@@ -15,33 +15,69 @@ const COLLECTIONS = {
   POKER:    'poker_tables',
 } as const;
 
+// ============================================================
+// オンラインユーザー登録 — 30秒throttle
+// ============================================================
+let _onlineThrottleTimer: ReturnType<typeof setTimeout> | null = null;
+let _pendingOnlineData: { uid: string; displayName: string; level: number; activity: string; lastDungeonCleared?: string } | null = null;
+
+function _flushOnline() {
+  if (!_pendingOnlineData) return;
+  const d = _pendingOnlineData;
+  _pendingOnlineData = null;
+  setDoc(doc(db, COLLECTIONS.ONLINE, d.uid), {
+    uid: d.uid, displayName: d.displayName, level: d.level,
+    lastSeen: Date.now(), currentActivity: d.activity,
+    ...(d.lastDungeonCleared ? { lastDungeonCleared: d.lastDungeonCleared } : {}),
+  }).catch(() => {});
+}
+
 export async function registerOnline(uid: string, displayName: string, level: number, activity?: string) {
+  // 初回登録は即座に書き込む
   await setDoc(doc(db, COLLECTIONS.ONLINE, uid), {
     uid, displayName, level, lastSeen: Date.now(), currentActivity: activity ?? 'オンライン',
   });
 }
 
 export async function updateActivity(uid: string, activity: string, lastDungeonCleared?: string) {
-  try {
-    await updateDoc(doc(db, COLLECTIONS.ONLINE, uid), {
-      lastSeen: Date.now(),
-      currentActivity: activity,
-      ...(lastDungeonCleared ? { lastDungeonCleared } : {}),
-    });
-  } catch { /* ignore */ }
+  // 30秒throttle: 最後のupdateから30秒後にまとめて書き込む
+  _pendingOnlineData = { uid, displayName: _pendingOnlineData?.displayName ?? '', level: _pendingOnlineData?.level ?? 1, activity, lastDungeonCleared };
+  if (!_onlineThrottleTimer) {
+    _onlineThrottleTimer = setTimeout(() => {
+      _onlineThrottleTimer = null;
+      _flushOnline();
+    }, 30_000);
+  }
 }
 
 export async function unregisterOnline(uid: string) {
+  if (_onlineThrottleTimer) { clearTimeout(_onlineThrottleTimer); _onlineThrottleTimer = null; }
   await deleteDoc(doc(db, COLLECTIONS.ONLINE, uid));
 }
 
+// オンラインユーザーは60秒ポーリング（onSnapshotリスナー廃止でRead節約）
 export function subscribeOnlineUsers(cb: (users: OnlineUser[]) => void): Unsubscribe {
-  // where+orderByの複合インデックス不要にするためorderByのみ使用、クライアント側でフィルタ
+  const POLL_INTERVAL = 60_000;
+  const cutoff = () => Date.now() - 5 * 60 * 1000;
   const q = query(collection(db, COLLECTIONS.ONLINE), orderBy('lastSeen', 'desc'), limit(50));
-  const cutoff = Date.now() - 5 * 60 * 1000;
-  return onSnapshot(q, snap => {
-    cb(snap.docs.map(d => d.data() as OnlineUser).filter(u => u.lastSeen > cutoff));
-  });
+
+  let timer: ReturnType<typeof setInterval> | null = null;
+  let stopped = false;
+
+  const fetch = () => {
+    getDocs(q).then(snap => {
+      if (stopped) return;
+      cb(snap.docs.map(d => d.data() as OnlineUser).filter(u => u.lastSeen > cutoff()));
+    }).catch(() => {});
+  };
+
+  fetch(); // 初回即時
+  timer = setInterval(fetch, POLL_INTERVAL);
+
+  return () => {
+    stopped = true;
+    if (timer) clearInterval(timer);
+  };
 }
 
 export async function postBoardMessage(uid: string, displayName: string, level: number, text: string) {
@@ -50,7 +86,14 @@ export async function postBoardMessage(uid: string, displayName: string, level: 
 
 export function subscribeBoardMessages(cb: (msgs: BoardMessage[]) => void): Unsubscribe {
   const q = query(collection(db, COLLECTIONS.BOARD), orderBy('createdAt', 'desc'), limit(30));
-  return onSnapshot(q, snap => { cb(snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<BoardMessage,'id'>) }))); });
+  let stopped = false;
+  const fetch = () => getDocs(q).then(snap => {
+    if (stopped) return;
+    cb(snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<BoardMessage,'id'>) })));
+  }).catch(() => {});
+  fetch();
+  const timer = setInterval(fetch, 5_000);
+  return () => { stopped = true; clearInterval(timer); };
 }
 
 export async function createAuction(listing: Omit<AuctionListing,'id'|'createdAt'>): Promise<string> {
@@ -86,24 +129,32 @@ export async function cancelAuction(listingId: string, sellerUid: string): Promi
 }
 
 export function subscribeAuctions(cb: (listings: AuctionListing[]) => void): Unsubscribe {
-  // where+orderByの複合インデックス不要にするためcreatedAtでソート、クライアント側で期限フィルタ
   const q = query(collection(db, COLLECTIONS.AUCTIONS), orderBy('createdAt', 'desc'), limit(50));
-  return onSnapshot(q, snap => {
+  let stopped = false;
+  const fetch = () => getDocs(q).then(snap => {
+    if (stopped) return;
     const now = Date.now();
     cb(snap.docs
       .map(d => ({ id: d.id, ...(d.data() as Omit<AuctionListing,'id'>) }))
       .filter(l => l.expiresAt > now));
-  });
+  }).catch(() => {});
+  fetch();
+  const timer = setInterval(fetch, 30_000);
+  return () => { stopped = true; clearInterval(timer); };
 }
 
 export function subscribeSoldNotifications(uid: string, cb: (notifications: { id: string; itemId: string; amount: number; totalGold: number }[]) => void): Unsubscribe {
-  // sellerUid==uid のみでクエリ、read==falseはクライアント側でフィルタ
   const q = query(collection(db, 'sold_notifications'), where('sellerUid', '==', uid), orderBy('createdAt', 'desc'), limit(20));
-  return onSnapshot(q, snap => {
+  let stopped = false;
+  const fetch = () => getDocs(q).then(snap => {
+    if (stopped) return;
     cb(snap.docs
       .filter(d => d.data()['read'] === false)
       .map(d => ({ id: d.id, itemId: d.data()['itemId'] as string, amount: d.data()['amount'] as number, totalGold: d.data()['totalGold'] as number })));
-  });
+  }).catch(() => {});
+  fetch();
+  const timer = setInterval(fetch, 60_000);
+  return () => { stopped = true; clearInterval(timer); };
 }
 
 export async function markSoldNotificationRead(notificationId: string): Promise<void> {
@@ -111,54 +162,78 @@ export async function markSoldNotificationRead(notificationId: string): Promise<
 }
 
 // ============================================================
-// ジャックポット
+// ジャックポット — ローカルバッファ+15秒flush
 // ============================================================
 const jackpotRef = () => doc(db, 'shared', 'jackpot');
 
+// ローカル状態
+let _localJackpotPool = 0;
+let _pendingJackpotContrib = 0;
+let _jackpotFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function _scheduleJackpotFlush() {
+  if (_jackpotFlushTimer) return;
+  _jackpotFlushTimer = setTimeout(async () => {
+    _jackpotFlushTimer = null;
+    const contrib = _pendingJackpotContrib;
+    if (contrib <= 0) return;
+    _pendingJackpotContrib = 0;
+    try {
+      await updateDoc(jackpotRef(), { pool: increment(contrib) });
+    } catch {
+      // ドキュメントが存在しない場合はsetDoc
+      try { await setDoc(jackpotRef(), { pool: _localJackpotPool }); } catch { /* ignore */ }
+    }
+  }, 15_000);
+}
+
 export async function getJackpotPool(): Promise<number> {
   const snap = await getDoc(jackpotRef());
-  return snap.exists() ? (snap.data()['pool'] as number ?? 0) : 0;
+  const pool = snap.exists() ? (snap.data()['pool'] as number ?? 0) : 0;
+  _localJackpotPool = pool + _pendingJackpotContrib;
+  return _localJackpotPool;
 }
 
 export function subscribeJackpotPool(cb: (pool: number) => void): Unsubscribe {
-  return onSnapshot(jackpotRef(), snap => { cb(snap.exists() ? (snap.data()['pool'] as number ?? 0) : 0); });
+  let stopped = false;
+  const fetch = () => getDoc(jackpotRef()).then(snap => {
+    if (stopped) return;
+    const base = snap.exists() ? (snap.data()['pool'] as number ?? 0) : 0;
+    _localJackpotPool = base;
+    cb(_localJackpotPool);
+  }).catch(() => {});
+  fetch();
+  const timer = setInterval(fetch, 10_000);
+  return () => { stopped = true; clearInterval(timer); };
 }
 
-// 他のギャンブルで賭けるたびにプールへ積立（ジャックポットは挑戦なし、蓄積のみ）
+// 他のギャンブルで賭けるたびにプールへ積立（ローカル積算+15秒flush）
 export async function contributeToJackpot(bet: number): Promise<number> {
   const contrib = calcJackpotContrib(bet);
-  const ref = jackpotRef();
-  const snap = await getDoc(ref);
-  if (snap.exists()) {
-    await updateDoc(ref, { pool: increment(contrib) });
-  } else {
-    await setDoc(ref, { pool: contrib });
-  }
-  const newSnap = await getDoc(ref);
-  return newSnap.exists() ? (newSnap.data()['pool'] as number) : 0;
+  _pendingJackpotContrib += contrib;
+  _localJackpotPool += contrib;
+  _scheduleJackpotFlush();
+  return _localJackpotPool;
 }
 
-// ジャックポット当選チェック（他ギャンブル実行時にバックグラウンドで発生）
+// ジャックポット当選チェック（ローカルpool値を使用、当選時のみWrite）
 export async function checkJackpotWin(): Promise<{ won: boolean; pool: number }> {
   const won = rollJackpot();
   if (!won) return { won: false, pool: 0 };
-  const ref = jackpotRef();
-  const snap = await getDoc(ref);
-  const pool = snap.exists() ? (snap.data()['pool'] as number) : 0;
-  if (won && pool > 0) {
-    await setDoc(ref, { pool: 0 });
+  const pool = _localJackpotPool;
+  if (pool > 0) {
+    _localJackpotPool = 0;
+    _pendingJackpotContrib = 0;
+    if (_jackpotFlushTimer) { clearTimeout(_jackpotFlushTimer); _jackpotFlushTimer = null; }
+    try { await setDoc(jackpotRef(), { pool: 0 }); } catch { /* ignore */ }
   }
   return { won, pool };
 }
 
 // 旧API互換
 export async function contributeAndRollJackpot(bet: number): Promise<{ won: boolean; pool: number }> {
-  const pool = await contributeToJackpot(bet);
-  const won = rollJackpot();
-  if (won && pool > 0) {
-    await setDoc(jackpotRef(), { pool: 0 });
-  }
-  return { won, pool };
+  await contributeToJackpot(bet);
+  return checkJackpotWin();
 }
 
 // ============================================================
@@ -178,33 +253,45 @@ export async function createGambleBattle(
 }
 
 export function subscribeGambleBattles(cb: (battles: GambleBattle[]) => void): Unsubscribe {
-  // orderByを外してインデックス不要に。クライアント側でソート＆フィルタ
   const q = query(
     collection(db, COLLECTIONS.BATTLES),
     where('status', '==', 'waiting'),
     limit(50)
   );
-  return onSnapshot(q, snap => {
+  let stopped = false;
+  const fetch = () => getDocs(q).then(snap => {
+    if (stopped) return;
     const now = Date.now();
-    const battles = snap.docs
+    cb(snap.docs
       .map(d => ({ id: d.id, ...(d.data() as Omit<GambleBattle,'id'>) }))
-      .filter(b => b.expiresAt > now) // 期限切れをクライアント側で除外
-      .sort((a, b) => b.createdAt - a.createdAt); // クライアント側でソート
-    cb(battles);
-  });
+      .filter(b => b.expiresAt > now)
+      .sort((a, b) => b.createdAt - a.createdAt));
+  }).catch(() => {});
+  fetch();
+  const timer = setInterval(fetch, 10_000);
+  return () => { stopped = true; clearInterval(timer); };
 }
 
 function _rollDice(n = 6) { return Math.floor(Math.random() * n) + 1; }
 
-function _resolveChohan(): boolean {
-  // 先行決め: 1個ずつ振って出目が大きい方が先攻（丁/半を選べる）
-  let hostOrder = _rollDice(), guestOrder = _rollDice();
-  while (hostOrder === guestOrder) { hostOrder = _rollDice(); guestOrder = _rollDice(); }
-  const hostGoesFirst = hostOrder > guestOrder;
+// 先攻決めサイコロ: ホストとゲストで異なる目が出るまで振る
+function _rollInitiative(): { hostDice: number; guestDice: number; hostGoesFirst: boolean } {
+  let hostDice = _rollDice(), guestDice = _rollDice();
+  while (hostDice === guestDice) { hostDice = _rollDice(); guestDice = _rollDice(); }
+  return { hostDice, guestDice, hostGoesFirst: hostDice > guestDice };
+}
+
+function _resolveChohan(): { hostWins: boolean; data: GambleBattleData } {
+  const { hostDice, guestDice, hostGoesFirst } = _rollInitiative();
   const d1 = _rollDice(), d2 = _rollDice();
   const isEven = (d1 + d2) % 2 === 0;
-  // 先行が丁を選ぶ、後攻は半が自動選択
-  return hostGoesFirst ? isEven : !isEven;
+  // 先攻が「丁（偶数）」を選ぶ
+  const firstChoice = 'cho';
+  const hostWins = hostGoesFirst ? isEven : !isEven;
+  return {
+    hostWins,
+    data: { hostGoesFirst, hostDice, guestDice, firstChoice, chohanDice: [d1, d2] },
+  };
 }
 
 function _chinchiroScore(dice: number[]): number {
@@ -212,49 +299,74 @@ function _chinchiroScore(dice: number[]): number {
   if (d[0]===1 && d[1]===1 && d[2]===1) return 1000; // ピンゾロ
   if (d[0]===1 && d[1]===2 && d[2]===3) return -1;   // ヒフミ（負け）
   if (d[0]===4 && d[1]===5 && d[2]===6) return 500;  // シゴロ
-  if (d[0]===d[1] && d[1]===d[2]) return 300 + d[0]; // アラシ（ゾロ目）数字大きい方が強い
-  // 通常目: 2つ被り + 残り1つ。残りの1つが目 (6が最強、1が最弱)
+  if (d[0]===d[1] && d[1]===d[2]) return 300 + d[0]; // アラシ（ゾロ目）
   const counts: Record<number,number> = {};
   for (const v of d) counts[v] = (counts[v]??0)+1;
   const singles = Object.entries(counts).filter(([,c])=>c===1).map(([v])=>Number(v));
   const pairs = Object.entries(counts).filter(([,c])=>c===2);
-  if (pairs.length === 1 && singles.length === 1) return singles[0]; // 1〜6
-  return 0; // 目なし（振り直し扱い → 0点）
+  if (pairs.length === 1 && singles.length === 1) return singles[0];
+  return 0;
 }
 
-function _resolveChinchiro(): boolean {
-  // 役が出るまで最大3回振り、スコアが高い方が勝ち
-  // ヒフミ(-1)は即負け、0は目なし（振り直し）
-  const roll = () => [_rollDice(),_rollDice(),_rollDice()];
+function _resolveChinchiro(): { hostWins: boolean; data: GambleBattleData } {
+  const { hostDice, guestDice, hostGoesFirst } = _rollInitiative();
+  // チンチロはホストが親（後攻）、ゲストが子（先攻）のルール
+  const rollDice3 = () => [_rollDice(),_rollDice(),_rollDice()];
+  const rolls: Array<{ who: 'host' | 'guest'; dice: number[] }> = [];
+
+  // チンチロの親は hostGoesFirst=false のとき = ゲストが先攻（子）なのでゲストから振る
+  // ここでは常にゲスト（子/先攻）→ホスト（親/後攻）の順
+  let guestScore = 0;
+  for (let i = 0; i < 3; i++) {
+    const dice = rollDice3();
+    rolls.push({ who: 'guest', dice });
+    guestScore = _chinchiroScore(dice);
+    if (guestScore !== 0) break;
+  }
+
+  // ゲストが即勝ち/即負けの特殊役チェック
+  if (guestScore === -1 || guestScore === 0) {
+    // ゲスト（子）がヒフミ/目なし → ホスト（親）勝ち
+    return { hostWins: true, data: { hostGoesFirst, hostDice, guestDice, chinchiroRolls: rolls } };
+  }
+
   let hostScore = 0;
   let hostInstantLoss = false;
   for (let i = 0; i < 3; i++) {
-    hostScore = _chinchiroScore(roll());
+    const dice = rollDice3();
+    rolls.push({ who: 'host', dice });
+    hostScore = _chinchiroScore(dice);
     if (hostScore !== 0) break;
   }
   if (hostScore === -1) hostInstantLoss = true;
-  // 親の一発終了ルール: ピンゾロ(1000)/シゴロ(500)/アラシ(300+) → 親総取り
-  // ヒフミ(-1)/目なし3投目(0) → 親総負け
-  if (hostScore >= 300 || hostScore === 500 || hostScore === 1000) return true;  // 親の即勝ち
-  if (hostInstantLoss || hostScore === 0) return false; // 親の即負け
-  // 通常目(1-6): 子もサイコロを振る
-  let guestScore = 0;
-  for (let i = 0; i < 3; i++) {
-    guestScore = _chinchiroScore(roll());
-    if (guestScore !== 0) break;
+  if (hostScore >= 300 || hostScore === 500 || hostScore === 1000) {
+    return { hostWins: true, data: { hostGoesFirst, hostDice, guestDice, chinchiroRolls: rolls } };
   }
-  if (guestScore === -1 || guestScore === 0) return true; // 子がヒフミ/目なし → 親勝ち
-  if (hostScore === guestScore) return Math.random() < 0.5;
-  return hostScore > guestScore;
+  if (hostInstantLoss || hostScore === 0) {
+    return { hostWins: false, data: { hostGoesFirst, hostDice, guestDice, chinchiroRolls: rolls } };
+  }
+  const hostWins = hostScore >= guestScore ? (hostScore === guestScore ? Math.random() < 0.5 : true) : false;
+  return { hostWins, data: { hostGoesFirst, hostDice, guestDice, chinchiroRolls: rolls } };
 }
 
-function _resolveCoinFlip(): boolean {
-  // 先行決めサイコロ → 先行が丁（偶数）を選ぶ、コインはランダム（丁半と同じロジック）
-  const hostFirst = _rollDice() >= _rollDice();
-  const d1 = _rollDice(), d2 = _rollDice();
-  const isEven = (d1 + d2) % 2 === 0;
-  // 先行が丁（偶数）を選ぶ
-  return hostFirst ? isEven : !isEven;
+function _resolveCoinFlip(): { hostWins: boolean; data: GambleBattleData } {
+  const { hostDice, guestDice, hostGoesFirst } = _rollInitiative();
+  // 先攻が「表（omote）」を選ぶ
+  const firstChoice = 'omote';
+  const coinResults: Array<'omote' | 'ura'> = [];
+  let firstWins = 0, secondWins = 0;
+  for (let i = 0; i < 6; i++) {
+    const face: 'omote' | 'ura' = Math.random() < 0.5 ? 'omote' : 'ura';
+    coinResults.push(face);
+    if (face === 'omote') firstWins++; else secondWins++;
+  }
+  // 先攻が「表」を選んだので表が多ければ先攻の勝ち
+  const firstPlayerWins = firstWins >= secondWins; // 同数は先攻有利
+  const hostWins = hostGoesFirst ? firstPlayerWins : !firstPlayerWins;
+  return {
+    hostWins,
+    data: { hostGoesFirst, hostDice, guestDice, firstChoice, coinResults },
+  };
 }
 
 const SLOT_SYMBOLS = ['🍒','🍋','💎','7️⃣','🔔','💰'];
@@ -262,24 +374,34 @@ function _slotRank(reels: string[]): number {
   if (reels[0]===reels[1] && reels[1]===reels[2]) {
     return reels[0]==='7️⃣' ? 100 : reels[0]==='💎' ? 50 : SLOT_SYMBOLS.indexOf(reels[0]) + 10;
   }
-  if (reels[0]===reels[1] || reels[1]===reels[2]) return 1;
+  if (reels[0]===reels[1] || reels[1]===reels[2] || reels[0]===reels[2]) return 1;
   return 0;
 }
 
-function _resolveSlot(): boolean {
-  // 先行決めサイコロ → スロットを回して役が出るまで（最大5回）
-  const spinUntilRoll = (): number => {
-    for (let i = 0; i < 5; i++) {
+function _resolveSlot(): { hostWins: boolean; data: GambleBattleData } {
+  const { hostDice, guestDice, hostGoesFirst } = _rollInitiative();
+  const slotRolls: Array<{ who: 'host' | 'guest'; symbols: string[] }> = [];
+  // 先攻から回す。hostGoesFirst=trueならhostが先攻
+  const spinRound = (who: 'host' | 'guest'): number => {
+    for (let i = 0; i < 10; i++) { // 最大10回で必ず役が出る
       const reels = [0,1,2].map(() => SLOT_SYMBOLS[Math.floor(Math.random()*SLOT_SYMBOLS.length)]);
+      slotRolls.push({ who, symbols: reels });
       const rank = _slotRank(reels);
       if (rank > 0) return rank;
     }
-    return 0;
+    // 役なしの場合はランダムな役を強制生成
+    const sym = SLOT_SYMBOLS[Math.floor(Math.random()*SLOT_SYMBOLS.length)];
+    const reels = [sym, sym, SLOT_SYMBOLS[Math.floor(Math.random()*SLOT_SYMBOLS.length)]];
+    slotRolls.push({ who, symbols: reels });
+    return 1;
   };
-  const hostRank = spinUntilRoll();
-  const guestRank = spinUntilRoll();
-  if (hostRank === guestRank) return Math.random() < 0.5;
-  return hostRank > guestRank;
+  const firstWho: 'host' | 'guest' = hostGoesFirst ? 'host' : 'guest';
+  const secondWho: 'host' | 'guest' = hostGoesFirst ? 'guest' : 'host';
+  const firstRank = spinRound(firstWho);
+  const secondRank = spinRound(secondWho);
+  const firstPlayerWins = firstRank >= secondRank;
+  const hostWins = hostGoesFirst ? firstPlayerWins : !firstPlayerWins;
+  return { hostWins, data: { hostGoesFirst, hostDice, guestDice, slotRolls } };
 }
 
 export async function joinGambleBattle(
@@ -293,19 +415,20 @@ export async function joinGambleBattle(
   if (battle.status !== 'waiting') return { success: false, battle };
   if (battle.hostUid === guestUid) return { success: false, battle };
 
-  // ゲームタイプに応じた対戦ロジック
+  // ゲームタイプに応じた対戦ロジック（サーバーサイドで一度だけ決定）
   let hostWins: boolean;
+  let battleData: GambleBattleData;
   const gt = battle.gambleType;
-  if (gt === 'chohan') hostWins = _resolveChohan();
-  else if (gt === 'chinchiro') hostWins = _resolveChinchiro();
-  else if (gt === 'coin_flip') hostWins = _resolveCoinFlip();
-  else if (gt === 'slot_machine') hostWins = _resolveSlot();
-  else hostWins = Math.random() < 0.5;
+  if (gt === 'chohan') { const r = _resolveChohan(); hostWins = r.hostWins; battleData = r.data; }
+  else if (gt === 'chinchiro') { const r = _resolveChinchiro(); hostWins = r.hostWins; battleData = r.data; }
+  else if (gt === 'coin_flip') { const r = _resolveCoinFlip(); hostWins = r.hostWins; battleData = r.data; }
+  else if (gt === 'slot_machine') { const r = _resolveSlot(); hostWins = r.hostWins; battleData = r.data; }
+  else { hostWins = Math.random() < 0.5; battleData = { hostGoesFirst: true, hostDice: 6, guestDice: 1 }; }
 
   const winnerId = hostWins ? battle.hostUid : guestUid;
-  await updateDoc(ref, { status: 'finished', guestUid, guestName, winnerId });
+  await updateDoc(ref, { status: 'finished', guestUid, guestName, winnerId, battleData });
 
-  return { success: true, battle: { ...battle, guestUid, guestName, winnerId, status: 'finished' } };
+  return { success: true, battle: { ...battle, guestUid, guestName, winnerId, status: 'finished', battleData } };
 }
 
 // ホストが自分のバトルの状態変化（finished）を監視するための購読
@@ -405,9 +528,15 @@ export async function setGambleMultipliers(multipliers: Record<string, number>):
 }
 
 export function subscribeGambleMultipliers(cb: (m: Record<string, number>) => void): Unsubscribe {
-  return onSnapshot(doc(db, 'admin', 'gamble_settings'), snap => {
+  const ref = doc(db, 'admin', 'gamble_settings');
+  let stopped = false;
+  const fetch = () => getDoc(ref).then(snap => {
+    if (stopped) return;
     cb(snap.exists() ? (snap.data() as Record<string, number>) : {});
-  });
+  }).catch(() => {});
+  fetch();
+  const timer = setInterval(fetch, 60_000);
+  return () => { stopped = true; clearInterval(timer); };
 }
 
 // プレイヤーのアクティビティログを取得（詳細表示用）
@@ -459,9 +588,15 @@ export async function setJackpotRate(rate: number): Promise<void> {
 }
 
 export function subscribeJackpotRate(cb: (rate: number) => void): Unsubscribe {
-  return onSnapshot(doc(db, 'admin', 'jackpot_settings'), snap => {
+  const ref = doc(db, 'admin', 'jackpot_settings');
+  let stopped = false;
+  const fetch = () => getDoc(ref).then(snap => {
+    if (stopped) return;
     cb(snap.exists() ? ((snap.data() as { rate: number }).rate ?? 0.20) : 0.20);
-  });
+  }).catch(() => {});
+  fetch();
+  const timer = setInterval(fetch, 60_000);
+  return () => { stopped = true; clearInterval(timer); };
 }
 
 // お知らせ履歴
@@ -499,22 +634,44 @@ export interface ActivityFeedEntry {
 
 const FEED_REF = () => doc(db, 'shared', 'activity_feed');
 
-/** アクティビティをフィードに追記（最新50件を保持） */
-export async function postActivityFeed(entry: Omit<ActivityFeedEntry, 'timestamp'>): Promise<void> {
+// ============================================================
+// ActivityFeed — バッファ+15秒flush（Read+Write毎回→15秒に1Write）
+// ============================================================
+let _feedBuffer: Omit<ActivityFeedEntry, 'timestamp'>[] = [];
+let _feedFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function _flushFeed() {
+  _feedFlushTimer = null;
+  if (_feedBuffer.length === 0) return;
+  const toWrite = _feedBuffer.map(e => ({ ...e, timestamp: Date.now() }));
+  _feedBuffer = [];
   try {
     const snap = await getDoc(FEED_REF());
     const prev: ActivityFeedEntry[] = snap.exists() ? ((snap.data()['entries'] ?? []) as ActivityFeedEntry[]) : [];
-    const next = [{ ...entry, timestamp: Date.now() }, ...prev].slice(0, 50);
+    const next = [...toWrite, ...prev].slice(0, 50);
     await setDoc(FEED_REF(), { entries: next, updatedAt: Date.now() });
   } catch { /* ignore */ }
 }
 
-/** アクティビティフィードをリアルタイム購読（onSnapshot 1本） */
+/** アクティビティをフィードに追記（バッファして15秒に1回まとめてWrite） */
+export async function postActivityFeed(entry: Omit<ActivityFeedEntry, 'timestamp'>): Promise<void> {
+  _feedBuffer.unshift(entry);
+  if (_feedBuffer.length > 10) _feedBuffer = _feedBuffer.slice(0, 10); // バッファ上限
+  if (!_feedFlushTimer) {
+    _feedFlushTimer = setTimeout(_flushFeed, 15_000);
+  }
+}
+
+/** アクティビティフィードをポーリング購読（60秒間隔） */
 export function subscribeActivityFeed(cb: (entries: ActivityFeedEntry[]) => void): Unsubscribe {
-  return onSnapshot(FEED_REF(), snap => {
-    if (!snap.exists()) { cb([]); return; }
-    cb((snap.data()['entries'] ?? []) as ActivityFeedEntry[]);
-  });
+  let stopped = false;
+  const fetch = () => getDoc(FEED_REF()).then(snap => {
+    if (stopped) return;
+    cb(snap.exists() ? ((snap.data()['entries'] ?? []) as ActivityFeedEntry[]) : []);
+  }).catch(() => {});
+  fetch();
+  const timer = setInterval(fetch, 60_000);
+  return () => { stopped = true; clearInterval(timer); };
 }
 
 // ============================================================
