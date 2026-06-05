@@ -828,7 +828,7 @@ export async function pokerAction(
   return { success: true };
 }
 
-function _getNextTurn(players: PokerPlayer[], currentIdx: number, phase: string): { nextTurnUid: string; shouldAdvancePhase: boolean } {
+function _getNextTurn(players: PokerPlayer[], currentIdx: number, _phase: string): { nextTurnUid: string; shouldAdvancePhase: boolean } {
   const n = players.length;
   // 次のアクティブプレイヤーを探す
   for (let i = 1; i <= n; i++) {
@@ -890,7 +890,7 @@ function _splitPot(ranked: (PokerPlayer & { ev: ReturnType<typeof _evaluateHand>
 
 async function _finishGame(
   _table: PokerTable, players: PokerPlayer[], _pot: number,
-  ref: ReturnType<typeof doc>,
+  _ref: ReturnType<typeof doc>,
   winners?: { uid: string; displayName: string; amount: number; handName: string }[]
 ): Promise<Record<string, unknown>> {
   return {
