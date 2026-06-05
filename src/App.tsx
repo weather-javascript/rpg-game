@@ -4,7 +4,7 @@ import { useGameStore } from './stores/gameStore';
 import { useAuth } from './hooks/useAuth';
 import { useAutoSave } from './hooks/useAutoSave';
 import { useEffect, useState } from 'react';
-import type { TabId, BoardMessage } from './types/game';
+import type { TabId } from './types/game';
 import { GatheringScreen } from './components/screens/GatheringScreen';
 import { MarketScreen }    from './components/screens/MarketScreen';
 import { DungeonScreen }   from './components/screens/DungeonScreen';
@@ -76,163 +76,24 @@ const ADMIN_UIDS = ['jJ7BrZ0HhpeC5WYsdZbjRlQBRzK2', '49yFkciBJLhFbFq7YJrbg8dI8rf
 // ============================================================
 // メンテナンス画面
 // ============================================================
-function MaintenanceScreen({ startedAt, estimatedMinutes, message, uid, displayName, level }: {
-  startedAt: number; estimatedMinutes: number; message?: string;
-  uid: string; displayName: string; level: number;
-}) {
+function MaintenanceScreen({ startedAt, estimatedMinutes, message }: { startedAt: number; estimatedMinutes: number; message?: string }) {
   const startTime = new Date(startedAt).toLocaleString('ja-JP');
   const endTime = new Date(startedAt + estimatedMinutes * 60 * 1000).toLocaleString('ja-JP');
-  const [tab, setTab] = useState<'chat' | 'game'>('chat');
-
-  // ---- チャット ----
-  const [messages, setMessages] = useState<BoardMessage[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  useEffect(() => {
-    let unsub: (() => void) | null = null;
-    import('./services/multiplayer').then(m => {
-      unsub = m.subscribeBoardMessages(setMessages);
-    });
-    return () => { unsub?.(); };
-  }, []);
-  const sendChat = async () => {
-    const text = chatInput.trim();
-    if (!text || text.length > 100) return;
-    setChatInput('');
-    const { postBoardMessage } = await import('./services/multiplayer');
-    await postBoardMessage(uid, displayName, level, text);
-  };
-
-  // ---- ミニゲーム: 数字当てゲーム ----
-  const [target, setTarget] = useState(() => Math.floor(Math.random() * 100) + 1);
-  const [guess, setGuess] = useState('');
-  const [guessCount, setGuessCount] = useState(0);
-  const [hint, setHint] = useState('1〜100の数字を当てよう！');
-  const [won, setWon] = useState(false);
-  const [bestScore, setBestScore] = useState<number | null>(() => {
-    try { const v = localStorage.getItem('mini_guess_best'); return v ? Number(v) : null; } catch { return null; }
-  });
-
-  const handleGuess = () => {
-    const n = parseInt(guess);
-    if (isNaN(n) || n < 1 || n > 100) { setHint('1〜100の整数を入力してください'); return; }
-    const next = guessCount + 1;
-    setGuessCount(next);
-    if (n === target) {
-      setWon(true);
-      setHint(`🎉 正解！ ${next}回で当てました！`);
-      if (bestScore === null || next < bestScore) {
-        setBestScore(next);
-        try { localStorage.setItem('mini_guess_best', String(next)); } catch { /* ignore */ }
-      }
-    } else if (n < target) {
-      setHint(`📈 もっと大きい（${next}回目）`);
-    } else {
-      setHint(`📉 もっと小さい（${next}回目）`);
-    }
-    setGuess('');
-  };
-  const resetGame = () => {
-    setTarget(Math.floor(Math.random() * 100) + 1);
-    setGuess(''); setGuessCount(0); setHint('1〜100の数字を当てよう！'); setWon(false);
-  };
-
-  const S = {
-    container: { minHeight:'100vh', background:'#0d0f14', display:'flex', flexDirection:'column' as const, alignItems:'center', padding:'20px 12px' },
-    card: { width:'100%', maxWidth:480, background:'#1c2235', border:'1px solid #2d3752', borderRadius:12, overflow:'hidden' },
-    header: { textAlign:'center' as const, padding:'20px 16px 12px', borderBottom:'1px solid #2d3752' },
-    tabs: { display:'flex', borderBottom:'1px solid #2d3752' },
-    tabBtn: (active: boolean) => ({
-      flex:1, padding:'10px 0', fontSize:'0.85rem', background: active ? 'rgba(91,141,238,0.15)' : 'transparent',
-      color: active ? '#5b8dee' : '#6a7290', border:'none', borderBottom: active ? '2px solid #5b8dee' : '2px solid transparent', cursor:'pointer',
-    }),
-    body: { padding:16 },
-  };
-
   return (
-    <div style={S.container}>
-      <div style={S.card}>
-        <div style={S.header}>
-          <div style={{ fontSize:'2.2rem', marginBottom:8 }}>🔧</div>
-          <h2 style={{ color:'#f0c060', fontFamily:'Cinzel,serif', margin:'0 0 6px' }}>メンテナンス中</h2>
-          {message && (
-            <div style={{ background:'rgba(240,192,96,0.08)', border:'1px solid rgba(240,192,96,0.25)', borderRadius:6, padding:'8px 12px', marginBottom:8, color:'#f0c060', fontSize:'0.82rem', lineHeight:1.7 }}>
-              {message}
-            </div>
-          )}
-          <p style={{ color:'#6a7290', fontSize:'0.78rem', margin:0, lineHeight:1.8 }}>
-            開始: {startTime}　終了予定: {endTime}
-          </p>
-        </div>
-
-        <div style={S.tabs}>
-          <button style={S.tabBtn(tab==='chat')} onClick={() => setTab('chat')}>💬 チャット</button>
-          <button style={S.tabBtn(tab==='game')} onClick={() => setTab('game')}>🎮 ミニゲーム</button>
-        </div>
-
-        <div style={S.body}>
-          {tab === 'chat' && (
-            <div>
-              <div style={{ height:300, overflowY:'auto', display:'flex', flexDirection:'column', gap:6, marginBottom:10 }}>
-                {messages.length === 0 && (
-                  <div style={{ color:'#4a5070', fontSize:'0.82rem', textAlign:'center', padding:'30px 0' }}>メッセージはまだありません</div>
-                )}
-                {messages.map(m => (
-                  <div key={m.id} style={{ background:'#161b26', border:'1px solid #2d3752', borderRadius:8, padding:'7px 10px' }}>
-                    <div style={{ display:'flex', gap:6, alignItems:'baseline', marginBottom:2 }}>
-                      <span style={{ fontSize:'0.78rem', color:'#5b8dee', fontWeight:600 }}>{m.displayName}</span>
-                      <span style={{ fontSize:'0.68rem', color:'#4a5070' }}>Lv.{m.level}</span>
-                    </div>
-                    <div style={{ fontSize:'0.84rem', color:'#c8d0e8', wordBreak:'break-all' as const }}>{m.text}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display:'flex', gap:6 }}>
-                <input
-                  value={chatInput}
-                  onChange={e => setChatInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && sendChat()}
-                  placeholder="メッセージを入力..."
-                  maxLength={100}
-                  style={{ flex:1, background:'#161b26', border:'1px solid #2d3752', borderRadius:6, padding:'8px 10px', color:'#e8e6ff', fontSize:'0.84rem', outline:'none' }}
-                />
-                <button onClick={sendChat} disabled={!chatInput.trim()} style={{ padding:'8px 14px', background:'#5b8dee', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:'0.84rem' }}>送信</button>
-              </div>
-            </div>
-          )}
-
-          {tab === 'game' && (
-            <div style={{ textAlign:'center' as const }}>
-              <h3 style={{ color:'#e8e6ff', margin:'0 0 4px', fontSize:'1rem' }}>🔢 数字当てゲーム</h3>
-              <p style={{ color:'#6a7290', fontSize:'0.78rem', margin:'0 0 16px' }}>1〜100の数字をできるだけ少ない回数で当てよう</p>
-              {bestScore !== null && (
-                <div style={{ background:'rgba(240,192,96,0.08)', border:'1px solid rgba(240,192,96,0.2)', borderRadius:6, padding:'6px 12px', marginBottom:12, fontSize:'0.8rem', color:'#f0c060' }}>
-                  🏆 ベスト: {bestScore}回
-                </div>
-              )}
-              <div style={{ background:'#161b26', border:'1px solid #2d3752', borderRadius:8, padding:'14px', marginBottom:14, fontSize:'0.9rem', color: won ? '#4caf87' : '#c8d0e8', minHeight:44, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                {hint}
-              </div>
-              {!won ? (
-                <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
-                  <input
-                    type="number" min={1} max={100}
-                    value={guess}
-                    onChange={e => setGuess(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleGuess()}
-                    placeholder="数字"
-                    style={{ width:80, background:'#161b26', border:'1px solid #2d3752', borderRadius:6, padding:'8px', color:'#e8e6ff', fontSize:'1rem', textAlign:'center' as const, outline:'none' }}
-                  />
-                  <button onClick={handleGuess} style={{ padding:'8px 20px', background:'#5b8dee', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:'0.9rem' }}>答える</button>
-                </div>
-              ) : (
-                <button onClick={resetGame} style={{ padding:'10px 28px', background:'linear-gradient(135deg,#4caf87,#2d8060)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontSize:'0.9rem', fontWeight:700 }}>
-                  もう一度
-                </button>
-              )}
-              <p style={{ color:'#4a5070', fontSize:'0.75rem', marginTop:12 }}>{guessCount}回目</p>
-            </div>
-          )}
-        </div>
+    <div style={{ minHeight:'100vh', background:'#0d0f14', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div style={{ textAlign:'center', color:'#e8e6ff' }}>
+        <div style={{ fontSize:'3rem', marginBottom:16 }}>🔧</div>
+        <h2 style={{ color:'#f0c060', fontFamily:'Cinzel,serif', marginBottom:12 }}>メンテナンス中です</h2>
+        {message && (
+          <div style={{ background:'rgba(240,192,96,0.1)', border:'1px solid rgba(240,192,96,0.3)', borderRadius:8, padding:'10px 16px', marginBottom:12, color:'#f0c060', fontSize:'0.9rem', lineHeight:1.7 }}>
+            {message}
+          </div>
+        )}
+        <p style={{ color:'#8a92b2', lineHeight:1.8 }}>
+          メンテナンス終了までしばらくお待ち下さい<br />
+          メンテナンス開始時間「{startTime}」<br />
+          メンテナンス終了予定時刻「{endTime}」
+        </p>
       </div>
     </div>
   );
@@ -601,7 +462,7 @@ export default function App() {
 
   // メンテナンス中チェック（ADMIN除く）
   if (maintenanceStatus?.active && !ADMIN_UIDS.includes(player.uid)) {
-    return <MaintenanceScreen startedAt={maintenanceStatus.startedAt} estimatedMinutes={maintenanceStatus.estimatedMinutes} message={maintenanceStatus.message} uid={player.uid} displayName={player.displayName} level={player.stats.level} />;
+    return <MaintenanceScreen startedAt={maintenanceStatus.startedAt} estimatedMinutes={maintenanceStatus.estimatedMinutes} message={maintenanceStatus.message} />;
   }
 
   return (

@@ -19,22 +19,22 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   ancient_shard:{ id:'ancient_shard', name:'古代の欠片', description:'ダンジョンの深部に眠る謎の素材。', category:'material', rarity:'epic', sellPrice:45000, buyPrice:0, maxStack:99, icon:'gem' },
   iron_ingot:  { id:'iron_ingot',  name:'鉄塊',      description:'精錬された鉄。各種製造に必要。', category:'material', rarity:'uncommon', sellPrice:40, buyPrice:0, maxStack:-1, icon:'iron_ingot' },
   plank:       { id:'plank',       name:'板材',      description:'木材を加工した板。製作に使用。', category:'material', rarity:'common',   sellPrice:8,  buyPrice:0, maxStack:-1, icon:'log' },
-  iron_sword:  { id:'iron_sword',  name:'鉄の剣',    description:'鉄塊から作れる武器。攻撃力+5。', category:'weapon',   rarity:'uncommon', sellPrice:80, buyPrice:0, maxStack:1, icon:'swords' },
-  iron_helmet: { id:'iron_helmet', name:'鉄のヘルメット', description:'鉄塊から作れる防具。防御力+3。', category:'armor', rarity:'uncommon', sellPrice:60, buyPrice:0, maxStack:1, icon:'helmet' },
-  wooden_bow:  { id:'wooden_bow',  name:'木の弓',    description:'木材から作れる武器。攻撃力+3。', category:'weapon',   rarity:'common',   sellPrice:40, buyPrice:0, maxStack:1, icon:'bow_arrow' },
-  stone_knife: { id:'stone_knife', name:'石のナイフ', description:'石から作れる武器。攻撃力+2。', category:'weapon',   rarity:'common',   sellPrice:25, buyPrice:0, maxStack:1, icon:'dagger' },
+  iron_sword:  { id:'iron_sword',  name:'鉄の剣',    description:'鉄塊から作れる武器。攻撃力+5。', category:'weapon',   rarity:'uncommon', sellPrice:80, buyPrice:0, maxStack:1, icon:'swords', attackBonus:5 },
+  iron_helmet: { id:'iron_helmet', name:'鉄のヘルメット', description:'鉄塊から作れる防具。防御力+3。', category:'armor', rarity:'uncommon', sellPrice:60, buyPrice:0, maxStack:1, icon:'helmet', defenseBonus:3 },
+  wooden_bow:  { id:'wooden_bow',  name:'木の弓',    description:'木材から作れる武器。攻撃力+3。', category:'weapon',   rarity:'common',   sellPrice:40, buyPrice:0, maxStack:1, icon:'bow_arrow', attackBonus:3 },
+  stone_knife: { id:'stone_knife', name:'石のナイフ', description:'石から作れる武器。攻撃力+2。', category:'weapon',   rarity:'common',   sellPrice:25, buyPrice:0, maxStack:1, icon:'dagger', attackBonus:2 },
   // モンスタードロップ
   cave_fragment:   { id:'cave_fragment',    name:'洞窟の欠片',    description:'洞窟王の手下が落とす欠片。', category:'material', rarity:'common',   sellPrice:8,   buyPrice:0, maxStack:-1, icon:'stone_idol' },
   cave_gem:        { id:'cave_gem',         name:'洞窟王の宝石',  description:'洞窟王が落とす輝く宝石。',  category:'material', rarity:'rare',     sellPrice:200, buyPrice:0, maxStack:99, icon:'gem_blue' },
-  rusty_sword:     { id:'rusty_sword',      name:'錆びた剣',      description:'洞窟王が落とす古い剣。',    category:'weapon',   rarity:'uncommon', sellPrice:50,  buyPrice:0, maxStack:1,  icon:'dagger' },
+  rusty_sword:     { id:'rusty_sword',      name:'錆びた剣',      description:'洞窟王が落とす古い剣。',    category:'weapon',   rarity:'uncommon', sellPrice:50,  buyPrice:0, maxStack:1,  icon:'dagger', attackBonus:3 },
   contract:        { id:'contract',         name:'契約書',        description:'各ダンジョンのモブが低確率で落とす。', category:'treasure', rarity:'uncommon', sellPrice:30, buyPrice:0, maxStack:-1, icon:'scroll' },
   coin:            { id:'coin',             name:'硬貨',          description:'中級ダンジョンの通貨。',    category:'material', rarity:'common',   sellPrice:1,   buyPrice:0, maxStack:-1, icon:'coin' },
   fortress_order:  { id:'fortress_order',   name:'要塞防衛出兵状',description:'鉄戦士が落とす出兵命令書。', category:'material', rarity:'uncommon', sellPrice:20, buyPrice:0, maxStack:-1, icon:'clipboard' },
   crusher_box:     { id:'crusher_box',      name:'破壊人の道具箱',description:'クラッシャーが落とす道具箱。', category:'material', rarity:'uncommon', sellPrice:25, buyPrice:0, maxStack:-1, icon:'toolbox' },
   memento:         { id:'memento',          name:'形見の写真',    description:'強戦士が落とす写真。',      category:'material', rarity:'rare',     sellPrice:60,  buyPrice:0, maxStack:99, icon:'photo_frame' },
-  hammer:          { id:'hammer',           name:'ハンマー',      description:'アルティメイトクラッシャーが落とす。', category:'weapon', rarity:'uncommon', sellPrice:80, buyPrice:0, maxStack:1, icon:'hammer' },
+  hammer:          { id:'hammer',           name:'ハンマー',      description:'アルティメイトクラッシャーが落とす。', category:'weapon', rarity:'uncommon', sellPrice:80, buyPrice:0, maxStack:1, icon:'hammer', attackBonus:7 },
   spear_shaft:     { id:'spear_shaft',      name:'槍の柄',        description:'特殊戦闘槍兵が落とす槍の柄。', category:'material', rarity:'uncommon', sellPrice:35, buyPrice:0, maxStack:-1, icon:'wand' },
-  almighty_staff:  { id:'almighty_staff',   name:'万能杖',        description:'バイオマンサーが確定ドロップ。', category:'weapon', rarity:'rare',     sellPrice:300, buyPrice:0, maxStack:1, icon:'wand' },
+  almighty_staff:  { id:'almighty_staff',   name:'万能杖',        description:'バイオマンサーが確定ドロップ。', category:'weapon', rarity:'rare',     sellPrice:300, buyPrice:0, maxStack:1, icon:'wand', attackBonus:12 },
   mole_claw:       { id:'mole_claw',        name:'モグラの爪',    description:'ドリュウが落とす硬い爪。', category:'material', rarity:'uncommon', sellPrice:40, buyPrice:0, maxStack:-1, icon:'badger' },
   spirit_ice:      { id:'spirit_ice',       name:'霊氷',          description:'氷霊が落とす素材。',       category:'material', rarity:'rare',     sellPrice:80, buyPrice:0, maxStack:99, icon:'ice' },
   stalactite:      { id:'stalactite',       name:'鍾乳石',        description:'零が確定ドロップ。一度に8個落とす。', category:'material', rarity:'epic', sellPrice:150, buyPrice:0, maxStack:-1, icon:'stalactite' },
@@ -629,6 +629,16 @@ export const DEFAULT_PLAYER_STATS = {
 // フォーマット: { version: 'x.x.x', date: 'YYYY-MM-DD', changes: ['変更内容...'] }
 // ============================================================
 export const VERSION_PATCHES = [
+  {
+    version: '2.2.1',
+    date: '2026-06-05',
+    changes: [
+      '⚔️ ダンジョンで装備した武器・防具のボーナスが攻撃力・防御力に正しく反映されるよう修正',
+      '🧪 ダンジョン戦闘中に食料・回復アイテムが正常に使用できるよう修正',
+      '🎰 PvP対戦で管理者以外のプレイヤーも参加できない問題を修正',
+      '📡 オンラインプレイヤーのアクティビティ表示で名前が正しく表示されない問題を修正',
+    ],
+  },
   {
     version: '2.2.0',
     date: '2026-06-04',

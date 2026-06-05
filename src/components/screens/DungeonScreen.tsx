@@ -204,10 +204,19 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape }: {
   // モンスターターン実行
   const doMonsterTurn = useCallback((prevBattle: TurnBattleState): TurnBattleState => {
     if (!monster) return prevBattle;
+    // 装備防具のdefenseBonusを加算
+    const armorSlots: (keyof EquipmentSlots)[] = ['helmet','chestplate','leggings','boots','offhand'];
+    const armorBonus = armorSlots.reduce((sum, slot) => {
+      const id = localEquip[slot] as string | null;
+      if (!id) return sum;
+      const it = ITEM_MASTER[id];
+      return it?.category === 'armor' ? sum + (it.defenseBonus ?? 0) : sum;
+    }, 0);
+    const totalDef = player.stats.defense + armorBonus;
     const isSpecial = monster.isBoss && randomChance(0.2);
     const mDmg = isSpecial
-      ? Math.floor(calcDamage(monster.attack, player.stats.defense) * 1.5)
-      : calcDamage(monster.attack, prevBattle.isDefending ? player.stats.defense * 2 : player.stats.defense);
+      ? Math.floor(calcDamage(monster.attack, totalDef) * 1.5)
+      : calcDamage(monster.attack, prevBattle.isDefending ? totalDef * 2 : totalDef);
     const reducedDmg = prevBattle.isDefending ? Math.floor(mDmg * 0.5) : mDmg;
     changeHp(-reducedDmg);
     const newPlayerHp = Math.max(0, player.stats.hp - reducedDmg);
@@ -219,12 +228,19 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape }: {
       return { ...prevBattle, log: [...prevBattle.log, logEntry, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
     }
     return { ...prevBattle, log: [...prevBattle.log, logEntry], turn: 'player', isDefending: false };
-  }, [monster, player.stats, changeHp]);
+  }, [monster, player.stats, changeHp, localEquip]);
 
   // プレイヤー行動: 攻撃
   const handleAttack = () => {
     if (battle.turn !== 'player' || battle.result) return;
-    const pDmg = calcDamage(player.stats.attack, monster?.defense ?? 0);
+    // 装備武器のattackBonusを加算
+    const weaponBonus = localEquip.hotbar.reduce((sum, id) => {
+      if (!id) return sum;
+      const it = ITEM_MASTER[id];
+      return it?.category === 'weapon' ? sum + (it.attackBonus ?? 0) : sum;
+    }, 0);
+    const totalAtk = player.stats.attack + weaponBonus;
+    const pDmg = calcDamage(totalAtk, monster?.defense ?? 0);
     const newMHp = Math.max(0, battle.monsterHp - pDmg);
     const log = [...battle.log, { text: `⚔️ あなたの攻撃！ ${pDmg}ダメージ！`, color: '#4caf87' }];
 
