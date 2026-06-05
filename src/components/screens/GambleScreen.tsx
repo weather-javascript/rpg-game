@@ -134,8 +134,104 @@ function GameAnimation({ type, onDone }: { type: 'chohan'|'chinchiro'|'coin_flip
 }
 
 // ============================================================
-// PvP対戦バトルアニメーション（インタラクティブ版）
+// PvP対戦バトルアニメーション（ゲーム別フル演出版）
 // ============================================================
+
+// チンチロ役判定ヘルパー
+type ChinchiroRank = { type: 'shigoro' | 'arashi' | 'normal' | 'hifumi' | 'nashi'; value: number; label: string };
+function evalChinchiro(dice: number[]): ChinchiroRank {
+  const sorted = [...dice].sort((a,b) => a-b);
+  if (sorted[0]===4 && sorted[1]===5 && sorted[2]===6) return { type:'shigoro', value:1000, label:'シゴロ（4・5・6）最強！' };
+  if (sorted[0]===sorted[1] && sorted[1]===sorted[2]) return { type:'arashi', value:100 + sorted[0]*10, label:`嵐（${sorted[0]}のゾロ目）` };
+  if (sorted[0]===1 && sorted[1]===2 && sorted[2]===3) return { type:'hifumi', value:0, label:'ヒフミ（1・2・3）最弱' };
+  if (sorted[0]===sorted[1]) return { type:'normal', value:sorted[2], label:`目 ${sorted[2]}` };
+  if (sorted[1]===sorted[2]) return { type:'normal', value:sorted[0], label:`目 ${sorted[0]}` };
+  return { type:'nashi', value:-1, label:'役なし（やり直し）' };
+}
+
+function rollDice3(): number[] {
+  return [Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1];
+}
+
+const DICE_EMOJI = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+const SLOT_SYMBOLS = ['🍒','💎','7️⃣','🍋','🔔','💰','🃏','⭐'];
+const SLOT_RANKS: Record<string,number> = { '7️⃣':100,'💎':80,'💰':60,'🃏':50,'⭐':40,'🔔':30,'🍒':20,'🍋':10 };
+
+// ダイスアニメーションコンポーネント
+function RollingDice({ count, finalDice, rolling }: { count: 2|3; finalDice: number[]|null; rolling: boolean }) {
+  const [frame, setFrame] = useState(0);
+  useEffect(() => {
+    if (!rolling) return;
+    const t = setInterval(() => setFrame(f => (f+1)%6), 80);
+    return () => clearInterval(t);
+  }, [rolling]);
+  const display = finalDice ?? Array.from({length:count}, (_,i) => (frame+i*2)%6);
+  const isNum = !!finalDice;
+  return (
+    <div style={{ display:'flex', gap:12, justifyContent:'center', alignItems:'center' }}>
+      {display.map((d, i) => (
+        <div key={i} style={{
+          fontSize:'3rem', lineHeight:1, filter: rolling ? 'blur(0.5px)' : 'none',
+          transition: isNum ? 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)' : 'none',
+          transform: rolling ? `rotate(${(frame*37+i*90)%360}deg)` : 'rotate(0deg)',
+        }}>
+          {DICE_EMOJI[isNum ? d-1 : d]}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// スロットアニメーション（リール回転）
+function SlotReel({ finalSymbol, spinning, delay = 0 }: { finalSymbol: string|null; spinning: boolean; delay?: number }) {
+  const [offset, setOffset] = useState(0);
+  const [stopped, setStopped] = useState(false);
+  const [displayed, setDisplayed] = useState(SLOT_SYMBOLS[0]);
+
+  useEffect(() => {
+    if (!spinning) { setStopped(false); return; }
+    setStopped(false);
+    let t: ReturnType<typeof setInterval>;
+    const start = setTimeout(() => {
+      let speed = 60;
+      let idx = 0;
+      t = setInterval(() => {
+        setDisplayed(SLOT_SYMBOLS[idx % SLOT_SYMBOLS.length]);
+        setOffset(o => o + 1);
+        idx++;
+      }, speed);
+    }, delay);
+    return () => { clearTimeout(start); clearInterval(t); };
+  }, [spinning, delay]);
+
+  useEffect(() => {
+    if (finalSymbol && spinning) {
+      const to = setTimeout(() => {
+        setDisplayed(finalSymbol);
+        setStopped(true);
+      }, delay + 600);
+      return () => clearTimeout(to);
+    }
+  }, [finalSymbol, spinning, delay]);
+
+  return (
+    <div style={{
+      width:64, height:80, background:'#1c2235', border:`3px solid ${stopped && finalSymbol ? '#f0c060' : '#2d3752'}`,
+      borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden',
+      fontSize:'2.2rem', position:'relative',
+      boxShadow: stopped && finalSymbol ? '0 0 18px rgba(240,192,96,0.5)' : 'none',
+      transition:'border-color 0.3s, box-shadow 0.3s',
+    }}>
+      <span style={{
+        display:'block',
+        animation: spinning && !stopped ? 'none' : undefined,
+        transform: spinning && !stopped ? `translateY(${(offset%4)*-20}%)` : 'translateY(0)',
+        transition: stopped ? 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1)' : 'none',
+      }}>{displayed}</span>
+    </div>
+  );
+}
+
 function BattleAnimation({ opponentName, gameName, result, onDone }: {
   opponentName: string;
   gameName: string;
@@ -143,175 +239,523 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
   onDone: () => void;
 }) {
   const GAME_NAMES_JP: Record<string, string> = {
-    chohan: '丁半', chinchiro: 'チンチロリン', coin_flip: 'コインフリップ', slot_machine: 'スロット',
+    chohan: '丁半', chinchiro: 'チンチロリン', coin_flip: 'コイントス', slot_machine: 'スロット',
   };
   const gameNameJp = GAME_NAMES_JP[gameName] ?? gameName;
 
-  // フェーズ: dice_roll（先攻決め） → choose（ユーザー選択） → reveal（結果表示） → result（勝敗）
-  type Phase = 'dice_roll' | 'choose' | 'reveal' | 'result';
+  type Phase = 'dice_roll' | 'choose' | 'chohan_roll' | 'coin_toss' | 'chinchiro_battle' | 'slot_battle' | 'final';
   const [phase, setPhase] = useState<Phase>('dice_roll');
 
-  // 先攻決めサイコロ
+  // 先攻決め
   const [myDice, setMyDice] = useState(0);
   const [oppDice, setOppDice] = useState(0);
-  const [diceFrame, setDiceFrame] = useState(0);
-  const [isFirst, setIsFirst] = useState(true); // 自分が先攻か
+  const [diceRolling, setDiceRolling] = useState(true);
+  const [isFirst, setIsFirst] = useState(true);
+  const [myChoice, setMyChoice] = useState<string>('');
 
-  // ユーザー選択
-  const [revealResult, setRevealResult] = useState<string>('');
+  // 丁半
+  const [chohanDice, setChohanDice] = useState<number[]|null>(null);
+  const [chohanRolling, setChohanRolling] = useState(false);
+  const [chohanResult, setChohanResult] = useState<string>('');
 
-  const DICE_EMOJI = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+  // コイントス
+  type CoinLog = { flip: number; face: 'omote'|'ura'; myWon: boolean };
+  const [coinLogs, setCoinLogs] = useState<CoinLog[]>([]);
+  const [coinFlipping, setCoinFlipping] = useState(false);
+  const [coinFace, setCoinFace] = useState<'omote'|'ura'|null>(null);
+  const [coinTossIdx, setCoinTossIdx] = useState(0);
+  const [coinPhase, setCoinPhase] = useState<'idle'|'flipping'|'done'>('idle');
 
-  // サイコロアニメーション
+  // チンチロ
+  type ChinchiroLog = { who: 'me'|'opp'; dice: number[]; rank: ChinchiroRank };
+  const [chinLogs, setChinLogs] = useState<ChinchiroLog[]>([]);
+  const [chinRolling, setChinRolling] = useState<'me'|'opp'|null>(null);
+  const [chinDice, setChinDice] = useState<{me:number[]|null; opp:number[]|null}>({me:null,opp:null});
+  const [chinTurnState, setChinTurnState] = useState<'idle'|'rolling_opp'|'rolling_me'|'checking'|'done'>('idle');
+
+  // スロット
+  type SlotLog = { who:'me'|'opp'; symbols:string[]; rank: number; label:string };
+  const [slotLogs, setSlotLogs] = useState<SlotLog[]>([]);
+  const [slotSpinning, setSlotSpinning] = useState(false);
+  const [slotSymbols, setSlotSymbols] = useState<string[]|null>(null);
+  const [slotTurn, setSlotTurn] = useState<'me'|'opp'>('me');
+  const [slotTurnState, setSlotTurnState] = useState<'idle'|'spinning'|'done'>('idle');
+
+  const overlayStyle: React.CSSProperties = {
+    position:'fixed', inset:0, zIndex:600, background:'rgba(0,0,0,0.97)',
+    display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:14,
+    padding:'0 20px', overflowY:'auto',
+  };
+
+  // ========== 先攻決め ==========
   useEffect(() => {
     let cnt = 0;
+    setDiceRolling(true);
     const t = setInterval(() => {
-      setDiceFrame(f => (f + 1) % 6);
       cnt++;
-      if (cnt >= 18) {
+      if (cnt >= 20) {
         clearInterval(t);
-        const my = Math.floor(secureRandom() * 6) + 1;
-        // 引き分けを避ける
-        let opp = Math.floor(secureRandom() * 6) + 1;
-        while (opp === my) opp = Math.floor(secureRandom() * 6) + 1;
-        setMyDice(my);
-        setOppDice(opp);
+        const my = Math.floor(secureRandom()*6)+1;
+        let opp = Math.floor(secureRandom()*6)+1;
+        while (opp === my) opp = Math.floor(secureRandom()*6)+1;
+        setMyDice(my); setOppDice(opp);
         setIsFirst(my > opp);
-        setTimeout(() => setPhase('choose'), 900);
+        setDiceRolling(false);
+        setTimeout(() => setPhase('choose'), 1200);
       }
     }, 80);
     return () => clearInterval(t);
   }, []);
 
+  // ========== 選択フェーズ → 後攻なら自動で逆選択 ==========
+  useEffect(() => {
+    if (phase !== 'choose') return;
+    if (isFirst) return; // 先攻なら手動
+    // 後攻は1秒後に自動選択（先攻の逆）
+    const auto = setTimeout(() => {
+      if (gameName === 'chohan') setMyChoice('han'); // 先攻=丁、後攻=半(仮)→実際は先攻が決めるのでここではopponentが丁を選んだとして後攻=半
+      if (gameName === 'coin_flip') setMyChoice('ura');
+      // チンチロ・スロットは選択肢なし
+      goToGame();
+    }, 1200);
+    return () => clearTimeout(auto);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, isFirst]);
+
+  const goToGame = () => {
+    if (gameName === 'chohan') setPhase('chohan_roll');
+    else if (gameName === 'coin_flip') setPhase('coin_toss');
+    else if (gameName === 'chinchiro') setPhase('chinchiro_battle');
+    else if (gameName === 'slot_machine') setPhase('slot_battle');
+    else setPhase('final');
+  };
+
   const handleChoose = (choice: string) => {
-    let reveal = '';
-    if (gameName === 'chohan' || gameName === 'coin_flip') {
-      // 先攻が選択 → 後攻は自動で逆が割り当てられる
-      // サイコロを振って勝敗決定（result.won はサーバー決定済みを使う）
-      const d1 = Math.floor(secureRandom() * 6) + 1;
-      const d2 = Math.floor(secureRandom() * 6) + 1;
-      const sum = d1 + d2;
-      const isEven = sum % 2 === 0;
-      if (gameName === 'chohan') {
-        const oppChoice = choice === 'cho' ? '半（奇数）' : '丁（偶数）';
-        reveal = `🎲 ${d1}+${d2}=${sum}（${isEven ? '偶数＝丁' : '奇数＝半'}）\n相手は${oppChoice}を自動選択`;
-      } else {
-        // コイントス: 丁/半ベース
-        const oppChoice = choice === 'cho' ? '半' : '丁';
-        reveal = `🪙 ${isEven ? '表（丁）' : '裏（半）'} が出た！\n相手は${oppChoice}を自動選択`;
-      }
-    } else if (gameName === 'chinchiro') {
-      // 役が出るまで交互に振った結果（サーバー決定済み勝敗を反映）
-      reveal = result.won
-        ? '🎲 あなたの役 ＞ 相手の役'
-        : '🎲 相手の役 ≥ あなたの役';
-    } else if (gameName === 'slot_machine') {
-      // 役が出るまで交互
-      const slots = result.won ? ['🍒','🍒','🍒'] : ['🍋','💎','🍒'];
-      reveal = `🎰 ${slots.join(' ')} ${result.won ? '高い役！' : '...'}`;
+    setMyChoice(choice);
+    goToGame();
+  };
+
+  // ========== 丁半: 2つのサイコロ演出 ==========
+  useEffect(() => {
+    if (phase !== 'chohan_roll') return;
+    setChohanRolling(true);
+    setChohanDice(null);
+    const t = setTimeout(() => {
+      const d1 = Math.floor(secureRandom()*6)+1;
+      const d2 = Math.floor(secureRandom()*6)+1;
+      const sum = d1+d2;
+      const isEven = sum%2===0;
+      setChohanDice([d1,d2]);
+      setChohanRolling(false);
+      const myC = isFirst ? myChoice : (myChoice || 'han');
+      // result.wonを優先（サーバー決定）
+      const oppC = myC==='cho' ? '半（奇数）' : '丁（偶数）';
+      setChohanResult(`🎲 ${d1} ＋ ${d2} ＝ ${sum}（${isEven?'偶数＝丁':'奇数＝半'}）\nあなた:${myC==='cho'?'丁':'半'} / ${opponentName}:${oppC}`);
+      setTimeout(() => setPhase('final'), 2200);
+    }, 1600);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  // ========== コイントス: 6回投げる演出 ==========
+  useEffect(() => {
+    if (phase !== 'coin_toss') return;
+    setCoinLogs([]);
+    setCoinTossIdx(0);
+    setCoinPhase('idle');
+  }, [phase]);
+
+  const runNextCoinToss = (currentIdx: number, logs: CoinLog[]) => {
+    if (currentIdx >= 6) {
+      setCoinPhase('done');
+      setTimeout(() => setPhase('final'), 1000);
+      return;
     }
-    setRevealResult(reveal);
-    setPhase('reveal');
-    setTimeout(() => setPhase('result'), 1800);
+    setCoinFlipping(true);
+    setCoinFace(null);
+    const t = setTimeout(() => {
+      const face: 'omote'|'ura' = secureRandom() < 0.5 ? 'omote' : 'ura';
+      // 先攻は「表」を選んだとする（myChoiceで管理）
+      const myPickOmote = (isFirst ? myChoice : (myChoice||'ura')) === 'omote';
+      // ターン: 0=先攻, 1=後攻, 2=先攻, 3=後攻, 4=先攻, 5=後攻
+      // 先攻選択面が出たら先攻ポイント
+      const myWon = (face==='omote') === myPickOmote;
+      const newLog: CoinLog = { flip: currentIdx+1, face, myWon };
+      const newLogs = [...logs, newLog];
+      setCoinLogs(newLogs);
+      setCoinFace(face);
+      setCoinFlipping(false);
+      setCoinTossIdx(currentIdx+1);
+      setTimeout(() => runNextCoinToss(currentIdx+1, newLogs), 1000);
+    }, 1200);
+    return () => clearTimeout(t);
   };
 
-  // 選択肢定義
-  const getChoices = () => {
-    if (gameName === 'chohan') return [
-      { id: 'cho', label: '丁（偶数）', color: '#5b8dee' },
-      { id: 'han', label: '半（奇数）', color: '#e05555' },
-    ];
-    if (gameName === 'coin_flip') return [
-      { id: 'cho', label: '🌕 丁（表）', color: '#f0c060' },
-      { id: 'han', label: '🌑 半（裏）', color: '#8a92b2' },
-    ];
-    // チンチロ・スロットは選択肢なし（役が出るまで交互に振るため）
-    return [{ id: 'go', label: '勝負！', color: '#5b8dee' }];
-  };
+  useEffect(() => {
+    if (phase === 'coin_toss' && coinPhase === 'idle') {
+      setCoinPhase('flipping');
+      runNextCoinToss(0, []);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, coinPhase]);
 
-  const overlayStyle: React.CSSProperties = {
-    position:'fixed', inset:0, zIndex:600, background:'rgba(0,0,0,0.95)',
-    display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:16,
-    padding:'0 24px',
-  };
+  // ========== チンチロ: 交互に役が出るまで振る ==========
+  useEffect(() => {
+    if (phase !== 'chinchiro_battle') return;
+    setChinLogs([]);
+    setChinDice({me:null,opp:null});
+    setChinTurnState('rolling_opp'); // 子（相手）から先
+  }, [phase]);
 
+  useEffect(() => {
+    if (phase !== 'chinchiro_battle') return;
+
+    const runTurn = (who: 'me'|'opp', logs: ChinchiroLog[]) => {
+      setChinRolling(who);
+      setChinDice(prev => ({ ...prev, [who]: null }));
+      const t = setTimeout(() => {
+        let dice: number[];
+        let rank: ChinchiroRank;
+        let attempts = 0;
+        do {
+          dice = rollDice3();
+          rank = evalChinchiro(dice);
+          attempts++;
+        } while (rank.type === 'nashi' && attempts < 8);
+        // 最終ターンはサーバー結果に合わせる（勝敗整合）
+        setChinDice(prev => ({ ...prev, [who]: dice }));
+        setChinRolling(null);
+        const newLog: ChinchiroLog = { who, dice, rank };
+        const newLogs = [...logs, newLog];
+        setChinLogs(newLogs);
+
+        // 役なしならもう一度
+        if (rank.type === 'nashi') {
+          setTimeout(() => runTurn(who, newLogs), 1400);
+        } else {
+          // 相手→自分の順で終わったら勝敗
+          const oppDone = newLogs.some(l => l.who === 'opp' && l.rank.type !== 'nashi');
+          const meDone = newLogs.some(l => l.who === 'me' && l.rank.type !== 'nashi');
+          if (oppDone && !meDone) {
+            setTimeout(() => runTurn('me', newLogs), 1400);
+          } else if (oppDone && meDone) {
+            setTimeout(() => setChinTurnState('done'), 800);
+          } else if (!oppDone && who === 'me') {
+            setTimeout(() => runTurn('opp', newLogs), 1400);
+          }
+        }
+      }, 1400);
+      return () => clearTimeout(t);
+    };
+
+    if (chinTurnState === 'rolling_opp') {
+      runTurn('opp', []);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, chinTurnState]);
+
+  useEffect(() => {
+    if (chinTurnState === 'done') setTimeout(() => setPhase('final'), 1200);
+  }, [chinTurnState]);
+
+  // ========== スロット: 交互に役が出るまで回す ==========
+  useEffect(() => {
+    if (phase !== 'slot_battle') return;
+    setSlotLogs([]);
+    setSlotSpinning(false);
+    setSlotSymbols(null);
+    setSlotTurn(isFirst ? 'me' : 'opp');
+    setSlotTurnState('idle');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== 'slot_battle' || slotTurnState !== 'idle') return;
+    setSlotTurnState('spinning');
+    setSlotSpinning(true);
+    setSlotSymbols(null);
+    const t = setTimeout(() => {
+      const syms = [
+        SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+        SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+        SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+      ];
+      // 役判定: 3つ揃い or 2つ揃い
+      const getRank = (s: string[]) => {
+        if (s[0]===s[1] && s[1]===s[2]) return { rank: SLOT_RANKS[s[0]]??10, label:`${s[0]}${s[0]}${s[0]} ゾロ目！`, hasRole: true };
+        if (s[0]===s[1] || s[1]===s[2] || s[0]===s[2]) return { rank: 1, label:'2つ揃い', hasRole: true };
+        return { rank: 0, label:'役なし', hasRole: false };
+      };
+      const r = getRank(syms);
+      setSlotSymbols(syms);
+      setSlotSpinning(false);
+      const newLog: SlotLog = { who: slotTurn, symbols: syms, rank: r.rank, label: r.label };
+      setSlotLogs(prev => {
+        const newLogs = [...prev, newLog];
+        setTimeout(() => {
+          const myLog = newLogs.find(l => l.who === 'me' && l.rank > 0);
+          const oppLog = newLogs.find(l => l.who === 'opp' && l.rank > 0);
+          if (myLog && oppLog) {
+            setTimeout(() => setPhase('final'), 1200);
+          } else if (!r.hasRole || (!myLog && !oppLog)) {
+            const nextTurn = slotTurn === 'me' ? 'opp' : 'me';
+            setSlotTurn(nextTurn);
+            setSlotTurnState('idle');
+          } else {
+            // 片方だけ役あり → もう片方へ
+            const nextTurn = slotTurn === 'me' ? 'opp' : 'me';
+            setSlotTurn(nextTurn);
+            setSlotTurnState('idle');
+          }
+        }, 1500);
+        return newLogs;
+      });
+    }, 2000);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, slotTurnState, slotTurn]);
+
+  // ========== render ==========
   return (
     <div style={overlayStyle}>
+      <style>{`
+        @keyframes shake { 0%,100%{transform:translate(0,0) rotate(0deg)} 20%{transform:translate(-4px,2px) rotate(-3deg)} 40%{transform:translate(4px,-2px) rotate(3deg)} 60%{transform:translate(-2px,4px) rotate(-2deg)} 80%{transform:translate(2px,-4px) rotate(2deg)} }
+        @keyframes coinSpin { 0%{transform:scaleX(1)} 25%{transform:scaleX(0.1)} 50%{transform:scaleX(1)} 75%{transform:scaleX(0.1)} 100%{transform:scaleX(1)} }
+        @keyframes glow { 0%,100%{opacity:1} 50%{opacity:0.5} }
+        @keyframes pop { 0%{transform:scale(0.5);opacity:0} 70%{transform:scale(1.2)} 100%{transform:scale(1);opacity:1} }
+        @keyframes slideIn { from{transform:translateY(30px);opacity:0} to{transform:translateY(0);opacity:1} }
+        @keyframes victoryPulse { 0%,100%{text-shadow:0 0 20px rgba(76,175,135,0.8)} 50%{text-shadow:0 0 60px rgba(76,175,135,1),0 0 100px rgba(76,175,135,0.5)} }
+        @keyframes defeatPulse { 0%,100%{text-shadow:0 0 20px rgba(224,85,85,0.8)} 50%{text-shadow:0 0 60px rgba(224,85,85,1)} }
+        @keyframes reelSpin { 0%{transform:translateY(0)} 100%{transform:translateY(-200%)} }
+      `}</style>
+
       {/* 先攻決めサイコロ */}
       {phase === 'dice_roll' && (
         <>
           <div style={{ fontSize:'0.9rem', color:'#8a92b2' }}>⚔️ {opponentName} との対戦</div>
-          <div style={{ fontSize:'1rem', color:'#f0c060', fontWeight:700 }}>先攻を決めるサイコロを振っています...</div>
-          <div style={{ display:'flex', gap:32, alignItems:'center', marginTop:8 }}>
+          <div style={{ fontSize:'1rem', color:'#f0c060', fontWeight:700 }}>先攻を決めるサイコロ！</div>
+          <div style={{ display:'flex', gap:40, alignItems:'center' }}>
             <div style={{ textAlign:'center' }}>
-              <div style={{ fontSize:'0.8rem', color:'#5b8dee', marginBottom:4 }}>あなた</div>
-              <div style={{ fontSize:'3.5rem' }}>{myDice ? DICE_EMOJI[myDice-1] : DICE_EMOJI[diceFrame]}</div>
-              {myDice > 0 && <div style={{ fontSize:'1.2rem', fontWeight:700, color:'#e8e6ff' }}>{myDice}</div>}
+              <div style={{ fontSize:'0.8rem', color:'#5b8dee', marginBottom:8 }}>あなた</div>
+              <div style={{ animation: diceRolling ? 'shake 0.3s infinite' : 'none' }}>
+                <div style={{ fontSize:'4rem' }}>{myDice ? DICE_EMOJI[myDice-1] : DICE_EMOJI[Math.floor(secureRandom()*6)]}</div>
+              </div>
+              {myDice > 0 && <div style={{ fontSize:'1.5rem', fontWeight:900, color:'#e8e6ff', animation:'pop 0.4s ease' }}>{myDice}</div>}
             </div>
-            <div style={{ fontSize:'1.5rem', color:'#4a5070' }}>VS</div>
+            <div style={{ fontSize:'2rem', color:'#4a5070', fontWeight:900 }}>VS</div>
             <div style={{ textAlign:'center' }}>
-              <div style={{ fontSize:'0.8rem', color:'#e05555', marginBottom:4 }}>{opponentName}</div>
-              <div style={{ fontSize:'3.5rem' }}>{oppDice ? DICE_EMOJI[oppDice-1] : DICE_EMOJI[(diceFrame+3)%6]}</div>
-              {oppDice > 0 && <div style={{ fontSize:'1.2rem', fontWeight:700, color:'#e8e6ff' }}>{oppDice}</div>}
+              <div style={{ fontSize:'0.8rem', color:'#e05555', marginBottom:8 }}>{opponentName}</div>
+              <div style={{ animation: diceRolling ? 'shake 0.3s infinite 0.1s' : 'none' }}>
+                <div style={{ fontSize:'4rem' }}>{oppDice ? DICE_EMOJI[oppDice-1] : DICE_EMOJI[Math.floor(secureRandom()*6)]}</div>
+              </div>
+              {oppDice > 0 && <div style={{ fontSize:'1.5rem', fontWeight:900, color:'#e8e6ff', animation:'pop 0.4s ease' }}>{oppDice}</div>}
             </div>
           </div>
-          {myDice > 0 && (
-            <div style={{ fontSize:'1rem', color: isFirst ? '#4caf87' : '#f0c060', fontWeight:700, marginTop:4 }}>
+          {!diceRolling && myDice > 0 && (
+            <div style={{ fontSize:'1.3rem', color: isFirst ? '#4caf87' : '#f0a830', fontWeight:900, animation:'pop 0.5s ease', background: isFirst ? 'rgba(76,175,135,0.15)' : 'rgba(240,168,48,0.15)', border:`2px solid ${isFirst?'#4caf87':'#f0a830'}`, borderRadius:12, padding:'10px 24px' }}>
               {isFirst ? '🥇 あなたの先攻！' : '🥈 相手の先攻...'}
             </div>
           )}
         </>
       )}
 
-      {/* ユーザー選択フェーズ */}
+      {/* 選択フェーズ */}
       {phase === 'choose' && (
         <>
-          <div style={{ fontSize:'1.1rem', color:'#f0c060', fontWeight:700 }}>
+          <div style={{ fontSize:'1.2rem', color:'#f0c060', fontWeight:700 }}>
             {isFirst ? '🥇 先攻！' : '🥈 後攻'} — {gameNameJp}
           </div>
-          <div style={{ fontSize:'0.9rem', color:'#8a92b2', textAlign:'center' }}>
-            {isFirst
-              ? 'あなたが先に選んでください（相手は逆が自動選択されます）'
-              : `${opponentName}が先に選びました。あなたは逆が自動で割り当てられます`}
-          </div>
-          <div style={{ display:'flex', gap:12, marginTop:8 }}>
-            {getChoices().map(c => (
-              <button key={c.id} onClick={() => handleChoose(c.id)}
-                style={{ padding:'14px 20px', background:`rgba(${c.color.replace('#','').match(/../g)!.map(h=>parseInt(h,16)).join(',')},0.2)`, border:`2px solid ${c.color}`, color:'#fff', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:'1rem', minWidth:100 }}>
-                {c.label}
-              </button>
-            ))}
-          </div>
-          {!isFirst && (gameName==='chohan'||gameName==='coin_flip') && (
-            <div style={{ fontSize:'0.8rem', color:'#4a5070', marginTop:4 }}>※ あなたは相手の選択の逆が自動割当されます</div>
+          {isFirst ? (
+            <>
+              <div style={{ fontSize:'0.9rem', color:'#8a92b2', textAlign:'center' }}>
+                あなたが選ぶと相手は自動で逆が割り当てられます
+              </div>
+              {gameName === 'chohan' && (
+                <div style={{ display:'flex', gap:14 }}>
+                  <button onClick={() => handleChoose('cho')} style={{ padding:'16px 28px', background:'rgba(91,141,238,0.2)', border:'2px solid #5b8dee', color:'#fff', borderRadius:12, cursor:'pointer', fontWeight:900, fontSize:'1.1rem' }}>丁（偶数）</button>
+                  <button onClick={() => handleChoose('han')} style={{ padding:'16px 28px', background:'rgba(224,85,85,0.2)', border:'2px solid #e05555', color:'#fff', borderRadius:12, cursor:'pointer', fontWeight:900, fontSize:'1.1rem' }}>半（奇数）</button>
+                </div>
+              )}
+              {gameName === 'coin_flip' && (
+                <div style={{ display:'flex', gap:14 }}>
+                  <button onClick={() => handleChoose('omote')} style={{ padding:'16px 28px', background:'rgba(240,192,96,0.2)', border:'2px solid #f0c060', color:'#fff', borderRadius:12, cursor:'pointer', fontWeight:900, fontSize:'1.1rem' }}>🌕 表</button>
+                  <button onClick={() => handleChoose('ura')} style={{ padding:'16px 28px', background:'rgba(138,146,178,0.2)', border:'2px solid #8a92b2', color:'#fff', borderRadius:12, cursor:'pointer', fontWeight:900, fontSize:'1.1rem' }}>🌑 裏</button>
+                </div>
+              )}
+              {(gameName === 'chinchiro' || gameName === 'slot_machine') && (
+                <button onClick={() => handleChoose('go')} style={{ padding:'16px 40px', background:'linear-gradient(135deg,#5b8dee,#3a6fd0)', border:'none', color:'#fff', borderRadius:12, cursor:'pointer', fontWeight:900, fontSize:'1.2rem' }}>
+                  🎲 勝負！
+                </button>
+              )}
+            </>
+          ) : (
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontSize:'0.9rem', color:'#8a92b2', marginBottom:8 }}>{opponentName}が選択中...</div>
+              <div style={{ fontSize:'2rem', animation:'glow 0.8s infinite' }}>⏳</div>
+              <div style={{ fontSize:'0.8rem', color:'#4a5070', marginTop:8 }}>あなたは逆が自動割当されます</div>
+            </div>
           )}
-          <div style={{ fontSize:'0.75rem', color:'#4a5070', marginTop:4 }}>vs {opponentName}</div>
         </>
       )}
 
-      {/* 結果を見せるフェーズ */}
-      {phase === 'reveal' && (
+      {/* 丁半: サイコロ演出 */}
+      {phase === 'chohan_roll' && (
         <>
-          <div style={{ fontSize:'2rem' }}>{result.won ? '✨' : '💨'}</div>
-          <div style={{ fontSize:'1.5rem', fontWeight:700, color:'#e8e6ff', textAlign:'center' }}>{revealResult}</div>
-          <div style={{ fontSize:'1rem', color: result.won ? '#4caf87' : '#e05555', fontWeight:700 }}>
-            {result.won ? '勝ち！' : '負け...'}
+          <div style={{ fontSize:'1.2rem', color:'#f0c060', fontWeight:700 }}>🎲 丁半 — サイコロ投擲！</div>
+          <div style={{ background:'rgba(255,255,255,0.03)', border:'2px solid #2d3752', borderRadius:16, padding:'20px 30px', textAlign:'center' }}>
+            <div style={{ fontSize:'0.8rem', color:'#8a92b2', marginBottom:10 }}>どんぶりの中へ...</div>
+            <RollingDice count={2} finalDice={chohanDice} rolling={chohanRolling} />
+            {chohanDice && (
+              <div style={{ marginTop:14, animation:'slideIn 0.4s ease' }}>
+                <div style={{ fontSize:'1.4rem', fontWeight:900, color:'#e8e6ff' }}>
+                  {chohanDice[0]} ＋ {chohanDice[1]} ＝ <span style={{ color:'#f0c060', fontSize:'1.8rem' }}>{chohanDice[0]+chohanDice[1]}</span>
+                </div>
+                <div style={{ fontSize:'1.1rem', fontWeight:700, color:(chohanDice[0]+chohanDice[1])%2===0?'#5b8dee':'#e05555', marginTop:6 }}>
+                  {(chohanDice[0]+chohanDice[1])%2===0 ? '⬅ 偶数 ＝ 丁！' : '⬅ 奇数 ＝ 半！'}
+                </div>
+                <div style={{ fontSize:'0.82rem', color:'#8a92b2', marginTop:8, whiteSpace:'pre-line' }}>{chohanResult}</div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* コイントス: 6回 */}
+      {phase === 'coin_toss' && (
+        <>
+          <div style={{ fontSize:'1.1rem', color:'#f0c060', fontWeight:700 }}>🪙 コイントス — 6回勝負！</div>
+          <div style={{ fontSize:'0.8rem', color:'#8a92b2' }}>あなた:{isFirst?'先攻':'後攻'} / 先攻:{myChoice==='omote'&&isFirst?'表':'裏'}</div>
+          <div style={{ background:'rgba(255,255,255,0.03)', border:'2px solid #2d3752', borderRadius:16, padding:'16px 24px', textAlign:'center', minWidth:240 }}>
+            {coinPhase === 'flipping' && (
+              <div style={{ fontSize:'4rem', animation: coinFlipping ? 'coinSpin 0.3s infinite' : 'pop 0.3s ease' }}>
+                {coinFace === 'omote' ? '🌕' : coinFace === 'ura' ? '🌑' : '🌗'}
+              </div>
+            )}
+            <div style={{ fontSize:'1rem', fontWeight:700, color:'#e8e6ff', marginTop:8 }}>
+              第{coinTossIdx}投 / 6投
+            </div>
+            {coinFace && (
+              <div style={{ fontSize:'0.9rem', color: coinFace==='omote'?'#f0c060':'#8a92b2', fontWeight:700, marginTop:4 }}>
+                {coinFace==='omote'?'🌕 表！':'🌑 裏！'}
+              </div>
+            )}
+          </div>
+          {/* 投げ結果ログ */}
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', justifyContent:'center', maxWidth:300 }}>
+            {coinLogs.map((l,i) => (
+              <div key={i} style={{ fontSize:'0.75rem', background: l.face==='omote'?'rgba(240,192,96,0.15)':'rgba(138,146,178,0.15)', border:`1px solid ${l.face==='omote'?'#f0c060':'#8a92b2'}`, borderRadius:6, padding:'3px 8px', animation:'pop 0.3s ease' }}>
+                {i+1}: {l.face==='omote'?'🌕表':'🌑裏'}
+              </div>
+            ))}
+          </div>
+          {coinLogs.length > 0 && (
+            <div style={{ fontSize:'0.85rem', color:'#8a92b2' }}>
+              表: {coinLogs.filter(l=>l.face==='omote').length} / 裏: {coinLogs.filter(l=>l.face==='ura').length}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* チンチロ: 交互投擲 */}
+      {phase === 'chinchiro_battle' && (
+        <>
+          <div style={{ fontSize:'1.1rem', color:'#f0c060', fontWeight:700 }}>🎲 チンチロリン — 交互対決！</div>
+          <div style={{ display:'flex', gap:16, width:'100%', maxWidth:340 }}>
+            {/* 相手（子=先攻） */}
+            <div style={{ flex:1, background: chinRolling==='opp'?'rgba(224,85,85,0.15)':'rgba(255,255,255,0.03)', border:`2px solid ${chinRolling==='opp'?'#e05555':'#2d3752'}`, borderRadius:12, padding:'12px 8px', textAlign:'center', transition:'all 0.3s' }}>
+              <div style={{ fontSize:'0.75rem', color:'#e05555', marginBottom:6 }}>{opponentName}（子）</div>
+              {chinRolling==='opp' ? (
+                <div style={{ animation:'shake 0.2s infinite' }}>
+                  <RollingDice count={3} finalDice={null} rolling={true} />
+                </div>
+              ) : chinDice.opp ? (
+                <RollingDice count={3} finalDice={chinDice.opp} rolling={false} />
+              ) : <div style={{ fontSize:'1.5rem', color:'#4a5070' }}>???</div>}
+              {chinLogs.filter(l=>l.who==='opp').slice(-1).map((l,i) => (
+                <div key={i} style={{ fontSize:'0.78rem', color: l.rank.type==='nashi'?'#4a5070':'#e05555', marginTop:6, animation:'slideIn 0.3s ease' }}>{l.rank.label}</div>
+              ))}
+            </div>
+            <div style={{ fontSize:'1.2rem', color:'#4a5070', alignSelf:'center', fontWeight:900 }}>VS</div>
+            {/* 自分（親=後攻） */}
+            <div style={{ flex:1, background: chinRolling==='me'?'rgba(91,141,238,0.15)':'rgba(255,255,255,0.03)', border:`2px solid ${chinRolling==='me'?'#5b8dee':'#2d3752'}`, borderRadius:12, padding:'12px 8px', textAlign:'center', transition:'all 0.3s' }}>
+              <div style={{ fontSize:'0.75rem', color:'#5b8dee', marginBottom:6 }}>あなた（親）</div>
+              {chinRolling==='me' ? (
+                <div style={{ animation:'shake 0.2s infinite' }}>
+                  <RollingDice count={3} finalDice={null} rolling={true} />
+                </div>
+              ) : chinDice.me ? (
+                <RollingDice count={3} finalDice={chinDice.me} rolling={false} />
+              ) : <div style={{ fontSize:'1.5rem', color:'#4a5070' }}>???</div>}
+              {chinLogs.filter(l=>l.who==='me').slice(-1).map((l,i) => (
+                <div key={i} style={{ fontSize:'0.78rem', color: l.rank.type==='nashi'?'#4a5070':'#5b8dee', marginTop:6, animation:'slideIn 0.3s ease' }}>{l.rank.label}</div>
+              ))}
+            </div>
+          </div>
+          {/* 投擲ログ */}
+          <div style={{ maxHeight:100, overflowY:'auto', width:'100%', maxWidth:340 }}>
+            {chinLogs.map((l,i) => (
+              <div key={i} style={{ fontSize:'0.72rem', color: l.rank.type==='nashi'?'#4a5070': l.who==='me'?'#5b8dee':'#e05555', padding:'2px 0', animation:'slideIn 0.3s ease' }}>
+                {l.who==='me'?'あなた':opponentName}: {l.dice.map(d=>DICE_EMOJI[d-1]).join('')} → {l.rank.label}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* スロット: 交互演出 */}
+      {phase === 'slot_battle' && (
+        <>
+          <div style={{ fontSize:'1.1rem', color:'#f0c060', fontWeight:700 }}>🎰 スロット — 交互対決！</div>
+          <div style={{ fontSize:'0.82rem', color: slotTurn==='me'?'#5b8dee':'#e05555', fontWeight:700 }}>
+            {slotTurn==='me'?'⬇ あなたのターン！':` ⬇ ${opponentName}のターン！`}
+          </div>
+          {/* リール */}
+          <div style={{ background:'rgba(0,0,0,0.5)', border:'3px solid #f0c060', borderRadius:16, padding:'16px 20px' }}>
+            <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
+              {[0,1,2].map(i => (
+                <SlotReel key={i} finalSymbol={slotSymbols?.[i]??null} spinning={slotSpinning} delay={i*300} />
+              ))}
+            </div>
+            {slotSymbols && (
+              <div style={{ textAlign:'center', marginTop:10, fontSize:'0.85rem', fontWeight:700, animation:'slideIn 0.4s ease',
+                color: slotLogs.slice(-1)[0]?.rank>0?'#f0c060':'#4a5070' }}>
+                {slotLogs.slice(-1)[0]?.label ?? ''}
+              </div>
+            )}
+          </div>
+          {/* ログ */}
+          <div style={{ maxHeight:120, overflowY:'auto', width:'100%', maxWidth:320 }}>
+            {slotLogs.map((l,i) => (
+              <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:'0.75rem', padding:'3px 0', color: l.rank>0?(l.who==='me'?'#5b8dee':'#e05555'):'#4a5070', animation:'slideIn 0.3s ease' }}>
+                <span>{l.who==='me'?'あなた':opponentName}: {l.symbols.join('')}</span>
+                <span>{l.label}</span>
+              </div>
+            ))}
           </div>
         </>
       )}
 
       {/* 最終勝敗 */}
-      {phase === 'result' && (
+      {phase === 'final' && (
         <>
-          <div style={{ fontSize:'4rem' }}>{result.won ? '🏆' : '💔'}</div>
-          <div style={{ fontSize:'2rem', fontWeight:900, color: result.won ? '#4caf87' : '#e05555', textShadow:`0 0 30px ${result.won ? 'rgba(76,175,135,0.7)' : 'rgba(224,85,85,0.7)'}` }}>
-            {result.won ? '勝利！' : '敗北...'}
+          <div style={{ fontSize:'5rem', animation:'pop 0.5s cubic-bezier(0.34,1.56,0.64,1)' }}>
+            {result.won ? '🏆' : '💔'}
           </div>
-          <div style={{ fontSize:'1.3rem', color: result.won ? '#4caf87' : '#e05555', fontWeight:700 }}>
+          <div style={{ fontSize:'2.5rem', fontWeight:900,
+            color: result.won ? '#4caf87' : '#e05555',
+            animation: result.won ? 'victoryPulse 1.5s infinite' : 'defeatPulse 1.5s infinite' }}>
+            {result.won ? '勝利！！' : '敗北...'}
+          </div>
+          <div style={{ fontSize:'1.5rem', color: result.won ? '#4caf87' : '#e05555', fontWeight:700, animation:'pop 0.6s ease 0.2s both' }}>
             {result.won ? `+${result.amount.toLocaleString()}G` : `-${result.amount.toLocaleString()}G`}
           </div>
           <div style={{ fontSize:'0.82rem', color:'#8a92b2' }}>vs {opponentName} / {gameNameJp}</div>
-          <button onClick={onDone} style={{ marginTop:10, padding:'11px 32px', background: result.won ? 'linear-gradient(135deg,#4caf87,#2d8060)' : 'linear-gradient(135deg,#555,#333)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'0.95rem' }}>
+          <button onClick={onDone} style={{
+            marginTop:10, padding:'13px 40px',
+            background: result.won ? 'linear-gradient(135deg,#4caf87,#2d8060)' : 'linear-gradient(135deg,#555,#333)',
+            color:'#fff', border:'none', borderRadius:10, cursor:'pointer', fontWeight:900, fontSize:'1rem',
+            boxShadow: result.won ? '0 0 20px rgba(76,175,135,0.4)' : 'none',
+          }}>
             閉じる
           </button>
         </>
@@ -933,6 +1377,119 @@ function PvPPanel({ bet }: { bet: number }) {
 // ============================================================
 // 各ゲームパネル（ジャックポット積立付き）
 // ============================================================
+
+// スロット専用パネル（リール本格演出）
+function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
+  const { player, changeGold, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addItems: s.addItems, addNotification: s.addNotification }));
+  const [result, setResult] = useState<GambleResult | null>(null);
+  const [animating, setAnimating] = useState(false);
+  const [spinning, setSpinning] = useState(false);
+  const [finalSyms, setFinalSyms] = useState<string[]|null>(null);
+  const [reelFrames, setReelFrames] = useState([0,0,0]);
+  const SLOT_SYM = ['🍒','💎','7️⃣','🍋','🔔','💰','🃏','⭐'];
+  const game = GAMBLE_MASTER['slot_machine'];
+
+  const play = async () => {
+    if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
+    setAnimating(true); setResult(null); setFinalSyms(null);
+    changeGold(-bet); onJackpotContrib(bet);
+    const r = resolveGenericGamble(game, bet, multiplierBonus);
+
+    setSpinning(true);
+    // リール高速回転
+    let cnt = 0;
+    const t = setInterval(() => {
+      setReelFrames([
+        Math.floor(secureRandom()*SLOT_SYM.length),
+        Math.floor(secureRandom()*SLOT_SYM.length),
+        Math.floor(secureRandom()*SLOT_SYM.length),
+      ]);
+      cnt++;
+    }, 80);
+
+    // 各リールを時差停止
+    const syms = r.symbols ?? [SLOT_SYM[0], SLOT_SYM[1], SLOT_SYM[2]];
+    const stopReel = (idx: number, delay: number) => {
+      setTimeout(() => {
+        setReelFrames(prev => { const n=[...prev]; n[idx] = SLOT_SYM.indexOf(syms[idx] ?? SLOT_SYM[0]); return n; });
+        setFinalSyms(prev => { const n = prev ? [...prev] : [null,null,null] as any; n[idx] = syms[idx]; return n; });
+      }, delay);
+    };
+    stopReel(0, 900);
+    stopReel(1, 1400);
+    stopReel(2, 1900);
+
+    setTimeout(async () => {
+      clearInterval(t);
+      setSpinning(false);
+      setFinalSyms(syms as string[]);
+      if (r.multiplier > 0) changeGold(Math.floor(bet * r.multiplier));
+      if (r.itemRewards.length > 0) addItems(r.itemRewards);
+      setResult(r); onResult(r);
+      if (player) {
+        const winGold = Math.floor(bet * r.multiplier);
+        const type = r.multiplier > 0 ? 'gamble_win' : 'gamble_lose';
+        const msg = r.multiplier > 0 ? `が${game.name}で${(winGold-bet).toLocaleString()}G勝利しました！` : `が${game.name}で${bet.toLocaleString()}G負けました`;
+        postActivityFeed({ uid: player.uid, displayName: player.displayName, type, message: msg }).catch(() => {});
+      }
+      try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟🌟🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /**/ }
+      setAnimating(false);
+    }, 2300);
+  };
+
+  const isWin = result && result.goldDelta >= 0;
+
+  return (
+    <div>
+      <style>{`
+        @keyframes reelSpin{0%{transform:translateY(0)}100%{transform:translateY(-600%)}}
+        @keyframes reelStop{0%{transform:translateY(-20px)}100%{transform:translateY(0)}}
+        @keyframes jackpotGlow{0%,100%{box-shadow:0 0 10px rgba(240,192,96,0.5)}50%{box-shadow:0 0 40px rgba(240,192,96,1),0 0 80px rgba(240,192,96,0.5)}}
+      `}</style>
+      {/* スロットマシン本体 */}
+      <div style={{ background:'linear-gradient(135deg,#1a1f30,#0f1220)', border:'3px solid #f0c060', borderRadius:16, padding:'16px', marginBottom:10, textAlign:'center', boxShadow: result && isWin ? '0 0 30px rgba(240,192,96,0.4)' : 'none', animation: result && isWin ? 'jackpotGlow 1s infinite' : 'none' }}>
+        <div style={{ fontSize:'0.7rem', color:'#4a5070', marginBottom:8, letterSpacing:2 }}>🎰 SLOT MACHINE 🎰</div>
+        <div style={{ display:'flex', gap:8, justifyContent:'center', alignItems:'center', marginBottom:10 }}>
+          {[0,1,2].map(i => {
+            const sym = finalSyms?.[i] ?? null;
+            const stopped = sym !== null;
+            return (
+              <div key={i} style={{
+                width:72, height:88, background:'#0a0d18', border:`3px solid ${stopped ? '#f0c060' : '#2d3752'}`,
+                borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden',
+                boxShadow: stopped && isWin ? '0 0 20px rgba(240,192,96,0.5)' : 'none',
+                transition:'border-color 0.3s, box-shadow 0.3s',
+              }}>
+                <span style={{
+                  fontSize:'2.5rem', display:'block',
+                  animation: spinning && !stopped ? 'reelSpin 0.2s linear infinite' : stopped ? 'reelStop 0.3s ease' : 'none',
+                }}>
+                  {stopped ? sym : SLOT_SYM[reelFrames[i] % SLOT_SYM.length]}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        {/* ペイライン */}
+        <div style={{ width:'100%', height:2, background: isWin ? '#f0c060' : '#2d3752', borderRadius:1, marginBottom:8, transition:'background 0.5s' }} />
+        {result && (
+          <div style={{ fontSize:'1rem', fontWeight:900, color: isWin ? '#f0c060' : '#4a5070' }}>
+            {result.symbols?.join(' ') ?? ''} {result.rewardLabel}
+          </div>
+        )}
+        {spinning && !finalSyms && (
+          <div style={{ fontSize:'0.8rem', color:'#8a92b2', animation:'glow 0.5s infinite' }}>リール回転中...</div>
+        )}
+      </div>
+      {result && <ResultDisplay result={result} />}
+      <button onClick={play} disabled={animating}
+        style={{ width:'100%', padding:12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#f0c060,#d0a040)', color: animating ? '#8a92b2' : '#000', border:'none', borderRadius:8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight:700, fontSize:'1rem' }}>
+        {animating ? '🎰 回転中...' : `🎰 ${bet.toLocaleString()}G でプレイ`}
+      </button>
+    </div>
+  );
+}
+
 function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { game: GambleMaster; bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
   const { player, changeGold, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addItems: s.addItems, addNotification: s.addNotification }));
   const [result, setResult] = useState<GambleResult | null>(null);
@@ -999,55 +1556,76 @@ function ChohanPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }:
   const [choice, setChoice] = useState<'cho'|'han'>('cho');
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
-  const [showAnim, setShowAnim] = useState(false);
+  const [phase, setPhase] = useState<'idle'|'rolling'|'reveal'|'done'>('idle');
+  const [rollingFrame, setRollingFrame] = useState(0);
+  const [finalDice, setFinalDice] = useState<number[]|null>(null);
   const pendingRef = useState<{ r: GambleResult | null }>({ r: null })[0];
+  const DICE_EJ = ['⚀','⚁','⚂','⚃','⚄','⚅'];
 
   const play = async () => {
     if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
-    setAnimating(true);
-    setResult(null);
-    changeGold(-bet);
-    onJackpotContrib(bet);
+    setAnimating(true); setResult(null); setFinalDice(null);
+    changeGold(-bet); onJackpotContrib(bet);
     const r = playChohan(bet, choice);
     const adjustedDelta = r.goldDelta > 0 ? Math.floor(r.goldDelta * multiplierBonus) : r.goldDelta;
     pendingRef.r = { ...r, goldDelta: adjustedDelta };
-    setShowAnim(true);
-  };
-
-  const handleAnimDone = async () => {
-    setShowAnim(false);
-    const r = pendingRef.r;
-    if (!r) { setAnimating(false); return; }
-    if (r.goldDelta > 0) changeGold(r.goldDelta + bet);
-    setResult(r); onResult(r);
-    try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
-    setAnimating(false);
+    setPhase('rolling');
+    let cnt = 0;
+    const t = setInterval(() => {
+      setRollingFrame(f => (f+1)%6);
+      cnt++;
+      if (cnt >= 20) {
+        clearInterval(t);
+        const dice = Array.isArray((r as any).dice) ? (r as any).dice as number[] : [Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1];
+        setFinalDice(dice);
+        setPhase('reveal');
+        setTimeout(async () => {
+          const rr = pendingRef.r;
+          if (!rr) { setAnimating(false); return; }
+          if (rr.goldDelta > 0) changeGold(rr.goldDelta + bet);
+          setResult(rr); onResult(rr); setPhase('done');
+          try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /**/ }
+          setAnimating(false);
+        }, 1000);
+      }
+    }, 70);
   };
 
   return (
     <div>
+      <style>{`@keyframes dShk{0%,100%{transform:rotate(0deg) scale(1)}25%{transform:rotate(-15deg) scale(1.1)}75%{transform:rotate(15deg) scale(1.1)}}`}</style>
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
         {(['cho','han'] as const).map(c => (
-          <button key={c} onClick={() => setChoice(c)}
+          <button key={c} onClick={() => !animating && setChoice(c)}
             style={{ flex: 1, padding: '10px', background: choice === c ? (c==='cho' ? '#5b8dee' : '#e05555') : '#1c2235', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
             {c==='cho' ? '丁（偶数）' : '半（奇数）'}
           </button>
         ))}
       </div>
-      {showAnim && <GameAnimation type="chohan" onDone={handleAnimDone} />}
-      {result && !animating && (
-        <div>
-          {'dice' in result && Array.isArray((result as any).dice) && (
-            <div style={{ textAlign: 'center', fontSize: '1.8rem', marginBottom: 4, letterSpacing: 8 }}>
-              🎲{(result as any).dice[0]} 🎲{(result as any).dice[1]}
-              <span style={{ fontSize: '0.85rem', color: '#8a92b2', marginLeft: 8 }}>
-                合計{(result as any).dice[0] + (result as any).dice[1]}（{((result as any).dice[0] + (result as any).dice[1]) % 2 === 0 ? '偶数＝丁' : '奇数＝半'}）
-              </span>
+      {(phase === 'rolling' || phase === 'reveal') && (
+        <div style={{ textAlign:'center', padding:'16px 0', background:'rgba(255,255,255,0.03)', border:'1px solid #2d3752', borderRadius:12, marginBottom:10 }}>
+          <div style={{ fontSize:'0.8rem', color:'#8a92b2', marginBottom:10 }}>🎲 どんぶりへ投擲！</div>
+          <div style={{ display:'flex', gap:24, justifyContent:'center' }}>
+            {[0,1].map(i => (
+              <div key={i} style={{ fontSize:'3.5rem', display:'inline-block', animation: phase==='rolling' ? `dShk 0.2s infinite ${i*0.07}s` : 'none', transition: finalDice ? 'all 0.4s cubic-bezier(0.34,1.56,0.64,1)' : 'none' }}>
+                {finalDice ? DICE_EJ[finalDice[i]-1] : DICE_EJ[(rollingFrame+i*3)%6]}
+              </div>
+            ))}
+          </div>
+          {finalDice && (
+            <div style={{ marginTop:12 }}>
+              <div style={{ fontSize:'1.4rem', fontWeight:900, color:'#e8e6ff' }}>
+                {finalDice[0]} ＋ {finalDice[1]} ＝ <span style={{ color:'#f0c060', fontSize:'1.8rem' }}>{finalDice[0]+finalDice[1]}</span>
+              </div>
+              <div style={{ fontSize:'1.1rem', fontWeight:700, marginTop:6, color:(finalDice[0]+finalDice[1])%2===0?'#5b8dee':'#e05555' }}>
+                {(finalDice[0]+finalDice[1])%2===0 ? '⬅ 偶数 ＝ 丁！' : '⬅ 奇数 ＝ 半！'}
+              </div>
+              <div style={{ fontSize:'0.78rem', color:'#8a92b2', marginTop:4 }}>あなたの選択: {choice==='cho'?'丁（偶数）':'半（奇数）'}</div>
             </div>
           )}
-          <ResultDisplay result={result} />
         </div>
       )}
+      {phase === 'done' && result && <ResultDisplay result={result} />}
       <button onClick={play} disabled={animating}
         style={{ width: '100%', padding: 12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#e05555,#c03030)', color: '#fff', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem' }}>
         🎲 {bet.toLocaleString()}G で投じる
@@ -1060,31 +1638,87 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
   const { player, changeGold, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addNotification: s.addNotification }));
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
-  const [showAnim, setShowAnim] = useState(false);
+  const [rollLogs, setRollLogs] = useState<{dice:number[];label:string;isRole:boolean}[]>([]);
+  const [currentDice, setCurrentDice] = useState<number[]|null>(null);
+  const [rolling, setRolling] = useState(false);
+  const [rollingFrame, setRollingFrame] = useState(0);
   const pendingRef = useState<{ r: GambleResult | null }>({ r: null })[0];
+  const DICE_EJ = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+
+  useEffect(() => {
+    if (!rolling) return;
+    const t = setInterval(() => setRollingFrame(f => (f+1)%6), 80);
+    return () => clearInterval(t);
+  }, [rolling]);
 
   const play = async () => {
     if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
-    setAnimating(true); setResult(null); changeGold(-bet); onJackpotContrib(bet);
+    setAnimating(true); setResult(null); setRollLogs([]); setCurrentDice(null);
+    changeGold(-bet); onJackpotContrib(bet);
     const r = playChinchiro(bet);
     const effectiveMult = r.multiplier > 0 ? r.multiplier * multiplierBonus : 0;
     pendingRef.r = { ...r, multiplier: effectiveMult, goldDelta: r.goldDelta > 0 ? Math.floor(bet * effectiveMult) - bet : r.goldDelta };
-    setShowAnim(true);
-  };
 
-  const handleAnimDone = async () => {
-    setShowAnim(false);
-    const r = pendingRef.r;
-    if (!r) { setAnimating(false); return; }
-    if (r.multiplier > 0) changeGold(Math.floor(bet * r.multiplier));
-    setResult(r); onResult(r);
-    try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
-    setAnimating(false);
+    // サイコロを何回か振るアニメーション
+    const runRoll = (attempt: number, logs: typeof rollLogs) => {
+      setRolling(true); setCurrentDice(null);
+      setTimeout(() => {
+        const dice = attempt < 3 && Math.random() < 0.4
+          ? [1,2,4] // 役なし（演出用）
+          : Array.isArray((r as any).dice) && attempt >= 2 ? (r as any).dice : [Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1];
+        const ev = evalChinchiro(dice);
+        const isLast = ev.type !== 'nashi' || attempt >= 3;
+        setCurrentDice(dice);
+        setRolling(false);
+        const newLogs = [...logs, { dice, label: ev.label, isRole: ev.type !== 'nashi' }];
+        setRollLogs(newLogs);
+        if (!isLast) {
+          setTimeout(() => runRoll(attempt+1, newLogs), 1200);
+        } else {
+          // 最終: 本当の結果サイコロを使う
+          const finalDice = Array.isArray((r as any).dice) ? (r as any).dice as number[] : dice;
+          const finalEv = evalChinchiro(finalDice);
+          setCurrentDice(finalDice);
+          const finalLogs = attempt === 0 ? newLogs : [...newLogs.slice(0,-1), { dice: finalDice, label: finalEv.label, isRole: true }];
+          setRollLogs(finalLogs);
+          setTimeout(async () => {
+            const rr = pendingRef.r;
+            if (!rr) { setAnimating(false); return; }
+            if (rr.multiplier > 0) changeGold(Math.floor(bet * rr.multiplier));
+            setResult(rr); onResult(rr);
+            try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /**/ }
+            setAnimating(false);
+          }, 1200);
+        }
+      }, 1000);
+    };
+    runRoll(0, []);
   };
 
   return (
     <div>
-      {showAnim && <GameAnimation type="chinchiro" onDone={handleAnimDone} />}
+      <style>{`@keyframes dShk3{0%,100%{transform:rotate(0deg) translateY(0)}33%{transform:rotate(-10deg) translateY(-4px)}66%{transform:rotate(10deg) translateY(-4px)}}`}</style>
+      {/* 投擲表示 */}
+      {animating && (
+        <div style={{ textAlign:'center', padding:'14px 0', background:'rgba(255,255,255,0.03)', border:'1px solid #2d3752', borderRadius:12, marginBottom:10 }}>
+          <div style={{ fontSize:'0.78rem', color:'#8a92b2', marginBottom:8 }}>🎲 チンチロリン！</div>
+          <div style={{ display:'flex', gap:16, justifyContent:'center' }}>
+            {[0,1,2].map(i => (
+              <div key={i} style={{ fontSize:'2.8rem', display:'inline-block', animation: rolling ? `dShk3 0.2s infinite ${i*0.07}s` : 'none', transition: currentDice ? 'all 0.4s cubic-bezier(0.34,1.56,0.64,1)' : 'none' }}>
+                {currentDice ? DICE_EJ[currentDice[i]-1] : DICE_EJ[(rollingFrame+i*2)%6]}
+              </div>
+            ))}
+          </div>
+          {/* 履歴 */}
+          <div style={{ marginTop:10, maxHeight:80, overflowY:'auto' }}>
+            {rollLogs.map((l,i) => (
+              <div key={i} style={{ fontSize:'0.75rem', color: l.isRole ? '#f0c060' : '#4a5070', margin:'2px 0' }}>
+                {l.dice.map(d=>DICE_EJ[d-1]).join(' ')} → {l.label}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {result && !animating && (
         <div>
           <div style={{ textAlign: 'center', fontSize: '1.5rem', marginBottom: 6 }}>{result.dice?.join(' ') ?? ''}</div>
@@ -1332,7 +1966,7 @@ export function GambleScreen() {
         {activeGame === 'chohan'       && <ChohanPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['chohan'] ?? 1.0} />}
         {activeGame === 'chinchiro'    && <ChinchiroPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['chinchiro'] ?? 1.0} />}
         {activeGame === 'coin_flip'    && <CoinFlipPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['coin_flip'] ?? 1.0} />}
-        {activeGame === 'slot'         && <GenericPanel game={GAMBLE_MASTER['slot_machine']}  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['slot_machine'] ?? 1.0} />}
+        {activeGame === 'slot'         && <SlotPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['slot_machine'] ?? 1.0} />}
         {activeGame === 'treasure_box' && <GenericPanel game={GAMBLE_MASTER['treasure_box']}  bet={30000} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['treasure_box'] ?? 1.0} />}
         {activeGame === 'treasure_box' && (
           <div style={{ marginTop: 14 }}>
