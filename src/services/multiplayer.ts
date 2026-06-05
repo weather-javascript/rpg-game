@@ -4,7 +4,7 @@ import {
   onSnapshot, addDoc, getDoc, updateDoc, where, Unsubscribe, increment,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { OnlineUser, BoardMessage, AuctionListing, GambleBattle } from '../types/game';
+import type { OnlineUser, BoardMessage, AuctionListing, GambleBattle, PokerTable, PokerCard, PokerPlayer } from '../types/game';
 import { calcJackpotContrib, rollJackpot } from '../systems/minigames';
 
 const COLLECTIONS = {
@@ -12,6 +12,7 @@ const COLLECTIONS = {
   BOARD:    'board_messages',
   AUCTIONS: 'auctions',
   BATTLES:  'gamble_battles',
+  POKER:    'poker_tables',
 } as const;
 
 export async function registerOnline(uid: string, displayName: string, level: number, activity?: string) {
@@ -514,4 +515,389 @@ export function subscribeActivityFeed(cb: (entries: ActivityFeedEntry[]) => void
     if (!snap.exists()) { cb([]); return; }
     cb((snap.data()['entries'] ?? []) as ActivityFeedEntry[]);
   });
+}
+
+// ============================================================
+// テキサスホールデム ポーカーテーブル
+// ============================================================
+
+const SUITS: PokerCard['suit'][] = ['S','H','D','C'];
+const RANKS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+
+function _makeDeck(): PokerCard[] {
+  const deck: PokerCard[] = [];
+  for (const suit of SUITS) for (const rank of RANKS) deck.push({ rank, suit });
+  return deck;
+}
+
+function _shuffle(deck: PokerCard[]): PokerCard[] {
+  const d = [...deck];
+  for (let i = d.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [d[i], d[j]] = [d[j], d[i]];
+  }
+  return d;
+}
+
+// ハンドランク評価
+function _rankVal(r: string): number {
+  return ['2','3','4','5','6','7','8','9','10','J','Q','K','A'].indexOf(r);
+}
+
+function _evaluateHand(cards: PokerCard[]): { rank: number; name: string; tiebreaker: number[] } {
+  // 7枚から最強5枚を選ぶ（全組み合わせ評価）
+  const combos: PokerCard[][] = [];
+  for (let i = 0; i < cards.length - 4; i++)
+    for (let j = i+1; j < cards.length - 3; j++)
+      for (let k = j+1; k < cards.length - 2; k++)
+        for (let l = k+1; l < cards.length - 1; l++)
+          for (let m = l+1; m < cards.length; m++)
+            combos.push([cards[i],cards[j],cards[k],cards[l],cards[m]]);
+
+  let best = { rank: -1, name: 'ハイカード', tiebreaker: [0] };
+  for (const combo of combos) {
+    const r = _eval5(combo);
+    if (r.rank > best.rank || (r.rank === best.rank && _compareTie(r.tiebreaker, best.tiebreaker) > 0)) {
+      best = r;
+    }
+  }
+  return best;
+}
+
+function _compareTie(a: number[], b: number[]): number {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const diff = (a[i] ?? 0) - (b[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+function _eval5(cards: PokerCard[]): { rank: number; name: string; tiebreaker: number[] } {
+  const vals = cards.map(c => _rankVal(c.rank)).sort((a,b) => b-a);
+  const suits = cards.map(c => c.suit);
+  const isFlush = suits.every(s => s === suits[0]);
+  const isStr8 = vals[0]-vals[4] === 4 && new Set(vals).size === 5;
+  // 特殊ストレート: A-2-3-4-5
+  const isWheel = vals[0]===12 && vals[1]===3 && vals[2]===2 && vals[3]===1 && vals[4]===0;
+  const counts: Record<number,number> = {};
+  for (const v of vals) counts[v] = (counts[v]??0)+1;
+  const groups = Object.entries(counts).map(([v,c]) => ({ v: Number(v), c })).sort((a,b) => b.c-a.c || b.v-a.v);
+
+  if (isFlush && (isStr8 || isWheel)) {
+    if (vals[0] === 12 && isStr8) return { rank: 9, name: 'ロイヤルフラッシュ', tiebreaker: vals };
+    return { rank: 8, name: 'ストレートフラッシュ', tiebreaker: isWheel ? [3,2,1,0,-1] : vals };
+  }
+  if (groups[0].c === 4) return { rank: 7, name: 'フォーカード', tiebreaker: [groups[0].v, groups[1].v] };
+  if (groups[0].c === 3 && groups[1].c === 2) return { rank: 6, name: 'フルハウス', tiebreaker: [groups[0].v, groups[1].v] };
+  if (isFlush) return { rank: 5, name: 'フラッシュ', tiebreaker: vals };
+  if (isStr8 || isWheel) return { rank: 4, name: 'ストレート', tiebreaker: isWheel ? [3,2,1,0,-1] : vals };
+  if (groups[0].c === 3) return { rank: 3, name: 'スリーカード', tiebreaker: [groups[0].v, groups[1].v, groups[2].v] };
+  if (groups[0].c === 2 && groups[1].c === 2) return { rank: 2, name: 'ツーペア', tiebreaker: [groups[0].v, groups[1].v, groups[2].v] };
+  if (groups[0].c === 2) return { rank: 1, name: 'ワンペア', tiebreaker: [groups[0].v, groups[1].v, groups[2].v, groups[3].v] };
+  return { rank: 0, name: 'ハイカード', tiebreaker: vals };
+}
+
+/** テキサスホールデムテーブルを作成 */
+export async function createPokerTable(
+  hostUid: string, hostName: string, hostLevel: number,
+  maxPlayers: number, buyIn: number
+): Promise<string> {
+  const hostPlayer: PokerPlayer = {
+    uid: hostUid, displayName: hostName, level: hostLevel,
+    chips: buyIn, bet: 0, hand: [], folded: false, allIn: false, isReady: false,
+  };
+  const ref = await addDoc(collection(db, COLLECTIONS.POKER), {
+    hostUid, hostName, hostLevel, maxPlayers, buyIn,
+    status: 'waiting',
+    phase: 'waiting',
+    players: [hostPlayer],
+    communityCards: [],
+    pot: 0,
+    currentTurnUid: '',
+    smallBlindUid: '',
+    bigBlindUid: '',
+    dealerUid: '',
+    currentBet: 0,
+    deck: [],
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 30 * 60 * 1000,
+    lastActionAt: Date.now(),
+  } as Omit<PokerTable,'id'>);
+  return ref.id;
+}
+
+/** テーブル一覧をリアルタイム購読 */
+export function subscribePokerTables(cb: (tables: PokerTable[]) => void): Unsubscribe {
+  const q = query(collection(db, COLLECTIONS.POKER), where('status', '==', 'waiting'), limit(20));
+  return onSnapshot(q, snap => {
+    const now = Date.now();
+    const tables = snap.docs
+      .map(d => ({ id: d.id, ...(d.data() as Omit<PokerTable,'id'>) }))
+      .filter(t => t.expiresAt > now)
+      .sort((a, b) => b.createdAt - a.createdAt);
+    cb(tables);
+  });
+}
+
+/** 特定テーブルをリアルタイム購読 */
+export function subscribePokerTable(tableId: string, cb: (table: PokerTable | null) => void): Unsubscribe {
+  return onSnapshot(doc(db, COLLECTIONS.POKER, tableId), snap => {
+    if (!snap.exists()) { cb(null); return; }
+    cb({ id: snap.id, ...(snap.data() as Omit<PokerTable,'id'>) });
+  });
+}
+
+/** テーブルに参加 */
+export async function joinPokerTable(
+  tableId: string, uid: string, displayName: string, level: number, buyIn: number
+): Promise<{ success: boolean; message?: string }> {
+  const ref = doc(db, COLLECTIONS.POKER, tableId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return { success: false, message: 'テーブルが見つかりません' };
+  const table = { id: snap.id, ...(snap.data() as Omit<PokerTable,'id'>) };
+  if (table.status !== 'waiting') return { success: false, message: 'ゲームは既に開始しています' };
+  if (table.players.some(p => p.uid === uid)) return { success: false, message: '既に参加しています' };
+  if (table.players.length >= table.maxPlayers) return { success: false, message: '満員です' };
+
+  const newPlayer: PokerPlayer = {
+    uid, displayName, level, chips: buyIn, bet: 0, hand: [], folded: false, allIn: false, isReady: false,
+  };
+  const newPlayers = [...table.players, newPlayer];
+  await updateDoc(ref, { players: newPlayers, lastActionAt: Date.now() });
+  return { success: true };
+}
+
+/** テーブルを取り消す（ホストのみ・waiting状態限定） */
+export async function cancelPokerTable(tableId: string, hostUid: string): Promise<boolean> {
+  const ref = doc(db, COLLECTIONS.POKER, tableId);
+  const snap = await getDoc(ref);
+  if (!snap.exists() || snap.data()['hostUid'] !== hostUid) return false;
+  if (snap.data()['status'] !== 'waiting') return false;
+  await deleteDoc(ref);
+  return true;
+}
+
+/** テーブルから退出（waiting状態限定） */
+export async function leavePokerTable(tableId: string, uid: string): Promise<boolean> {
+  const ref = doc(db, COLLECTIONS.POKER, tableId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return false;
+  const table = { id: snap.id, ...(snap.data() as Omit<PokerTable,'id'>) };
+  if (table.status !== 'waiting') return false;
+  const newPlayers = table.players.filter(p => p.uid !== uid);
+  if (newPlayers.length === 0) { await deleteDoc(ref); return true; }
+  await updateDoc(ref, { players: newPlayers, lastActionAt: Date.now() });
+  return true;
+}
+
+/** ゲームを開始（ホストのみ・3人以上） */
+export async function startPokerGame(tableId: string, hostUid: string): Promise<{ success: boolean; message?: string }> {
+  const ref = doc(db, COLLECTIONS.POKER, tableId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return { success: false, message: 'テーブルが見つかりません' };
+  const table = { id: snap.id, ...(snap.data() as Omit<PokerTable,'id'>) };
+  if (table.hostUid !== hostUid) return { success: false, message: '権限がありません' };
+  if (table.players.length < 3) return { success: false, message: '最低3人必要です' };
+  if (table.status !== 'waiting') return { success: false, message: '既に開始しています' };
+
+  const deck = _shuffle(_makeDeck());
+  const players = table.players.map(p => ({ ...p, bet: 0, folded: false, allIn: false, isReady: false, hand: [] as PokerCard[] }));
+
+  // 手札を2枚ずつ配る
+  let deckIdx = 0;
+  for (const p of players) { p.hand = [deck[deckIdx++], deck[deckIdx++]]; }
+
+  // ブラインド設定
+  const smallBlind = Math.max(1, Math.floor(table.buyIn * 0.01)); // buyInの1%
+  const bigBlind = smallBlind * 2;
+  const dealerIdx = 0;
+  const sbIdx = (dealerIdx + 1) % players.length;
+  const bbIdx = (dealerIdx + 2) % players.length;
+  const firstActIdx = (dealerIdx + 3) % players.length;
+
+  players[sbIdx].chips -= smallBlind;
+  players[sbIdx].bet = smallBlind;
+  players[bbIdx].chips -= bigBlind;
+  players[bbIdx].bet = bigBlind;
+
+  const remainingDeck = deck.slice(deckIdx);
+
+  await updateDoc(ref, {
+    status: 'playing',
+    phase: 'preflop',
+    players,
+    deck: remainingDeck,
+    communityCards: [],
+    pot: smallBlind + bigBlind,
+    currentBet: bigBlind,
+    dealerUid: players[dealerIdx].uid,
+    smallBlindUid: players[sbIdx].uid,
+    bigBlindUid: players[bbIdx].uid,
+    currentTurnUid: players[firstActIdx].uid,
+    lastActionAt: Date.now(),
+  });
+  return { success: true };
+}
+
+/** プレイヤーアクション: fold / check / call / raise */
+export async function pokerAction(
+  tableId: string, uid: string,
+  action: 'fold' | 'check' | 'call' | 'raise' | 'allin',
+  raiseAmount?: number
+): Promise<{ success: boolean; message?: string }> {
+  const ref = doc(db, COLLECTIONS.POKER, tableId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return { success: false, message: 'テーブルが見つかりません' };
+  const table = { id: snap.id, ...(snap.data() as Omit<PokerTable,'id'>) };
+  if (table.currentTurnUid !== uid) return { success: false, message: 'あなたのターンではありません' };
+
+  const players = table.players.map(p => ({ ...p }));
+  const pidx = players.findIndex(p => p.uid === uid);
+  if (pidx < 0) return { success: false, message: 'プレイヤーが見つかりません' };
+  const me = players[pidx];
+
+  let pot = table.pot;
+  let currentBet = table.currentBet;
+
+  if (action === 'fold') {
+    me.folded = true;
+  } else if (action === 'check') {
+    if (me.bet < currentBet) return { success: false, message: 'チェックできません' };
+  } else if (action === 'call') {
+    const toCall = currentBet - me.bet;
+    const actual = Math.min(toCall, me.chips);
+    me.chips -= actual;
+    me.bet += actual;
+    pot += actual;
+    if (me.chips === 0) me.allIn = true;
+  } else if (action === 'raise') {
+    if (!raiseAmount) return { success: false, message: 'レイズ額が必要です' };
+    const toCall = currentBet - me.bet;
+    const total = toCall + raiseAmount;
+    if (me.chips < total) return { success: false, message: 'チップが足りません' };
+    me.chips -= total;
+    me.bet += total;
+    pot += total;
+    currentBet = me.bet;
+  } else if (action === 'allin') {
+    const allInAmt = me.chips;
+    me.bet += allInAmt;
+    pot += allInAmt;
+    me.chips = 0;
+    me.allIn = true;
+    if (me.bet > currentBet) currentBet = me.bet;
+  }
+
+  // 次のプレイヤーを決定
+  const activePlayers = players.filter(p => !p.folded);
+  const { nextTurnUid, shouldAdvancePhase } = _getNextTurn(players, pidx, table.phase);
+
+  let updates: Record<string, unknown> = { players, pot, currentBet, currentTurnUid: nextTurnUid, lastActionAt: Date.now() };
+
+  // フォールドで1人残ったら終了
+  if (activePlayers.filter(p => p.uid !== uid || !me.folded).length === 1) {
+    const winner = activePlayers.find(p => !p.folded || p.uid !== uid) ?? activePlayers[0];
+    const winnerIdx = players.findIndex(p => p.uid === winner.uid);
+    players[winnerIdx].chips += pot;
+    updates = { ...(await _finishGame(table, players, pot, ref)), players, lastActionAt: Date.now() };
+    await updateDoc(ref, updates);
+    return { success: true };
+  }
+
+  if (shouldAdvancePhase) {
+    const nextPhase = _nextPhase(table.phase);
+    if (nextPhase === 'showdown') {
+      const finalUpdates = await _resolveShowdown(table, players, pot, ref);
+      await updateDoc(ref, { ...finalUpdates, lastActionAt: Date.now() });
+      return { success: true };
+    }
+    // 新フェーズ用のコミュニティカードを追加
+    const deck = table.deck as PokerCard[];
+    const newCommunity = [...table.communityCards];
+    let newDeck = [...deck];
+    if (nextPhase === 'flop') { newCommunity.push(newDeck[0], newDeck[1], newDeck[2]); newDeck = newDeck.slice(3); }
+    else if (nextPhase === 'turn' || nextPhase === 'river') { newCommunity.push(newDeck[0]); newDeck = newDeck.slice(1); }
+    // 新フェーズではベットをリセット
+    const resetPlayers = players.map(p => ({ ...p, bet: 0 }));
+    const firstActIdx = resetPlayers.findIndex(p => !p.folded && !p.allIn);
+    updates = { ...updates, players: resetPlayers, communityCards: newCommunity, deck: newDeck,
+      phase: nextPhase, currentBet: 0, currentTurnUid: firstActIdx >= 0 ? resetPlayers[firstActIdx].uid : '' };
+  }
+
+  await updateDoc(ref, updates);
+  return { success: true };
+}
+
+function _getNextTurn(players: PokerPlayer[], currentIdx: number, phase: string): { nextTurnUid: string; shouldAdvancePhase: boolean } {
+  const n = players.length;
+  // 次のアクティブプレイヤーを探す
+  for (let i = 1; i <= n; i++) {
+    const idx = (currentIdx + i) % n;
+    if (!players[idx].folded && !players[idx].allIn) {
+      return { nextTurnUid: players[idx].uid, shouldAdvancePhase: false };
+    }
+  }
+  // 全員フォールドかオールイン → フェーズ進行
+  return { nextTurnUid: '', shouldAdvancePhase: true };
+}
+
+function _nextPhase(current: string): string {
+  const order = ['preflop','flop','turn','river','showdown'];
+  const idx = order.indexOf(current);
+  return idx >= 0 && idx < order.length - 1 ? order[idx + 1] : 'showdown';
+}
+
+async function _resolveShowdown(
+  table: PokerTable, players: PokerPlayer[], pot: number,
+  ref: ReturnType<typeof doc>
+): Promise<Record<string, unknown>> {
+  const active = players.filter(p => !p.folded);
+  const community = table.communityCards;
+
+  const ranked = active.map(p => {
+    const all = [...p.hand, ...community];
+    const ev = _evaluateHand(all);
+    return { ...p, ev };
+  }).sort((a,b) => {
+    const rd = b.ev.rank - a.ev.rank;
+    if (rd !== 0) return rd;
+    return _compareTie(b.ev.tiebreaker, a.ev.tiebreaker);
+  });
+
+  // 勝者にポット付与
+  const winners = _splitPot(ranked, pot);
+  const updatedPlayers = players.map(p => {
+    const w = winners.find(w => w.uid === p.uid);
+    return w ? { ...p, chips: p.chips + w.amount } : p;
+  });
+
+  return await _finishGame(table, updatedPlayers, pot, ref, winners.map(w => ({
+    uid: w.uid,
+    displayName: players.find(p => p.uid === w.uid)?.displayName ?? '',
+    amount: w.amount,
+    handName: ranked.find(r => r.uid === w.uid)?.ev.name ?? '',
+  })));
+}
+
+function _splitPot(ranked: (PokerPlayer & { ev: ReturnType<typeof _evaluateHand> })[], pot: number) {
+  // 同着の場合は均等分配
+  const topRank = ranked[0].ev.rank;
+  const topTie = ranked[0].ev.tiebreaker;
+  const winners = ranked.filter(p => p.ev.rank === topRank && _compareTie(p.ev.tiebreaker, topTie) === 0);
+  const each = Math.floor(pot / winners.length);
+  return winners.map(w => ({ uid: w.uid, amount: each }));
+}
+
+async function _finishGame(
+  _table: PokerTable, players: PokerPlayer[], _pot: number,
+  ref: ReturnType<typeof doc>,
+  winners?: { uid: string; displayName: string; amount: number; handName: string }[]
+): Promise<Record<string, unknown>> {
+  return {
+    status: 'finished',
+    phase: 'finished',
+    players,
+    winners: winners ?? [],
+    currentTurnUid: '',
+  };
 }

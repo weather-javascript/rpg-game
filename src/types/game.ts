@@ -299,6 +299,52 @@ export interface GambleBattle {
 }
 
 // ============================================================
+// テキサスホールデム マルチプレイヤー型
+// ============================================================
+export interface PokerCard {
+  rank: string;
+  suit: 'S' | 'H' | 'D' | 'C';
+}
+
+export interface PokerPlayer {
+  uid: string;
+  displayName: string;
+  level: number;
+  chips: number;       // テーブルでの所持チップ
+  bet: number;         // 現在ラウンドのベット額
+  hand: PokerCard[];   // 手札（本人のみ参照）
+  folded: boolean;
+  allIn: boolean;
+  isReady: boolean;
+}
+
+export type PokerPhase = 'waiting' | 'preflop' | 'flop' | 'turn' | 'river' | 'showdown' | 'finished';
+
+export interface PokerTable {
+  id: string;
+  hostUid: string;
+  hostName: string;
+  hostLevel: number;
+  maxPlayers: number;          // 3〜6
+  buyIn: number;               // 参加費（掛け金）
+  status: 'waiting' | 'playing' | 'finished';
+  phase: PokerPhase;
+  players: PokerPlayer[];
+  communityCards: PokerCard[];
+  pot: number;
+  currentTurnUid: string;
+  smallBlindUid: string;
+  bigBlindUid: string;
+  dealerUid: string;
+  currentBet: number;          // 現ラウンドの最高ベット額
+  winners?: { uid: string; displayName: string; amount: number; handName: string }[];
+  deck: PokerCard[];           // サーバー側で管理するデッキ（クライアントには見せない）
+  createdAt: number;
+  expiresAt: number;
+  lastActionAt: number;
+}
+
+// ============================================================
 // UI 型
 // ============================================================
 export interface Notification {

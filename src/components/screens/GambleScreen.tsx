@@ -12,8 +12,10 @@ import {
   createGambleBattle, subscribeGambleBattles, joinGambleBattle, cancelGambleBattle,
   subscribeGambleMultipliers, subscribeGambleBattle,
   postActivityFeed,
+  createPokerTable, subscribePokerTables, subscribePokerTable,
+  joinPokerTable, cancelPokerTable, leavePokerTable, startPokerGame, pokerAction,
 } from '../../services/multiplayer';
-import type { GambleResult, GambleMaster } from '../../types/game';
+import type { GambleResult, GambleMaster, PokerTable } from '../../types/game';
 import type { PokerState } from '../../systems/minigames';
 import type { GambleBattle } from '../../types/game';
 
@@ -314,6 +316,436 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
           </button>
         </>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// テキサスホールデム PvP パネル
+// ============================================================
+
+const SUIT_ICONS: Record<string,string> = { S:'♠', H:'♥', D:'♦', C:'♣' };
+const SUIT_COLORS: Record<string,string> = { S:'#e8e6ff', H:'#e05555', D:'#e05555', C:'#e8e6ff' };
+
+function TxCard({ rank, suit, faceDown = false, small = false }: { rank: string; suit: string; faceDown?: boolean; small?: boolean }) {
+  const w = small ? 30 : 40, h = small ? 44 : 58;
+  return (
+    <div style={{
+      width: w, height: h,
+      background: faceDown ? 'linear-gradient(135deg,#1c2235,#2d3752)' : '#fff',
+      border: `1.5px solid ${faceDown ? '#4a5070' : '#ccc'}`,
+      borderRadius: 5, display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', fontSize: small ? '0.7rem' : '0.85rem', fontWeight: 700,
+      color: faceDown ? '#4a5070' : SUIT_COLORS[suit] ?? '#333',
+      flexShrink: 0, userSelect: 'none',
+    }}>
+      {faceDown ? <span style={{fontSize:'1rem'}}>🂠</span> : <><span>{rank}</span><span>{SUIT_ICONS[suit]??suit}</span></>}
+    </div>
+  );
+}
+
+function TexasHoldemPanel() {
+  const player = useGameStore(s => s.player);
+  const changeGold = useGameStore(s => s.changeGold);
+  const addNotification = useGameStore(s => s.addNotification);
+
+  // ロビービュー
+  const [tables, setTables] = useState<PokerTable[]>([]);
+  const [myTableId, setMyTableId] = useState<string | null>(null);
+  const [activeTable, setActiveTable] = useState<PokerTable | null>(null);
+
+  // テーブル作成フォーム
+  const [createForm, setCreateForm] = useState({ maxPlayers: 4, buyIn: 1000 });
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // ゲーム内アクション
+  const [raiseInput, setRaiseInput] = useState(0);
+  const [showRaise, setShowRaise] = useState(false);
+
+  // ロビー購読
+  useEffect(() => {
+    const unsub = subscribePokerTables(setTables);
+    return unsub;
+  }, []);
+
+  // 自分がいるテーブルを購読
+  useEffect(() => {
+    if (!myTableId) { setActiveTable(null); return; }
+    const unsub = subscribePokerTable(myTableId, (t) => {
+      if (!t) { setMyTableId(null); setActiveTable(null); return; }
+      setActiveTable(t);
+      // ゲーム終了時のゴールド処理
+      if (t.status === 'finished' && player) {
+        const me = t.players.find(p => p.uid === player.uid);
+        if (me && me.chips > 0) {
+          changeGold(me.chips);
+        }
+      }
+    });
+    return unsub;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myTableId, player?.uid]);
+
+  const handleCreate = async () => {
+    if (!player) return;
+    if (player.gold < createForm.buyIn) { addNotification('error', 'ゴールドが足りません'); return; }
+    setLoading(true);
+    try {
+      changeGold(-createForm.buyIn);
+      const id = await createPokerTable(player.uid, player.displayName, player.stats.level, createForm.maxPlayers, createForm.buyIn);
+      setMyTableId(id);
+      setShowCreateForm(false);
+      addNotification('success', `♠ テーブルを作成しました！参加者を待っています (${createForm.buyIn.toLocaleString()}G)`);
+    } catch (e) {
+      changeGold(createForm.buyIn);
+      addNotification('error', '作成に失敗しました');
+    }
+    setLoading(false);
+  };
+
+  const handleJoin = async (table: PokerTable) => {
+    if (!player) return;
+    if (player.gold < table.buyIn) { addNotification('error', 'ゴールドが足りません'); return; }
+    setLoading(true);
+    try {
+      changeGold(-table.buyIn);
+      const res = await joinPokerTable(table.id, player.uid, player.displayName, player.stats.level, table.buyIn);
+      if (res.success) {
+        setMyTableId(table.id);
+        addNotification('success', `テーブルに参加しました！`);
+      } else {
+        changeGold(table.buyIn);
+        addNotification('error', res.message ?? '参加に失敗しました');
+      }
+    } catch {
+      changeGold(table.buyIn);
+      addNotification('error', '参加に失敗しました');
+    }
+    setLoading(false);
+  };
+
+  const handleCancel = async () => {
+    if (!player || !myTableId) return;
+    setLoading(true);
+    try {
+      await cancelPokerTable(myTableId, player.uid);
+      changeGold(createForm.buyIn); // 返金
+      setMyTableId(null);
+      addNotification('info', 'テーブルを取り消しました（返金済み）');
+    } catch { addNotification('error', '取り消しに失敗しました'); }
+    setLoading(false);
+  };
+
+  const handleLeave = async () => {
+    if (!player || !myTableId || !activeTable) return;
+    setLoading(true);
+    try {
+      await leavePokerTable(myTableId, player.uid);
+      const me = activeTable.players.find(p => p.uid === player.uid);
+      if (me) changeGold(me.chips); // 返金
+      setMyTableId(null);
+      addNotification('info', 'テーブルから退出しました（返金済み）');
+    } catch { addNotification('error', '退出に失敗しました'); }
+    setLoading(false);
+  };
+
+  const handleStart = async () => {
+    if (!player || !myTableId) return;
+    setLoading(true);
+    try {
+      const res = await startPokerGame(myTableId, player.uid);
+      if (!res.success) addNotification('error', res.message ?? '開始に失敗しました');
+    } catch { addNotification('error', '開始に失敗しました'); }
+    setLoading(false);
+  };
+
+  const handleAction = async (action: 'fold'|'check'|'call'|'raise'|'allin', amount?: number) => {
+    if (!player || !myTableId) return;
+    setLoading(true);
+    try {
+      const res = await pokerAction(myTableId, player.uid, action, amount);
+      if (!res.success) addNotification('error', res.message ?? 'アクションに失敗しました');
+      setShowRaise(false);
+    } catch { addNotification('error', 'アクションに失敗しました'); }
+    setLoading(false);
+  };
+
+  // アクティブテーブルビュー（ゲーム中）
+  if (activeTable && player) {
+    const me = activeTable.players.find(p => p.uid === player.uid);
+    const isHost = activeTable.hostUid === player.uid;
+    const isMyTurn = activeTable.currentTurnUid === player.uid;
+    const phase = activeTable.phase;
+    const phaseName: Record<string,string> = { waiting:'待機中', preflop:'プリフロップ', flop:'フロップ', turn:'ターン', river:'リバー', showdown:'ショーダウン', finished:'終了' };
+    const canCheck = me && !me.folded && me.bet >= activeTable.currentBet;
+    const smallBlind = Math.max(1, Math.floor(activeTable.buyIn * 0.01));
+
+    return (
+      <div style={{ minHeight: 400 }}>
+        {/* ヘッダー */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+          <div>
+            <span style={{ fontWeight:700, fontSize:'0.9rem', color:'#f0c060' }}>♠ テキサスホールデム</span>
+            <span style={{ marginLeft:8, fontSize:'0.75rem', background:'rgba(91,141,238,0.2)', color:'#5b8dee', border:'1px solid #5b8dee', borderRadius:4, padding:'1px 6px' }}>{phaseName[phase] ?? phase}</span>
+          </div>
+          <span style={{ fontSize:'0.8rem', color:'#8a92b2' }}>ポット: <span style={{color:'#f0c060',fontWeight:700}}>{activeTable.pot.toLocaleString()}G</span></span>
+        </div>
+
+        {/* コミュニティカード */}
+        <div style={{ background:'rgba(76,175,135,0.08)', border:'1px solid #2d3752', borderRadius:8, padding:'10px', marginBottom:10, textAlign:'center' }}>
+          <div style={{ fontSize:'0.72rem', color:'#4a5070', marginBottom:6 }}>コミュニティカード</div>
+          <div style={{ display:'flex', gap:6, justifyContent:'center', flexWrap:'wrap' }}>
+            {activeTable.communityCards.length === 0
+              ? <span style={{ color:'#4a5070', fontSize:'0.78rem' }}>まだ公開されていません</span>
+              : activeTable.communityCards.map((c,i) => <TxCard key={i} rank={c.rank} suit={c.suit} />)
+            }
+            {/* 残りはフェイスダウン */}
+            {Array.from({ length: Math.max(0, 5 - activeTable.communityCards.length) }).map((_,i) => (
+              <TxCard key={`fd-${i}`} rank='' suit='' faceDown />
+            ))}
+          </div>
+        </div>
+
+        {/* 自分の手札 */}
+        {me && phase !== 'waiting' && (
+          <div style={{ background:'rgba(91,141,238,0.08)', border:'1px solid #2d3752', borderRadius:8, padding:'10px', marginBottom:10 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+              <span style={{ fontSize:'0.72rem', color:'#5b8dee' }}>あなたの手札</span>
+              <span style={{ fontSize:'0.75rem', color:'#f0c060' }}>{me.chips.toLocaleString()} chips</span>
+            </div>
+            <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
+              {me.hand.map((c,i) => <TxCard key={i} rank={c.rank} suit={c.suit} />)}
+            </div>
+            {me.folded && <div style={{ textAlign:'center', color:'#e05555', fontSize:'0.8rem', marginTop:4 }}>フォールド済み</div>}
+            {me.allIn && <div style={{ textAlign:'center', color:'#f0a830', fontSize:'0.8rem', marginTop:4 }}>オールイン！</div>}
+          </div>
+        )}
+
+        {/* プレイヤー一覧 */}
+        <div style={{ marginBottom:10 }}>
+          <div style={{ fontSize:'0.72rem', color:'#4a5070', marginBottom:4 }}>プレイヤー</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+            {activeTable.players.map(p => (
+              <div key={p.uid} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 8px', background: p.uid === activeTable.currentTurnUid ? 'rgba(240,192,96,0.1)' : '#161b26', border:`1px solid ${p.uid === activeTable.currentTurnUid ? '#f0c060' : '#2d3752'}`, borderRadius:6 }}>
+                {p.uid === activeTable.dealerUid && <span style={{fontSize:'0.65rem',color:'#f0c060',fontWeight:700}}>D</span>}
+                {p.uid === activeTable.smallBlindUid && phase !== 'waiting' && <span style={{fontSize:'0.65rem',color:'#4caf87',fontWeight:700}}>SB</span>}
+                {p.uid === activeTable.bigBlindUid && phase !== 'waiting' && <span style={{fontSize:'0.65rem',color:'#5b8dee',fontWeight:700}}>BB</span>}
+                <span style={{ fontWeight:700, fontSize:'0.82rem', flex:1, color: p.folded ? '#4a5070' : '#e8e6ff' }}>
+                  {p.displayName}{p.uid === player.uid ? ' (あなた)' : ''} Lv.{p.level}
+                </span>
+                <span style={{ fontSize:'0.75rem', color:'#f0c060' }}>{p.chips.toLocaleString()}G</span>
+                {p.bet > 0 && <span style={{ fontSize:'0.7rem', color:'#8a92b2' }}>bet:{p.bet.toLocaleString()}</span>}
+                {p.folded && <span style={{ fontSize:'0.65rem', color:'#e05555' }}>FOLD</span>}
+                {p.allIn && <span style={{ fontSize:'0.65rem', color:'#f0a830' }}>ALL IN</span>}
+                {/* ショーダウン時は全員の手札を表示 */}
+                {(phase === 'showdown' || phase === 'finished') && p.hand.length > 0 && (
+                  <div style={{ display:'flex', gap:2 }}>
+                    {p.hand.map((c,i) => <TxCard key={i} rank={c.rank} suit={c.suit} small />)}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ショーダウン/終了結果 */}
+        {(phase === 'showdown' || phase === 'finished') && activeTable.winners && activeTable.winners.length > 0 && (
+          <div style={{ background:'rgba(76,175,135,0.1)', border:'1px solid #4caf87', borderRadius:8, padding:'10px', marginBottom:10, textAlign:'center' }}>
+            <div style={{ fontWeight:700, color:'#4caf87', marginBottom:4 }}>🏆 勝者</div>
+            {activeTable.winners.map((w,i) => (
+              <div key={i} style={{ fontSize:'0.85rem', color:'#e8e6ff' }}>
+                {w.displayName}（{w.handName}）+{w.amount.toLocaleString()}G
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* アクションボタン */}
+        {phase === 'waiting' && isHost && (
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            <div style={{ fontSize:'0.78rem', color:'#8a92b2', textAlign:'center' }}>
+              参加者: {activeTable.players.length}/{activeTable.maxPlayers}人 | 参加費: {activeTable.buyIn.toLocaleString()}G
+            </div>
+            <button onClick={handleStart} disabled={loading || activeTable.players.length < 3}
+              style={{ padding:'9px', background: activeTable.players.length >= 3 ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontWeight:700, fontSize:'0.85rem' }}>
+              {activeTable.players.length < 3 ? `あと${3 - activeTable.players.length}人必要` : '▶ ゲームを開始する'}
+            </button>
+            <button onClick={handleCancel} disabled={loading}
+              style={{ padding:'7px', background:'#1c2235', color:'#e05555', border:'1px solid #e05555', borderRadius:7, cursor:'pointer', fontSize:'0.8rem' }}>
+              テーブルを取り消す（返金）
+            </button>
+          </div>
+        )}
+        {phase === 'waiting' && !isHost && (
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            <div style={{ fontSize:'0.78rem', color:'#8a92b2', textAlign:'center' }}>
+              ホスト({activeTable.hostName})がゲームを開始するのを待っています... ({activeTable.players.length}/{activeTable.maxPlayers}人)
+            </div>
+            <button onClick={handleLeave} disabled={loading}
+              style={{ padding:'7px', background:'#1c2235', color:'#e05555', border:'1px solid #e05555', borderRadius:7, cursor:'pointer', fontSize:'0.8rem' }}>
+              退出する（返金）
+            </button>
+          </div>
+        )}
+        {isMyTurn && !me?.folded && phase !== 'waiting' && phase !== 'finished' && phase !== 'showdown' && (
+          <div style={{ marginTop:8 }}>
+            <div style={{ fontSize:'0.75rem', color:'#f0c060', textAlign:'center', marginBottom:6, fontWeight:700 }}>🎯 あなたのターン！</div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              <button onClick={() => handleAction('fold')} disabled={loading}
+                style={{ flex:1, minWidth:60, padding:'8px 4px', background:'rgba(224,85,85,0.2)', color:'#e05555', border:'1px solid #e05555', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.82rem' }}>
+                フォールド
+              </button>
+              {canCheck ? (
+                <button onClick={() => handleAction('check')} disabled={loading}
+                  style={{ flex:1, minWidth:60, padding:'8px 4px', background:'rgba(76,175,135,0.2)', color:'#4caf87', border:'1px solid #4caf87', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.82rem' }}>
+                  チェック
+                </button>
+              ) : (
+                <button onClick={() => handleAction('call')} disabled={loading}
+                  style={{ flex:1, minWidth:60, padding:'8px 4px', background:'rgba(91,141,238,0.2)', color:'#5b8dee', border:'1px solid #5b8dee', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.82rem' }}>
+                  コール ({(activeTable.currentBet - (me?.bet ?? 0)).toLocaleString()}G)
+                </button>
+              )}
+              <button onClick={() => setShowRaise(!showRaise)} disabled={loading}
+                style={{ flex:1, minWidth:60, padding:'8px 4px', background:'rgba(240,192,96,0.2)', color:'#f0c060', border:'1px solid #f0c060', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.82rem' }}>
+                レイズ
+              </button>
+              <button onClick={() => handleAction('allin')} disabled={loading}
+                style={{ flex:1, minWidth:60, padding:'8px 4px', background:'rgba(240,168,48,0.2)', color:'#f0a830', border:'1px solid #f0a830', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.82rem' }}>
+                オールイン
+              </button>
+            </div>
+            {showRaise && (
+              <div style={{ marginTop:8, display:'flex', gap:6, alignItems:'center' }}>
+                <input type="number" value={raiseInput} min={smallBlind} max={me?.chips ?? 0}
+                  onChange={e => setRaiseInput(Number(e.target.value))}
+                  style={{ flex:1, padding:'6px 8px', background:'#1c2235', border:'1px solid #f0c060', color:'#e8e6ff', borderRadius:6, fontSize:'0.85rem' }}
+                />
+                <button onClick={() => handleAction('raise', raiseInput)} disabled={loading || raiseInput < smallBlind}
+                  style={{ padding:'6px 14px', background:'linear-gradient(135deg,#f0c060,#d0a040)', color:'#000', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.82rem' }}>
+                  レイズ確定
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        {!isMyTurn && phase !== 'waiting' && phase !== 'finished' && phase !== 'showdown' && (
+          <div style={{ textAlign:'center', color:'#8a92b2', fontSize:'0.8rem', padding:'8px 0' }}>
+            {activeTable.players.find(p => p.uid === activeTable.currentTurnUid)?.displayName ?? '？'} のターンを待っています...
+          </div>
+        )}
+        {phase === 'finished' && (
+          <button onClick={() => setMyTableId(null)}
+            style={{ width:'100%', marginTop:8, padding:'9px', background:'#2d3752', color:'#e8e6ff', border:'none', borderRadius:7, cursor:'pointer', fontWeight:700 }}>
+            ロビーに戻る
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // ロビービュー
+  return (
+    <div>
+      <div style={{ marginBottom:12 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+          <span style={{ fontSize:'0.85rem', color:'#f0c060', fontWeight:700 }}>♠ テキサスホールデム対戦</span>
+          <button onClick={() => setShowCreateForm(!showCreateForm)}
+            style={{ padding:'5px 12px', background: showCreateForm ? '#2d3752' : 'linear-gradient(135deg,#5b8dee,#3a6fd0)', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:'0.78rem', fontWeight:700 }}>
+            {showCreateForm ? 'キャンセル' : '+ テーブルを作る'}
+          </button>
+        </div>
+
+        {showCreateForm && (
+          <div style={{ background:'rgba(91,141,238,0.08)', border:'1px solid #2d3752', borderRadius:8, padding:'12px', marginBottom:12 }}>
+            <div style={{ fontSize:'0.8rem', color:'#8a92b2', marginBottom:8 }}>テーブル設定</div>
+            <div style={{ marginBottom:8 }}>
+              <div style={{ fontSize:'0.75rem', color:'#8a92b2', marginBottom:4 }}>参加人数（3〜6人）</div>
+              <div style={{ display:'flex', gap:4 }}>
+                {[3,4,5,6].map(n => (
+                  <button key={n} onClick={() => setCreateForm(f => ({...f, maxPlayers:n}))}
+                    style={{ flex:1, padding:'6px', background: createForm.maxPlayers === n ? 'rgba(91,141,238,0.3)' : '#1c2235', border:`1px solid ${createForm.maxPlayers === n ? '#5b8dee' : '#2d3752'}`, color: createForm.maxPlayers === n ? '#e8e6ff' : '#8a92b2', borderRadius:4, cursor:'pointer', fontWeight:700, fontSize:'0.85rem' }}>
+                    {n}人
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginBottom:8 }}>
+              <div style={{ fontSize:'0.75rem', color:'#8a92b2', marginBottom:4 }}>参加費（掛け金）</div>
+              <div style={{ display:'flex', gap:4, marginBottom:4 }}>
+                {[500,1000,5000,10000].map(v => (
+                  <button key={v} onClick={() => setCreateForm(f => ({...f, buyIn:v}))}
+                    style={{ flex:1, padding:'4px 2px', background: createForm.buyIn === v ? 'rgba(240,192,96,0.2)' : '#1c2235', border:`1px solid ${createForm.buyIn === v ? '#f0c060' : '#2d3752'}`, color: createForm.buyIn === v ? '#f0c060' : '#8a92b2', borderRadius:4, cursor:'pointer', fontSize:'0.72rem' }}>
+                    {v.toLocaleString()}G
+                  </button>
+                ))}
+              </div>
+              <input type="number" value={createForm.buyIn} min={100}
+                onChange={e => setCreateForm(f => ({...f, buyIn: Math.max(100, Number(e.target.value))}))}
+                style={{ width:'100%', padding:'6px 8px', background:'#1c2235', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.85rem', boxSizing:'border-box' as const }}
+              />
+            </div>
+            <div style={{ fontSize:'0.72rem', color:'#4a5070', marginBottom:8 }}>
+              ブラインド: SB {Math.max(1,Math.floor(createForm.buyIn*0.01)).toLocaleString()}G / BB {Math.max(2,Math.floor(createForm.buyIn*0.02)).toLocaleString()}G<br/>
+              ※ 参加費は先払い。キャンセルで全額返金。{createForm.maxPlayers}人全員が揃ったらホストがゲームを開始します。
+            </div>
+            <button onClick={handleCreate} disabled={loading || (player?.gold ?? 0) < createForm.buyIn}
+              style={{ width:'100%', padding:'8px', background:(player?.gold ?? 0) >= createForm.buyIn ? 'linear-gradient(135deg,#5b8dee,#3a6fd0)' : '#2d3752', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.85rem' }}>
+              {(player?.gold ?? 0) >= createForm.buyIn ? `♠ テーブルを作成 (${createForm.buyIn.toLocaleString()}G)` : 'Gが足りない'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div style={{ fontSize:'0.85rem', color:'#f0c060', fontWeight:700, marginBottom:8 }}>🔍 募集中のテーブル ({tables.length}件)</div>
+      {tables.length === 0 ? (
+        <div style={{ textAlign:'center', color:'#4a5070', fontSize:'0.82rem', padding:'20px 0' }}>
+          現在募集中のテーブルはありません<br />
+          <span style={{ fontSize:'0.75rem' }}>テーブルを作って仲間を募集しよう！</span>
+        </div>
+      ) : (
+        tables.map(t => {
+          const isFull = t.players.length >= t.maxPlayers;
+          const alreadyIn = t.players.some(p => p.uid === player?.uid);
+          return (
+            <div key={t.id} style={{ background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'10px 12px', marginBottom:6 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                <div>
+                  <span style={{ fontWeight:700, fontSize:'0.9rem' }}>♠ {t.hostName}</span>
+                  <span style={{ marginLeft:6, fontSize:'0.72rem', color:'#5b8dee' }}>Lv.{t.hostLevel}</span>
+                </div>
+                <span style={{ color:'#f0c060', fontWeight:700 }}>{t.buyIn.toLocaleString()}G</span>
+              </div>
+              <div style={{ fontSize:'0.75rem', color:'#8a92b2', marginBottom:8 }}>
+                参加: {t.players.length}/{t.maxPlayers}人 | ブラインド: {Math.max(1,Math.floor(t.buyIn*0.01)).toLocaleString()}G/{Math.max(2,Math.floor(t.buyIn*0.02)).toLocaleString()}G
+              </div>
+              {/* プレイヤーリスト */}
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:8 }}>
+                {t.players.map(p => (
+                  <span key={p.uid} style={{ fontSize:'0.68rem', background:'rgba(91,141,238,0.15)', color:'#5b8dee', border:'1px solid #2d3752', borderRadius:3, padding:'1px 5px' }}>
+                    {p.displayName}
+                  </span>
+                ))}
+                {Array.from({length: t.maxPlayers - t.players.length}).map((_,i) => (
+                  <span key={`empty-${i}`} style={{ fontSize:'0.68rem', background:'#161b26', color:'#4a5070', border:'1px dashed #2d3752', borderRadius:3, padding:'1px 5px' }}>
+                    空席
+                  </span>
+                ))}
+              </div>
+              <button
+                onClick={() => handleJoin(t)}
+                disabled={loading || isFull || alreadyIn || (player?.gold ?? 0) < t.buyIn}
+                style={{ width:'100%', padding:'6px', background: (!isFull && !alreadyIn && (player?.gold??0) >= t.buyIn) ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.82rem' }}>
+                {alreadyIn ? '参加済み' : isFull ? '満員' : (player?.gold??0) < t.buyIn ? 'Gが足りない' : `参加する (${t.buyIn.toLocaleString()}G)`}
+              </button>
+            </div>
+          );
+        })
+      )}
+      <div style={{ marginTop:10, padding:'8px 10px', background:'rgba(91,141,238,0.05)', border:'1px solid #2d3752', borderRadius:8, fontSize:'0.72rem', color:'#4a5070' }}>
+        📜 ルール: テキサスホールデム / 3〜6人 / 2枚の手札＋5枚のコミュニティカードで最強の役を作る / 勝者がポット総取り
+      </div>
     </div>
   );
 }
@@ -810,7 +1242,7 @@ function PokerPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: 
 // ============================================================
 // メイン画面
 // ============================================================
-type GameTab = 'chohan'|'chinchiro'|'coin_flip'|'slot'|'poker'|'treasure_box'|'pvp';
+type GameTab = 'chohan'|'chinchiro'|'coin_flip'|'slot'|'poker'|'treasure_box'|'pvp'|'texas';
 const GAME_TABS: { id: GameTab; label: string; icon: string }[] = [
   { id:'chohan',       label:'丁半',     icon:'dice' },
   { id:'chinchiro',    label:'チンチロ', icon:'target' },
@@ -819,6 +1251,7 @@ const GAME_TABS: { id: GameTab; label: string; icon: string }[] = [
   { id:'poker',        label:'ポーカー', icon:'joker_card' },
   { id:'treasure_box', label:'宝箱',     icon:'box' },
   { id:'pvp',          label:'対戦',     icon:'swords' },
+  { id:'texas',        label:'TH対戦',   icon:'joker_card' },
 ];
 
 export function GambleScreen() {
@@ -933,6 +1366,12 @@ export function GambleScreen() {
             <div style={{ fontWeight:700, fontSize:'1rem', marginBottom:8 }}>⚔️ PvP対戦</div>
             <BetInput game={GAMBLE_MASTER['chohan']} bet={bet} setBet={setBet} />
             <PvPPanel bet={bet} />
+          </>
+        )}
+        {activeGame === 'texas'        && (
+          <>
+            <div style={{ fontWeight:700, fontSize:'1rem', marginBottom:8 }}>♠ テキサスホールデム</div>
+            <TexasHoldemPanel />
           </>
         )}
       </div>
