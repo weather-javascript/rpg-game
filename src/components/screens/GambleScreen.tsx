@@ -788,6 +788,120 @@ function TxCard({ rank, suit, faceDown = false, small = false }: { rank: string;
   );
 }
 
+// ============================================================
+// TH ルール説明パネル
+// ============================================================
+function THRulesPanel() {
+  const [open, setOpen] = useState(false);
+  const S = {
+    wrap: { marginTop:10, background:'rgba(91,141,238,0.05)', border:'1px solid #2d3752', borderRadius:8, overflow:'hidden' as const },
+    header: { display:'flex' as const, justifyContent:'space-between' as const, alignItems:'center' as const, padding:'8px 12px', cursor:'pointer' as const },
+    body: { padding:'0 12px 12px' },
+    h: { fontSize:'0.8rem', color:'#5b8dee', fontWeight:700 } as const,
+    p: { fontSize:'0.72rem', color:'#8a92b2', lineHeight:1.6 } as const,
+    section: { marginBottom:10 },
+    title: { fontSize:'0.75rem', color:'#f0c060', fontWeight:700, marginBottom:4 } as const,
+    hand: { display:'flex' as const, gap:6, flexWrap:'wrap' as const, marginBottom:4 },
+    handItem: { fontSize:'0.68rem', background:'rgba(240,192,96,0.08)', border:'1px solid rgba(240,192,96,0.25)', borderRadius:4, padding:'2px 6px', color:'#e8e6ff' },
+    action: { display:'flex' as const, gap:6, flexWrap:'wrap' as const, marginBottom:4 },
+    actionItem: { fontSize:'0.68rem', borderRadius:4, padding:'2px 6px' },
+  };
+  return (
+    <div style={S.wrap}>
+      <div style={S.header} onClick={() => setOpen(o => !o)}>
+        <span style={S.h}>📜 テキサスホールデム ルール説明</span>
+        <span style={{ fontSize:'0.75rem', color:'#5b8dee' }}>{open ? '▲ 閉じる' : '▼ 開く'}</span>
+      </div>
+      {open && (
+        <div style={S.body}>
+          {/* 基本ルール */}
+          <div style={S.section}>
+            <div style={S.title}>🃏 基本ルール</div>
+            <p style={S.p}>
+              ジョーカーなし52枚のデッキを使用。2〜6人でプレイ。<br/>
+              各プレイヤーに<strong style={{color:'#e8e6ff'}}>秘密の手札2枚（ホールカード）</strong>が配られ、
+              全員共通の<strong style={{color:'#e8e6ff'}}>場のカード5枚（コミュニティカード）</strong>を合わせた
+              計7枚の中から<strong style={{color:'#f0c060'}}>最も強い5枚の組み合わせ</strong>を作る。<br/>
+              最強の役を持つプレイヤーが積み立てられたチップ（ポット）を総取り！
+              他の全員がフォールドしても勝利になる。
+            </p>
+          </div>
+          {/* ゲームの流れ */}
+          <div style={S.section}>
+            <div style={S.title}>🔄 ゲームの流れ</div>
+            <div style={{ display:'flex', flexDirection:'column' as const, gap:4 }}>
+              {[
+                ['①プリフロップ','手札2枚が配られる。SB・BBが強制ベット。UTG（BBの左隣）から時計回りにアクション開始。'],
+                ['②フロップ','コミュニティカード3枚を公開。残っているプレイヤーでSBからアクション。'],
+                ['③ターン','コミュニティカードをもう1枚追加（計4枚）。フロップと同様にアクション。'],
+                ['④リバー','最後のコミュニティカードを公開（計5枚）。最後のベッティングラウンド。'],
+                ['⑤ショーダウン','2人以上残っていれば手札を公開して勝敗決定。最強の5枚役を持つプレイヤーが勝利！'],
+              ].map(([name, desc]) => (
+                <div key={name} style={{ display:'flex', gap:8 }}>
+                  <span style={{ fontSize:'0.72rem', color:'#5b8dee', fontWeight:700, whiteSpace:'nowrap' as const, minWidth:80 }}>{name}</span>
+                  <span style={{ fontSize:'0.7rem', color:'#8a92b2', lineHeight:1.5 }}>{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* アクション */}
+          <div style={S.section}>
+            <div style={S.title}>⚡ アクション（行動）</div>
+            <div style={S.action}>
+              {[
+                ['フォールド','rgba(224,85,85,0.2)','#e05555','手札を捨ててゲームから降りる。それまでの賭けは戻らない。'],
+                ['チェック','rgba(76,175,135,0.2)','#4caf87','ベットせずに次の人へ。直前に賭けが上がっていない場合のみ可能。'],
+                ['コール','rgba(91,141,238,0.2)','#5b8dee','直前のプレイヤーと同じ金額を出してゲームに残る。'],
+                ['ベット','rgba(240,192,96,0.2)','#f0c060','そのラウンドで最初にチップを賭ける。'],
+                ['レイズ','rgba(240,192,96,0.2)','#f0c060','直前の賭け金を上乗せしてさらに賭ける。'],
+                ['オールイン','rgba(240,168,48,0.2)','#f0a830','持っているチップを全部賭ける！'],
+              ].map(([name, bg, color, desc]) => (
+                <div key={name} style={{ width:'100%', display:'flex', gap:8, alignItems:'flex-start' }}>
+                  <span style={{ ...S.actionItem, background:bg, color, minWidth:60, textAlign:'center' as const, flexShrink:0 }}>{name}</span>
+                  <span style={{ fontSize:'0.7rem', color:'#8a92b2' }}>{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* 役の強さ */}
+          <div style={S.section}>
+            <div style={S.title}>👑 役の強さ（弱い順）</div>
+            <div style={{ display:'flex', flexDirection:'column' as const, gap:3 }}>
+              {[
+                ['①ハイカード','役なし。カード単体の強さで比較（A最強・2最弱）'],
+                ['②ワンペア','同じ数字のペア1組（例：A♠A♥）'],
+                ['③ツーペア','同じ数字のペア2組（例：K♠K♥と10♠10♥）'],
+                ['④スリーカード','同じ数字3枚（セット・トリップスとも呼ぶ）'],
+                ['⑤ストレート','数字が5枚連続（A-2-3-4-5が最弱、10-J-Q-K-Aが最強）'],
+                ['⑥フラッシュ','同じマーク（スート）のカード5枚'],
+                ['⑦フルハウス','スリーカード＋ワンペアの組み合わせ（例：Q-Q-Q と 7-7）'],
+                ['⑧フォーカード','同じ数字4枚（クワッズ）'],
+                ['⑨ストレートフラッシュ','同じマークで数字が5枚連続'],
+                ['⑩ロイヤルフラッシュ','同じマークの10-J-Q-K-A。最強の役！'],
+              ].map(([name, desc]) => (
+                <div key={name} style={{ display:'flex', gap:8 }}>
+                  <span style={{ fontSize:'0.7rem', color:'#f0c060', fontWeight:700, whiteSpace:'nowrap' as const, minWidth:100 }}>{name}</span>
+                  <span style={{ fontSize:'0.68rem', color:'#8a92b2' }}>{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* ポジション */}
+          <div style={S.section}>
+            <div style={S.title}>📍 ポジションとブラインド</div>
+            <p style={S.p}>
+              <strong style={{color:'#e8e6ff'}}>ディーラー(D)</strong>: ゲームを仕切る役。各ゲームで時計回りに変わる。<br/>
+              <strong style={{color:'#4caf87'}}>スモールブラインド(SB)</strong>: Dの左隣。参加費の1%を強制ベット。<br/>
+              <strong style={{color:'#5b8dee'}}>ビッグブラインド(BB)</strong>: SBの左隣。参加費の2%を強制ベット。<br/>
+              プリフロップはBBの左隣（UTG）からアクション開始。フロップ以降はSBからスタート。
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TexasHoldemPanel() {
   const player = useGameStore(s => s.player);
   const changeGold = useGameStore(s => s.changeGold);
@@ -1011,9 +1125,9 @@ function TexasHoldemPanel() {
             <div style={{ fontSize:'0.78rem', color:'#8a92b2', textAlign:'center' }}>
               参加者: {activeTable.players.length}/{activeTable.maxPlayers}人 | 参加費: {activeTable.buyIn.toLocaleString()}G
             </div>
-            <button onClick={handleStart} disabled={loading || activeTable.players.length < 3}
+            <button onClick={handleStart} disabled={loading || activeTable.players.length < 2}
               style={{ padding:'9px', background: activeTable.players.length >= 3 ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontWeight:700, fontSize:'0.85rem' }}>
-              {activeTable.players.length < 3 ? `あと${3 - activeTable.players.length}人必要` : '▶ ゲームを開始する'}
+              {activeTable.players.length < 2 ? `あと${2 - activeTable.players.length}人必要` : '▶ ゲームを開始する'}
             </button>
             <button onClick={handleCancel} disabled={loading}
               style={{ padding:'7px', background:'#1c2235', color:'#e05555', border:'1px solid #e05555', borderRadius:7, cursor:'pointer', fontSize:'0.8rem' }}>
@@ -1105,9 +1219,9 @@ function TexasHoldemPanel() {
           <div style={{ background:'rgba(91,141,238,0.08)', border:'1px solid #2d3752', borderRadius:8, padding:'12px', marginBottom:12 }}>
             <div style={{ fontSize:'0.8rem', color:'#8a92b2', marginBottom:8 }}>テーブル設定</div>
             <div style={{ marginBottom:8 }}>
-              <div style={{ fontSize:'0.75rem', color:'#8a92b2', marginBottom:4 }}>参加人数（3〜6人）</div>
+              <div style={{ fontSize:'0.75rem', color:'#8a92b2', marginBottom:4 }}>参加人数（2〜6人）</div>
               <div style={{ display:'flex', gap:4 }}>
-                {[3,4,5,6].map(n => (
+                {[2,3,4,5,6].map(n => (
                   <button key={n} onClick={() => setCreateForm(f => ({...f, maxPlayers:n}))}
                     style={{ flex:1, padding:'6px', background: createForm.maxPlayers === n ? 'rgba(91,141,238,0.3)' : '#1c2235', border:`1px solid ${createForm.maxPlayers === n ? '#5b8dee' : '#2d3752'}`, color: createForm.maxPlayers === n ? '#e8e6ff' : '#8a92b2', borderRadius:4, cursor:'pointer', fontWeight:700, fontSize:'0.85rem' }}>
                     {n}人
@@ -1187,9 +1301,8 @@ function TexasHoldemPanel() {
           );
         })
       )}
-      <div style={{ marginTop:10, padding:'8px 10px', background:'rgba(91,141,238,0.05)', border:'1px solid #2d3752', borderRadius:8, fontSize:'0.72rem', color:'#4a5070' }}>
-        📜 ルール: テキサスホールデム / 3〜6人 / 2枚の手札＋5枚のコミュニティカードで最強の役を作る / 勝者がポット総取り
-      </div>
+      {/* ルール説明 */}
+      <THRulesPanel />
     </div>
   );
 }

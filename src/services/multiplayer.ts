@@ -803,14 +803,14 @@ export async function leavePokerTable(tableId: string, uid: string): Promise<boo
   return true;
 }
 
-/** ゲームを開始（ホストのみ・3人以上） */
+/** ゲームを開始（ホストのみ・2人以上） */
 export async function startPokerGame(tableId: string, hostUid: string): Promise<{ success: boolean; message?: string }> {
   const ref = doc(db, COLLECTIONS.POKER, tableId);
   const snap = await getDoc(ref);
   if (!snap.exists()) return { success: false, message: 'テーブルが見つかりません' };
   const table = { id: snap.id, ...(snap.data() as Omit<PokerTable,'id'>) };
   if (table.hostUid !== hostUid) return { success: false, message: '権限がありません' };
-  if (table.players.length < 3) return { success: false, message: '最低3人必要です' };
+  if (table.players.length < 2) return { success: false, message: '最低2人必要です' };
   if (table.status !== 'waiting') return { success: false, message: '既に開始しています' };
 
   const deck = _shuffle(_makeDeck());
