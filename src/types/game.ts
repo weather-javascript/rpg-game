@@ -3,7 +3,44 @@
 export type IdMap<T> = Record<string, T>;
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 export type ItemCategory = 'material' | 'tool' | 'consumable' | 'weapon' | 'armor' | 'treasure' | 'food' | 'potion';
+export type ItemType = 'Weapon' | 'Armor' | 'Item' | 'Heal';
 export type SkillId = 'mining' | 'woodcutting' | 'combat' | 'fishing' | 'crafting';
+
+// ============================================================
+// 武器スキル型
+// ============================================================
+export interface WeaponPassiveSkill {
+  type: 'penetrate_per_turn';   // 毎ターン貫通ダメージ
+  value: number;
+}
+export interface WeaponRegenSkill {
+  type: 'regen_per_turn';       // 毎ターン回復
+  hpRestore?: number;
+  satietyRestore?: number;
+}
+export interface WeaponShieldSkill {
+  type: 'hotbar_shield';        // ホットバー装備中に敵攻撃カット
+  cutPercent: number;
+}
+export interface WeaponManaSkill {
+  type: 'mana_charge';          // MANAチャージ型必殺技
+  manaPerTurn: number;
+  manaMax: number;
+}
+export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill;
+
+export interface WeaponUltimate {
+  name: string;
+  description: string;
+  // 物理 × 回数 + 貫通 × 回数
+  physDamage?: number;
+  physHits?: number;
+  penetrateDamage?: number;
+  penetrateHits?: number;
+  // 発動後バフ
+  postBuffTurns?: number;
+  postBuffPoisonDmg?: number;
+}
 export type TabId = 'gathering' | 'market' | 'dungeon' | 'gamble' | 'status' | 'online' | 'fishing' | 'admin';
 export type GambleType = 'slot' | 'treasure_box' | 'coin_flip' | 'chohan' | 'chinchiro' | 'jackpot' | 'poker';
 export type DungeonTier = 'beginner' | 'intermediate' | 'advanced' | 'super' | 'extreme' | 'volcano';
@@ -16,19 +53,29 @@ export interface ItemMaster {
   name: string;
   description: string;
   category: ItemCategory;
+  itemType: ItemType;       // Weapon / Armor / Item / Heal
   rarity: Rarity;
   sellPrice: number;
   buyPrice: number;
   maxStack: number;
   icon: string;
+  // 武器固有ステータス
+  weaponAtk?: number;       // 武器固有攻撃力（通常攻撃をこの値で上書き）
+  weaponDef?: number;       // 装備時防御ボーナス
+  weaponHpBonus?: number;   // 装備時最大HP増加
+  // 武器スキル（複数可）
+  weaponSkills?: WeaponSkill[];
+  weaponUltimate?: WeaponUltimate;
+  // SVGアイコン文字列（カスタム武器など）
+  svgIcon?: string;
   useEffect?: {
     hpRestore?: number;
     satietyRestore?: number;
     message?: string;
-    attackBonus?: number;   // 武器使用時の追加攻撃ダメージ
-    attackType?: string;    // 将来の属性拡張用 (例: 'fire', 'ice', 'poison')
-    buffType?: string;      // 将来のバフ拡張用
-    buffDuration?: number;  // バフ持続時間（ターン数）
+    attackBonus?: number;   // 武器使用時の追加攻撃ダメージ（後方互換）
+    attackType?: string;
+    buffType?: string;
+    buffDuration?: number;
   };
 }
 

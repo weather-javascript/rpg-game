@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { secureRandom, randomInt, randomIntRange, randomChance } from '../../utils/random';
 import { DUNGEON_MASTER, MONSTER_MASTER, ITEM_MASTER } from '../../data/masters';
-import type { MonsterMaster, DungeonRunState, DungeonMaster } from '../../types/game';
+import type { MonsterMaster, DungeonRunState, DungeonMaster, WeaponPassiveSkill, WeaponRegenSkill, WeaponShieldSkill, WeaponManaSkill } from '../../types/game';
 import type { EquipmentSlots } from '../../types/game';
 import { defaultEquipmentSlots } from '../../types/game';
 import { postActivityFeed } from '../../services/multiplayer';
@@ -31,14 +31,21 @@ interface TurnBattleState {
   monsterId: string;
   monsterHp: number;
   monsterMaxHp: number;
-  playerHpSnapshot: number; // バトル開始時HP（表示用）
+  playerHpSnapshot: number;
   turn: 'player' | 'monster' | 'result';
   log: { text: string; color: string }[];
   result: 'win' | 'lose' | 'escaped' | null;
   expGained: number;
   goldGained: number;
   drops: { itemId: string; amount: number }[];
-  isDefending: boolean; // 防御中フラグ
+  isDefending: boolean;
+  // 武器スキル用
+  weaponMana: number;           // 現在MANAチャージ量
+  weaponManaMax: number;        // 必殺技発動に必要なMANA
+  ultimateReady: boolean;       // 必殺技使用可能フラグ
+  poisonBuff: number;           // 毒バフ残りターン数
+  poisonDmg: number;            // 毒ダメージ量
+  equippedWeaponId: string | null; // バトル中装備武器ID
 }
 
 // ============================================================
@@ -166,6 +173,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape }: {
   const player = useGameStore(s => s.player)!;
   const consumeItem = useGameStore(s => s.consumeItem);
   const changeHp = useGameStore(s => s.changeHp);
+  const changeSatiety = useGameStore(s => s.changeSatiety);
   const addNotification = useGameStore(s => s.addNotification);
 
   const dungeon = DUNGEON_MASTER[runState.dungeonId];
@@ -183,6 +191,10 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape }: {
       monsterId = dungeon.monsterIds[randomInt(dungeon.monsterIds.length)];
     }
     const monster = MONSTER_MASTER[monsterId];
+    // ホットバーの武器を探す
+    const hotbarWeaponId = equipment.hotbar.find(id => id && ITEM_MASTER[id]?.itemType === 'Weapon') ?? null;
+    const weaponItem = hotbarWeaponId ? ITEM_MASTER[hotbarWeaponId] : null;
+    const manaSkill = weaponItem?.weaponSkills?.find((s): s is WeaponManaSkill => s.type === 'mana_charge');
     return {
       monsterId,
       monsterHp: monster?.maxHp ?? 50,
@@ -193,6 +205,12 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape }: {
       result: null,
       expGained: 0, goldGained: 0, drops: [],
       isDefending: false,
+      weaponMana: 0,
+      weaponManaMax: manaSkill?.manaMax ?? 1200,
+      ultimateReady: false,
+      poisonBuff: 0,
+      poisonDmg: 5,
+      equippedWeaponId: hotbarWeaponId,
     };
   });
 
@@ -204,29 +222,88 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape }: {
   // モンスターターン実行
   const doMonsterTurn = useCallback((prevBattle: TurnBattleState): TurnBattleState => {
     if (!monster) return prevBattle;
+    let newLog = [...prevBattle.log];
+    let newBattle = { ...prevBattle };
+
+    // 武器パッシブスキル処理（モンスターターン開始時）
+    const weaponItem = prevBattle.equippedWeaponId ? ITEM_MASTER[prevBattle.equippedWeaponId] : null;
+    if (weaponItem?.weaponSkills) {
+      for (const skill of weaponItem.weaponSkills) {
+        // 貫通ダメージ（毎ターン）
+        if (skill.type === 'penetrate_per_turn') {
+          const pen = (skill as WeaponPassiveSkill).value;
+          newBattle = { ...newBattle, monsterHp: Math.max(0, newBattle.monsterHp - pen) };
+          newLog.push({ text: `🔱 ${weaponItem.name}の貫通攻撃！ ${pen}ダメージ！`, color: '#9b6df0' });
+        }
+        // HP・満腹度回復（毎ターン）
+        if (skill.type === 'regen_per_turn') {
+          const regen = skill as WeaponRegenSkill;
+          if (regen.hpRestore) { changeHp(regen.hpRestore); newLog.push({ text: `💚 ${weaponItem.name}の回復！ HP+${regen.hpRestore}`, color: '#4caf87' }); }
+          if (regen.satietyRestore) { changeSatiety(regen.satietyRestore); }
+        }
+        // MANAチャージ
+        if (skill.type === 'mana_charge') {
+          const ms = skill as WeaponManaSkill;
+          const newMana = Math.min(prevBattle.weaponMana + ms.manaPerTurn, ms.manaMax);
+          newBattle = { ...newBattle, weaponMana: newMana, ultimateReady: newMana >= ms.manaMax };
+          if (newMana >= ms.manaMax && prevBattle.weaponMana < ms.manaMax) {
+            newLog.push({ text: `⭐ 必殺技「${weaponItem.weaponUltimate?.name}」が使えるようになった！`, color: '#f0c060' });
+          }
+        }
+      }
+    }
+    // 毒バフ処理
+    if (newBattle.poisonBuff > 0) {
+      newBattle = { ...newBattle, monsterHp: Math.max(0, newBattle.monsterHp - newBattle.poisonDmg), poisonBuff: newBattle.poisonBuff - 1 };
+      newLog.push({ text: `☠️ 毒！ ${monster.name}に${newBattle.poisonDmg}ダメージ (残${newBattle.poisonBuff}ターン)`, color: '#9b6df0' });
+    }
+    // 貫通攻撃で倒した場合
+    if (newBattle.monsterHp <= 0) {
+      const drops = calcMonsterDrops(monster, combatLv);
+      const exp = Math.floor(monster.baseExp * dungeon.expBonus * (1 + combatLv * 0.01));
+      const gold = Math.floor(monster.baseGold * dungeon.goldBonus * (0.8 + secureRandom() * 0.4));
+      newLog.push({ text: `✨ ${monster.name}を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' });
+      return { ...newBattle, log: newLog, turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, isDefending: false };
+    }
+
+    // モンスター攻撃
     const isSpecial = monster.isBoss && randomChance(0.2);
-    const mDmg = isSpecial
+    let mDmg = isSpecial
       ? Math.floor(calcDamage(monster.attack, player.stats.defense) * 1.5)
       : calcDamage(monster.attack, prevBattle.isDefending ? player.stats.defense * 2 : player.stats.defense);
+    // ホットバー武器のシールドスキル
+    if (weaponItem?.weaponSkills) {
+      const shield = weaponItem.weaponSkills.find(s => s.type === 'hotbar_shield') as WeaponShieldSkill | undefined;
+      if (shield) {
+        const cut = shield.cutPercent / 100;
+        mDmg = Math.max(1, Math.floor(mDmg * (1 - cut)));
+        newLog.push({ text: `🛡️ ${weaponItem.name}のシールドで攻撃を${shield.cutPercent}%カット！`, color: '#5b8dee' });
+      }
+    }
     const reducedDmg = prevBattle.isDefending ? Math.floor(mDmg * 0.5) : mDmg;
     changeHp(-reducedDmg);
     const newPlayerHp = Math.max(0, player.stats.hp - reducedDmg);
     const logEntry = isSpecial
       ? { text: `💥 ${monster.name}の特殊攻撃！ あなたに${reducedDmg}ダメージ！`, color: '#e05555' }
       : { text: `🐉 ${monster.name}の攻撃！ あなたに${reducedDmg}ダメージ${prevBattle.isDefending ? '（防御中）' : ''}`, color: '#e05555' };
+    newLog.push(logEntry);
 
     if (newPlayerHp <= 0) {
-      return { ...prevBattle, log: [...prevBattle.log, logEntry, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
+      return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
     }
-    return { ...prevBattle, log: [...prevBattle.log, logEntry], turn: 'player', isDefending: false };
-  }, [monster, player.stats, changeHp]);
+    return { ...newBattle, log: newLog, turn: 'player', isDefending: false };
+  }, [monster, player.stats, changeHp, changeSatiety, dungeon, combatLv]);
 
   // プレイヤー行動: 攻撃
   const handleAttack = () => {
     if (battle.turn !== 'player' || battle.result) return;
-    const pDmg = calcDamage(player.stats.attack, monster?.defense ?? 0);
+    const weaponItem = battle.equippedWeaponId ? ITEM_MASTER[battle.equippedWeaponId] : null;
+    // 武器固有攻撃力があればそれを使う、なければプレイヤーatk
+    const atkBase = weaponItem?.weaponAtk ?? player.stats.attack;
+    const pDmg = calcDamage(atkBase, monster?.defense ?? 0);
+    const weaponMsg = weaponItem ? `${weaponItem.name}で` : '';
     const newMHp = Math.max(0, battle.monsterHp - pDmg);
-    const log = [...battle.log, { text: `⚔️ あなたの攻撃！ ${pDmg}ダメージ！`, color: '#4caf87' }];
+    const log = [...battle.log, { text: `⚔️ ${weaponMsg}攻撃！ ${pDmg}ダメージ！`, color: '#4caf87' }];
 
     if (newMHp <= 0) {
       const drops = calcMonsterDrops(monster!, combatLv);
@@ -235,9 +312,55 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape }: {
       setBattle(b => ({ ...b, monsterHp: 0, log: [...log, { text: `✨ ${monster!.name}を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops }));
       return;
     }
-    // モンスターターンへ
     const afterAttack: TurnBattleState = { ...battle, monsterHp: newMHp, log, turn: 'monster', isDefending: false };
     setBattle(afterAttack);
+    setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+  };
+
+  // 必殺技発動
+  const handleUltimate = () => {
+    if (battle.turn !== 'player' || battle.result || !battle.ultimateReady) return;
+    const weaponItem = battle.equippedWeaponId ? ITEM_MASTER[battle.equippedWeaponId] : null;
+    const ult = weaponItem?.weaponUltimate;
+    if (!ult) return;
+
+    let dmgTotal = 0;
+    const logEntries: { text: string; color: string }[] = [];
+    logEntries.push({ text: `💫 必殺技「${ult.name}」発動！`, color: '#f0c060' });
+
+    // 物理攻撃 × hits
+    if (ult.physDamage && ult.physHits) {
+      for (let i = 0; i < ult.physHits; i++) {
+        dmgTotal += ult.physDamage;
+      }
+      logEntries.push({ text: `⚔️ 物理${ult.physDamage}×${ult.physHits}ヒット！ 合計${ult.physDamage * ult.physHits}ダメージ！`, color: '#4caf87' });
+    }
+    // 貫通攻撃 × hits
+    if (ult.penetrateDamage && ult.penetrateHits) {
+      for (let i = 0; i < ult.penetrateHits; i++) {
+        dmgTotal += ult.penetrateDamage;
+      }
+      logEntries.push({ text: `🔱 貫通${ult.penetrateDamage}×${ult.penetrateHits}ヒット！ 合計${ult.penetrateDamage * ult.penetrateHits}ダメージ！`, color: '#9b6df0' });
+    }
+
+    const newMHp = Math.max(0, battle.monsterHp - dmgTotal);
+    logEntries.push({ text: `💥 総ダメージ：${dmgTotal}！`, color: '#f0c060' });
+
+    // 毒バフ
+    const newPoisonBuff = ult.postBuffTurns ?? 0;
+    const newPoisonDmg = ult.postBuffPoisonDmg ?? 0;
+    if (newPoisonBuff > 0) logEntries.push({ text: `☠️ ${newPoisonBuff}ターン毒付与！（毎ターン${newPoisonDmg}ダメージ）`, color: '#9b6df0' });
+
+    if (newMHp <= 0) {
+      const drops = calcMonsterDrops(monster!, combatLv);
+      const exp = Math.floor(monster!.baseExp * dungeon.expBonus * (1 + combatLv * 0.01));
+      const gold = Math.floor(monster!.baseGold * dungeon.goldBonus * (0.8 + secureRandom() * 0.4));
+      logEntries.push({ text: `✨ ${monster!.name}を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' });
+      setBattle(b => ({ ...b, monsterHp: 0, log: [...b.log, ...logEntries], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, weaponMana: 0, ultimateReady: false }));
+      return;
+    }
+    const afterUlt: TurnBattleState = { ...battle, monsterHp: newMHp, log: [...battle.log, ...logEntries], turn: 'monster', isDefending: false, weaponMana: 0, ultimateReady: false, poisonBuff: newPoisonBuff, poisonDmg: newPoisonDmg };
+    setBattle(afterUlt);
     setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
   };
 
@@ -256,31 +379,52 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape }: {
     const itemId = localEquip.hotbar[idx];
     if (!itemId) { addNotification('warning', `スロット${idx+1}にアイテムがありません`); return; }
     const item = ITEM_MASTER[itemId];
-    if (!item?.useEffect) { addNotification('warning', `${item?.name}は使用できません`); return; }
+    if (!item) { addNotification('warning', `アイテムが見つかりません`); return; }
 
-    // 武器（attackBonus）の場合は消費せずダメージを与える
-    if (item.useEffect.attackBonus && item.useEffect.attackBonus > 0) {
-      const baseDmg = calcDamage(player.stats.attack, monster?.defense ?? 0);
-      const weaponBonus = item.useEffect.attackBonus;
-      const totalDmg = baseDmg + weaponBonus;
-      const newMHp = Math.max(0, battle.monsterHp - totalDmg);
-      const msg = item.useEffect.message ?? `${item.name}で攻撃した`;
-      const logEntries = [
-        { text: `🗡️ ${msg} (通常${baseDmg}+武器${weaponBonus}=${totalDmg}ダメージ！)`, color: '#f0c060' },
-      ];
+    // Weapon属性：装備して通常攻撃
+    if (item.itemType === 'Weapon') {
+      const atkBase = item.weaponAtk ?? (item.useEffect?.attackBonus ? player.stats.attack + item.useEffect.attackBonus : player.stats.attack);
+      const pDmg = calcDamage(atkBase, monster?.defense ?? 0);
+      const newMHp = Math.max(0, battle.monsterHp - pDmg);
+      const msg = item.useEffect?.message ?? `${item.name}で攻撃した`;
+      const logEntries = [{ text: `🗡️ ${msg} ${pDmg}ダメージ！`, color: '#f0c060' }];
+      // 武器をアクティブ武器として登録
+      const newEquippedId = itemId;
       if (newMHp <= 0) {
-        logEntries.push({ text: `💀 ${monster?.name}を倒した！`, color: '#4caf87' });
-        const drops = battle.drops;
-        const newBattle: TurnBattleState = { ...battle, monsterHp: 0, log: [...battle.log, ...logEntries], turn: 'result', result: 'win', drops };
-        setBattle(newBattle);
+        const drops = calcMonsterDrops(monster!, combatLv);
+        const exp = Math.floor(monster!.baseExp * dungeon.expBonus * (1 + combatLv * 0.01));
+        const gold = Math.floor(monster!.baseGold * dungeon.goldBonus * (0.8 + secureRandom() * 0.4));
+        logEntries.push({ text: `✨ ${monster!.name}を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' });
+        setBattle(b => ({ ...b, monsterHp: 0, log: [...b.log, ...logEntries], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, equippedWeaponId: newEquippedId }));
       } else {
-        const afterWeapon: TurnBattleState = { ...battle, monsterHp: newMHp, log: [...battle.log, ...logEntries], turn: 'monster', isDefending: false };
-        setBattle(afterWeapon);
+        const after: TurnBattleState = { ...battle, monsterHp: newMHp, log: [...battle.log, ...logEntries], turn: 'monster', isDefending: false, equippedWeaponId: newEquippedId };
+        setBattle(after);
         setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
       }
       return;
     }
 
+    // Heal属性：アイテム固有の回復量で回復
+    if (item.itemType === 'Heal') {
+      if (!item.useEffect) { addNotification('warning', `${item.name}は使用できません`); return; }
+      const ok = consumeItem(itemId, 1);
+      if (!ok) { addNotification('warning', `${item.name}が足りません`); return; }
+      const { hpRestore, satietyRestore, message } = item.useEffect;
+      if (hpRestore && hpRestore > 0) changeHp(hpRestore);
+      if (satietyRestore && satietyRestore > 0) changeSatiety(satietyRestore);
+      const healParts = [];
+      if (hpRestore && hpRestore > 0) healParts.push(`HP+${hpRestore}`);
+      if (satietyRestore && satietyRestore > 0) healParts.push(`満腹+${satietyRestore}`);
+      const logMsg = message ?? `${item.name}を使用した`;
+      const log = [...battle.log, { text: `🧪 ${logMsg}${healParts.length ? ` (${healParts.join(', ')})` : ''}`, color: '#4caf87' }];
+      const afterItem: TurnBattleState = { ...battle, log, turn: 'monster', isDefending: false };
+      setBattle(afterItem);
+      setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+      return;
+    }
+
+    // Item属性（後方互換）
+    if (!item.useEffect) { addNotification('warning', `${item?.name}は使用できません`); return; }
     const ok = consumeItem(itemId, 1);
     if (!ok) { addNotification('warning', `${item.name}が足りません`); return; }
     const { hpRestore, satietyRestore: _satietyRestore, message } = item.useEffect;
@@ -369,6 +513,36 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape }: {
               🛡️ 防御
             </button>
           </div>
+
+          {/* 必殺技・MANAバー */}
+          {battle.equippedWeaponId && (() => {
+            const wi = ITEM_MASTER[battle.equippedWeaponId!];
+            const hasUlt = !!wi?.weaponUltimate;
+            const hasMana = wi?.weaponSkills?.some(s => s.type === 'mana_charge');
+            if (!hasUlt && !hasMana) return null;
+            return (
+              <div style={{ marginBottom: 8 }}>
+                {hasMana && (
+                  <div style={{ marginBottom: 4 }}>
+                    <div style={{ fontSize: '0.7rem', color: '#f0c060', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>⭐ MANA</span>
+                      <span>{battle.weaponMana}/{battle.weaponManaMax}</span>
+                    </div>
+                    <div style={{ height: 5, background: '#2d3752', borderRadius: 3, overflow: 'hidden', marginTop: 2 }}>
+                      <div style={{ height: '100%', background: battle.ultimateReady ? '#f0c060' : '#9b6df0', width: `${(battle.weaponMana / battle.weaponManaMax) * 100}%`, transition: 'width 0.3s' }} />
+                    </div>
+                  </div>
+                )}
+                {hasUlt && (
+                  <button onClick={handleUltimate}
+                    disabled={!battle.ultimateReady || battle.turn !== 'player'}
+                    style={{ width: '100%', padding: '8px', background: battle.ultimateReady && battle.turn === 'player' ? 'linear-gradient(135deg,#f0c060,#e0a020)' : '#2d3752', color: battle.ultimateReady ? '#000' : '#4a5070', border: 'none', borderRadius: 8, cursor: battle.ultimateReady && battle.turn === 'player' ? 'pointer' : 'not-allowed', fontWeight: 700, fontSize: '0.85rem' }}>
+                    💫 必殺技「{wi?.weaponUltimate?.name}」{!battle.ultimateReady ? `（MANA ${battle.weaponMana}/${battle.weaponManaMax}）` : ''}
+                  </button>
+                )}
+              </div>
+            );
+          })()}
 
           {/* ホットバーアイテム使用 */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>

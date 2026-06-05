@@ -206,7 +206,6 @@ export function subscribeJackpotPool(cb: (pool: number) => void): Unsubscribe {
   const timer = setInterval(fetch, 10_000);
   return () => { stopped = true; clearInterval(timer); };
 }
-}
 
 // 他のギャンブルで賭けるたびにプールへ積立（ローカル積算+15秒flush）
 export async function contributeToJackpot(bet: number): Promise<number> {
@@ -560,6 +559,7 @@ export interface AnnouncementRecord {
   id: string;
   text: string;
   timestamp: number;
+  imageUrl?: string;
 }
 
 export async function getAnnouncementHistory(): Promise<AnnouncementRecord[]> {
@@ -571,9 +571,9 @@ export async function getAnnouncementHistory(): Promise<AnnouncementRecord[]> {
   } catch { return []; }
 }
 
-export async function saveAnnouncementToHistory(text: string): Promise<void> {
+export async function saveAnnouncementToHistory(text: string, imageUrl?: string): Promise<void> {
   const { addDoc, collection: col } = await import('firebase/firestore');
-  await addDoc(col(db, 'announcements'), { text, timestamp: Date.now() });
+  await addDoc(col(db, 'announcements'), { text, timestamp: Date.now(), ...(imageUrl ? { imageUrl } : {}) });
 }
 
 // ============================================================

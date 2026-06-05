@@ -1,11 +1,10 @@
 // src/components/screens/MarketScreen.tsx
 // 市場画面 - 売却後にFirebaseへ即時保存するよう修正
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { GameIcon } from '../icons';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
-import { subscribeItemPrices } from '../../services/multiplayer';
 
 type ShopTab = 'sell' | 'buy' | 'satiety' | 'use';
 
@@ -24,21 +23,9 @@ export function MarketScreen() {
   const useItem = useGameStore(s => s.useItem);
   const addNotification = useGameStore(s => s.addNotification);
   const [shopTab, setShopTab] = useState<ShopTab>('sell');
-  const [priceOverrides, setPriceOverrides] = useState<Record<string, { buyPrice: number; sellPrice: number }>>({});
 
-  useEffect(() => {
-    const unsub = subscribeItemPrices(p => setPriceOverrides(p));
-    return unsub;
-  }, []);
 
-  // マスターデータにオーバーライドを適用したアイテム情報を返す
-  const getItem = (id: string) => {
-    const base = ITEM_MASTER[id];
-    if (!base) return base;
-    const ov = priceOverrides[id];
-    if (!ov) return base;
-    return { ...base, buyPrice: ov.buyPrice, sellPrice: ov.sellPrice };
-  };
+
 
   // 売却: アイテム消費 → Gold加算 → Firebase即時保存（バグ修正）
   const handleSell = async (itemId: string, amount: number) => {
@@ -253,3 +240,4 @@ export function MarketScreen() {
       )}
     </div>
   );
+}

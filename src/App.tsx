@@ -242,11 +242,11 @@ function MaintenanceScreen({ startedAt, estimatedMinutes, message, uid, displayN
 // ADMINからのお知らせポップアップ
 // ============================================================
 function AdminAnnouncementPopup({ onClose }: { onClose: () => void }) {
-  const [announcements, setAnnouncements] = useState<Array<{ id: string; text: string; timestamp: number }>>([]);
+  const [announcements, setAnnouncements] = useState<Array<{ id: string; text: string; timestamp: number; imageUrl?: string }>>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     import('./services/multiplayer').then(m => {
-      m.getAnnouncementHistory().then(list => { setAnnouncements(list); setLoading(false); });
+      m.getAnnouncementHistory().then(list => { setAnnouncements(list as any); setLoading(false); });
     });
   }, []);
   return (
@@ -263,8 +263,18 @@ function AdminAnnouncementPopup({ onClose }: { onClose: () => void }) {
         ) : (
           announcements.map(a => (
             <div key={a.id} style={{ background:'#161b26', border:'1px solid #2d3752', borderRadius:8, padding:'10px 12px', marginBottom:8 }}>
-              <div style={{ fontSize:'0.72rem', color:'#4a5070', marginBottom:4 }}>{new Date(a.timestamp).toLocaleString('ja-JP')}</div>
-              <div style={{ fontSize:'0.88rem', color:'#e8e6ff' }}>{a.text}</div>
+              <div style={{ fontSize:'0.72rem', color:'#4a5070', marginBottom:6 }}>{new Date(a.timestamp).toLocaleString('ja-JP')}</div>
+              <div style={{ display:'flex', alignItems:'flex-start', gap:10 }}>
+                {a.imageUrl && (
+                  <img
+                    src={a.imageUrl}
+                    alt=""
+                    style={{ width:56, height:56, objectFit:'contain', borderRadius:6, border:'1px solid #2d3752', flexShrink:0, background:'#0e1220' }}
+                    onError={e => (e.currentTarget.style.display = 'none')}
+                  />
+                )}
+                <div style={{ fontSize:'0.88rem', color:'#e8e6ff', flex:1 }}>{a.text}</div>
+              </div>
             </div>
           ))
         )}

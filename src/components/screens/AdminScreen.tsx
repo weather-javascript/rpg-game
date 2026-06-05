@@ -30,6 +30,7 @@ export function AdminScreen() {
   const [subTab, setSubTab] = useState<SubTab>('players');
   const [saving, setSaving] = useState(false);
   const [announceText, setAnnounceText] = useState('');
+  const [announceImageUrl, setAnnounceImageUrl] = useState('');
   const [playerFilter, setPlayerFilter] = useState('');
   const [confirmBan, setConfirmBan] = useState<string | null>(null);
   const [jackpotRate, setJackpotRateState] = useState(0.20);
@@ -427,6 +428,22 @@ export function AdminScreen() {
             全プレイヤーのゲーム内に通知を配信します（Firestoreの shared/announcement に書き込み）。
           </p>
           <div style={{marginBottom:10}}>
+            <div style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:4}}>画像URL（任意）</div>
+            <input
+              type="text"
+              value={announceImageUrl}
+              onChange={e => setAnnounceImageUrl(e.target.value)}
+              placeholder="https://example.com/image.png"
+              style={{width:'100%', padding:'8px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.85rem', boxSizing:'border-box'}}
+            />
+            {announceImageUrl && (
+              <div style={{marginTop:6, display:'flex', alignItems:'center', gap:8}}>
+                <img src={announceImageUrl} alt="プレビュー" style={{width:48, height:48, objectFit:'contain', borderRadius:4, border:'1px solid #2d3752'}} onError={e => (e.currentTarget.style.display='none')} />
+                <span style={{fontSize:'0.72rem', color:'#4a5070'}}>画像プレビュー</span>
+              </div>
+            )}
+          </div>
+          <div style={{marginBottom:10}}>
             <div style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:4}}>お知らせ本文（最大100文字）</div>
             <textarea
               value={announceText}
@@ -448,12 +465,14 @@ export function AdminScreen() {
                   timestamp: Date.now(),
                   createdAt: Date.now(),
                   type: 'admin',
+                  ...(announceImageUrl.trim() ? { imageUrl: announceImageUrl.trim() } : {}),
                 });
-                await saveAnnouncementToHistory(announceText);
+                await saveAnnouncementToHistory(announceText, announceImageUrl.trim() || undefined);
                 const h = await getAnnouncementHistory();
                 setAnnounceHistory(h);
                 addNotification('success', 'お知らせを配信しました');
                 setAnnounceText('');
+                setAnnounceImageUrl('');
               } catch (e: any) {
                 addNotification('error', `配信失敗: ${e?.message ?? e}`);
               }
@@ -470,7 +489,10 @@ export function AdminScreen() {
             ) : announceHistory.map(a => (
               <div key={a.id} style={{background:'#161b26', border:'1px solid #2d3752', borderRadius:6, padding:'8px 10px', marginBottom:6}}>
                 <div style={{fontSize:'0.68rem', color:'#4a5070', marginBottom:3}}>{new Date(a.timestamp).toLocaleString('ja-JP')}</div>
-                <div style={{fontSize:'0.82rem', color:'#e8e6ff'}}>{a.text}</div>
+                <div style={{display:'flex', alignItems:'flex-start', gap:8}}>
+                  {(a as any).imageUrl && <img src={(a as any).imageUrl} alt="" style={{width:36, height:36, objectFit:'contain', borderRadius:4, flexShrink:0}} />}
+                  <div style={{fontSize:'0.82rem', color:'#e8e6ff'}}>{a.text}</div>
+                </div>
               </div>
             ))}
           </div>
