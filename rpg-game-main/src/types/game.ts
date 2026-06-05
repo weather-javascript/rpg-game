@@ -185,6 +185,8 @@ export interface PlayerData {
   activityLog?: ActivityEntry[];
   // 設定
   settings?: { gambleMultiplierBonus?: number };
+  // 満腹度上限アップグレード購入回数
+  satietyUpgradeCount?: number;
 }
 
 export interface ActivityEntry {
