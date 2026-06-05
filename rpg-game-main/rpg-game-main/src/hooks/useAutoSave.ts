@@ -6,7 +6,7 @@ import { useGameStore } from '../stores/gameStore';
 import { savePlayer } from '../services/database';
 import type { PlayerData } from '../types/game';
 
-const AUTO_SAVE_INTERVAL_MS = 30 * 1000; // 30秒ごと
+const AUTO_SAVE_INTERVAL_MS = 15 * 1000; // 15秒ごと
 const LS_KEY = 'rpg_backup';
 
 /** localStorage にバックアップ保存（失敗しても無視） */

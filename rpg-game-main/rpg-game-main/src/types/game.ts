@@ -21,8 +21,6 @@ export interface ItemMaster {
   buyPrice: number;
   maxStack: number;
   icon: string;
-  attackBonus?: number;
-  defenseBonus?: number;
   useEffect?: {
     hpRestore?: number;
     satietyRestore?: number;
@@ -287,22 +285,6 @@ export interface OnlineUser {
 // ============================================================
 // PvPギャンブル対戦型
 // ============================================================
-// 対戦演出用の同期データ（ゲストがjoin時にサーバーサイドで決定し保存）
-export interface GambleBattleData {
-  hostGoesFirst: boolean;       // ホストが先攻かどうか
-  hostDice: number;             // ホストの先攻決めサイコロ
-  guestDice: number;            // ゲストの先攻決めサイコロ
-  firstChoice?: string;         // 先攻が選んだ選択肢 (cho/han/omote/ura)
-  // 丁半
-  chohanDice?: [number, number]; // 丁半のサイコロ目
-  // コイントス
-  coinResults?: Array<'omote' | 'ura'>; // 6回のコイン表裏
-  // チンチロ
-  chinchiroRolls?: Array<{ who: 'host' | 'guest'; dice: number[] }>; // 投擲ログ
-  // スロット
-  slotRolls?: Array<{ who: 'host' | 'guest'; symbols: string[] }>; // スロットログ
-}
-
 export interface GambleBattle {
   id: string;
   hostUid: string;
@@ -314,7 +296,6 @@ export interface GambleBattle {
   guestUid?: string;
   guestName?: string;
   winnerId?: string;
-  battleData?: GambleBattleData; // 演出同期データ
   createdAt: number;
   expiresAt: number;
 }

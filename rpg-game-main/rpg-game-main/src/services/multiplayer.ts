@@ -4,7 +4,7 @@ import {
   onSnapshot, addDoc, getDoc, updateDoc, where, Unsubscribe, increment, getDocs,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { OnlineUser, BoardMessage, AuctionListing, GambleBattle, GambleBattleData, PokerTable, PokerCard, PokerPlayer } from '../types/game';
+import type { OnlineUser, BoardMessage, AuctionListing, GambleBattle, PokerTable, PokerCard, PokerPlayer } from '../types/game';
 import { calcJackpotContrib, rollJackpot } from '../systems/minigames';
 
 const COLLECTIONS = {
@@ -20,8 +20,6 @@ const COLLECTIONS = {
 // ============================================================
 let _onlineThrottleTimer: ReturnType<typeof setTimeout> | null = null;
 let _pendingOnlineData: { uid: string; displayName: string; level: number; activity: string; lastDungeonCleared?: string } | null = null;
-// displayName/levelをregisterOnline後に保持するキャッシュ
-let _onlineUserCache: { uid: string; displayName: string; level: number } | null = null;
 
 function _flushOnline() {
   if (!_pendingOnlineData) return;
@@ -35,8 +33,6 @@ function _flushOnline() {
 }
 
 export async function registerOnline(uid: string, displayName: string, level: number, activity?: string) {
-  // キャッシュに保存
-  _onlineUserCache = { uid, displayName, level };
   // 初回登録は即座に書き込む
   await setDoc(doc(db, COLLECTIONS.ONLINE, uid), {
     uid, displayName, level, lastSeen: Date.now(), currentActivity: activity ?? 'オンライン',
@@ -44,15 +40,8 @@ export async function registerOnline(uid: string, displayName: string, level: nu
 }
 
 export async function updateActivity(uid: string, activity: string, lastDungeonCleared?: string) {
-  // キャッシュからdisplayName/levelを取得（なければ空文字・1で継続）
-  const cached = _onlineUserCache?.uid === uid ? _onlineUserCache : null;
-  _pendingOnlineData = {
-    uid,
-    displayName: cached?.displayName ?? _pendingOnlineData?.displayName ?? '',
-    level: cached?.level ?? _pendingOnlineData?.level ?? 1,
-    activity,
-    lastDungeonCleared,
-  };
+  // 30秒throttle: 最後のupdateから30秒後にまとめて書き込む
+  _pendingOnlineData = { uid, displayName: _pendingOnlineData?.displayName ?? '', level: _pendingOnlineData?.level ?? 1, activity, lastDungeonCleared };
   if (!_onlineThrottleTimer) {
     _onlineThrottleTimer = setTimeout(() => {
       _onlineThrottleTimer = null;
@@ -217,6 +206,7 @@ export function subscribeJackpotPool(cb: (pool: number) => void): Unsubscribe {
   const timer = setInterval(fetch, 10_000);
   return () => { stopped = true; clearInterval(timer); };
 }
+}
 
 // 他のギャンブルで賭けるたびにプールへ積立（ローカル積算+15秒flush）
 export async function contributeToJackpot(bet: number): Promise<number> {
@@ -285,24 +275,15 @@ export function subscribeGambleBattles(cb: (battles: GambleBattle[]) => void): U
 
 function _rollDice(n = 6) { return Math.floor(Math.random() * n) + 1; }
 
-// 先攻決めサイコロ: ホストとゲストで異なる目が出るまで振る
-function _rollInitiative(): { hostDice: number; guestDice: number; hostGoesFirst: boolean } {
-  let hostDice = _rollDice(), guestDice = _rollDice();
-  while (hostDice === guestDice) { hostDice = _rollDice(); guestDice = _rollDice(); }
-  return { hostDice, guestDice, hostGoesFirst: hostDice > guestDice };
-}
-
-function _resolveChohan(): { hostWins: boolean; data: GambleBattleData } {
-  const { hostDice, guestDice, hostGoesFirst } = _rollInitiative();
+function _resolveChohan(): boolean {
+  // 先行決め: 1個ずつ振って出目が大きい方が先攻（丁/半を選べる）
+  let hostOrder = _rollDice(), guestOrder = _rollDice();
+  while (hostOrder === guestOrder) { hostOrder = _rollDice(); guestOrder = _rollDice(); }
+  const hostGoesFirst = hostOrder > guestOrder;
   const d1 = _rollDice(), d2 = _rollDice();
   const isEven = (d1 + d2) % 2 === 0;
-  // 先攻が「丁（偶数）」を選ぶ
-  const firstChoice = 'cho';
-  const hostWins = hostGoesFirst ? isEven : !isEven;
-  return {
-    hostWins,
-    data: { hostGoesFirst, hostDice, guestDice, firstChoice, chohanDice: [d1, d2] },
-  };
+  // 先行が丁を選ぶ、後攻は半が自動選択
+  return hostGoesFirst ? isEven : !isEven;
 }
 
 function _chinchiroScore(dice: number[]): number {
@@ -310,74 +291,49 @@ function _chinchiroScore(dice: number[]): number {
   if (d[0]===1 && d[1]===1 && d[2]===1) return 1000; // ピンゾロ
   if (d[0]===1 && d[1]===2 && d[2]===3) return -1;   // ヒフミ（負け）
   if (d[0]===4 && d[1]===5 && d[2]===6) return 500;  // シゴロ
-  if (d[0]===d[1] && d[1]===d[2]) return 300 + d[0]; // アラシ（ゾロ目）
+  if (d[0]===d[1] && d[1]===d[2]) return 300 + d[0]; // アラシ（ゾロ目）数字大きい方が強い
+  // 通常目: 2つ被り + 残り1つ。残りの1つが目 (6が最強、1が最弱)
   const counts: Record<number,number> = {};
   for (const v of d) counts[v] = (counts[v]??0)+1;
   const singles = Object.entries(counts).filter(([,c])=>c===1).map(([v])=>Number(v));
   const pairs = Object.entries(counts).filter(([,c])=>c===2);
-  if (pairs.length === 1 && singles.length === 1) return singles[0];
-  return 0;
+  if (pairs.length === 1 && singles.length === 1) return singles[0]; // 1〜6
+  return 0; // 目なし（振り直し扱い → 0点）
 }
 
-function _resolveChinchiro(): { hostWins: boolean; data: GambleBattleData } {
-  const { hostDice, guestDice, hostGoesFirst } = _rollInitiative();
-  // チンチロはホストが親（後攻）、ゲストが子（先攻）のルール
-  const rollDice3 = () => [_rollDice(),_rollDice(),_rollDice()];
-  const rolls: Array<{ who: 'host' | 'guest'; dice: number[] }> = [];
-
-  // チンチロの親は hostGoesFirst=false のとき = ゲストが先攻（子）なのでゲストから振る
-  // ここでは常にゲスト（子/先攻）→ホスト（親/後攻）の順
-  let guestScore = 0;
-  for (let i = 0; i < 3; i++) {
-    const dice = rollDice3();
-    rolls.push({ who: 'guest', dice });
-    guestScore = _chinchiroScore(dice);
-    if (guestScore !== 0) break;
-  }
-
-  // ゲストが即勝ち/即負けの特殊役チェック
-  if (guestScore === -1 || guestScore === 0) {
-    // ゲスト（子）がヒフミ/目なし → ホスト（親）勝ち
-    return { hostWins: true, data: { hostGoesFirst, hostDice, guestDice, chinchiroRolls: rolls } };
-  }
-
+function _resolveChinchiro(): boolean {
+  // 役が出るまで最大3回振り、スコアが高い方が勝ち
+  // ヒフミ(-1)は即負け、0は目なし（振り直し）
+  const roll = () => [_rollDice(),_rollDice(),_rollDice()];
   let hostScore = 0;
   let hostInstantLoss = false;
   for (let i = 0; i < 3; i++) {
-    const dice = rollDice3();
-    rolls.push({ who: 'host', dice });
-    hostScore = _chinchiroScore(dice);
+    hostScore = _chinchiroScore(roll());
     if (hostScore !== 0) break;
   }
   if (hostScore === -1) hostInstantLoss = true;
-  if (hostScore >= 300 || hostScore === 500 || hostScore === 1000) {
-    return { hostWins: true, data: { hostGoesFirst, hostDice, guestDice, chinchiroRolls: rolls } };
+  // 親の一発終了ルール: ピンゾロ(1000)/シゴロ(500)/アラシ(300+) → 親総取り
+  // ヒフミ(-1)/目なし3投目(0) → 親総負け
+  if (hostScore >= 300 || hostScore === 500 || hostScore === 1000) return true;  // 親の即勝ち
+  if (hostInstantLoss || hostScore === 0) return false; // 親の即負け
+  // 通常目(1-6): 子もサイコロを振る
+  let guestScore = 0;
+  for (let i = 0; i < 3; i++) {
+    guestScore = _chinchiroScore(roll());
+    if (guestScore !== 0) break;
   }
-  if (hostInstantLoss || hostScore === 0) {
-    return { hostWins: false, data: { hostGoesFirst, hostDice, guestDice, chinchiroRolls: rolls } };
-  }
-  const hostWins = hostScore >= guestScore ? (hostScore === guestScore ? Math.random() < 0.5 : true) : false;
-  return { hostWins, data: { hostGoesFirst, hostDice, guestDice, chinchiroRolls: rolls } };
+  if (guestScore === -1 || guestScore === 0) return true; // 子がヒフミ/目なし → 親勝ち
+  if (hostScore === guestScore) return Math.random() < 0.5;
+  return hostScore > guestScore;
 }
 
-function _resolveCoinFlip(): { hostWins: boolean; data: GambleBattleData } {
-  const { hostDice, guestDice, hostGoesFirst } = _rollInitiative();
-  // 先攻が「表（omote）」を選ぶ
-  const firstChoice = 'omote';
-  const coinResults: Array<'omote' | 'ura'> = [];
-  let firstWins = 0, secondWins = 0;
-  for (let i = 0; i < 6; i++) {
-    const face: 'omote' | 'ura' = Math.random() < 0.5 ? 'omote' : 'ura';
-    coinResults.push(face);
-    if (face === 'omote') firstWins++; else secondWins++;
-  }
-  // 先攻が「表」を選んだので表が多ければ先攻の勝ち
-  const firstPlayerWins = firstWins >= secondWins; // 同数は先攻有利
-  const hostWins = hostGoesFirst ? firstPlayerWins : !firstPlayerWins;
-  return {
-    hostWins,
-    data: { hostGoesFirst, hostDice, guestDice, firstChoice, coinResults },
-  };
+function _resolveCoinFlip(): boolean {
+  // 先行決めサイコロ → 先行が丁（偶数）を選ぶ、コインはランダム（丁半と同じロジック）
+  const hostFirst = _rollDice() >= _rollDice();
+  const d1 = _rollDice(), d2 = _rollDice();
+  const isEven = (d1 + d2) % 2 === 0;
+  // 先行が丁（偶数）を選ぶ
+  return hostFirst ? isEven : !isEven;
 }
 
 const SLOT_SYMBOLS = ['🍒','🍋','💎','7️⃣','🔔','💰'];
@@ -385,34 +341,24 @@ function _slotRank(reels: string[]): number {
   if (reels[0]===reels[1] && reels[1]===reels[2]) {
     return reels[0]==='7️⃣' ? 100 : reels[0]==='💎' ? 50 : SLOT_SYMBOLS.indexOf(reels[0]) + 10;
   }
-  if (reels[0]===reels[1] || reels[1]===reels[2] || reels[0]===reels[2]) return 1;
+  if (reels[0]===reels[1] || reels[1]===reels[2]) return 1;
   return 0;
 }
 
-function _resolveSlot(): { hostWins: boolean; data: GambleBattleData } {
-  const { hostDice, guestDice, hostGoesFirst } = _rollInitiative();
-  const slotRolls: Array<{ who: 'host' | 'guest'; symbols: string[] }> = [];
-  // 先攻から回す。hostGoesFirst=trueならhostが先攻
-  const spinRound = (who: 'host' | 'guest'): number => {
-    for (let i = 0; i < 10; i++) { // 最大10回で必ず役が出る
+function _resolveSlot(): boolean {
+  // 先行決めサイコロ → スロットを回して役が出るまで（最大5回）
+  const spinUntilRoll = (): number => {
+    for (let i = 0; i < 5; i++) {
       const reels = [0,1,2].map(() => SLOT_SYMBOLS[Math.floor(Math.random()*SLOT_SYMBOLS.length)]);
-      slotRolls.push({ who, symbols: reels });
       const rank = _slotRank(reels);
       if (rank > 0) return rank;
     }
-    // 役なしの場合はランダムな役を強制生成
-    const sym = SLOT_SYMBOLS[Math.floor(Math.random()*SLOT_SYMBOLS.length)];
-    const reels = [sym, sym, SLOT_SYMBOLS[Math.floor(Math.random()*SLOT_SYMBOLS.length)]];
-    slotRolls.push({ who, symbols: reels });
-    return 1;
+    return 0;
   };
-  const firstWho: 'host' | 'guest' = hostGoesFirst ? 'host' : 'guest';
-  const secondWho: 'host' | 'guest' = hostGoesFirst ? 'guest' : 'host';
-  const firstRank = spinRound(firstWho);
-  const secondRank = spinRound(secondWho);
-  const firstPlayerWins = firstRank >= secondRank;
-  const hostWins = hostGoesFirst ? firstPlayerWins : !firstPlayerWins;
-  return { hostWins, data: { hostGoesFirst, hostDice, guestDice, slotRolls } };
+  const hostRank = spinUntilRoll();
+  const guestRank = spinUntilRoll();
+  if (hostRank === guestRank) return Math.random() < 0.5;
+  return hostRank > guestRank;
 }
 
 export async function joinGambleBattle(
@@ -426,20 +372,19 @@ export async function joinGambleBattle(
   if (battle.status !== 'waiting') return { success: false, battle };
   if (battle.hostUid === guestUid) return { success: false, battle };
 
-  // ゲームタイプに応じた対戦ロジック（サーバーサイドで一度だけ決定）
+  // ゲームタイプに応じた対戦ロジック
   let hostWins: boolean;
-  let battleData: GambleBattleData;
   const gt = battle.gambleType;
-  if (gt === 'chohan') { const r = _resolveChohan(); hostWins = r.hostWins; battleData = r.data; }
-  else if (gt === 'chinchiro') { const r = _resolveChinchiro(); hostWins = r.hostWins; battleData = r.data; }
-  else if (gt === 'coin_flip') { const r = _resolveCoinFlip(); hostWins = r.hostWins; battleData = r.data; }
-  else if (gt === 'slot_machine') { const r = _resolveSlot(); hostWins = r.hostWins; battleData = r.data; }
-  else { hostWins = Math.random() < 0.5; battleData = { hostGoesFirst: true, hostDice: 6, guestDice: 1 }; }
+  if (gt === 'chohan') hostWins = _resolveChohan();
+  else if (gt === 'chinchiro') hostWins = _resolveChinchiro();
+  else if (gt === 'coin_flip') hostWins = _resolveCoinFlip();
+  else if (gt === 'slot_machine') hostWins = _resolveSlot();
+  else hostWins = Math.random() < 0.5;
 
   const winnerId = hostWins ? battle.hostUid : guestUid;
-  await updateDoc(ref, { status: 'finished', guestUid, guestName, winnerId, battleData });
+  await updateDoc(ref, { status: 'finished', guestUid, guestName, winnerId });
 
-  return { success: true, battle: { ...battle, guestUid, guestName, winnerId, status: 'finished', battleData } };
+  return { success: true, battle: { ...battle, guestUid, guestName, winnerId, status: 'finished' } };
 }
 
 // ホストが自分のバトルの状態変化（finished）を監視するための購読
