@@ -796,6 +796,7 @@ function TexasHoldemPanel() {
   const [createForm, setCreateForm] = useState({ maxPlayers: 4, buyIn: 1000 });
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showRules, setShowRules] = useState(false);
 
   // ゲーム内アクション
   const [raiseInput, setRaiseInput] = useState(0);
@@ -921,13 +922,66 @@ function TexasHoldemPanel() {
 
     return (
       <div style={{ minHeight: 400 }}>
+        {/* ルール詳細モーダル（ゲーム中も表示可） */}
+        {showRules && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:200, display:'flex', alignItems:'flex-start', justifyContent:'center', overflowY:'auto', padding:'16px 8px' }}
+            onClick={() => setShowRules(false)}>
+            <div style={{ background:'#1c2235', border:'1px solid #2d3752', borderRadius:12, padding:'18px 16px', maxWidth:480, width:'100%', color:'#e8e6ff', fontSize:'0.82rem', lineHeight:1.7 }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                <span style={{ fontWeight:700, fontSize:'1rem', color:'#f0c060' }}>♠ テキサスホールデム ルール</span>
+                <button onClick={() => setShowRules(false)} style={{ background:'none', border:'none', color:'#8a92b2', cursor:'pointer', fontSize:'1.2rem' }}>✕</button>
+              </div>
+              <div style={{ color:'#8a92b2', marginBottom:12, fontSize:'0.78rem' }}>ポーカーが初めての方もこれを読めばプレイできます！</div>
+              <div style={{ fontWeight:700, color:'#5b8dee', marginBottom:4 }}>📍 ポジション</div>
+              <div style={{ marginBottom:10 }}>
+                <span style={{ color:'#f0c060', fontWeight:700 }}>D（ディーラー）</span>…親の役割。<br/>
+                <span style={{ color:'#4caf87', fontWeight:700 }}>SB（スモールブラインド）</span>…強制的に少額ベット。<br/>
+                <span style={{ color:'#5b8dee', fontWeight:700 }}>BB（ビッグブラインド）</span>…強制的にSBの2倍をベット。
+              </div>
+              <div style={{ fontWeight:700, color:'#5b8dee', marginBottom:4 }}>🎯 アクション</div>
+              <div style={{ marginBottom:10 }}>
+                <div style={{ marginBottom:2 }}><span style={{ color:'#e05555', fontWeight:700 }}>フォールド</span>：手札を捨てて降りる。</div>
+                <div style={{ marginBottom:2 }}><span style={{ color:'#4caf87', fontWeight:700 }}>チェック</span>：追加ベットなしでパス（ベットが上がっていない時のみ）。</div>
+                <div style={{ marginBottom:2 }}><span style={{ color:'#5b8dee', fontWeight:700 }}>コール</span>：直前のベット額に合わせる。</div>
+                <div style={{ marginBottom:2 }}><span style={{ color:'#f0c060', fontWeight:700 }}>レイズ</span>：ベット額をさらに上乗せする。</div>
+                <div><span style={{ color:'#f0a830', fontWeight:700 }}>オールイン</span>：全チップを賭ける。</div>
+              </div>
+              <div style={{ fontWeight:700, color:'#5b8dee', marginBottom:4 }}>🏆 役の強さ（弱い順）</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:2, marginBottom:10 }}>
+                {[
+                  ['1','ハイカード','役なし'],
+                  ['2','ワンペア','同数字2枚'],
+                  ['3','ツーペア','ペア2組'],
+                  ['4','スリーオブアカインド','同数字3枚'],
+                  ['5','ストレート','5枚連続'],
+                  ['6','フラッシュ','同マーク5枚'],
+                  ['7','フルハウス','3枚+ペア'],
+                  ['8','フォーオブアカインド','同数字4枚'],
+                  ['9','ストレートフラッシュ','同マーク5枚連続'],
+                  ['10','ロイヤルストレートフラッシュ','10-J-Q-K-A 同マーク（最強）'],
+                ].map(([n, name, desc]) => (
+                  <div key={n} style={{ display:'flex', gap:6 }}>
+                    <span style={{ minWidth:18, color:'#4a5070', fontWeight:700, fontSize:'0.75rem' }}>{n}.</span>
+                    <span style={{ color: Number(n) >= 8 ? '#f0c060' : Number(n) >= 5 ? '#4caf87' : '#e8e6ff', fontWeight:700 }}>{name}</span>
+                    <span style={{ color:'#8a92b2', fontSize:'0.75rem' }}>{desc}</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => setShowRules(false)} style={{ width:'100%', padding:'9px', background:'linear-gradient(135deg,#5b8dee,#3a6fd0)', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontWeight:700 }}>閉じる</button>
+            </div>
+          </div>
+        )}
         {/* ヘッダー */}
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
           <div>
             <span style={{ fontWeight:700, fontSize:'0.9rem', color:'#f0c060' }}>♠ テキサスホールデム</span>
             <span style={{ marginLeft:8, fontSize:'0.75rem', background:'rgba(91,141,238,0.2)', color:'#5b8dee', border:'1px solid #5b8dee', borderRadius:4, padding:'1px 6px' }}>{phaseName[phase] ?? phase}</span>
           </div>
-          <span style={{ fontSize:'0.8rem', color:'#8a92b2' }}>ポット: <span style={{color:'#f0c060',fontWeight:700}}>{activeTable.pot.toLocaleString()}G</span></span>
+          <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+            <button onClick={() => setShowRules(true)} style={{ padding:'3px 8px', background:'rgba(91,141,238,0.15)', color:'#5b8dee', border:'1px solid #5b8dee', borderRadius:5, cursor:'pointer', fontSize:'0.7rem', fontWeight:700 }}>？ルール</button>
+            <span style={{ fontSize:'0.8rem', color:'#8a92b2' }}>ポット: <span style={{color:'#f0c060',fontWeight:700}}>{activeTable.pot.toLocaleString()}G</span></span>
+          </div>
         </div>
 
         {/* コミュニティカード */}
@@ -1005,9 +1059,9 @@ function TexasHoldemPanel() {
             <div style={{ fontSize:'0.78rem', color:'#8a92b2', textAlign:'center' }}>
               参加者: {activeTable.players.length}/{activeTable.maxPlayers}人 | 参加費: {activeTable.buyIn.toLocaleString()}G
             </div>
-            <button onClick={handleStart} disabled={loading || activeTable.players.length < 3}
-              style={{ padding:'9px', background: activeTable.players.length >= 3 ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontWeight:700, fontSize:'0.85rem' }}>
-              {activeTable.players.length < 3 ? `あと${3 - activeTable.players.length}人必要` : '▶ ゲームを開始する'}
+            <button onClick={handleStart} disabled={loading || activeTable.players.length < 2}
+              style={{ padding:'9px', background: activeTable.players.length >= 2 ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontWeight:700, fontSize:'0.85rem' }}>
+              {activeTable.players.length < 2 ? `あと${2 - activeTable.players.length}人必要` : '▶ ゲームを開始する'}
             </button>
             <button onClick={handleCancel} disabled={loading}
               style={{ padding:'7px', background:'#1c2235', color:'#e05555', border:'1px solid #e05555', borderRadius:7, cursor:'pointer', fontSize:'0.8rem' }}>
@@ -1086,22 +1140,106 @@ function TexasHoldemPanel() {
   // ロビービュー
   return (
     <div>
+      {/* ルール詳細モーダル */}
+      {showRules && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:200, display:'flex', alignItems:'flex-start', justifyContent:'center', overflowY:'auto', padding:'16px 8px' }}
+          onClick={() => setShowRules(false)}>
+          <div style={{ background:'#1c2235', border:'1px solid #2d3752', borderRadius:12, padding:'18px 16px', maxWidth:480, width:'100%', color:'#e8e6ff', fontSize:'0.82rem', lineHeight:1.7 }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+              <span style={{ fontWeight:700, fontSize:'1rem', color:'#f0c060' }}>♠ テキサスホールデム ルール</span>
+              <button onClick={() => setShowRules(false)} style={{ background:'none', border:'none', color:'#8a92b2', cursor:'pointer', fontSize:'1.2rem' }}>✕</button>
+            </div>
+            <div style={{ color:'#8a92b2', marginBottom:12, fontSize:'0.78rem' }}>ポーカーが初めての方もこれを読めばプレイできます！</div>
+
+            <div style={{ fontWeight:700, color:'#5b8dee', marginBottom:4 }}>🃏 基本ルール</div>
+            <div style={{ marginBottom:10 }}>
+              ジョーカーなし52枚のデッキを使います。各プレイヤーに秘密の手札2枚（ホールカード）が配られ、全員で共有する場の5枚（コミュニティカード）と合わせて、合計7枚の中から最強の5枚の組み合わせ（役）を作ります。最も強い役を持つプレイヤーが、場に積まれたチップ（ポット）をすべて獲得します。
+            </div>
+
+            <div style={{ fontWeight:700, color:'#5b8dee', marginBottom:4 }}>📍 ポジション</div>
+            <div style={{ marginBottom:10 }}>
+              <span style={{ color:'#f0c060', fontWeight:700 }}>D（ディーラー）</span>…親の役割。<br/>
+              <span style={{ color:'#4caf87', fontWeight:700 }}>SB（スモールブラインド）</span>…強制的に少額ベット。<br/>
+              <span style={{ color:'#5b8dee', fontWeight:700 }}>BB（ビッグブラインド）</span>…強制的にSBの2倍をベット。<br/>
+              ※ブラインドはゲーム開始前に強制的に出すチップです。
+            </div>
+
+            <div style={{ fontWeight:700, color:'#5b8dee', marginBottom:4 }}>🔄 ゲームの流れ</div>
+            <div style={{ marginBottom:10 }}>
+              <div style={{ marginBottom:4 }}><span style={{ color:'#f0c060', fontWeight:700 }}>① プリフロップ</span>：手札2枚が配られる。BBの左隣から順番にアクション。</div>
+              <div style={{ marginBottom:4 }}><span style={{ color:'#f0c060', fontWeight:700 }}>② フロップ</span>：場にコミュニティカード3枚が公開される。SBから順番にアクション。</div>
+              <div style={{ marginBottom:4 }}><span style={{ color:'#f0c060', fontWeight:700 }}>③ ターン</span>：コミュニティカードがさらに1枚（計4枚）公開される。</div>
+              <div style={{ marginBottom:4 }}><span style={{ color:'#f0c060', fontWeight:700 }}>④ リバー</span>：最後のコミュニティカード1枚（計5枚）が公開される。</div>
+              <div><span style={{ color:'#f0c060', fontWeight:700 }}>⑤ ショーダウン</span>：2人以上残っていれば手札を開示して役を比べ、勝者がポットを獲得。</div>
+            </div>
+
+            <div style={{ fontWeight:700, color:'#5b8dee', marginBottom:4 }}>🎯 アクション（行動）</div>
+            <div style={{ marginBottom:10 }}>
+              <div style={{ marginBottom:3 }}><span style={{ color:'#e05555', fontWeight:700 }}>フォールド</span>：手札を捨てて降りる。それまでに出したチップは戻らない。</div>
+              <div style={{ marginBottom:3 }}><span style={{ color:'#4caf87', fontWeight:700 }}>チェック</span>：追加でチップを出さずにパス。自分の前にベットが上がっていない時だけ使える。</div>
+              <div style={{ marginBottom:3 }}><span style={{ color:'#5b8dee', fontWeight:700 }}>コール</span>：直前のベット額に合わせてチップを出す。</div>
+              <div style={{ marginBottom:3 }}><span style={{ color:'#f0c060', fontWeight:700 }}>レイズ</span>：直前のベット額にさらに上乗せして賭ける。</div>
+              <div><span style={{ color:'#f0a830', fontWeight:700 }}>オールイン</span>：持っているチップをすべて賭ける。</div>
+            </div>
+
+            <div style={{ fontWeight:700, color:'#5b8dee', marginBottom:4 }}>🏆 役の強さ（弱い順）</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:12 }}>
+              {[
+                ['1','ハイカード','役なし。最も強いカード1枚で比べる（Aが最強）'],
+                ['2','ワンペア','同じ数字が2枚（例: A-A）'],
+                ['3','ツーペア','同じ数字ペアが2組（例: K-K と 10-10）'],
+                ['4','スリーオブアカインド','同じ数字が3枚'],
+                ['5','ストレート','数字が5枚連続（例: 5-6-7-8-9）A-2-3-4-5が最弱、10-J-Q-K-Aが最強'],
+                ['6','フラッシュ','同じマーク(スート)が5枚'],
+                ['7','フルハウス','3枚＋ペア（例: Q-Q-Q と 7-7）'],
+                ['8','フォーオブアカインド','同じ数字が4枚（クワッズ）'],
+                ['9','ストレートフラッシュ','同じマークで5枚連続'],
+                ['10','ロイヤルストレートフラッシュ','同マークの 10-J-Q-K-A。最強の役！'],
+              ].map(([n, name, desc]) => (
+                <div key={n} style={{ display:'flex', gap:6, alignItems:'flex-start' }}>
+                  <span style={{ minWidth:18, color:'#4a5070', fontWeight:700, fontSize:'0.75rem' }}>{n}.</span>
+                  <div>
+                    <span style={{ color: Number(n) >= 8 ? '#f0c060' : Number(n) >= 5 ? '#4caf87' : '#e8e6ff', fontWeight:700 }}>{name}</span>
+                    <span style={{ color:'#8a92b2', marginLeft:6, fontSize:'0.75rem' }}>{desc}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ background:'rgba(91,141,238,0.08)', border:'1px solid #2d3752', borderRadius:8, padding:'8px 10px', fontSize:'0.75rem', color:'#8a92b2' }}>
+              💡 <strong style={{ color:'#e8e6ff' }}>ポイント</strong>：自分の手札2枚は相手に見えません。コミュニティカードは全員共通なので、いかに自分の手札とうまく組み合わせるかが勝負です。相手より強い役を作るか、全員にフォールドさせれば勝ちです！
+            </div>
+
+            <button onClick={() => setShowRules(false)} style={{ width:'100%', marginTop:12, padding:'9px', background:'linear-gradient(135deg,#5b8dee,#3a6fd0)', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontWeight:700 }}>
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{ marginBottom:12 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
           <span style={{ fontSize:'0.85rem', color:'#f0c060', fontWeight:700 }}>♠ テキサスホールデム対戦</span>
-          <button onClick={() => setShowCreateForm(!showCreateForm)}
-            style={{ padding:'5px 12px', background: showCreateForm ? '#2d3752' : 'linear-gradient(135deg,#5b8dee,#3a6fd0)', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:'0.78rem', fontWeight:700 }}>
-            {showCreateForm ? 'キャンセル' : '+ テーブルを作る'}
-          </button>
+          <div style={{ display:'flex', gap:6 }}>
+            <button onClick={() => setShowRules(true)}
+              style={{ padding:'5px 10px', background:'rgba(91,141,238,0.15)', color:'#5b8dee', border:'1px solid #5b8dee', borderRadius:6, cursor:'pointer', fontSize:'0.75rem', fontWeight:700 }}>
+              ？ルール
+            </button>
+            <button onClick={() => setShowCreateForm(!showCreateForm)}
+              style={{ padding:'5px 12px', background: showCreateForm ? '#2d3752' : 'linear-gradient(135deg,#5b8dee,#3a6fd0)', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:'0.78rem', fontWeight:700 }}>
+              {showCreateForm ? 'キャンセル' : '+ テーブルを作る'}
+            </button>
+          </div>
         </div>
 
         {showCreateForm && (
           <div style={{ background:'rgba(91,141,238,0.08)', border:'1px solid #2d3752', borderRadius:8, padding:'12px', marginBottom:12 }}>
             <div style={{ fontSize:'0.8rem', color:'#8a92b2', marginBottom:8 }}>テーブル設定</div>
             <div style={{ marginBottom:8 }}>
-              <div style={{ fontSize:'0.75rem', color:'#8a92b2', marginBottom:4 }}>参加人数（3〜6人）</div>
+              <div style={{ fontSize:'0.75rem', color:'#8a92b2', marginBottom:4 }}>参加人数（2〜6人）</div>
               <div style={{ display:'flex', gap:4 }}>
-                {[3,4,5,6].map(n => (
+                {[2,3,4,5,6].map(n => (
                   <button key={n} onClick={() => setCreateForm(f => ({...f, maxPlayers:n}))}
                     style={{ flex:1, padding:'6px', background: createForm.maxPlayers === n ? 'rgba(91,141,238,0.3)' : '#1c2235', border:`1px solid ${createForm.maxPlayers === n ? '#5b8dee' : '#2d3752'}`, color: createForm.maxPlayers === n ? '#e8e6ff' : '#8a92b2', borderRadius:4, cursor:'pointer', fontWeight:700, fontSize:'0.85rem' }}>
                     {n}人
@@ -1182,7 +1320,8 @@ function TexasHoldemPanel() {
         })
       )}
       <div style={{ marginTop:10, padding:'8px 10px', background:'rgba(91,141,238,0.05)', border:'1px solid #2d3752', borderRadius:8, fontSize:'0.72rem', color:'#4a5070' }}>
-        📜 ルール: テキサスホールデム / 3〜6人 / 2枚の手札＋5枚のコミュニティカードで最強の役を作る / 勝者がポット総取り
+        📜 ルール: テキサスホールデム / 2〜6人 / 2枚の手札＋5枚のコミュニティカードで最強の役を作る / 勝者がポット総取り<br/>
+        <span style={{ cursor:'pointer', color:'#5b8dee', textDecoration:'underline' }} onClick={() => setShowRules(true)}>詳しいルール・役の一覧はこちら →</span>
       </div>
     </div>
   );

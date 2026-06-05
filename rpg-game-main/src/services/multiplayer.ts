@@ -865,7 +865,7 @@ export async function startPokerGame(tableId: string, hostUid: string): Promise<
   if (!snap.exists()) return { success: false, message: 'テーブルが見つかりません' };
   const table = { id: snap.id, ...(snap.data() as Omit<PokerTable,'id'>) };
   if (table.hostUid !== hostUid) return { success: false, message: '権限がありません' };
-  if (table.players.length < 3) return { success: false, message: '最低3人必要です' };
+  if (table.players.length < 2) return { success: false, message: '最低2人必要です' };
   if (table.status !== 'waiting') return { success: false, message: '既に開始しています' };
 
   const deck = _shuffle(_makeDeck());
@@ -879,9 +879,11 @@ export async function startPokerGame(tableId: string, hostUid: string): Promise<
   const smallBlind = Math.max(1, Math.floor(table.buyIn * 0.01)); // buyInの1%
   const bigBlind = smallBlind * 2;
   const dealerIdx = 0;
-  const sbIdx = (dealerIdx + 1) % players.length;
-  const bbIdx = (dealerIdx + 2) % players.length;
-  const firstActIdx = (dealerIdx + 3) % players.length;
+  // ヘッズアップ(2人)はDealerがSB、相手がBB、SBから先行アクション
+  const isHeadsUp = players.length === 2;
+  const sbIdx = isHeadsUp ? dealerIdx : (dealerIdx + 1) % players.length;
+  const bbIdx = isHeadsUp ? (dealerIdx + 1) % players.length : (dealerIdx + 2) % players.length;
+  const firstActIdx = isHeadsUp ? dealerIdx : (dealerIdx + 3) % players.length;
 
   players[sbIdx].chips -= smallBlind;
   players[sbIdx].bet = smallBlind;
