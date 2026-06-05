@@ -1,0 +1,180 @@
+// firestore.rules
+// デプロイ: firebase deploy --only firestore:rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return request.auth != null
+        && (request.auth.uid == 'jJ7BrZ0HhpeC5WYsdZbjRlQBRzK2'
+          || request.auth.uid == '49yFkciBJLhFbFq7YJrbg8dI8rf2');
+    }
+
+    // ============================================================
+    // players/{uid} — プレイヤーデータ
+    // ============================================================
+    match /players/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.gold is int
+        && request.resource.data.gold >= 0
+        && request.resource.data.gold <= 10000;  // 初期所持金の上限
+
+      allow update: if isAdmin()
+        || (isOwner(uid)
+            // 不変フィールドの保護
+            && request.resource.data.uid == uid
+            && request.resource.data.createdAt == resource.data.createdAt
+            // gold は整数・非負・上限あり
+            && request.resource.data.gold is int
+            && request.resource.data.gold >= 0
+            && request.resource.data.gold <= 100000000
+            // 1回のwrite で gold を 50,000G 超えて増やせない
+            && (request.resource.data.gold - resource.data.gold) <= 50000
+            // stats.level の直接書き換えを禁止（経験値テーブル経由でのみ上がる）
+            // stats オブジェクトが存在する場合のみチェック
+            && (!("stats" in request.resource.data)
+                || request.resource.data.stats.level <= resource.data.stats.level + 1)
+            // banned フラグは本人が書き換えられない
+            && request.resource.data.get("banned", false) == resource.data.get("banned", false));
+
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
+    // auctions/{listingId} — オークション出品
+    // ============================================================
+    match /auctions/{listingId} {
+      allow read: if isAuthed();
+      allow create: if isAuthed()
+        && request.resource.data.sellerUid == request.auth.uid
+        && request.resource.data.pricePerUnit is int
+        && request.resource.data.pricePerUnit >= 1
+        && request.resource.data.pricePerUnit <= 10000000
+        && request.resource.data.amount is int
+        && request.resource.data.amount >= 1
+        && request.resource.data.amount <= 9999
+        && request.resource.data.expiresAt is int
+        && request.resource.data.expiresAt <= request.time.toMillis() + 604800001;
+      allow delete: if isAuthed()
+        && (resource.data.sellerUid == request.auth.uid || isAdmin());
+      allow update: if isAdmin();
+    }
+
+    // ============================================================
+    // gamble_battles/{battleId} — ギャンブル対戦
+    // ============================================================
+    match /gamble_battles/{battleId} {
+      allow read: if isAuthed();
+      allow create: if isAuthed()
+        && request.resource.data.hostUid == request.auth.uid
+        && request.resource.data.betAmount is int
+        && request.resource.data.betAmount >= 10
+        && request.resource.data.betAmount <= 100000
+        // status は waiting のみ作成可
+        && request.resource.data.status == 'waiting';
+      allow update: if isAuthed()
+        && (resource.data.hostUid == request.auth.uid
+          || resource.data.guestUid == request.auth.uid
+          || isAdmin())
+        // betAmount・hostUid は書き換え不可
+        && request.resource.data.betAmount == resource.data.betAmount
+        && request.resource.data.hostUid == resource.data.hostUid;
+      allow delete: if isAuthed()
+        && (resource.data.hostUid == request.auth.uid || isAdmin());
+    }
+
+    // ============================================================
+    // board/{messageId} — 掲示板
+    // ============================================================
+    match /board/{messageId} {
+      allow read: if isAuthed();
+      allow create: if isAuthed()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() >= 1
+        && request.resource.data.text.size() <= 200;
+      allow delete: if isAuthed()
+        && (resource.data.uid == request.auth.uid || isAdmin());
+      allow update: if isAdmin();
+    }
+
+    // ============================================================
+    // online_users/{uid} — オンライン状態
+    // ============================================================
+    match /online_users/{uid} {
+      allow read: if isAuthed();
+      allow write: if isOwner(uid);
+    }
+
+    // ============================================================
+    // admin/{docId} — 管理者設定（ギャンブル倍率・メンテナンス等）
+    // ============================================================
+    match /admin/{docId} {
+      allow read: if isAuthed();
+      allow write: if isAdmin();
+    }
+
+    // ============================================================
+    // sold_notifications/{notifId} — 売却通知
+    // ============================================================
+    match /sold_notifications/{notifId} {
+      allow read: if isAuthed()
+        && (resource.data.sellerUid == request.auth.uid
+          || resource.data.buyerUid == request.auth.uid
+          || isAdmin());
+      // 作成はオークション購入ロジック（buyerUid が存在する場合のみ）
+      allow create: if isAuthed()
+        && request.resource.data.buyerUid == request.auth.uid
+        && request.resource.data.sellerUid is string
+        && request.resource.data.totalGold is int
+        && request.resource.data.totalGold >= 0;
+      // 既読フラグのみ書き換え可（sellerUid 本人）
+      allow update: if isAuthed()
+        && resource.data.sellerUid == request.auth.uid
+        && request.resource.data.read == true
+        && request.resource.data.sellerUid == resource.data.sellerUid
+        && request.resource.data.totalGold == resource.data.totalGold;
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
+    // shared/{docId} — 共有設定（お知らせ・ジャックポット）
+    // ============================================================
+    match /shared/{docId} {
+      allow read: if isAuthed();
+      allow write: if isAdmin()
+        // ジャックポット積立は認証ユーザー全員が加算のみ可
+        || (docId == 'jackpot'
+            && isAuthed()
+            && request.resource.data.pool is int
+            && request.resource.data.pool >= resource.data.get('pool', 0));
+    }
+
+    // ============================================================
+    // announcements/{docId} — お知らせ履歴
+    // ============================================================
+    match /announcements/{docId} {
+      allow read: if isAuthed();
+      allow write: if isAdmin();
+    }
+
+    // ============================================================
+    // それ以外は全拒否（コンソールからの野良writeを完全遮断）
+    // ============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
