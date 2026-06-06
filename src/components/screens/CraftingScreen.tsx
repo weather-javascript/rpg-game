@@ -21,17 +21,11 @@ const EMPTY_GRID: GridCell[] = Array(9).fill(null).map(() => ({ itemId: '', amou
 // ============================================================
 // レシピマッチング（shapeがあれば位置一致、なければ位置不問）
 // ============================================================
-function matchRecipe(grid: GridCell[], recipes: CraftRecipe[]): CraftRecipe | null {
-  return matchRecipeWithCount(grid, recipes)?.recipe ?? null;
-}
-
 /** レシピマッチ＋何回分製作できるか */
 function matchRecipeWithCount(grid: GridCell[], recipes: CraftRecipe[]): { recipe: CraftRecipe; times: number } | null {
   for (const recipe of recipes) {
     if (recipe.shape && recipe.shape.length === 9) {
       // 位置一致マッチング（shapeあり）
-      // まず最小配置（各セルに1個）でshapeが一致するか確認
-      const baseGrid = grid.map(c => ({ ...c, amount: c.amount > 0 ? 1 : 0 }));
       const match = recipe.shape.every((expected, i) => {
         if (!expected) return !grid[i].itemId;
         return grid[i].itemId === expected;

@@ -1106,7 +1106,7 @@ export interface Proposal {
 }
 
 export async function submitProposal(proposal: Omit<Proposal, 'id' | 'status' | 'createdAt'>): Promise<void> {
-  const { addDoc, collection, serverTimestamp } = await import('firebase/firestore');
+  const { addDoc, collection } = await import('firebase/firestore');
   await addDoc(collection(db, 'proposals'), {
     ...proposal,
     status: 'pending',
