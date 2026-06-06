@@ -932,6 +932,25 @@ export async function pokerAction(
   }
 
   if (shouldAdvancePhase) {
+    // 全員オールイン→残りフェーズを一気に展開してショーダウン
+    const allInOrFolded = players.every(p => p.folded || p.allIn);
+    if (allInOrFolded) {
+      const deck2 = table.deck as PokerCard[];
+      let newDeck2 = [...deck2];
+      let newCommunity2 = [...table.communityCards];
+      let cur = table.phase;
+      while (newCommunity2.length < 5) {
+        const nxt = _nextPhase(cur);
+        if (nxt === 'showdown') break;
+        if (nxt === 'flop') { newCommunity2.push(newDeck2[0], newDeck2[1], newDeck2[2]); newDeck2 = newDeck2.slice(3); }
+        else if (nxt === 'turn' || nxt === 'river') { newCommunity2.push(newDeck2[0]); newDeck2 = newDeck2.slice(1); }
+        cur = nxt;
+      }
+      const tableForShowdown = { ...table, communityCards: newCommunity2, deck: newDeck2 };
+      const finalUpdates2 = await _resolveShowdown(tableForShowdown, players.map(p => ({ ...p, bet: 0 })), pot, ref);
+      await updateDoc(ref, { ...finalUpdates2, lastActionAt: Date.now() });
+      return { success: true };
+    }
     const nextPhase = _nextPhase(table.phase);
     if (nextPhase === 'showdown') {
       const finalUpdates = await _resolveShowdown(table, players, pot, ref);
