@@ -4,7 +4,7 @@ import {
   onSnapshot, addDoc, getDoc, updateDoc, where, Unsubscribe, increment, getDocs,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { OnlineUser, BoardMessage, AuctionListing, GambleBattle, PokerTable, PokerCard, PokerPlayer } from '../types/game';
+import type { OnlineUser, BoardMessage, AuctionListing, GambleBattle, PokerTable, PokerCard, PokerPlayer, PokerPhase } from '../types/game';
 import { calcJackpotContrib, rollJackpot } from '../systems/minigames';
 
 const COLLECTIONS = {
@@ -944,7 +944,7 @@ export async function pokerAction(
         if (nxt === 'showdown') break;
         if (nxt === 'flop') { newCommunity2.push(newDeck2[0], newDeck2[1], newDeck2[2]); newDeck2 = newDeck2.slice(3); }
         else if (nxt === 'turn' || nxt === 'river') { newCommunity2.push(newDeck2[0]); newDeck2 = newDeck2.slice(1); }
-        cur = nxt;
+        cur = nxt as PokerPhase;
       }
       const tableForShowdown = { ...table, communityCards: newCommunity2, deck: newDeck2 };
       const finalUpdates2 = await _resolveShowdown(tableForShowdown, players.map(p => ({ ...p, bet: 0 })), pot, ref);
