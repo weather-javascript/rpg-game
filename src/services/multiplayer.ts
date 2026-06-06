@@ -1115,10 +1115,9 @@ export async function submitProposal(proposal: Omit<Proposal, 'id' | 'status' | 
 }
 
 export function subscribeProposals(cb: (proposals: Proposal[]) => void): () => void {
-  const { query, collection, orderBy } = require('firebase/firestore');
   return onSnapshot(
     query(collection(db, 'proposals'), orderBy('createdAt', 'desc')),
-    (snap: any) => cb(snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Proposal)))
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Proposal)))
   );
 }
 
