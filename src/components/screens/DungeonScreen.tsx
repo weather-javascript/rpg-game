@@ -910,6 +910,7 @@ export function DungeonScreen() {
             🔒 解放ガイド ({lockedDungeons.length})
           </button>
         )}
+      </div>
 
       {showUnlockGuide && (
         <div style={{ background: '#161b26', border: '2px solid #f0a830', borderRadius: 10, padding: 12, marginBottom: 12 }}>
