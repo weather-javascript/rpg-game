@@ -33,6 +33,15 @@ service cloud.firestore {
         && request.resource.data.gold <= 10000;  // 初期所持金の上限
 
       allow update: if isAdmin()
+        // 【オークション購入】認証ユーザーが出品者のgoldのみ増額する場合を許可
+        || (isAuthed()
+            && request.resource.data.gold is int
+            && request.resource.data.gold > resource.data.gold
+            && request.resource.data.gold <= 100000000
+            && request.resource.data.uid == resource.data.uid
+            && request.resource.data.get('stats', {}) == resource.data.get('stats', {})
+            && request.resource.data.get('inventory', {}) == resource.data.get('inventory', {})
+            && request.resource.data.get('banned', false) == resource.data.get('banned', false))
         || (isOwner(uid)
             // 不変フィールドの保護
             && request.resource.data.uid == uid

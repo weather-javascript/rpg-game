@@ -71,24 +71,26 @@ function JackpotBanner({ pool }: { pool: number }) {
 }
 
 // 賭け金入力
-function BetInput({ game, bet, setBet }: { game: GambleMaster; bet: number; setBet: (v: number) => void }) {
+function BetInput({ game, bet, setBet, disabled = false }: { game: GambleMaster; bet: number; setBet: (v: number) => void; disabled?: boolean }) {
   const player = useGameStore(s => s.player);
   const presets = [game.minBet, Math.floor(game.maxBet * 0.1), Math.floor(game.maxBet * 0.25), game.maxBet].filter((v, i, a) => a.indexOf(v) === i);
   return (
     <div style={{ marginBottom: 10 }}>
+      {disabled && <div style={{ fontSize: '0.72rem', color: '#e05555', marginBottom: 4 }}>⚠ ゲーム中は賭け金を変更できません</div>}
       <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
         {presets.map(p => (
-          <button key={p} onClick={() => setBet(Math.min(p, player?.gold ?? 0))}
-            style={{ padding: '3px 8px', background: bet === p ? '#5b8dee' : '#1c2235', color: bet === p ? '#fff' : '#8a92b2', border: `1px solid ${bet === p ? '#5b8dee' : '#2d3752'}`, borderRadius: 4, cursor: 'pointer', fontSize: '0.75rem' }}>
+          <button key={p} onClick={() => !disabled && setBet(Math.min(p, player?.gold ?? 0))}
+            style={{ padding: '3px 8px', background: bet === p ? '#5b8dee' : '#1c2235', color: bet === p ? '#fff' : '#8a92b2', border: `1px solid ${bet === p ? '#5b8dee' : '#2d3752'}`, borderRadius: 4, cursor: disabled ? 'not-allowed' : 'pointer', fontSize: '0.75rem', opacity: disabled ? 0.5 : 1 }}>
             {p.toLocaleString()}G
           </button>
         ))}
-        <button onClick={() => setBet(Math.min(player?.gold ?? 0, game.maxBet))}
-          style={{ padding: '3px 8px', background: '#1c2235', color: '#f0c060', border: '1px solid #f0c060', borderRadius: 4, cursor: 'pointer', fontSize: '0.75rem' }}>MAX</button>
+        <button onClick={() => !disabled && setBet(Math.min(player?.gold ?? 0, game.maxBet))}
+          style={{ padding: '3px 8px', background: '#1c2235', color: '#f0c060', border: '1px solid #f0c060', borderRadius: 4, cursor: disabled ? 'not-allowed' : 'pointer', fontSize: '0.75rem', opacity: disabled ? 0.5 : 1 }}>MAX</button>
       </div>
       <input type="number" value={bet} min={game.minBet} max={Math.min(game.maxBet, player?.gold ?? 0)}
-        onChange={e => setBet(Math.max(game.minBet, Math.min(game.maxBet, Number(e.target.value))))}
-        style={{ width: '100%', padding: '6px 10px', background: '#1c2235', border: '1px solid #2d3752', color: '#e8e6ff', borderRadius: 6, fontSize: '0.9rem', boxSizing: 'border-box' as const }}
+        onChange={e => !disabled && setBet(Math.max(game.minBet, Math.min(game.maxBet, Number(e.target.value))))}
+        disabled={disabled}
+        style={{ width: '100%', padding: '6px 10px', background: disabled ? '#161b26' : '#1c2235', border: `1px solid ${disabled ? '#4a5070' : '#2d3752'}`, color: disabled ? '#4a5070' : '#e8e6ff', borderRadius: 6, fontSize: '0.9rem', boxSizing: 'border-box' as const, cursor: disabled ? 'not-allowed' : 'text' }}
       />
     </div>
   );
@@ -471,6 +473,16 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
 
   useEffect(() => {
     if (phase !== 'slot_battle' || slotTurnState !== 'idle') return;
+    // 両者が振り終わって役なし → ログリセットして再ラウンド
+    setSlotLogs(prev => {
+      const firstPlayer = isFirst ? 'me' : 'opp';
+      const secondPlayer = isFirst ? 'opp' : 'me';
+      const firstDone = prev.some(l => l.who === firstPlayer);
+      const secondDone = prev.some(l => l.who === secondPlayer);
+      const anyRole = prev.some(l => l.rank > 0);
+      if (firstDone && secondDone && !anyRole) return []; // 両方役なし → リセット
+      return prev;
+    });
     setSlotTurnState('spinning');
     setSlotSpinning(true);
     setSlotSymbols(null);
@@ -493,16 +505,52 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
       setSlotLogs(prev => {
         const newLogs = [...prev, newLog];
         setTimeout(() => {
-          const myLog = newLogs.find(l => l.who === 'me' && l.rank > 0);
-          const oppLog = newLogs.find(l => l.who === 'opp' && l.rank > 0);
-          if (myLog && oppLog) {
+          const myLogs = newLogs.filter(l => l.who === 'me');
+          const oppLogs = newLogs.filter(l => l.who === 'opp');
+          const myHasRole = myLogs.some(l => l.rank > 0);
+          const oppHasRole = oppLogs.some(l => l.rank > 0);
+
+          // 先攻・後攻をisFirstで判断
+          const firstPlayer = isFirst ? 'me' : 'opp';
+          const secondPlayer = isFirst ? 'opp' : 'me';
+
+          // 同ラウンドで先攻が役あり → 後攻が振った結果を確認
+          const firstLogs = newLogs.filter(l => l.who === firstPlayer);
+          const secondLogs = newLogs.filter(l => l.who === secondPlayer);
+          const firstHasRole = firstLogs.some(l => l.rank > 0);
+          const secondHasRole = secondLogs.some(l => l.rank > 0);
+
+          if (firstHasRole && secondHasRole) {
+            // 両者役あり → 役の強さで比較（result.wonで判定済み）→ 終了
+            setSlotTurnState('done');
             setTimeout(() => setPhase('final'), 1200);
-          } else if (!r.hasRole || (!myLog && !oppLog)) {
-            const nextTurn = slotTurn === 'me' ? 'opp' : 'me';
-            setSlotTurn(nextTurn);
+          } else if (firstHasRole && secondLogs.length > 0 && !secondHasRole) {
+            // 先攻役あり・後攻役なし → 後攻の勝ち → 終了
+            setSlotTurnState('done');
+            setTimeout(() => setPhase('final'), 1200);
+          } else if (firstHasRole && secondLogs.length === 0) {
+            // 先攻役あり・後攻まだ未回転 → 後攻のターンへ
+            setSlotTurn(secondPlayer);
             setSlotTurnState('idle');
+          } else if (!firstHasRole && firstLogs.length > 0 && secondLogs.length === 0) {
+            // 先攻役なし・後攻未回転 → 後攻のターンへ
+            setSlotTurn(secondPlayer);
+            setSlotTurnState('idle');
+          } else if (!firstHasRole && !secondHasRole) {
+            // 両者役なし → logsリセットして先攻から再スタート
+            // ただし後攻がまだ未回転の場合は後攻へ渡す（両方振ってからリセット）
+            if (firstLogs.length > 0 && secondLogs.length > 0) {
+              // 両方振り終わった → リセット
+              // setSlotLogs([])はsetSlotLogsのprev内からは呼べないので外でやる
+            }
+            setSlotTurn(firstPlayer);
+            setSlotTurnState('idle');
+          } else if (!firstHasRole && secondHasRole) {
+            // 先攻役なし・後攻役あり → 後攻の勝ち → 終了
+            setSlotTurnState('done');
+            setTimeout(() => setPhase('final'), 1200);
           } else {
-            // 片方だけ役あり → もう片方へ
+            // その他: 相手のターンへ
             const nextTurn = slotTurn === 'me' ? 'opp' : 'me';
             setSlotTurn(nextTurn);
             setSlotTurnState('idle');
@@ -1776,11 +1824,13 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
     const runRoll = (attempt: number, logs: typeof rollLogs) => {
       setRolling(true); setCurrentDice(null);
       setTimeout(() => {
-        const dice = attempt < 3 && Math.random() < 0.4
-          ? [1,2,4] // 役なし（演出用）
-          : Array.isArray((r as any).dice) && attempt >= 2 ? (r as any).dice : [Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1];
+        // 3回目は演出用役なしダイスを使わず実際の結果ダイスを使う
+        const dice = attempt >= 2
+          ? (Array.isArray((r as any).dice) ? (r as any).dice as number[] : [Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1])
+          : (attempt < 2 && Math.random() < 0.4 ? [1,2,4] : [Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1]);
         const ev = evalChinchiro(dice);
-        const isLast = ev.type !== 'nashi' || attempt >= 3;
+        // 3回目(attempt=2)は役なしでも強制終了（負け確定）
+        const isLast = ev.type !== 'nashi' || attempt >= 2;
         setCurrentDice(dice);
         setRolling(false);
         const newLogs = [...logs, { dice, label: ev.label, isRole: ev.type !== 'nashi' }];
@@ -1984,7 +2034,7 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
   );
 }
 
-function PokerPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
+function PokerPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, onBetLock }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number; onBetLock?: (locked: boolean) => void }) {
   const { player, changeGold, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addItems: s.addItems, addNotification: s.addNotification }));
   const [pokerState, setPokerState] = useState<PokerState | null>(null);
   const [hold, setHold] = useState<boolean[]>([false,false,false,false,false]);
@@ -2006,6 +2056,7 @@ function PokerPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: 
     const state = dealPoker();
     pendingRef.state = state;
     setHold([false,false,false,false,false]);
+    onBetLock?.(true); // ゲーム開始でbetをロック
     setPhase('dealing');
   };
 
@@ -2065,7 +2116,7 @@ function PokerPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: 
         </button>
       )}
       {phase==='result' && (
-        <button onClick={() => { setPhase('idle'); setPokerState(null); setResult(null); }}
+        <button onClick={() => { setPhase('idle'); setPokerState(null); setResult(null); onBetLock?.(false); }}
           style={{ width:'100%', padding:10, background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:8, cursor:'pointer', marginTop:8 }}>
           もう一度
         </button>
@@ -2096,6 +2147,7 @@ export function GambleScreen() {
   const [stats, setStats] = useState<SessionStats>(initStats());
   const [jackpotPool, setJackpotPool] = useState(0);
   const [gambleMultipliers, setGambleMultipliers] = useState<Record<string, number>>({});
+  const [pokerBetLocked, setPokerBetLocked] = useState(false);
 
   useEffect(() => {
     const unsub = subscribeJackpotPool(setJackpotPool);
@@ -2162,7 +2214,7 @@ export function GambleScreen() {
             <div style={{ fontSize: '0.78rem', color: '#8a92b2', marginTop: 2 }}>{game.description}</div>
           </div>
         )}
-        {activeGame !== 'pvp' && <BetInput game={game} bet={bet} setBet={setBet} />}
+        {activeGame !== 'pvp' && <BetInput game={game} bet={bet} setBet={setBet} disabled={activeGame === 'poker' && pokerBetLocked} />}
 
         {activeGame === 'chohan'       && <ChohanPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['chohan'] ?? 1.0} />}
         {activeGame === 'chinchiro'    && <ChinchiroPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['chinchiro'] ?? 1.0} />}
@@ -2195,7 +2247,7 @@ export function GambleScreen() {
             <div style={{ fontSize: '0.72rem', color: '#4a5070', marginTop: 6, textAlign: 'center' }}>1回 30,000G固定</div>
           </div>
         )}
-        {activeGame === 'poker'        && <PokerPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['poker'] ?? 1.0} />}
+        {activeGame === 'poker'        && <PokerPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['poker'] ?? 1.0} onBetLock={setPokerBetLocked} />}
         {activeGame === 'pvp'          && (
           <>
             <div style={{ fontWeight:700, fontSize:'1rem', marginBottom:8 }}>⚔️ PvP対戦</div>
