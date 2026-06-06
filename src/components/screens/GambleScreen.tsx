@@ -40,14 +40,18 @@ function resolveGenericGamble(game: GambleMaster, bet: number, multiplierBonus =
 }
 
 function ResultDisplay({ result }: { result: GambleResult }) {
-  const isWin = result.goldDelta >= 0;
+  const isReplay = result.symbols?.[0] === '🔄' && result.multiplier === 1.0;
+  const isWin = result.goldDelta > 0;
+  const labelColor = isReplay ? '#5b8dee' : isWin ? '#4caf87' : '#e05555';
+  const bgColor = isReplay ? 'rgba(91,141,238,0.1)' : isWin ? 'rgba(76,175,135,0.1)' : 'rgba(224,85,85,0.1)';
+  const borderColor = isReplay ? '#5b8dee' : isWin ? '#4caf87' : '#e05555';
   return (
-    <div style={{ padding: '10px', background: isWin ? 'rgba(76,175,135,0.1)' : 'rgba(224,85,85,0.1)', border: `1px solid ${isWin ? '#4caf87' : '#e05555'}`, borderRadius: 8, marginBottom: 10, textAlign: 'center' }}>
-      <div style={{ fontSize: '1.2rem', fontWeight: 700, color: isWin ? '#4caf87' : '#e05555', marginBottom: 4 }}>
+    <div style={{ padding: '10px', background: bgColor, border: `1px solid ${borderColor}`, borderRadius: 8, marginBottom: 10, textAlign: 'center' }}>
+      <div style={{ fontSize: '1.2rem', fontWeight: 700, color: labelColor, marginBottom: 4 }}>
         {result.symbols?.join(' ') ?? ''} {result.rewardLabel}
       </div>
-      <div style={{ fontSize: '1rem', fontWeight: 700, color: isWin ? '#4caf87' : '#e05555' }}>
-        {isWin ? `+${result.goldDelta.toLocaleString()}G` : `${result.goldDelta.toLocaleString()}G`}
+      <div style={{ fontSize: '1rem', fontWeight: 700, color: labelColor }}>
+        {isReplay ? '🔄 掛け金返還' : isWin ? `+${result.goldDelta.toLocaleString()}G` : `${result.goldDelta.toLocaleString()}G`}
       </div>
       {result.itemRewards.length > 0 && (
         <div style={{ marginTop: 6, fontSize: '0.8rem' }}>
@@ -156,7 +160,7 @@ function rollDice3(): number[] {
 }
 
 const DICE_EMOJI = ['⚀','⚁','⚂','⚃','⚄','⚅'];
-const SLOT_SYMBOLS = ['🍒','💎','7️⃣','🍋','🔔','💰','🃏','⭐'];
+const SLOT_SYMBOLS = ['🍒','💰','🌟','🍋','🔄','👑','🔔','⭐'];
 const SLOT_RANKS: Record<string,number> = { '7️⃣':100,'💎':80,'💰':60,'🃏':50,'⭐':40,'🔔':30,'🍒':20,'🍋':10 };
 
 // ダイスアニメーションコンポーネント
@@ -1542,7 +1546,7 @@ function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
   const [spinning, setSpinning] = useState(false);
   const [finalSyms, setFinalSyms] = useState<string[]|null>(null);
   const [reelFrames, setReelFrames] = useState([0,0,0]);
-  const SLOT_SYM = ['🍒','💎','7️⃣','🍋','🔔','💰','🃏','⭐'];
+  const SLOT_SYM = ['🍒','💰','🌟','🍋','🔄','👑','🔔','⭐'];
   const game = GAMBLE_MASTER['slot_machine'];
 
   const play = async () => {
@@ -1581,6 +1585,10 @@ function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
       setFinalSyms(syms as string[]);
       if (r.multiplier > 0) changeGold(r.goldDelta + bet);
       if (r.itemRewards.length > 0) addItems(r.itemRewards);
+      // REPLAY役（×1.0）は「掛け金返還」として通知
+      if (r.symbols?.[0] === '🔄' && r.multiplier === 1.0) {
+        addNotification('success', '🔄 REPLAY！掛け金返還！');
+      }
       setResult(r); onResult(r);
       if (player) {
         const winGold = Math.floor(bet * r.multiplier);
@@ -1894,31 +1902,38 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
 // 倍々チキンレース コインフリップ
 function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
   const { player, changeGold, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addNotification: s.addNotification }));
-  // phase: idle=未開始, playing=進行中（連続投げ可能）, busted=裏が出て終了, cashed=利確して終了
-  const [phase, setPhase] = useState<'idle'|'playing'|'busted'|'cashed'>('idle');
-  const [score, setScore] = useState(0);       // 現在の倍率（表が出るたびに2倍）
-  const [flips, setFlips] = useState(0);       // 投げた回数
+  // phase: idle=未開始, choosing=表裏選択中, playing=進行中, busted=負け, cashed=利確
+  const [phase, setPhase] = useState<'idle'|'choosing'|'playing'|'busted'|'cashed'>('idle');
+  const [pick, setPick] = useState<'omote'|'ura'>('omote');  // 毎回選んだ面
+  const [score, setScore] = useState(0);
+  const [flips, setFlips] = useState(0);
   const [animating, setAnimating] = useState(false);
   const [showAnim, setShowAnim] = useState(false);
   const [lastFlip, setLastFlip] = useState<'heads'|'tails'|null>(null);
   const pendingRef = useState<{ isHeads: boolean }>({ isHeads: false })[0];
 
-  // ゲーム開始（初回コイン投げ）
-  const startGame = () => {
-    if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
-    changeGold(-bet);
-    onJackpotContrib(bet);
-    setPhase('playing');
-    setScore(1);
+  // ゲーム開始ボタン押下 → 表裏選択フェーズへ
+  const handleStart = () => {
+    if (!player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
+    setPhase('choosing');
+    setScore(0);
     setFlips(0);
     setLastFlip(null);
-    throwCoin();
   };
 
-  const throwCoin = () => {
+  // 表/裏を選んで投げる（初回 or 継続）
+  const throwCoin = (choice: 'omote' | 'ura') => {
+    if (animating) return;
+    if (phase === 'choosing') {
+      // 初回：ここで掛け金を払う
+      changeGold(-bet);
+      onJackpotContrib(bet);
+      setScore(1);
+      setPhase('playing');
+    }
+    setPick(choice);
     setAnimating(true);
-    const isHeads = secureRandom() < 0.5;
-    pendingRef.isHeads = isHeads;
+    pendingRef.isHeads = secureRandom() < 0.5;
     setShowAnim(true);
   };
 
@@ -1926,21 +1941,22 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
     setShowAnim(false);
     const isHeads = pendingRef.isHeads;
     setLastFlip(isHeads ? 'heads' : 'tails');
-    if (isHeads) {
+    const pickedOmote = pick === 'omote';
+    const hit = isHeads === pickedOmote; // 選んだ面が出たか
+    if (hit) {
       setScore(prev => prev * 2);
       setFlips(prev => prev + 1);
       setAnimating(false);
     } else {
-      // 裏が出たらバスト
       setFlips(prev => prev + 1);
       setPhase('busted');
-      const r: GambleResult = { rewardLabel: '裏！全没収！', multiplier: 0, goldDelta: -bet, itemRewards: [], symbols: ['🌑','💥'] };
+      const r: GambleResult = { rewardLabel: `${pick === 'omote' ? '裏' : '表'}が出た！全没収！`, multiplier: 0, goldDelta: -bet, itemRewards: [], symbols: ['🌑','💥'] };
       onResult(r);
       setAnimating(false);
     }
   };
 
-  // 利確（ストップ）
+  // 利確
   const cashOut = async () => {
     if (phase !== 'playing' || animating) return;
     const multiplier = score * multiplierBonus;
@@ -1952,29 +1968,47 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
     try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
   };
 
-  const reset = () => { setPhase('idle'); setScore(1); setFlips(0); setLastFlip(null); };
+  const reset = () => { setPhase('idle'); setScore(0); setFlips(0); setLastFlip(null); };
 
   const scoreGold = Math.floor(bet * score * multiplierBonus);
+
+  // 表裏選択ボタン（初回 or 継続投げ用）
+  const ChoiceButtons = ({ isFirst }: { isFirst: boolean }) => (
+    <div style={{ display: 'flex', gap: 8 }}>
+      <button onClick={() => throwCoin('omote')} disabled={animating}
+        style={{ flex: 1, padding: '14px 0', background: 'rgba(240,192,96,0.18)', border: '2px solid #f0c060', color: '#f0c060', borderRadius: 10, cursor: 'pointer', fontWeight: 900, fontSize: '1.1rem' }}>
+        🌕 表{isFirst ? '' : `（×${score * 2}倍狙い）`}
+      </button>
+      <button onClick={() => throwCoin('ura')} disabled={animating}
+        style={{ flex: 1, padding: '14px 0', background: 'rgba(138,146,178,0.18)', border: '2px solid #8a92b2', color: '#c0c8e0', borderRadius: 10, cursor: 'pointer', fontWeight: 900, fontSize: '1.1rem' }}>
+        🌑 裏{isFirst ? '' : `（×${score * 2}倍狙い）`}
+      </button>
+    </div>
+  );
 
   return (
     <div>
       {/* タイトルと説明 */}
       <div style={{ background: 'rgba(240,192,96,0.08)', border: '1px solid rgba(240,192,96,0.3)', borderRadius: 8, padding: '10px 12px', marginBottom: 12, fontSize: '0.78rem', color: '#8a92b2', lineHeight: 1.6 }}>
         <div style={{ color: '#f0c060', fontWeight: 700, marginBottom: 4 }}>🪙 倍々チキンレース</div>
-        表が出るたびにスコアが<span style={{ color: '#4caf87', fontWeight: 700 }}>2倍</span>に！
-        裏が出たら<span style={{ color: '#e05555', fontWeight: 700 }}>全没収</span>。好きなタイミングで利確しよう。
+        表か裏かを選んで投げ、当たるたびにスコアが<span style={{ color: '#4caf87', fontWeight: 700 }}>2倍</span>に！
+        外れたら<span style={{ color: '#e05555', fontWeight: 700 }}>全没収</span>。好きなタイミングで利確しよう。
       </div>
 
       {/* スコア表示 */}
-      {phase !== 'idle' && (
-        <div style={{ textAlign: 'center', padding: '12px 0', marginBottom: 12 }}>
+      {phase !== 'idle' && phase !== 'choosing' && (
+        <div style={{ textAlign: 'center', padding: '10px 0', marginBottom: 10 }}>
           <div style={{ fontSize: '0.72rem', color: '#8a92b2', marginBottom: 2 }}>現在のスコア</div>
           <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#f0c060' }}>×{score}倍</div>
           <div style={{ fontSize: '0.85rem', color: '#4caf87' }}>≈ {scoreGold.toLocaleString()}G</div>
-          <div style={{ fontSize: '0.7rem', color: '#4a5070', marginTop: 2 }}>{flips}回投げた</div>
+          <div style={{ fontSize: '0.7rem', color: '#4a5070', marginTop: 2 }}>{flips}回当てた</div>
           {lastFlip && (
-            <div style={{ fontSize: '1.4rem', marginTop: 6 }}>
+            <div style={{ fontSize: '1.2rem', marginTop: 4 }}>
               {lastFlip === 'heads' ? '🌕 表！' : '🌑 裏！'}
+              {' '}
+              <span style={{ fontSize: '0.8rem', color: lastFlip === (pick === 'omote' ? 'heads' : 'tails') ? '#4caf87' : '#e05555' }}>
+                {lastFlip === (pick === 'omote' ? 'heads' : 'tails') ? '当たり！' : 'はずれ…'}
+              </span>
             </div>
           )}
         </div>
@@ -1985,8 +2019,8 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
       {/* バスト表示 */}
       {phase === 'busted' && !showAnim && (
         <div style={{ textAlign: 'center', background: 'rgba(224,85,85,0.1)', border: '1px solid #e05555', borderRadius: 8, padding: 12, marginBottom: 12 }}>
-          <div style={{ fontSize: '1.2rem', color: '#e05555', fontWeight: 700 }}>💥 裏が出た！全没収！</div>
-          <div style={{ color: '#8a92b2', fontSize: '0.78rem', marginTop: 4 }}>{flips}回連続で表を出したが…</div>
+          <div style={{ fontSize: '1.2rem', color: '#e05555', fontWeight: 700 }}>💥 外れ！全没収！</div>
+          <div style={{ color: '#8a92b2', fontSize: '0.78rem', marginTop: 4 }}>{flips}回連続で当てたが…</div>
         </div>
       )}
 
@@ -2000,20 +2034,25 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
 
       {/* ボタン群 */}
       {phase === 'idle' && (
-        <button onClick={startGame} disabled={animating || (player?.gold ?? 0) < bet}
+        <button onClick={handleStart} disabled={(player?.gold ?? 0) < bet}
           style={{ width: '100%', padding: 12, background: (player?.gold ?? 0) >= bet ? 'linear-gradient(135deg,#f0c060,#c08020)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>
           🪙 {bet.toLocaleString()}G でゲーム開始
         </button>
       )}
 
+      {phase === 'choosing' && (
+        <div>
+          <div style={{ textAlign: 'center', fontSize: '0.82rem', color: '#8a92b2', marginBottom: 8 }}>どちらを選ぶ？</div>
+          <ChoiceButtons isFirst={true} />
+        </div>
+      )}
+
       {phase === 'playing' && !showAnim && (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={throwCoin} disabled={animating}
-            style={{ flex: 2, padding: 12, background: 'linear-gradient(135deg,#5b8dee,#3a6fd0)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.95rem' }}>
-            🪙 もう一回投げる（×{score*2}倍狙い）
-          </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: '0.78rem', color: '#8a92b2', textAlign: 'center' }}>次はどちら？</div>
+          <ChoiceButtons isFirst={false} />
           <button onClick={cashOut} disabled={animating}
-            style={{ flex: 1, padding: 12, background: 'linear-gradient(135deg,#4caf87,#2d8060)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+            style={{ width: '100%', padding: 11, background: 'linear-gradient(135deg,#4caf87,#2d8060)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
             💰 利確（{scoreGold.toLocaleString()}G）
           </button>
         </div>

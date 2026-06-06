@@ -593,14 +593,15 @@ export const GAMBLE_MASTER: Record<string, GambleMaster> = {
   },
   slot_machine: {
     id:'slot_machine', name:'スロットマシン', description:'3つのシンボルが揃えばジャックポット！',
-    icon:'slot_machine', type:'slot', minBet:10, maxBet:10000, returnRate:0.96,
+    icon:'slot_machine', type:'slot', minBet:10, maxBet:10000, returnRate:0.95,
     rewardTable:[
-      { label:'💰💰💰 JACKPOT', probability:0.005, multiplier:50,  symbols:['💰','💰','💰'] },
-      { label:'⭐⭐⭐ BIG WIN', probability:0.025, multiplier:10,  symbols:['⭐','⭐','⭐'] },
-      { label:'🍒🍒🍒 MIDDLE', probability:0.060, multiplier:5,   symbols:['🍒','🍒','🍒'] },
-      { label:'🍋🍋🍋 SMALL',  probability:0.110, multiplier:2.5, symbols:['🍋','🍋','🍋'] },
-      { label:'🍒🍒 2枚揃い',  probability:0.280, multiplier:1.3, symbols:['🍒','🍒','🔔'] },
-      { label:'ハズレ',        probability:0.520, multiplier:0,   symbols:['💨','💨','💨'] },
+      { label:'👑👑👑 SUPER JACKPOT!!', probability:0.001, multiplier:100, symbols:['👑','👑','👑'] },
+      { label:'💰💰💰 JACKPOT!',        probability:0.004, multiplier:50,  symbols:['💰','💰','💰'] },
+      { label:'🌟🌟🌟 BIG WIN!',        probability:0.020, multiplier:10,  symbols:['🌟','🌟','🌟'] },
+      { label:'🍒🍒🍒 MIDDLE',          probability:0.040, multiplier:5,   symbols:['🍒','🍒','🍒'] },
+      { label:'🍋🍋🍋 SMALL',           probability:0.060, multiplier:2.5, symbols:['🍋','🍋','🍋'] },
+      { label:'🔄🔄🔄 REPLAY',          probability:0.100, multiplier:1.0, symbols:['🔄','🔄','🔄'] },
+      { label:'ハズレ',                  probability:0.775, multiplier:0,   symbols:['💨','💨','💨'] },
     ],
   },
   treasure_box: {
