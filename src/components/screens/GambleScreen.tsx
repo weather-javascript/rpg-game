@@ -505,11 +505,6 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
       setSlotLogs(prev => {
         const newLogs = [...prev, newLog];
         setTimeout(() => {
-          const myLogs = newLogs.filter(l => l.who === 'me');
-          const oppLogs = newLogs.filter(l => l.who === 'opp');
-          const myHasRole = myLogs.some(l => l.rank > 0);
-          const oppHasRole = oppLogs.some(l => l.rank > 0);
-
           // 先攻・後攻をisFirstで判断
           const firstPlayer = isFirst ? 'me' : 'opp';
           const secondPlayer = isFirst ? 'opp' : 'me';
