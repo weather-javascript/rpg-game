@@ -2178,12 +2178,14 @@ const GAME_TABS: { id: GameTab; label: string; icon: string }[] = [
 
 export function GambleScreen() {
   const player = useGameStore(s => s.player);
+  const setPlayer = useGameStore(s => s.setPlayer);
   const [activeGame, setActiveGame] = useState<GameTab>('chohan');
   const [bet, setBet] = useState(100);
   const [stats, setStats] = useState<SessionStats>(initStats());
   const [jackpotPool, setJackpotPool] = useState(0);
   const [gambleMultipliers, setGambleMultipliers] = useState<Record<string, number>>({});
   const [pokerBetLocked, setPokerBetLocked] = useState(false);
+  const [ticketActive, setTicketActive] = useState(false); // チケット1枚使用中
 
   useEffect(() => {
     const unsub = subscribeJackpotPool(setJackpotPool);
@@ -2196,6 +2198,14 @@ export function GambleScreen() {
   }, []);
 
   const handleResult = (r: GambleResult) => {
+    // チケット消費（1ゲーム後）
+    if (ticketActive && player) {
+      const cur = player.inventory?.['gacha_multiplier_ticket'] ?? 0;
+      if (cur > 0) {
+        setPlayer({ ...player, inventory: { ...player.inventory, gacha_multiplier_ticket: cur - 1 } });
+      }
+      setTicketActive(false);
+    }
     setStats(prev => {
       const isWin = r.goldDelta >= 0;
       return {
@@ -2223,6 +2233,27 @@ export function GambleScreen() {
       <h2 style={{ fontFamily: 'Cinzel,serif', color: '#f0c060', marginBottom: 8, borderBottom: '1px solid #2d3752', paddingBottom: 8 }}>🎰 ギャンブル</h2>
 
       <JackpotBanner pool={jackpotPool} />
+
+      {/* ギャンブル倍率2倍チケット */}
+      {(() => {
+        const ticketCount = player.inventory?.['gacha_multiplier_ticket'] ?? 0;
+        return ticketCount > 0 || ticketActive ? (
+          <div style={{ background: ticketActive ? 'rgba(255,200,0,0.12)' : '#1c2235', border: `1px solid ${ticketActive ? '#f0c060' : '#2d3752'}`, borderRadius: 8, padding: '8px 12px', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.8rem', color: ticketActive ? '#f0c060' : '#8a92b2' }}>
+              🎫 倍率2倍チケット: {ticketCount}枚
+              {ticketActive && <span style={{ color: '#f0c060', fontWeight: 700 }}> ▶ 次の1ゲームに適用中！</span>}
+            </span>
+            <button onClick={() => {
+              if (!ticketActive && ticketCount > 0) setTicketActive(true);
+              else if (ticketActive) setTicketActive(false);
+            }}
+              disabled={!ticketActive && ticketCount < 1}
+              style={{ padding: '4px 10px', fontSize: '0.75rem', background: ticketActive ? '#e05555' : '#3a5070', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+              {ticketActive ? 'キャンセル' : '使用する'}
+            </button>
+          </div>
+        ) : null;
+      })()}
 
       {stats.gamesPlayed > 0 && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 8, fontSize: '0.75rem' }}>
@@ -2252,11 +2283,11 @@ export function GambleScreen() {
         )}
         {activeGame !== 'pvp' && <BetInput game={game} bet={bet} setBet={setBet} disabled={activeGame === 'poker' && pokerBetLocked} />}
 
-        {activeGame === 'chohan'       && <ChohanPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['chohan'] ?? 1.0} />}
-        {activeGame === 'chinchiro'    && <ChinchiroPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['chinchiro'] ?? 1.0} />}
-        {activeGame === 'coin_flip'    && <CoinFlipPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['coin_flip'] ?? 1.0} />}
-        {activeGame === 'slot'         && <SlotPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['slot_machine'] ?? 1.0} />}
-        {activeGame === 'treasure_box' && <GenericPanel game={GAMBLE_MASTER['treasure_box']}  bet={30000} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['treasure_box'] ?? 1.0} />}
+        {activeGame === 'chohan'       && <ChohanPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chohan'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
+        {activeGame === 'chinchiro'    && <ChinchiroPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chinchiro'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
+        {activeGame === 'coin_flip'    && <CoinFlipPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['coin_flip'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
+        {activeGame === 'slot'         && <SlotPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['slot_machine'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
+        {activeGame === 'treasure_box' && <GenericPanel game={GAMBLE_MASTER['treasure_box']}  bet={30000} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['treasure_box'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
         {activeGame === 'treasure_box' && (
           <div style={{ marginTop: 14 }}>
             <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#f0c060', marginBottom: 8 }}>📦 宝箱の中身一覧</div>

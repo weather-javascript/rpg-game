@@ -68,6 +68,8 @@ export interface ItemMaster {
   weaponUltimate?: WeaponUltimate;
   // SVGアイコン文字列（カスタム武器など）
   svgIcon?: string;
+  // PNG base64アイコン（カスタム武器など）
+  pngIcon?: string;
   useEffect?: {
     hpRestore?: number;
     satietyRestore?: number;
@@ -242,6 +244,8 @@ export interface PlayerData {
   settings?: { gambleMultiplierBonus?: number };
   // 満腹度上限アップグレード購入回数
   satietyUpgradeCount?: number;
+  // ガチャコイン
+  gachaCoins?: number;
 }
 
 export interface ActivityEntry {

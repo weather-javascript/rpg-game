@@ -234,6 +234,24 @@ service cloud.firestore {
     }
 
     // ============================================================
+    // proposals/{proposalId} — 機能提案
+    // ============================================================
+    match /proposals/{proposalId} {
+      allow read: if isAuthed();
+      allow create: if isAuthed()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 1
+        && request.resource.data.title.size() <= 50
+        && request.resource.data.body is string
+        && request.resource.data.body.size() >= 1
+        && request.resource.data.body.size() <= 500
+        && request.resource.data.status == 'pending';
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
     // それ以外は全拒否
     // ============================================================
     match /{document=**} {

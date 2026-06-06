@@ -681,6 +681,101 @@ function DungeonCard({ dungeon, selected, onSelect, playerLevel, clearedCount, i
 // ============================================================
 // メイン画面
 // ============================================================
+// ============================================================
+// ガチャパネル
+// ============================================================
+const GACHA_TABLE = [
+  { id: 'revolution_sword',          rate: 0.03, label: '⚔️ Revolution Sword',         rarity: '★★★' },
+  { id: 'revolution_armor_set',      rate: 0.03, label: '🛡️ Revolution Armor (一式)',   rarity: '★★★' },
+  { id: 'revolution_healwand',       rate: 0.03, label: '🪄 Revolution Healwand',       rarity: '★★★' },
+  { id: 'revolution_defencer',       rate: 0.03, label: '🔰 Revolution Defencer',       rarity: '★★★' },
+  { id: 'gacha_multiplier_ticket',   rate: 0.13, label: '🎫 ギャンブル倍率2倍チケット', rarity: '★★' },
+  { id: 'gacha_lose_ticket',         rate: 0.75, label: '💸 ハズレチケット',            rarity: '★' },
+];
+
+function GachaPanel({ player, addItems, changeGold, addNotification }: {
+  player: import('../../types/game').PlayerData;
+  addItems: (items: { itemId: string; amount: number }[]) => void;
+  changeGold: (delta: number) => void;
+  addNotification: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
+}) {
+  const setPlayer = useGameStore(s => s.setPlayer);
+  const coins = player.gachaCoins ?? 0;
+  const loseTickets = player.inventory?.['gacha_lose_ticket'] ?? 0;
+
+  const pullGacha = () => {
+    if (coins < 1) { addNotification('warning', 'ガチャコインが足りません！ダンジョンをクリアして獲得しよう。'); return; }
+    // コイン消費
+    setPlayer({ ...player, gachaCoins: coins - 1 });
+    // ガチャ抽選
+    const roll = Math.random();
+    let cumulative = 0;
+    let result = GACHA_TABLE[GACHA_TABLE.length - 1];
+    for (const entry of GACHA_TABLE) {
+      cumulative += entry.rate;
+      if (roll < cumulative) { result = entry; break; }
+    }
+    // アイテム付与
+    if (result.id === 'revolution_armor_set') {
+      addItems([
+        { itemId: 'revolution_armor_helmet', amount: 1 },
+        { itemId: 'revolution_armor_chest', amount: 1 },
+        { itemId: 'revolution_armor_leggings', amount: 1 },
+        { itemId: 'revolution_armor_boots', amount: 1 },
+      ]);
+    } else {
+      addItems([{ itemId: result.id, amount: 1 }]);
+    }
+    // ハズレチケット20枚交換チェック（addItemsで+1された後の枚数で判定）
+    if (result.id === 'gacha_lose_ticket' && loseTickets + 1 >= 20) {
+      // 20枚分消費（removeItemsが無いためinventory直接操作）
+      const newInv = { ...player.inventory, gacha_lose_ticket: (loseTickets + 1) - 20 };
+      setPlayer({ ...player, gachaCoins: coins - 1, inventory: newInv });
+      changeGold(200000);
+      addNotification('success', `🎉 ハズレチケット20枚達成！200,000Gを獲得！`);
+      return;
+    }
+    addNotification(result.rarity === '★★★' ? 'success' : 'info',
+      `${result.rarity} ${result.label} を入手！`);
+  };
+
+  return (
+    <div style={{ padding: '0 0 20px' }}>
+      <h2 style={{ fontFamily: 'Cinzel,serif', color: '#c864ff', borderBottom: '1px solid #2d3752', paddingBottom: 8, marginBottom: 12 }}>🎰 ダンジョンガチャ</h2>
+      <div style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 10, padding: 14, marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: '0.85rem', color: '#8a92b2' }}>所持ガチャコイン</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f0c060' }}>🪙 {coins}枚</div>
+          </div>
+          <div style={{ textAlign: 'right', fontSize: '0.78rem', color: '#8a92b2' }}>
+            <div>ハズレチケット: {loseTickets}/20枚</div>
+            <div>20枚→20万G交換</div>
+          </div>
+        </div>
+        <button onClick={pullGacha} disabled={coins < 1}
+          style={{ width: '100%', padding: '14px', fontWeight: 700, fontSize: '1rem', background: coins >= 1 ? 'linear-gradient(135deg,#c864ff,#8840cc)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 8, cursor: coins >= 1 ? 'pointer' : 'not-allowed', marginBottom: 8 }}>
+          🎰 ガチャを引く（1コイン）
+        </button>
+        <div style={{ fontSize: '0.72rem', color: '#8a92b2', textAlign: 'center' }}>
+          ダンジョンをクリアするとコイン獲得（初級1枚〜極限5枚）
+        </div>
+      </div>
+      <div style={{ background: '#161b26', border: '1px solid #2d3752', borderRadius: 10, padding: 12 }}>
+        <div style={{ fontWeight: 700, color: '#c864ff', marginBottom: 8, fontSize: '0.85rem' }}>📋 排出確率</div>
+        {GACHA_TABLE.map((e, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: i < GACHA_TABLE.length - 1 ? '1px solid #2d3752' : 'none' }}>
+            <span style={{ fontSize: '0.8rem', color: e.rarity === '★★★' ? '#f0c060' : e.rarity === '★★' ? '#a0c0ff' : '#8a92b2' }}>
+              {e.rarity} {e.label}
+            </span>
+            <span style={{ fontSize: '0.8rem', color: '#e8e6ff', fontWeight: 700 }}>{(e.rate * 100).toFixed(0)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function DungeonScreen() {
   const player = useGameStore(s => s.player);
   const addItems = useGameStore(s => s.addItems);
@@ -700,6 +795,7 @@ export function DungeonScreen() {
   const [equipment, _setEquipment] = useState<EquipmentSlots>(() => player?.equipment ?? defaultEquipmentSlots());
   const [showUnlockGuide, setShowUnlockGuide] = useState(false);
   const [runLog, setRunLog] = useState<string[]>([]);
+  const [dungeonInnerTab, setDungeonInnerTab] = useState<'dungeon' | 'gacha'>('dungeon');
 
   const dungeons = Object.values(DUNGEON_MASTER);
   const lockedDungeons = dungeons.filter(d => !isDungeonUnlocked(d.id));
@@ -761,7 +857,8 @@ export function DungeonScreen() {
       } else {
         isComplete = true;
         recordDungeonClear(runState.dungeonId);
-        addNotification('success', `🏆 ${dungeon?.name} 攻略完了！`);
+        const gachaCoinReward = ({ beginner:1, intermediate:2, advanced:3, super:4, extreme:5, volcano:4 } as Record<string,number>)[dungeon?.tier ?? 'beginner'] ?? 1;
+        addNotification('success', `🏆 ${dungeon?.name} 攻略完了！🪙 ガチャコイン+${gachaCoinReward}枚！`);
         if (player) postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'dungeon_clear', message: `が「${dungeon?.name}」をクリアしました！` }).catch(() => {});
       }
     }
@@ -786,8 +883,25 @@ export function DungeonScreen() {
 
   if (!player) return null;
 
+  const dungeonTabActive = dungeonInnerTab === 'dungeon';
+  const gachaTabActive = dungeonInnerTab === 'gacha';
+
   return (
     <div style={{ padding: '12px 8px 80px' }}>
+      {/* ダンジョン内タブ */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+        <button onClick={() => setDungeonInnerTab('dungeon')}
+          style={{ flex: 1, padding: '8px', fontWeight: 700, fontSize: '0.85rem', background: dungeonTabActive ? 'rgba(240,192,96,0.15)' : '#1c2235', border: `1px solid ${dungeonTabActive ? '#f0c060' : '#2d3752'}`, color: dungeonTabActive ? '#f0c060' : '#8a92b2', borderRadius: 8, cursor: 'pointer' }}>
+          ⚔️ ダンジョン
+        </button>
+        <button onClick={() => setDungeonInnerTab('gacha')}
+          style={{ flex: 1, padding: '8px', fontWeight: 700, fontSize: '0.85rem', background: gachaTabActive ? 'rgba(200,100,255,0.15)' : '#1c2235', border: `1px solid ${gachaTabActive ? '#c864ff' : '#2d3752'}`, color: gachaTabActive ? '#c864ff' : '#8a92b2', borderRadius: 8, cursor: 'pointer' }}>
+          🎰 ガチャ <span style={{ fontSize: '0.75rem', color: '#f0c060' }}>({player.gachaCoins ?? 0}枚)</span>
+        </button>
+      </div>
+
+      {gachaTabActive && <GachaPanel player={player} addItems={addItems} changeGold={changeGold} addNotification={addNotification} />}
+      {!gachaTabActive && <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <h2 style={{ fontFamily: 'Cinzel,serif', color: '#f0c060', borderBottom: '1px solid #2d3752', paddingBottom: 8, flex: 1 }}>⚔️ ダンジョン</h2>
         {lockedDungeons.length > 0 && (
@@ -796,7 +910,6 @@ export function DungeonScreen() {
             🔒 解放ガイド ({lockedDungeons.length})
           </button>
         )}
-      </div>
 
       {showUnlockGuide && (
         <div style={{ background: '#161b26', border: '2px solid #f0a830', borderRadius: 10, padding: 12, marginBottom: 12 }}>
@@ -914,6 +1027,7 @@ export function DungeonScreen() {
           )}
         </>
       )}
+      </>}
     </div>
   );
 }
