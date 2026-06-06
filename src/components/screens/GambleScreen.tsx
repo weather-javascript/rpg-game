@@ -40,7 +40,7 @@ function resolveGenericGamble(game: GambleMaster, bet: number, multiplierBonus =
 }
 
 function ResultDisplay({ result }: { result: GambleResult }) {
-  const isReplay = result.symbols?.[0] === '🔄' && result.multiplier === 1.0;
+  const isReplay = result.rewardLabel.includes('REPLAY');
   const isWin = result.goldDelta > 0;
   const labelColor = isReplay ? '#5b8dee' : isWin ? '#4caf87' : '#e05555';
   const bgColor = isReplay ? 'rgba(91,141,238,0.1)' : isWin ? 'rgba(76,175,135,0.1)' : 'rgba(224,85,85,0.1)';
@@ -1586,7 +1586,7 @@ function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
       if (r.multiplier > 0) changeGold(r.goldDelta + bet);
       if (r.itemRewards.length > 0) addItems(r.itemRewards);
       // REPLAY役（×1.0）は「掛け金返還」として通知
-      if (r.symbols?.[0] === '🔄' && r.multiplier === 1.0) {
+      if (r.rewardLabel.includes('REPLAY')) {
         addNotification('success', '🔄 REPLAY！掛け金返還！');
       }
       setResult(r); onResult(r);
