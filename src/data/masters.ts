@@ -226,6 +226,11 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     outputItemId: 'plank',
     outputAmount: 2,
     inputs: [{ itemId: 'wood', amount: 1 }],
+    // どこか1マスに wood を1個
+    // □□□
+    // □W□
+    // □□□
+    shape: ['','','', '','wood','', '','',''],
     requiredCraftingLevel: 1,
     craftingExpGain: 5,
   },
@@ -236,6 +241,11 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     outputItemId: 'stone_knife',
     outputAmount: 1,
     inputs: [{ itemId: 'stone', amount: 3 }],
+    // 縦一列（左列）
+    // S□□
+    // S□□
+    // S□□
+    shape: ['stone','','', 'stone','','', 'stone','',''],
     requiredCraftingLevel: 1,
     craftingExpGain: 20,
   },
@@ -246,6 +256,11 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     outputItemId: 'wooden_bow',
     outputAmount: 1,
     inputs: [{ itemId: 'wood', amount: 5 }, { itemId: 'plank', amount: 2 }],
+    // 弓型 (木5, 板2)
+    // WPW
+    // W□W
+    // WPW
+    shape: ['wood','plank','wood', 'wood','','wood', 'wood','plank','wood'],
     requiredCraftingLevel: 3,
     craftingExpGain: 40,
   },
@@ -256,6 +271,11 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     outputItemId: 'iron_ingot',
     outputAmount: 1,
     inputs: [{ itemId: 'iron_ore', amount: 2 }, { itemId: 'coal', amount: 1 }],
+    // 縦に iron_ore,iron_ore,coal
+    // □I□
+    // □I□
+    // □C□
+    shape: ['','iron_ore','', '','iron_ore','', '','coal',''],
     requiredCraftingLevel: 5,
     craftingExpGain: 35,
   },
@@ -266,6 +286,20 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     outputItemId: 'iron_sword',
     outputAmount: 1,
     inputs: [{ itemId: 'iron_ingot', amount: 3 }, { itemId: 'plank', amount: 1 }],
+    // 剣型
+    // □I□
+    // □I□
+    // □P□  ← 柄
+    // ※iron_ingot x2 + iron_ingot x1 = 3個 → 上2行中央+中央下がIで最下はP
+    // 実際は: I,I,I を上から縦+Pを下
+    // □I□
+    // □I□
+    // □I□ + Pを右端
+    // →剣型: 上中央から3つI、中央下にP
+    // I□□
+    // I□□
+    // I□P
+    shape: ['iron_ingot','','', 'iron_ingot','','', 'iron_ingot','','plank'],
     requiredCraftingLevel: 8,
     craftingExpGain: 80,
   },
@@ -276,6 +310,11 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     outputItemId: 'iron_helmet',
     outputAmount: 1,
     inputs: [{ itemId: 'iron_ingot', amount: 4 }],
+    // ヘルメット型（上Uの字）
+    // III
+    // I□I
+    // □□□
+    shape: ['iron_ingot','iron_ingot','iron_ingot', 'iron_ingot','','iron_ingot', '','',''],
     requiredCraftingLevel: 10,
     craftingExpGain: 100,
   },
@@ -286,6 +325,10 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     outputItemId: 'health_potion',
     outputAmount: 3,
     inputs: [{ itemId: 'spirit_ice', amount: 1 }, { itemId: 'slime_gel', amount: 2 }],
+    // □G□
+    // □I□
+    // □G□  (I=spirit_ice, G=slime_gel)
+    shape: ['','slime_gel','', '','spirit_ice','', '','slime_gel',''],
     requiredCraftingLevel: 12,
     craftingExpGain: 60,
   },
@@ -296,6 +339,10 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     outputItemId: 'mega_potion',
     outputAmount: 2,
     inputs: [{ itemId: 'ancient_shard', amount: 1 }, { itemId: 'health_potion', amount: 2 }],
+    // H□H
+    // □A□
+    // □□□  (A=ancient_shard, H=health_potion)
+    shape: ['health_potion','','health_potion', '','ancient_shard','', '','',''],
     requiredCraftingLevel: 20,
     craftingExpGain: 150,
   },
@@ -306,6 +353,11 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     outputItemId: 'mystery_key',
     outputAmount: 1,
     inputs: [{ itemId: 'polishing_agent_1', amount: 5 }, { itemId: 'polishing_agent_5', amount: 1 }],
+    // 鍵型
+    // A□A
+    // AAA
+    // □B□  (A=polishing_agent_1 x5, B=polishing_agent_5 x1)
+    shape: ['polishing_agent_1','','polishing_agent_1', 'polishing_agent_1','polishing_agent_1','polishing_agent_1', '','polishing_agent_5',''],
     requiredCraftingLevel: 15,
     craftingExpGain: 120,
   },

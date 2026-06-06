@@ -177,14 +177,15 @@ service cloud.firestore {
     // ============================================================
     match /poker_tables/{tableId} {
       allow read: if isAuthed();
-      allow create: if isAuthed()
+      allow create: if isAdmin()
+        || (isAuthed()
         && request.resource.data.hostUid == request.auth.uid
         && request.resource.data.buyIn is int
         && request.resource.data.buyIn >= 100
         && request.resource.data.maxPlayers is int
         && request.resource.data.maxPlayers >= 3
         && request.resource.data.maxPlayers <= 6
-        && request.resource.data.status == 'waiting';
+        && request.resource.data.status == 'waiting');
       allow update: if isAuthed()
         && (
           resource.data.hostUid == request.auth.uid

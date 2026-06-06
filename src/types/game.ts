@@ -175,6 +175,10 @@ export interface CraftRecipe {
   outputItemId: string;
   outputAmount: number;
   inputs: { itemId: string; amount: number }[];
+  /** 3×3グリッドのレシピ配置。長さ9の配列（インデックス0=左上, 8=右下）。
+   *  空文字列はどのアイテムも不要なセル。
+   *  省略した場合は従来通り位置不問マッチング。 */
+  shape?: (string | '')[];
   requiredCraftingLevel: number;
   craftingExpGain: number;
 }

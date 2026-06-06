@@ -19,24 +19,29 @@ interface GridCell {
 const EMPTY_GRID: GridCell[] = Array(9).fill(null).map(() => ({ itemId: '', amount: 0 }));
 
 // ============================================================
-// レシピマッチング（順序不問、任意配置）
+// レシピマッチング（shapeがあれば位置一致、なければ位置不問）
 // ============================================================
 function matchRecipe(grid: GridCell[], recipes: CraftRecipe[]): CraftRecipe | null {
-  // グリッドから空でないセルのitemId→合計amountマップを作る
-  const used: Record<string, number> = {};
-  for (const cell of grid) {
-    if (cell.itemId) used[cell.itemId] = (used[cell.itemId] ?? 0) + cell.amount;
-  }
-  const usedKeys = Object.keys(used).filter(k => used[k] > 0);
-  if (usedKeys.length === 0) return null;
-
   for (const recipe of recipes) {
-    // inputの種類数・合計が一致するか
-    const reqKeys = recipe.inputs.map(i => i.itemId);
-    if (reqKeys.length !== usedKeys.length) continue;
-    if (!reqKeys.every(k => usedKeys.includes(k))) continue;
-    const match = recipe.inputs.every(inp => (used[inp.itemId] ?? 0) === inp.amount);
-    if (match) return recipe;
+    if (recipe.shape && recipe.shape.length === 9) {
+      // 位置一致マッチング: shapeの各マスとグリッドを照合
+      const match = recipe.shape.every((expected, i) => {
+        if (!expected) return !grid[i].itemId; // 空指定は空マスのみOK
+        return grid[i].itemId === expected;
+      });
+      if (match) return recipe;
+    } else {
+      // 位置不問マッチング（shapeなしレシピの後方互換）
+      const used: Record<string, number> = {};
+      for (const cell of grid) {
+        if (cell.itemId) used[cell.itemId] = (used[cell.itemId] ?? 0) + cell.amount;
+      }
+      const usedKeys = Object.keys(used).filter(k => used[k] > 0);
+      const reqKeys = recipe.inputs.map(i => i.itemId);
+      if (reqKeys.length !== usedKeys.length) continue;
+      if (!reqKeys.every(k => usedKeys.includes(k))) continue;
+      if (recipe.inputs.every(inp => (used[inp.itemId] ?? 0) === inp.amount)) return recipe;
+    }
   }
   return null;
 }
@@ -247,7 +252,7 @@ export function CraftingScreen() {
 
           {/* ヒント */}
           <div style={{ marginTop: 12, fontSize: '0.72rem', color: '#4a5070', lineHeight: 1.6 }}>
-            💡 左のアイテムをタップして選択→グリッドをタップで配置。同じマスを再タップで追加。
+            💡 左のアイテムをタップして選択→グリッドをタップで配置。レシピ通りの位置に置かないとクラフトできません！レシピタブで配置パターンを確認しよう。
           </div>
 
           {/* インベントリ一覧（選択用） */}
@@ -307,19 +312,34 @@ export function CraftingScreen() {
                     <div style={{ color: '#f0c060' }}>→ ×{recipe.outputAmount}</div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                  {recipe.inputs.map(inp => {
-                    const iitem = ITEM_MASTER[inp.itemId];
-                    const have = inv[inp.itemId] ?? 0;
-                    return (
-                      <span key={inp.itemId}
-                        style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '2px 6px', background: have >= inp.amount ? 'rgba(76,175,135,0.15)' : 'rgba(224,85,85,0.1)', border: `1px solid ${have >= inp.amount ? '#4caf87' : '#e05555'}`, borderRadius: 4, fontSize: '0.7rem', color: have >= inp.amount ? '#4caf87' : '#e05555' }}>
-                        <GameIcon id={iitem?.icon ?? 'gem'} size={14} />
-                        {iitem?.name ?? inp.itemId} ×{inp.amount}
-                        <span style={{ color: '#8a92b2' }}>({have})</span>
-                      </span>
-                    );
-                  })}
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  {/* 3x3 shapeプレビュー */}
+                  {recipe.shape && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 20px)', gap: 1, flexShrink: 0 }}>
+                      {recipe.shape.map((cell, si) => {
+                        const ci = cell ? ITEM_MASTER[cell] : null;
+                        return (
+                          <div key={si} style={{ width: 20, height: 20, background: cell ? 'rgba(91,141,238,0.25)' : '#111827', border: `1px solid ${cell ? '#5b8dee' : '#1c2235'}`, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {ci && <GameIcon id={ci.icon} size={14} />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {recipe.inputs.map(inp => {
+                      const iitem = ITEM_MASTER[inp.itemId];
+                      const have = inv[inp.itemId] ?? 0;
+                      return (
+                        <span key={inp.itemId}
+                          style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '2px 6px', background: have >= inp.amount ? 'rgba(76,175,135,0.15)' : 'rgba(224,85,85,0.1)', border: `1px solid ${have >= inp.amount ? '#4caf87' : '#e05555'}`, borderRadius: 4, fontSize: '0.7rem', color: have >= inp.amount ? '#4caf87' : '#e05555' }}>
+                          <GameIcon id={iitem?.icon ?? 'gem'} size={14} />
+                          {iitem?.name ?? inp.itemId} ×{inp.amount}
+                          <span style={{ color: '#8a92b2' }}>({have})</span>
+                        </span>
+                      );
+                    })}
+                  </div>
                 </div>
                 {customRecipes.find(r => r.id === recipe.id) && (
                   <div style={{ fontSize: '0.62rem', color: '#5b8dee', marginTop: 4 }}>★ 管理者追加レシピ</div>
