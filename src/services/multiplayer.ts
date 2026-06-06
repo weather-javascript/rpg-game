@@ -418,6 +418,7 @@ export interface AdminPlayerData {
   dungeonClearedCount?: Record<string, number>;
   skillLevels?: Record<string, number>;
   activityLog?: Array<{ type: string; message: string; timestamp: number }>;
+  inventory?: Record<string, number>;
   lastSavedAt?: number;
   createdAt?: number;
 }

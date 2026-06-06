@@ -70,7 +70,7 @@ export function CraftingScreen() {
   const allRecipes = [...CRAFT_RECIPES, ...customRecipes];
   const matchedRecipe = matchRecipe(grid, allRecipes);
 
-  const craftingLevel = player?.skills?.crafting?.level ?? 1;
+  const craftingLevel = player?.skillLevels?.['crafting'] ?? 1;
 
   // グリッドセルクリック
   const handleCellClick = (idx: number) => {
