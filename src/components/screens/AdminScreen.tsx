@@ -8,12 +8,13 @@ import {
   setJackpotRate, getJackpotRate, getJackpotPool,
   saveAnnouncementToHistory, getAnnouncementHistory,
   getItemPrices, setItemPrices,
+  subscribeProposals, updateProposalStatus, Proposal,
 } from '../../services/multiplayer';
 import { GAMBLE_MASTER, DUNGEON_MASTER, ITEM_MASTER, CRAFT_RECIPES } from '../../data/masters';
 import type { CraftRecipe } from '../../types/game';
 import { useGameStore } from '../../stores/gameStore';
 
-type SubTab = 'players' | 'gamble' | 'items' | 'announce' | 'stats' | 'system' | 'recipes';
+type SubTab = 'players' | 'gamble' | 'items' | 'announce' | 'stats' | 'system' | 'recipes' | 'proposals';
 
 export function AdminScreen() {
   const player = useGameStore(s => s.player);
@@ -50,10 +51,17 @@ export function AdminScreen() {
   // クラフトレシピ管理
   const [customRecipes, setCustomRecipes] = useState<CraftRecipe[]>([]);
   const [newRecipe, setNewRecipe] = useState<Partial<CraftRecipe>>({ inputs: [], outputAmount: 1, requiredCraftingLevel: 1, craftingExpGain: 10 });
-  const [newInputItem, setNewInputItem] = useState('');
-  const [newInputAmount, setNewInputAmount] = useState('1');
+  const [newShape, setNewShape] = useState<string[]>(Array(9).fill(''));
+  const [selectedShapeItem, setSelectedShapeItem] = useState('');
+  // 提案管理
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [proposalProcessing, setProposalProcessing] = useState<string | null>(null);
 
   // リアルタイム購読でプレイヤー一覧を取得
+  useEffect(() => {
+    const unsub = subscribeProposals(setProposals);
+    return unsub;
+  }, []);
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -215,13 +223,14 @@ export function AdminScreen() {
   );
 
   const SUB_TABS: { id: SubTab; label: string; icon: string }[] = [
-    { id: 'players',  label: 'プレイヤー', icon: '👥' },
-    { id: 'gamble',   label: 'ギャンブル', icon: '🎰' },
-    { id: 'items',    label: 'アイテム',   icon: '🎒' },
-    { id: 'recipes',  label: 'レシピ',     icon: '📖' },
-    { id: 'announce', label: 'お知らせ',   icon: '📢' },
-    { id: 'system',   label: 'システム',   icon: '⚙️' },
-    { id: 'stats',    label: '統計',       icon: '📊' },
+    { id: 'players',   label: 'プレイヤー', icon: '👥' },
+    { id: 'gamble',    label: 'ギャンブル', icon: '🎰' },
+    { id: 'items',     label: 'アイテム',   icon: '🎒' },
+    { id: 'recipes',   label: 'レシピ',     icon: '📖' },
+    { id: 'proposals', label: '提案',       icon: '💡' },
+    { id: 'announce',  label: 'お知らせ',   icon: '📢' },
+    { id: 'system',    label: 'システム',   icon: '⚙️' },
+    { id: 'stats',     label: '統計',       icon: '📊' },
   ];
 
   return (
@@ -655,49 +664,93 @@ export function AdminScreen() {
                   style={{width:'100%', padding:'5px 7px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.75rem', boxSizing:'border-box'}} />
               </div>
             </div>
-            {/* 素材追加 */}
-            <div style={{marginBottom:8}}>
-              <div style={{fontSize:'0.72rem', color:'#f0c060', fontWeight:700, marginBottom:4}}>素材（必要アイテム）</div>
-              {(newRecipe.inputs ?? []).map((inp, i) => (
-                <div key={i} style={{display:'flex', alignItems:'center', gap:4, marginBottom:4}}>
-                  <GameIcon id={ITEM_MASTER[inp.itemId]?.icon ?? 'gem'} size={16} />
-                  <span style={{flex:1, fontSize:'0.72rem', color:'#e8e6ff'}}>{ITEM_MASTER[inp.itemId]?.name ?? inp.itemId} ×{inp.amount}</span>
-                  <button onClick={() => setNewRecipe(r => ({...r, inputs: (r.inputs ?? []).filter((_, j) => j !== i)}))}
-                    style={{padding:'2px 6px', background:'rgba(224,85,85,0.15)', color:'#e05555', border:'none', borderRadius:3, cursor:'pointer', fontSize:'0.65rem'}}>
-                    削除
-                  </button>
-                </div>
-              ))}
-              <div style={{display:'flex', gap:4, marginTop:4}}>
-                <select value={newInputItem} onChange={e => setNewInputItem(e.target.value)}
-                  style={{flex:1, padding:'4px 5px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.68rem'}}>
-                  <option value="">-- 素材アイテム --</option>
+            {/* 3×3 クラフトグリッド */}
+            <div style={{marginBottom:10}}>
+              <div style={{fontSize:'0.72rem', color:'#f0c060', fontWeight:700, marginBottom:6}}>🔲 3×3 クラフト配置</div>
+              <div style={{fontSize:'0.65rem', color:'#8a92b2', marginBottom:6}}>
+                下でアイテムを選択してからマスをクリックで配置。右クリックまたは再クリックで削除。
+              </div>
+              {/* アイテム選択 */}
+              <div style={{display:'flex', gap:4, marginBottom:8, alignItems:'center'}}>
+                <select value={selectedShapeItem} onChange={e => setSelectedShapeItem(e.target.value)}
+                  style={{flex:1, padding:'4px 6px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.68rem'}}>
+                  <option value="">── グリッドに置くアイテムを選択 ──</option>
                   {Object.values(ITEM_MASTER).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
-                <input type="number" min={1} value={newInputAmount} onChange={e => setNewInputAmount(e.target.value)}
-                  style={{width:44, padding:'4px 5px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.7rem'}} />
-                <button onClick={() => {
-                  if (!newInputItem) return;
-                  const amt = Math.max(1, Number(newInputAmount));
-                  setNewRecipe(r => ({...r, inputs: [...(r.inputs ?? []), { itemId: newInputItem, amount: amt }]}));
-                  setNewInputItem(''); setNewInputAmount('1');
-                }} style={{padding:'4px 8px', background:'rgba(76,175,135,0.2)', color:'#4caf87', border:'1px solid #4caf87', borderRadius:4, cursor:'pointer', fontSize:'0.68rem'}}>
-                  追加
+                <button onClick={() => setNewShape(Array(9).fill(''))}
+                  style={{padding:'4px 8px', background:'rgba(224,85,85,0.12)', color:'#e05555', border:'1px solid #e05555', borderRadius:4, cursor:'pointer', fontSize:'0.65rem'}}>
+                  クリア
                 </button>
               </div>
+              {/* 3×3グリッド本体 */}
+              <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:4, maxWidth:180, margin:'0 auto 8px'}}>
+                {newShape.map((cellItem, idx) => {
+                  const item = cellItem ? ITEM_MASTER[cellItem] : null;
+                  return (
+                    <div key={idx}
+                      onClick={() => {
+                        if (!selectedShapeItem) {
+                          // 選択なし → クリックでそのセルを削除
+                          setNewShape(prev => prev.map((c, i) => i === idx ? '' : c));
+                        } else if (cellItem === selectedShapeItem) {
+                          // 同じアイテム → 削除
+                          setNewShape(prev => prev.map((c, i) => i === idx ? '' : c));
+                        } else {
+                          // 配置
+                          setNewShape(prev => prev.map((c, i) => i === idx ? selectedShapeItem : c));
+                        }
+                      }}
+                      style={{
+                        width:'100%', aspectRatio:'1', background: cellItem ? 'rgba(91,141,238,0.15)' : '#161b26',
+                        border: `2px solid ${cellItem ? '#5b8dee' : '#2d3752'}`,
+                        borderRadius:4, display:'flex', flexDirection:'column', alignItems:'center',
+                        justifyContent:'center', cursor:'pointer', padding:2, position:'relative',
+                        transition:'border-color 0.15s, background 0.15s',
+                      }}>
+                      {item ? (
+                        <>
+                          <GameIcon id={item.icon ?? 'gem'} size={22} />
+                          <span style={{fontSize:'0.5rem', color:'#8a92b2', textAlign:'center', lineHeight:1.1, marginTop:1, maxWidth:'90%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                            {item.name}
+                          </span>
+                        </>
+                      ) : (
+                        <span style={{color:'#2d3752', fontSize:'1rem'}}>+</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* グリッドから素材リストを自動生成（表示のみ） */}
+              {(() => {
+                const used: Record<string,number> = {};
+                newShape.forEach(id => { if (id) used[id] = (used[id] ?? 0) + 1; });
+                const entries = Object.entries(used);
+                if (entries.length === 0) return null;
+                return (
+                  <div style={{fontSize:'0.68rem', color:'#8a92b2', background:'#161b26', borderRadius:4, padding:'4px 8px'}}>
+                    素材: {entries.map(([id, n]) => `${ITEM_MASTER[id]?.name ?? id}×${n}`).join(' / ')}
+                  </div>
+                );
+              })()}
             </div>
-            <button disabled={saving || !newRecipe.id || !newRecipe.name || !newRecipe.outputItemId || (newRecipe.inputs ?? []).length === 0}
+            <button disabled={saving || !newRecipe.id || !newRecipe.name || !newRecipe.outputItemId || newShape.every(c => !c)}
               onClick={async () => {
-                if (!newRecipe.id || !newRecipe.name || !newRecipe.outputItemId || (newRecipe.inputs ?? []).length === 0) return;
+                if (!newRecipe.id || !newRecipe.name || !newRecipe.outputItemId || newShape.every(c => !c)) return;
                 setSaving(true);
                 try {
+                  // shapeからinputsを自動生成
+                  const used: Record<string,number> = {};
+                  newShape.forEach(id => { if (id) used[id] = (used[id] ?? 0) + 1; });
+                  const inputs = Object.entries(used).map(([itemId, amount]) => ({ itemId, amount }));
                   const recipe: CraftRecipe = {
                     id: newRecipe.id,
                     name: newRecipe.name,
                     description: newRecipe.description ?? '',
                     outputItemId: newRecipe.outputItemId,
                     outputAmount: newRecipe.outputAmount ?? 1,
-                    inputs: newRecipe.inputs ?? [],
+                    inputs,
+                    shape: newShape,
                     requiredCraftingLevel: newRecipe.requiredCraftingLevel ?? 1,
                     craftingExpGain: newRecipe.craftingExpGain ?? 10,
                   };
@@ -707,6 +760,8 @@ export function AdminScreen() {
                   await setDoc(doc(db, 'admin', 'craft_recipes'), { recipes: updated });
                   setCustomRecipes(updated);
                   setNewRecipe({ inputs: [], outputAmount: 1, requiredCraftingLevel: 1, craftingExpGain: 10 });
+                  setNewShape(Array(9).fill(''));
+                  setSelectedShapeItem('');
                   addNotification('success', `レシピ「${recipe.name}」を追加しました`);
                 } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
                 setSaving(false);
@@ -722,7 +777,7 @@ export function AdminScreen() {
             ? <div style={{color:'#4a5070', fontSize:'0.78rem', textAlign:'center', padding:12}}>カスタムレシピなし</div>
             : customRecipes.map(recipe => (
               <div key={recipe.id} style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:6, padding:'8px 10px', marginBottom:6}}>
-                <div style={{display:'flex', alignItems:'center', gap:8}}>
+                <div style={{display:'flex', alignItems:'center', gap:8, marginBottom: recipe.shape ? 6 : 0}}>
                   <GameIcon id={ITEM_MASTER[recipe.outputItemId]?.icon ?? 'gem'} size={20} />
                   <div style={{flex:1}}>
                     <div style={{fontSize:'0.82rem', color:'#e8e6ff', fontWeight:700}}>{recipe.name}</div>
@@ -745,6 +800,19 @@ export function AdminScreen() {
                     削除
                   </button>
                 </div>
+                {/* shapeグリッドプレビュー */}
+                {recipe.shape && recipe.shape.length === 9 && (
+                  <div style={{display:'grid', gridTemplateColumns:'repeat(3,24px)', gap:2, marginTop:4}}>
+                    {recipe.shape.map((cellId, i) => {
+                      const it = cellId ? ITEM_MASTER[cellId] : null;
+                      return (
+                        <div key={i} style={{width:24, height:24, background: cellId ? 'rgba(91,141,238,0.15)' : '#161b26', border:`1px solid ${cellId ? '#5b8dee' : '#2d3752'}`, borderRadius:3, display:'flex', alignItems:'center', justifyContent:'center'}}>
+                          {it ? <GameIcon id={it.icon ?? 'gem'} size={14} /> : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             ))
           }
@@ -760,6 +828,66 @@ export function AdminScreen() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ===== 提案管理 ===== */}
+      {subTab === 'proposals' && (
+        <div>
+          <div style={{fontSize:'0.82rem', color:'#8a92b2', marginBottom:12}}>
+            プレイヤーからの機能提案一覧。承認すると提案チケットが付与されます。
+          </div>
+          {proposals.length === 0 && (
+            <div style={{color:'#4a5070', fontSize:'0.82rem', textAlign:'center', padding:20}}>提案はまだありません</div>
+          )}
+          {proposals.map(p => {
+            const statusColor = p.status === 'approved' ? '#4caf87' : p.status === 'rejected' ? '#e05555' : '#f0c060';
+            const statusLabel = p.status === 'approved' ? '✅ 承認済' : p.status === 'rejected' ? '❌ 却下' : '⏳ 未処理';
+            return (
+              <div key={p.id} style={{background:'#1c2235', border:`1px solid ${statusColor}40`, borderRadius:8, padding:'10px 12px', marginBottom:8}}>
+                <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:4}}>
+                  <span style={{fontWeight:700, color:'#e8e6ff', fontSize:'0.88rem', flex:1}}>{p.title}</span>
+                  <span style={{fontSize:'0.72rem', color: statusColor, fontWeight:700}}>{statusLabel}</span>
+                </div>
+                <div style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:4}}>by {p.displayName} | {new Date(p.createdAt).toLocaleString('ja-JP')}</div>
+                <div style={{fontSize:'0.78rem', color:'#c0c8e0', marginBottom:8, lineHeight:1.6, whiteSpace:'pre-wrap'}}>{p.body}</div>
+                {p.status === 'pending' && (
+                  <div style={{display:'flex', gap:6}}>
+                    <button disabled={!!proposalProcessing}
+                      onClick={async () => {
+                        setProposalProcessing(p.id);
+                        try {
+                          await updateProposalStatus(p.id, 'approved');
+                          // 提案チケット付与: updatePlayerAdminでinventory更新
+                          const target = players.find(pl => pl.id === p.uid);
+                          if (target) {
+                            const inv = { ...(target.inventory ?? {}), vote_ticket: (target.inventory?.vote_ticket ?? 0) + 1 };
+                            await updatePlayerAdmin(p.uid, { inventory: inv });
+                          }
+                          addNotification('success', `提案を承認し提案チケットを付与しました`);
+                        } catch { addNotification('error', '処理に失敗しました'); }
+                        setProposalProcessing(null);
+                      }}
+                      style={{padding:'5px 12px', background:'rgba(76,175,135,0.2)', color:'#4caf87', border:'1px solid #4caf87', borderRadius:4, cursor:'pointer', fontWeight:700, fontSize:'0.75rem'}}>
+                      ✅ 承認（チケット付与）
+                    </button>
+                    <button disabled={!!proposalProcessing}
+                      onClick={async () => {
+                        setProposalProcessing(p.id);
+                        try {
+                          await updateProposalStatus(p.id, 'rejected');
+                          addNotification('success', '提案を却下しました');
+                        } catch { addNotification('error', '処理に失敗しました'); }
+                        setProposalProcessing(null);
+                      }}
+                      style={{padding:'5px 12px', background:'rgba(224,85,85,0.15)', color:'#e05555', border:'1px solid #e05555', borderRadius:4, cursor:'pointer', fontWeight:700, fontSize:'0.75rem'}}>
+                      ❌ 却下
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

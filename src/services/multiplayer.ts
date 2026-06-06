@@ -1091,3 +1091,38 @@ export function subscribeItemPrices(cb: (prices: Record<string, ItemPriceOverrid
     cb(snap.exists() ? (snap.data() as Record<string, ItemPriceOverride>) : {});
   });
 }
+
+// ============================================================
+// 提案システム (proposals)
+// ============================================================
+export interface Proposal {
+  id: string;
+  uid: string;
+  displayName: string;
+  title: string;
+  body: string;
+  createdAt: number;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
+export async function submitProposal(proposal: Omit<Proposal, 'id' | 'status' | 'createdAt'>): Promise<void> {
+  const { addDoc, collection, serverTimestamp } = await import('firebase/firestore');
+  await addDoc(collection(db, 'proposals'), {
+    ...proposal,
+    status: 'pending',
+    createdAt: Date.now(),
+  });
+}
+
+export function subscribeProposals(cb: (proposals: Proposal[]) => void): () => void {
+  const { query, collection, orderBy } = require('firebase/firestore');
+  return onSnapshot(
+    query(collection(db, 'proposals'), orderBy('createdAt', 'desc')),
+    (snap: any) => cb(snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Proposal)))
+  );
+}
+
+export async function updateProposalStatus(id: string, status: 'approved' | 'rejected'): Promise<void> {
+  const { updateDoc, doc: firestoreDoc } = await import('firebase/firestore');
+  await updateDoc(firestoreDoc(db, 'proposals', id), { status });
+}

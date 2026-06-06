@@ -39,19 +39,21 @@ function resolveGenericGamble(game: GambleMaster, bet: number, multiplierBonus =
   return { rewardLabel: last.label, multiplier: last.multiplier, goldDelta: Math.floor(bet * last.multiplier) - bet, itemRewards: last.itemRewards ?? [], symbols: last.symbols };
 }
 
-function ResultDisplay({ result }: { result: GambleResult }) {
+function ResultDisplay({ result, bet = 0 }: { result: GambleResult; bet?: number }) {
   const isReplay = result.rewardLabel.includes('REPLAY');
   const isWin = result.goldDelta > 0;
   const labelColor = isReplay ? '#5b8dee' : isWin ? '#4caf87' : '#e05555';
   const bgColor = isReplay ? 'rgba(91,141,238,0.1)' : isWin ? 'rgba(76,175,135,0.1)' : 'rgba(224,85,85,0.1)';
   const borderColor = isReplay ? '#5b8dee' : isWin ? '#4caf87' : '#e05555';
+  // 手元に戻る合計額（賭け金返還分 + 差益）を表示
+  const totalReturn = result.goldDelta + bet;
   return (
     <div style={{ padding: '10px', background: bgColor, border: `1px solid ${borderColor}`, borderRadius: 8, marginBottom: 10, textAlign: 'center' }}>
       <div style={{ fontSize: '1.2rem', fontWeight: 700, color: labelColor, marginBottom: 4 }}>
         {result.symbols?.join(' ') ?? ''} {result.rewardLabel}
       </div>
       <div style={{ fontSize: '1rem', fontWeight: 700, color: labelColor }}>
-        {isReplay ? '🔄 掛け金返還' : isWin ? `+${result.goldDelta.toLocaleString()}G` : `${result.goldDelta.toLocaleString()}G`}
+        {isReplay ? `🔄 掛け金返還 (+${bet.toLocaleString()}G)` : isWin ? `+${totalReturn.toLocaleString()}G` : `${result.goldDelta.toLocaleString()}G`}
       </div>
       {result.itemRewards.length > 0 && (
         <div style={{ marginTop: 6, fontSize: '0.8rem' }}>
@@ -1645,7 +1647,7 @@ function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
           <div style={{ fontSize:'0.8rem', color:'#8a92b2', animation:'glow 0.5s infinite' }}>リール回転中...</div>
         )}
       </div>
-      {result && <ResultDisplay result={result} />}
+      {result && <ResultDisplay result={result} bet={bet} />}
       <button onClick={play} disabled={animating}
         style={{ width:'100%', padding:12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#f0c060,#d0a040)', color: animating ? '#8a92b2' : '#000', border:'none', borderRadius:8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight:700, fontSize:'1rem' }}>
         {animating ? '🎰 回転中...' : `🎰 ${bet.toLocaleString()}G でプレイ`}
@@ -1706,7 +1708,7 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus =
   return (
     <div>
       {showAnim && <GameAnimation type={animType as 'slot'|'treasure_box'|'generic'} onDone={handleAnimDone} />}
-      {result && !animating && <ResultDisplay result={result} />}
+      {result && !animating && <ResultDisplay result={result} bet={bet} />}
       <button onClick={play} disabled={animating}
         style={{ width: '100%', padding: 12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#5b8dee,#3a6fd0)', color: '#fff', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem' }}>
         {animating ? '結果を出しています...' : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><GameIcon id={game.icon} size={18} /> {bet.toLocaleString()}G で挑戦</span>}
@@ -1789,7 +1791,7 @@ function ChohanPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }:
           )}
         </div>
       )}
-      {phase === 'done' && result && <ResultDisplay result={result} />}
+      {phase === 'done' && result && <ResultDisplay result={result} bet={bet} />}
       <button onClick={play} disabled={animating}
         style={{ width: '100%', padding: 12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#e05555,#c03030)', color: '#fff', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem' }}>
         🎲 {bet.toLocaleString()}G で投じる
@@ -1888,7 +1890,7 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
       {result && !animating && (
         <div>
           <div style={{ textAlign: 'center', fontSize: '1.5rem', marginBottom: 6 }}>{result.dice?.join(' ') ?? ''}</div>
-          <ResultDisplay result={result} />
+          <ResultDisplay result={result} bet={bet} />
         </div>
       )}
       <button onClick={play} disabled={animating}
@@ -2136,7 +2138,7 @@ function PokerPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, on
               </div>
             ))}
           </div>
-          {phase==='result' && result && <ResultDisplay result={result} />}
+          {phase==='result' && result && <ResultDisplay result={result} bet={bet} />}
         </div>
       )}
       {phase==='idle' && (

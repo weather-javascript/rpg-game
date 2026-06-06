@@ -22,16 +22,30 @@ const EMPTY_GRID: GridCell[] = Array(9).fill(null).map(() => ({ itemId: '', amou
 // レシピマッチング（shapeがあれば位置一致、なければ位置不問）
 // ============================================================
 function matchRecipe(grid: GridCell[], recipes: CraftRecipe[]): CraftRecipe | null {
+  return matchRecipeWithCount(grid, recipes)?.recipe ?? null;
+}
+
+/** レシピマッチ＋何回分製作できるか */
+function matchRecipeWithCount(grid: GridCell[], recipes: CraftRecipe[]): { recipe: CraftRecipe; times: number } | null {
   for (const recipe of recipes) {
     if (recipe.shape && recipe.shape.length === 9) {
-      // 位置一致マッチング: shapeの各マスとグリッドを照合
+      // 位置一致マッチング（shapeあり）
+      // まず最小配置（各セルに1個）でshapeが一致するか確認
+      const baseGrid = grid.map(c => ({ ...c, amount: c.amount > 0 ? 1 : 0 }));
       const match = recipe.shape.every((expected, i) => {
-        if (!expected) return !grid[i].itemId; // 空指定は空マスのみOK
+        if (!expected) return !grid[i].itemId;
         return grid[i].itemId === expected;
       });
-      if (match) return recipe;
+      if (!match) continue;
+      // 一致した → 各セルのamountの最小値が「何回分か」
+      const shapeIndices = recipe.shape.map((s, i) => s ? i : -1).filter(i => i >= 0);
+      const times = shapeIndices.length > 0
+        ? Math.min(...shapeIndices.map(i => grid[i].amount))
+        : 1;
+      if (times < 1) continue;
+      return { recipe, times };
     } else {
-      // 位置不問マッチング（shapeなしレシピの後方互換）
+      // 位置不問マッチング
       const used: Record<string, number> = {};
       for (const cell of grid) {
         if (cell.itemId) used[cell.itemId] = (used[cell.itemId] ?? 0) + cell.amount;
@@ -40,7 +54,11 @@ function matchRecipe(grid: GridCell[], recipes: CraftRecipe[]): CraftRecipe | nu
       const reqKeys = recipe.inputs.map(i => i.itemId);
       if (reqKeys.length !== usedKeys.length) continue;
       if (!reqKeys.every(k => usedKeys.includes(k))) continue;
-      if (recipe.inputs.every(inp => (used[inp.itemId] ?? 0) === inp.amount)) return recipe;
+      // 各素材について「置かれた数 ÷ 要求数」が何回分か
+      const timesPerInput = recipe.inputs.map(inp => Math.floor((used[inp.itemId] ?? 0) / inp.amount));
+      if (timesPerInput.some(t => t < 1)) continue;
+      const times = Math.min(...timesPerInput);
+      return { recipe, times };
     }
   }
   return null;
@@ -73,7 +91,9 @@ export function CraftingScreen() {
   }, []);
 
   const allRecipes = [...CRAFT_RECIPES, ...customRecipes];
-  const matchedRecipe = matchRecipe(grid, allRecipes);
+  const matchResult = matchRecipeWithCount(grid, allRecipes);
+  const matchedRecipe = matchResult?.recipe ?? null;
+  const craftTimes = matchResult?.times ?? 1;
 
   const craftingLevel = player?.skillLevels?.['crafting'] ?? 1;
 
@@ -122,17 +142,18 @@ export function CraftingScreen() {
       addNotification('error', `製作スキルLv${matchedRecipe.requiredCraftingLevel}が必要です（現在Lv${craftingLevel}）`);
       return;
     }
-    // 素材消費
+    // 素材消費（craftTimes倍）
     for (const inp of matchedRecipe.inputs) {
-      const ok = consumeItem(inp.itemId, inp.amount);
+      const ok = consumeItem(inp.itemId, inp.amount * craftTimes);
       if (!ok) { addNotification('error', `${ITEM_MASTER[inp.itemId]?.name ?? inp.itemId} が不足しています`); return; }
     }
-    addItems([{ itemId: matchedRecipe.outputItemId, amount: matchedRecipe.outputAmount }]);
-    addSkillExp('crafting', matchedRecipe.craftingExpGain);
+    const totalOutput = matchedRecipe.outputAmount * craftTimes;
+    addItems([{ itemId: matchedRecipe.outputItemId, amount: totalOutput }]);
+    addSkillExp('crafting', matchedRecipe.craftingExpGain * craftTimes);
     const outItem = ITEM_MASTER[matchedRecipe.outputItemId];
-    addNotification('success', `✨ ${outItem?.name ?? matchedRecipe.outputItemId} ×${matchedRecipe.outputAmount} を製作しました！`);
+    addNotification('success', `✨ ${outItem?.name ?? matchedRecipe.outputItemId} ×${totalOutput}${craftTimes > 1 ? ` (${craftTimes}回分)` : ''} を製作しました！`);
     clearGrid();
-  }, [matchedRecipe, player, craftingLevel, consumeItem, addItems, addSkillExp, addNotification]);
+  }, [matchedRecipe, craftTimes, player, craftingLevel, consumeItem, addItems, addSkillExp, addNotification]);
 
   if (!player) return null;
 
@@ -213,7 +234,7 @@ export function CraftingScreen() {
                   <>
                     <GameIcon id={ITEM_MASTER[matchedRecipe.outputItemId]?.icon ?? 'gem'} size={32} />
                     <span style={{ fontSize: '0.65rem', color: '#f0c060', fontWeight: 700, position: 'absolute', bottom: 4, right: 6 }}>
-                      ×{matchedRecipe.outputAmount}
+                      ×{matchedRecipe.outputAmount * craftTimes}
                     </span>
                   </>
                 ) : (

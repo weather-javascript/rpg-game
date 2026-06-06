@@ -541,7 +541,18 @@ export default function App() {
   const changeGold = useGameStore(s => s.changeGold);
   const applyPassiveRegen = useGameStore(s => s.applyPassiveRegen);
 
-  // バージョン更新ポップアップ（毎回表示）
+  const addItems = useGameStore(s => s.addItems);
+
+  // OTT（オンタイムチケット）: 10分遊ぶと1枚付与
+  useEffect(() => {
+    if (!player) return;
+    const OTT_INTERVAL_MS = 10 * 60 * 1000; // 10分
+    const timer = setInterval(() => {
+      addItems([{ itemId: 'ontime_ticket', amount: 1 }]);
+      addNotification('success', '🎫 オンタイムチケットを1枚獲得しました！（10分プレイ報酬）');
+    }, OTT_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [player?.uid]);
   const [showVersionPopup, setShowVersionPopup] = useState(false);
   const [showAdminAnnounce, setShowAdminAnnounce] = useState(false);
   const [maintenanceStatus, setMaintenanceStatus] = useState<{ active: boolean; startedAt: number; estimatedMinutes: number; message?: string } | null>(null);

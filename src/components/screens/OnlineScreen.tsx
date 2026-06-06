@@ -12,10 +12,55 @@ import {
   subscribeAuctions, createAuction, buyAuction, cancelAuction,
   subscribeAllPlayersAdmin,
   subscribeActivityFeed, ActivityFeedEntry, postActivityFeed,
+  submitProposal,
 } from '../../services/multiplayer';
 import type { OnlineUser, BoardMessage, AuctionListing } from '../../types/game';
 
-type SubTab = 'online' | 'board' | 'auction' | 'activity' | 'ranking';
+type SubTab = 'online' | 'board' | 'auction' | 'activity' | 'ranking' | 'proposal';
+
+function ProposalPanel() {
+  const player = useGameStore(s => s.player);
+  const addNotification = useGameStore(s => s.addNotification);
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!player || !title.trim() || !body.trim()) return;
+    setSending(true);
+    try {
+      await submitProposal({ uid: player.uid, displayName: player.displayName, title: title.trim(), body: body.trim() });
+      addNotification('success', '📨 提案を送信しました！承認されると提案チケットが付与されます。');
+      setTitle(''); setBody('');
+    } catch { addNotification('error', '送信に失敗しました'); }
+    setSending(false);
+  };
+
+  return (
+    <div>
+      <h3 style={{color:'#5b8dee', marginBottom:6, fontSize:'0.95rem'}}>💡 運営への機能提案</h3>
+      <p style={{color:'#8a92b2', fontSize:'0.78rem', marginBottom:12, lineHeight:1.6}}>
+        ゲームへの要望・改善案を送信できます。承認された場合、<strong style={{color:'#f0c060'}}>提案チケット</strong>が付与されます。
+      </p>
+      <div style={{marginBottom:8}}>
+        <div style={{fontSize:'0.72rem', color:'#8a92b2', marginBottom:3}}>タイトル</div>
+        <input value={title} onChange={e => setTitle(e.target.value)} maxLength={50}
+          placeholder="例：採掘スキルに新しい鉱石を追加してほしい"
+          style={{width:'100%', padding:'7px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', boxSizing:'border-box'}} />
+      </div>
+      <div style={{marginBottom:10}}>
+        <div style={{fontSize:'0.72rem', color:'#8a92b2', marginBottom:3}}>詳細・理由</div>
+        <textarea value={body} onChange={e => setBody(e.target.value)} maxLength={500} rows={4}
+          placeholder="提案の詳細を書いてください..."
+          style={{width:'100%', padding:'7px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', boxSizing:'border-box', resize:'vertical'}} />
+      </div>
+      <button onClick={handleSubmit} disabled={sending || !title.trim() || !body.trim()}
+        style={{width:'100%', padding:'9px', background: (!title.trim() || !body.trim()) ? '#2d3752' : 'linear-gradient(135deg,#5b8dee,#3d6fd0)', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.85rem'}}>
+        {sending ? '送信中...' : '📨 提案を送信する'}
+      </button>
+    </div>
+  );
+}
 
 function OnlinePanel({ users }: { users: OnlineUser[] }) {
   return (
@@ -375,6 +420,7 @@ export function OnlineScreen() {
     { id:'board'    as SubTab, label:'掲示板',     icon:'chat' },
     { id:'auction'  as SubTab, label:'オークション', icon:'tag' },
     { id:'ranking'  as SubTab, label:'ランキング', icon:'trophy' },
+    { id:'proposal' as SubTab, label:'提案',       icon:'ballot_box' },
   ];
 
   return (
@@ -393,6 +439,7 @@ export function OnlineScreen() {
       {subTab === 'board'    && <BoardPanel />}
       {subTab === 'auction'  && <AuctionPanel />}
       {subTab === 'ranking'  && <RankingPanel />}
+      {subTab === 'proposal' && <ProposalPanel />}
     </div>
   );
 }

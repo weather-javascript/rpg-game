@@ -58,7 +58,7 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   master_rod:     { id:'master_rod',    name:'マスターロッド', description:'Yランダムボックスが釣れる。', category:'tool',  itemType:'Item', rarity:'epic',   sellPrice:2000, buyPrice:0,    maxStack:1, icon:'fishing_rod' },
   master_rod_z:   { id:'master_rod_z',  name:'マスターロッドZ', description:'資源釣り最上位の竿。', category:'tool',  itemType:'Item', rarity:'epic',      sellPrice:5000, buyPrice:0,    maxStack:1, icon:'fishing_rod' },
   ffgg_rod_r1:    { id:'ffgg_rod_r1',   name:'FFGGロッドRank1', description:'FFGG専用釣り竿。',     category:'tool',  itemType:'Item', rarity:'rare',      sellPrice:300,  buyPrice:0,    maxStack:1, icon:'fishing_rod' },
-  ffgg_rod_r3:    { id:'ffgg_rod_r3',   name:'FFGGロッドRank3', description:'投票チケット+OTT64枚で入手。', category:'tool',  itemType:'Item', rarity:'rare', sellPrice:800, buyPrice:0,   maxStack:1, icon:'fishing_rod' },
+  ffgg_rod_r3:    { id:'ffgg_rod_r3',   name:'FFGGロッドRank3', description:'提案チケット+OTT64枚で入手。', category:'tool',  itemType:'Item', rarity:'rare', sellPrice:800, buyPrice:0,   maxStack:1, icon:'fishing_rod' },
   ffgg_rod_r6:    { id:'ffgg_rod_r6',   name:'FFGGロッドRank6', description:'FFGG釣り最強。',        category:'tool',  itemType:'Item', rarity:'epic',      sellPrice:5000, buyPrice:0,    maxStack:1, icon:'fishing_rod' },
   ffggr_rod:      { id:'ffggr_rod',     name:'FFGGRロッド',     description:'GGR釣り専用。',         category:'tool',  itemType:'Item', rarity:'legendary', sellPrice:8000, buyPrice:0,    maxStack:1, icon:'fishing_rod' },
   // 魚
@@ -101,7 +101,7 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   polishing_agent_5: { id:'polishing_agent_5', name:'研磨剤Ⅴ',  description:'研磨剤の中級品。',         category:'material',  itemType:'Item', rarity:'uncommon', sellPrice:50, buyPrice:150, maxStack:-1, icon:'gem' },
   resource_pickaxe:  { id:'resource_pickaxe',  name:'資源ピッケル', description:'採掘効率大幅アップ。',    category:'tool',  itemType:'Item',     rarity:'rare',     sellPrice:500,buyPrice:0,   maxStack:1,  icon:'pickaxe' },
   storage_box:       { id:'storage_box',       name:'ストレージボックス', description:'大量収納。',         category:'tool',  itemType:'Item',     rarity:'uncommon', sellPrice:100,buyPrice:300, maxStack:99, icon:'box' },
-  vote_ticket:       { id:'vote_ticket',       name:'投票チケット', description:'FFGGロッドの交換に使用。', category:'treasure',  itemType:'Item', rarity:'uncommon', sellPrice:200,buyPrice:0,   maxStack:99, icon:'ballot_box' },
+  vote_ticket:       { id:'vote_ticket',       name:'提案チケット', description:'運営への提案承認で入手。FFGGロッドの交換に使用。', category:'treasure',  itemType:'Item', rarity:'uncommon', sellPrice:200,buyPrice:0,   maxStack:99, icon:'ballot_box' },
   ontime_ticket:     { id:'ontime_ticket',     name:'OTT(オンタイムチケット)', description:'各種交換に使用。', category:'treasure',  itemType:'Item', rarity:'uncommon', sellPrice:150,buyPrice:0, maxStack:-1, icon:'clock' },
   mystery_key:       { id:'mystery_key',       name:'謎の鍵',    description:'ミステリーBOX開封に必要。', category:'tool',  itemType:'Item', rarity:'uncommon', sellPrice:80, buyPrice:0, maxStack:99, icon:'old_key' },
   mystery_box_ore:   { id:'mystery_box_ore',   name:'謎のミステリーBOX', description:'カスタムチケットが出る。', category:'treasure',  itemType:'Item', rarity:'rare', sellPrice:0, buyPrice:0, maxStack:99, icon:'box' },

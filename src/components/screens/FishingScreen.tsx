@@ -435,7 +435,7 @@ export function FishingScreen() {
           })}
           <div style={{ background: '#1c2235', border: '1px dashed #2d3752', borderRadius: 8, padding: 10, fontSize: '0.78rem', color: '#4a5070' }}>
             💡 釣り竿は市場で購入するか、ダンジョン・ギャンブルで入手できます。
-            FFGGロッドは投票チケット+OTT64枚で交換可能です。
+            FFGGロッドは提案チケット+OTT64枚で交換可能です。
           </div>
         </div>
       )}
