@@ -340,6 +340,9 @@ export function AdminScreen() {
                       await updatePlayerAdmin(selectedPlayer.id, { inventory: newInv });
                       setSelectedPlayer((p: any) => ({ ...p, inventory: newInv }));
                       setPlayers(prev => prev.map(p => p.id === selectedPlayer.id ? { ...p, inventory: newInv } : p));
+                      if (player && player.uid === selectedPlayer.id) {
+                        useGameStore.setState(s => ({ player: s.player ? { ...s.player, inventory: newInv } : s.player }));
+                      }
                       addNotification('success', `${ITEM_MASTER[invEditItem]?.name ?? invEditItem} ×${amt} を追加`);
                     } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
                     setSaving(false);
@@ -369,6 +372,9 @@ export function AdminScreen() {
                             if (newAmt === 0) delete curInv[itemId]; else curInv[itemId] = newAmt;
                             setSelectedPlayer((p: any) => ({ ...p, inventory: curInv }));
                             setPlayers(prev => prev.map(p => p.id === selectedPlayer.id ? { ...p, inventory: curInv } : p));
+                            if (player && player.uid === selectedPlayer.id) {
+                              useGameStore.setState(s => ({ player: s.player ? { ...s.player, inventory: curInv } : s.player }));
+                            }
                             try { await updatePlayerAdmin(selectedPlayer.id, { inventory: curInv }); }
                             catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
                           }}
@@ -382,6 +388,9 @@ export function AdminScreen() {
                             await updatePlayerAdmin(selectedPlayer.id, { inventory: curInv });
                             setSelectedPlayer((p: any) => ({ ...p, inventory: curInv }));
                             setPlayers(prev => prev.map(p => p.id === selectedPlayer.id ? { ...p, inventory: curInv } : p));
+                            if (player && player.uid === selectedPlayer.id) {
+                              useGameStore.setState(s => ({ player: s.player ? { ...s.player, inventory: curInv } : s.player }));
+                            }
                           } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
                           setSaving(false);
                         }} style={{padding:'2px 6px', background:'rgba(224,85,85,0.15)', color:'#e05555', border:'none', borderRadius:4, cursor:'pointer', fontSize:'0.68rem'}}>

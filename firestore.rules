@@ -107,9 +107,24 @@ service cloud.firestore {
     }
 
     // ============================================================
-    // board/{messageId} — 掲示板
+    // board/{messageId} — 掲示板（旧コレクション名、互換性のため残す）
     // ============================================================
     match /board/{messageId} {
+      allow read: if isAuthed();
+      allow create: if isAuthed()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() >= 1
+        && request.resource.data.text.size() <= 200;
+      allow delete: if isAuthed()
+        && (resource.data.uid == request.auth.uid || isAdmin());
+      allow update: if isAdmin();
+    }
+
+    // ============================================================
+    // board_messages/{messageId} — 掲示板（実際に使用されるコレクション名）
+    // ============================================================
+    match /board_messages/{messageId} {
       allow read: if isAuthed();
       allow create: if isAuthed()
         && request.resource.data.uid == request.auth.uid
@@ -192,7 +207,7 @@ service cloud.firestore {
         && request.resource.data.buyIn is int
         && request.resource.data.buyIn >= 100
         && request.resource.data.maxPlayers is int
-        && request.resource.data.maxPlayers >= 3
+        && request.resource.data.maxPlayers >= 2
         && request.resource.data.maxPlayers <= 6
         && request.resource.data.status == 'waiting');
       allow update: if isAuthed()

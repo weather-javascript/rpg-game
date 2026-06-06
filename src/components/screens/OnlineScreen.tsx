@@ -49,6 +49,7 @@ const ACTIVITY_STYLE: Record<string, { emoji: string; color: string }> = {
   crafting:      { emoji: '🔨', color: '#9b6df0' },
   gamble_win:    { emoji: '🎰', color: '#4caf87' },
   gamble_lose:   { emoji: '🎰', color: '#e05555' },
+  gamble_battle: { emoji: '⚔️', color: '#f0c060' },
   fishing:       { emoji: '🎣', color: '#5b8dee' },
   mining:        { emoji: '⛏️', color: '#f0a830' },
   auction:       { emoji: '🏷️', color: '#f0c060' },

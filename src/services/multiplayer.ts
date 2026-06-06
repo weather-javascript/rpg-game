@@ -383,6 +383,20 @@ export async function joinGambleBattle(
   const winnerId = hostWins ? battle.hostUid : guestUid;
   await updateDoc(ref, { status: 'finished', guestUid, guestName, winnerId });
 
+  // アクティビティフィード投稿
+  const GAME_NAMES_JP: Record<string, string> = {
+    chohan: '丁半', chinchiro: 'チンチロリン', coin_flip: 'コイントス', slot_machine: 'スロット',
+  };
+  const gameNameJp = GAME_NAMES_JP[gt] ?? gt;
+  const winnerName = hostWins ? battle.hostName : guestName;
+  const loserName = hostWins ? guestName : battle.hostName;
+  postActivityFeed({
+    uid: winnerId,
+    displayName: winnerName,
+    type: 'gamble_battle',
+    message: `が${loserName}との${gameNameJp}対戦に勝利！${battle.betAmount.toLocaleString()}G獲得！`,
+  }).catch(() => {});
+
   return { success: true, battle: { ...battle, guestUid, guestName, winnerId, status: 'finished' } };
 }
 
@@ -903,7 +917,7 @@ export async function pokerAction(
 
   // 次のプレイヤーを決定
   const activePlayers = players.filter(p => !p.folded);
-  const { nextTurnUid, shouldAdvancePhase } = _getNextTurn(players, pidx, table.phase);
+  const { nextTurnUid, shouldAdvancePhase } = _getNextTurn(players, pidx, currentBet);
 
   let updates: Record<string, unknown> = { players, pot, currentBet, currentTurnUid: nextTurnUid, lastActionAt: Date.now() };
 
@@ -941,16 +955,35 @@ export async function pokerAction(
   return { success: true };
 }
 
-function _getNextTurn(players: PokerPlayer[], currentIdx: number, _phase: string): { nextTurnUid: string; shouldAdvancePhase: boolean } {
+function _getNextTurn(players: PokerPlayer[], currentIdx: number, currentBet: number): { nextTurnUid: string; shouldAdvancePhase: boolean } {
   const n = players.length;
-  // 次のアクティブプレイヤーを探す
+  const activePlayers = players.filter(p => !p.folded && !p.allIn);
+
+  // 全員がcurrentBetに追いついているか確認
+  const allMatched = activePlayers.every(p => p.bet >= currentBet || p.allIn);
+
+  if (allMatched) {
+    // 次のアクティブプレイヤーを探す（折り返しても全員確認）
+    for (let i = 1; i <= n; i++) {
+      const idx = (currentIdx + i) % n;
+      if (!players[idx].folded && !players[idx].allIn) {
+        // このプレイヤーが既にcurrentBetに追いついていれば、フェーズ進行
+        if (players[idx].bet >= currentBet) {
+          return { nextTurnUid: '', shouldAdvancePhase: true };
+        }
+        return { nextTurnUid: players[idx].uid, shouldAdvancePhase: false };
+      }
+    }
+    return { nextTurnUid: '', shouldAdvancePhase: true };
+  }
+
+  // まだ追いついていないプレイヤーを探す
   for (let i = 1; i <= n; i++) {
     const idx = (currentIdx + i) % n;
     if (!players[idx].folded && !players[idx].allIn) {
       return { nextTurnUid: players[idx].uid, shouldAdvancePhase: false };
     }
   }
-  // 全員フォールドかオールイン → フェーズ進行
   return { nextTurnUid: '', shouldAdvancePhase: true };
 }
 
