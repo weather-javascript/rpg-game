@@ -498,8 +498,6 @@ export function FishingScreen() {
           </div>
         </div>
       )}
-        </div>
-      )}
     </div>
   );
 }
