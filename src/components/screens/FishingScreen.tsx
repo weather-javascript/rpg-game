@@ -62,7 +62,7 @@ export function FishingScreen() {
 
   const [log, setLog] = useState<string[]>([]);
   const [cooldown, setCooldown] = useState(0);
-  const [activeTab, setActiveTab] = useState<'fish' | 'rod' | 'exchange' | 'commands'>('fish');
+  const [activeTab, setActiveTab] = useState<'fish' | 'rod' | 'exchange'>('fish');
   const [fever, setFever] = useState<FeverState>({ active: false, remaining: 0, scoreBonus: 1 });
   const [feverMissCount, setFeverMissCount] = useState(0);
 
@@ -310,7 +310,6 @@ export function FishingScreen() {
         {tabBtn('fish', '🎣 釣る')}
         {tabBtn('rod', '🔧 釣り竿')}
         {tabBtn('exchange', '🔄 交換')}
-        {tabBtn('commands', '⌨️ コマンド')}
       </div>
 
       {/* ===== 釣るタブ ===== */}
@@ -499,30 +498,6 @@ export function FishingScreen() {
           </div>
         </div>
       )}
-
-      {/* ===== コマンドタブ ===== */}
-      {activeTab === 'commands' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ fontSize: '0.82rem', color: '#8a92b2', marginBottom: 4 }}>
-            life鯖で使えるコマンドの一覧です（ゲーム内では自動適用）
-          </div>
-          {[
-            { cmd: '/jobs join fisher', desc: '釣り師ジョブに就く。釣りのたびにお金が入る。', effect: () => { get().setActiveJob('fisher'); addNotification('success', '🎣 釣り師ジョブに就いた！釣りのたびにお金が入ります。'); } },
-            { cmd: '/jobs join miner',  desc: '採掘師ジョブに就く。採掘のたびにお金が入る。', effect: () => { get().setActiveJob('mining'); addNotification('success', '⛏️ 採掘師ジョブに就いた！'); } },
-            { cmd: '/mls',             desc: 'アイテム獲得ログ表示切替（ゲーム内はログで常時ON）', effect: () => addNotification('info', '/mls: ゲーム内ではログに常時表示されます') },
-            { cmd: '/dropprotect',     desc: 'アイテムドロップ保護設定', effect: () => addNotification('info', '/dropprotect: ゲーム内では自動保護されています') },
-            { cmd: '/ott',             desc: 'オンタイムポイント→OTT変換', effect: () => addNotification('info', 'OTTはゲームプレイ時間に応じて自動獲得されます') },
-          ].map((c, i) => (
-            <div key={i} style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 8, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <div>
-                <div style={{ fontFamily: 'monospace', color: '#5b8dee', fontSize: '0.85rem' }}>{c.cmd}</div>
-                <div style={{ fontSize: '0.75rem', color: '#4a5070', marginTop: 2 }}>{c.desc}</div>
-              </div>
-              <button onClick={c.effect} style={{ padding: '4px 10px', background: '#2d3752', color: '#8a92b2', border: '1px solid #4a5070', borderRadius: 4, cursor: 'pointer', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
-                実行
-              </button>
-            </div>
-          ))}
         </div>
       )}
     </div>

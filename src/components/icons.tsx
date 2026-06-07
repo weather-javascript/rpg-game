@@ -432,6 +432,46 @@ const ICONS: Record<string, SvgDef> = {
     <line x1="18" y1="16" x2="24" y2="16" stroke="${C.steelDk}" stroke-width="1" opacity="0.4"/>
   ` },
 
+  golden_chestplate: { content: `
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="${C.gold}"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="${C.goldDk}"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="${C.gold}"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="${C.gold}"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="${C.goldDk}" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="${C.goldDk}" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="22" x2="23" y2="22" stroke="${C.goldDk}" stroke-width="1" opacity="0.4"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="#ffe08a" stroke-width="1"/>
+  ` },
+
+  golden_helmet: { content: `
+    <path d="M8 20 Q8 10 16 8 Q24 10 24 20 L22 20 Q22 14 16 12 Q10 14 10 20 Z" fill="${C.gold}"/>
+    <path d="M8 20 L24 20 L23 24 L9 24 Z" fill="${C.goldDk}"/>
+    <rect x="12" y="20" width="8" height="4" rx="1" fill="${C.gold}"/>
+    <path d="M11 12 Q12 10 16 10 Q20 10 21 12" fill="none" stroke="#ffe08a" stroke-width="1.5"/>
+  ` },
+
+  golden_leggings: { content: `
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="${C.goldDk}"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="${C.gold}"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="${C.gold}"/>
+    <line x1="9" y1="14" x2="15" y2="14" stroke="${C.goldDk}" stroke-width="1.5" opacity="0.5"/>
+    <line x1="17" y1="14" x2="23" y2="14" stroke="${C.goldDk}" stroke-width="1.5" opacity="0.5"/>
+    <line x1="9" y1="18" x2="15" y2="18" stroke="${C.goldDk}" stroke-width="1" opacity="0.4"/>
+    <line x1="17" y1="18" x2="23" y2="18" stroke="${C.goldDk}" stroke-width="1" opacity="0.4"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="#ffe08a" stroke-width="1"/>
+  ` },
+
+  golden_boots: { content: `
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="${C.gold}"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="${C.gold}"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="${C.goldDk}"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="${C.goldDk}"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="#ffe08a" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="#ffe08a" stroke-width="1"/>
+    <line x1="8" y1="16" x2="14" y2="16" stroke="${C.goldDk}" stroke-width="1" opacity="0.4"/>
+    <line x1="18" y1="16" x2="24" y2="16" stroke="${C.goldDk}" stroke-width="1" opacity="0.4"/>
+  ` },
+
   dagger: { content: `
     <line x1="8" y1="26" x2="22" y2="12" stroke="${C.blade}" stroke-width="3" stroke-linecap="round"/>
     <path d="M20 10 L24 10 L24 14 L22 12 Z" fill="${C.steel}"/>

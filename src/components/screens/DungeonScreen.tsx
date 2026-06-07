@@ -995,6 +995,7 @@ function TrapWorldPanel({ player, addItems, addNotification }: {
   const [isElite, setIsElite] = useState(false);
   const [currentMob, setCurrentMob] = useState<TrapMob | null>(null);
   const [log, setLog] = useState<{ text: string; color: string }[]>([]);
+  const [attackCooldown, setAttackCooldown] = useState(false);
   const equipment = player.equipment ?? defaultEquipmentSlots();
 
   const getPlayerAtk = () => {
@@ -1024,7 +1025,9 @@ function TrapWorldPanel({ player, addItems, addNotification }: {
   };
 
   const handleAttack = () => {
-    if (!currentMob) return;
+    if (!currentMob || attackCooldown) return;
+    setAttackCooldown(true);
+    setTimeout(() => setAttackCooldown(false), 500);
     const atk = getPlayerAtk();
     const dmg = Math.max(1, atk - 0) + randomInt(Math.ceil(atk * 0.2) + 1);
     const newHp = Math.max(0, mobHp - dmg);

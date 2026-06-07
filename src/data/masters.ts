@@ -31,6 +31,10 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   iron_chestplate:{ id:'iron_chestplate',name:'鉄のチェストプレート', description:'鉄塊から作れる防具。防御力+5。', category:'armor', itemType:'Armor', rarity:'uncommon', sellPrice:100, buyPrice:0, maxStack:1, icon:'iron_chestplate' },
   iron_leggings:{ id:'iron_leggings',name:'鉄のレギンス', description:'鉄塊から作れる防具。防御力+4。', category:'armor', itemType:'Armor', rarity:'uncommon', sellPrice:80, buyPrice:0, maxStack:1, icon:'iron_leggings' },
   iron_boots:  { id:'iron_boots',  name:'鉄のブーツ', description:'鉄塊から作れる防具。防御力+2。', category:'armor', itemType:'Armor', rarity:'uncommon', sellPrice:50, buyPrice:0, maxStack:1, icon:'iron_boots' },
+  golden_chestplate: { id:'golden_chestplate', name:'金のチェストプレート', description:'金塊から作れる防具。防御力+6。', category:'armor', itemType:'Armor', rarity:'rare', sellPrice:150, buyPrice:0, maxStack:1, icon:'golden_chestplate' },
+  golden_helmet:     { id:'golden_helmet',     name:'金のヘルメット',     description:'金塊から作れる防具。防御力+4。', category:'armor', itemType:'Armor', rarity:'rare', sellPrice:120, buyPrice:0, maxStack:1, icon:'golden_helmet' },
+  golden_leggings:   { id:'golden_leggings',   name:'金のレギンス',       description:'金塊から作れる防具。防御力+5。', category:'armor', itemType:'Armor', rarity:'rare', sellPrice:130, buyPrice:0, maxStack:1, icon:'golden_leggings' },
+  golden_boots:      { id:'golden_boots',      name:'金のブーツ',         description:'金塊から作れる防具。防御力+3。', category:'armor', itemType:'Armor', rarity:'rare', sellPrice:100, buyPrice:0, maxStack:1, icon:'golden_boots' },
   wooden_bow:  { id:'wooden_bow',  name:'木の弓',    description:'木材から作れる武器。攻撃力+3。', category:'weapon',  itemType:'Weapon',   rarity:'common',   sellPrice:40, buyPrice:0, maxStack:1, icon:'bow_arrow', useEffect:{attackBonus:3, message:'木の弓で矢を放った！', attackType:'physical'} },
   stone_knife: { id:'stone_knife', name:'石のナイフ', description:'石から作れる武器。攻撃力+2。', category:'weapon',  itemType:'Weapon',   rarity:'common',   sellPrice:25, buyPrice:0, maxStack:1, icon:'dagger', useEffect:{attackBonus:2, message:'石のナイフで刺した！', attackType:'physical'} },
   cave_staff:  { id:'cave_staff',  name:'洞窟の杖',   description:'洞窟王の宝石から作られた杖。範囲攻撃貫通10。', category:'weapon', itemType:'Weapon', rarity:'rare', sellPrice:800, buyPrice:0, maxStack:1, icon:'wand', isAreaWeapon:true, areaPenetrate:10, useEffect:{attackBonus:0, message:'洞窟の杖で全体攻撃！', attackType:'area'} },
@@ -988,6 +992,17 @@ export const DEFAULT_PLAYER_STATS = {
 // フォーマット: { version: 'x.x.x', date: 'YYYY-MM-DD', changes: ['変更内容...'] }
 // ============================================================
 export const VERSION_PATCHES = [
+  {
+    version: '2.3.0',
+    date: '2026-06-07',
+    changes: [
+      '🛡️ 新防具追加：金のチェストプレート(DEF+6)・金のヘルメット(DEF+4)・金のレギンス(DEF+5)・金のブーツ(DEF+3)',
+      '🎨 金装備のSVGアイコンを金色デザインで新規追加',
+      '🔄 市場に取引タブを追加！洞窟王の宝石64個→洞窟の杖、洞窟の杖＋モグラの爪4個→岩窟の杖と交換可能に',
+      '🕷️ トラップワールド追加：ダンジョンタブ内で5種のMob（ゾンビ・スケルトン・エンダーマン・クモ・クリーパー）と戦闘し素材を入手可能に',
+      '💀 トラップワールドにエリートMob出現（5%確率）：圧縮素材をドロップ',
+    ],
+  },
   {
     version: '2.2.9',
     date: '2026-06-07',

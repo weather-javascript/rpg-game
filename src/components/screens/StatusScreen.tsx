@@ -294,46 +294,6 @@ function RenamePanel({ onClose }: { onClose: () => void }) {
 // ============================================================
 // メール設定パネル
 // ============================================================
-function EmailSettingsPanel() {
-  const player = useGameStore(s => s.player);
-  const saveGame = useGameStore(s => s.saveGame);
-  const addNotification = useGameStore(s => s.addNotification);
-  const [email, setEmail] = useState(player?.emailAddress ?? '');
-  const [saving, setSaving] = useState(false);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const { useGameStore: store } = await import('../../stores/gameStore');
-      const p = store.getState().player;
-      if (p) {
-        store.setState({ player: { ...p, emailAddress: email, emailNotifications: { auction: true, events: true, updates: true } } });
-        await saveGame();
-        addNotification('success', '📧 メール設定を保存しました');
-      }
-    } catch { addNotification('error', '保存に失敗しました'); }
-    setSaving(false);
-  };
-
-  return (
-    <div style={{background:'#161b26', border:'1px solid #2d3752', borderRadius:8, padding:12}}>
-      <div style={{fontSize:'0.82rem', color:'#8a92b2', marginBottom:8}}>
-        オークションで売れたとき・イベント開始・バージョン更新時にメール通知が届きます。
-        Googleアカウントの場合はGmailに届きます。
-      </div>
-      <input
-        type="email" value={email} onChange={e => setEmail(e.target.value)}
-        placeholder="メールアドレスを入力"
-        style={{width:'100%', padding:'7px 10px', background:'#1c2235', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.85rem', boxSizing:'border-box', marginBottom:8}}
-      />
-      <button onClick={handleSave} disabled={saving}
-        style={{width:'100%', padding:'7px', background:'#5b8dee', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:'0.85rem', fontWeight:700}}>
-        {saving ? '保存中...' : '📧 メール設定を保存'}
-      </button>
-    </div>
-  );
-}
-
 // ============================================================
 // ADMINパネル入口
 // ============================================================
@@ -383,7 +343,7 @@ export function StatusScreen() {
   const useItem = useGameStore(s => s.useItem);
   const addNotification = useGameStore(s => s.addNotification);
   const setActiveTab = useGameStore(s => s.setActiveTab);
-  const [activeSection, setActiveSection] = useState<'stats'|'skills'|'inventory'|'crafting'|'email'|'equipment'>('stats');
+  const [activeSection, setActiveSection] = useState<'stats'|'skills'|'inventory'|'equipment'>('stats');
   const [showRename, setShowRename] = useState(false);
 
   if (!player) return null;
@@ -403,8 +363,6 @@ export function StatusScreen() {
     { id:'skills', label:'スキル', icon:'lightning' },
     { id:'inventory', label:'所持', icon:'backpack' },
     { id:'equipment', label:'装備', icon:'swords' },
-    { id:'crafting', label:'製作', icon:'hammer' },
-    { id:'email', label:'通知', icon:'mail' },
   ] as const;
 
   const inventoryEntries = Object.entries(player.inventory).filter(([, qty]) => qty > 0);
@@ -559,21 +517,7 @@ export function StatusScreen() {
         </section>
       )}
 
-      {/* 製作 */}
-      {activeSection === 'crafting' && (
-        <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
-          <h3 style={{fontSize:'0.9rem', color:'#f0c060', marginBottom:10}}>🔨 製作</h3>
-          <CraftingPanel />
-        </section>
-      )}
-
       {/* メール通知設定 */}
-      {activeSection === 'email' && (
-        <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
-          <h3 style={{fontSize:'0.9rem', color:'#f0c060', marginBottom:10}}>📧 メール通知設定</h3>
-          <EmailSettingsPanel />
-        </section>
-      )}
     </div>
   );
 }

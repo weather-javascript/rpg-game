@@ -136,7 +136,7 @@ export function MarketScreen() {
   const inventoryEntries = Object.entries(player?.inventory ?? {}).filter(([, qty]) => qty > 0);
   const sellable = inventoryEntries.map(([id, qty]) => ({ item: ITEM_MASTER[id], qty, id, sellPrice: getEffectivePrice(id).sellPrice })).filter(e => e.item && e.sellPrice > 0);
   const buyable = Object.values(ITEM_MASTER).filter(item => getEffectivePrice(item.id).buyPrice > 0);
-  const usable = inventoryEntries.map(([id, qty]) => ({ item: ITEM_MASTER[id], qty, id })).filter(e => e.item?.useEffect);
+  const usable = inventoryEntries.map(([id, qty]) => ({ item: ITEM_MASTER[id], qty, id })).filter(e => e.item?.useEffect && e.item?.category === 'food');
 
   const satietyCount = player?.satietyUpgradeCount ?? 0;
   const nextPrice = satietyUpgradePrice(satietyCount);
