@@ -221,6 +221,7 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
     weaponDef: 3,
     weaponSkills: [{ type: 'hotbar_shield' as const, cutPercent: 75 }],
   },
+  },
   revolution_armor_chest: {
     id: 'revolution_armor_chest', name: 'Revolution Armor [胸]',
     description: 'Revolution Armorの胴体。25%の確率で被ダメージを75%カット。',
