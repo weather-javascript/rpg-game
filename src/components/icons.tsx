@@ -90,13 +90,12 @@ const ICONS: Record<string, SvgDef> = {
   hengen: { vb: '0 0 374 370', content: `<path fill="#565656" d="M348 9h3l6 1v9l-1 8-4 1v7l-2 4h-5l1 3-1 8h-4v3l-1 7-6 1v4l-3 1-1 2-3 4-3 1-2 4h-4l1 5h-5v3h-2v2l-2 1-3 4v2h-4l-2 4h-3l-2 6-6 1v4l-4 1-1 5-3 1-3 1-1 4h-4l1 5h-5l-1 2q-1 4-5 5l-1 4-5 1v2l-1 2-3 1-1 2q-3 5-8 7l-3 3-7 4-4 4h14l3 5 7 1 8 1 1 4h10l5 1v5h10l1 5h19v4h-2l1 5-6-1v3h18l4 1v6l-4 1h-12l-1 5h-21l1 3h3l8 2v3h-2v2h-2v2l-4 2h6l1 6h10v8h-30l-11 2-2 2-2 2h-3l1 3 3 1 1 4 5 1 1 5h4l2 5h3l1 7-5 1h-12v-6h-7q-3 1-5-2-2-4-4-3h-16v15l-1 1h-5v16l-5 1v15l-1 1h-5v15l-4 2-3-2v-57q-4-3-9-1v20l-7 1v-11h-2l-3-1-1-8v-3l1-6-2 1-7 2-1 4-6 1v3l-1 6 3 5 3 1 1 2q5 3 9 2 3 2 2 5h7l4 4v8l-1 6-5 1v11l-2 6-3 1v20l-1 7h-4l-2 4h-2l-1 3-3-1v-2h-2l1-4v-4l-5-5v-8l-2 1v10l-1 3v5l-1 3h-6l-1-4v-2l-4-1v-2l-1-3v-3q-1-3-5-5l-2-4v-2l-1-2-2-4-5-1v21l-1 5-2 1-4-1v-10h-5q-2-4-2-10 0-2-3-5l-1-12v-3q0-3 2-5l2-1v-8l-4-1v-17q1-6 6-10l5-1v-2l2-5q4-4 4-9h2v-2c5-5 5-5 8-5v-4l4-1q2-9 0-19h-3v4h2q-1 6-5 8h-2v4h-4v4h-4l-1 2-4 6h-3v4h-4l-2 5h-2v2l-4 1v3l-3 1-1 3-1 2-4 1-3 5-3 3-1 2h-2l-2 1-1 3-5 5-2 2h-9q-2-3-2-8v-4l5-1v-2l1-4h5l1-5h4l1-5 5-1 1-4 4-1 1-5h2l3-3 3-3h2v-5h3l3-1 2-5 3-1 2-5h4l1-5h3l2-5h2v-2l-4-1v-2h-4v2l-4 1-1 4h-3l-1 4h-3v2q-5 4-12 5l-3 1v2q-1 4-6 7h-3v2q0 3-4 5H74l-2-1q-2 1-4-3v-3l-7 1-1 2-1 3-12 1-3-1-7-1-1-4h-7l-4-4 1-2H15c-1-4-1-4 1-8h26v-3l-2-1-4-3q-4-3-9-4l-4-2-8-2-1-5-4-1-1-5 16-1h5l1-4h-2l-3-1h-3l-4-4-2-1-8-7 1-5h32v-2l1-3q5-2 11-2h3l2-3h17v3q1 5 4 6 4 5 3 12h2l2 1 1 2 2 1q3 1 4 5 5 0 6-4l1-2h2l1-3h3v-2l3-6v-2h-2l-9 1h-3q-3 1-5-2l-2-4h-8l-1-5 4-2h18l1-8-60-1v-8h10l5 1v-5q4-2 10-1h7v-2l1-4h14l2-5h17l-1-2v-18h-5l-1-7v-5h-5v-9l1-9h5l1 5 6 2v3h2l2 1 1 2q1 4 4 4l2 1v4l1-2 2-1 1-2q2-2 5-2V54l4-2q4 5 3 11l1 7h8l7-1 1 4h3v-9l1-5h6v-2c-2-11-2-11 1-15h4l1 18v11l4-2v-4l1-6 6-1 1 10v7l5 1v10l5 2v11l1 3 5 3 1 6c-1 4-1 4 2 8l2 2 1 6v6l1-2 5-6h2l1-6h4l2-4h3v-2h2l-1-3 1-2h5v-5h2l2-1 1-2 1-2 5-1 1-5 4 1v-6h5l1-2q1-4 5-6l1-4 5 1 1-5h3v-2h2v-5h5v-5l5 1 1-6 6-1v-5h4v-5h5v-2h2v-3l5-1-1-5h6l1-5h3l7-2 1-5h8l4-6 8 1 1-2q2-6 9-4"/><path fill="#d5d5d5" d="M348 9h3l6 1v9l-1 8-4 1v7l-2 4h-5l1 3-1 8h-4v3l-1 7-6 1v4l-3 1-1 2-3 4-3 1-2 4h-4l1 5h-5v3h-2v2l-2 1-3 4v2h-4l-2 4h-3l-2 6-6 1v4l-4 1-1 5-3 1-3 1-1 4h-4l1 5h-5l-1 2q-1 4-5 5l-1 4-5 1v2l-1 2-3 1-1 3-4 2h-8v5h-6v-11h-11v6h-5v5h-6v6h-5v5h-6v9h4v2l-6 1h-3l-6-1v-14h3v3h3v-11h-3v-4l3-1 1-3h4v-4h-4v-4h4v-2l4-4 1-3 1-2 4-1 1-6h4l2-4h3v-2h2l-1-3 1-2h5v-5h2l2-1 1-2 1-2 5-1 1-5 4 1v-6h5l1-2q1-4 5-6l1-4 5 1 1-5h3v-2h2v-5h5v-5l5 1 1-6 6-1v-5h4v-5h5v-2h2v-3l5-1-1-5h6l1-5h3l7-2 1-5h8l4-6 8 1 1-2q2-6 9-4"/><path fill="#8d408e" d="m66 291 4 1v4l2-1h3l1 4v3l-2 1-3 2v8l-4 2-2-1v2l-3 4q-2 2-2 6v3l-2 1q-5 2-5 6l-4 1v3l-3 7h-2l-2 5c-11-1-11-1-15-3v2H15l-1-10v-17h7l-1-6q4-2 10-1v-4l5-1 2-6h7l4-4h5l1-7h8z"/><path fill="#691a68" d="M173 169h8l1 4h9v2l3 1h-2v10l5-1v11l-1 3v3l-4-1-1-4-5 1v5h-11v5h-6v-5h-16l-1-5-10-1v11h-22v-5h16v-17h11v-5h6l1-7h9v-4q5-2 10-1"/><path fill="#835184" d="M98 86h5l1 5 6 2v3h2l2 1 1 2q1 4 4 4l2 1 1 4 3 1v11h6v11h-6v-6l-5-1v-4h-11v11h5v17H92v5H81v6l-11 1H43v-8h10l5 1v-5q4-2 10-1h7v-2l1-4h14l2-5h17l-1-2v-18h-5l-1-7v-5h-5v-9z"/>` },
 
   swords: { content: `
-    <line x1="5" y1="27" x2="21" y2="11" stroke="${C.blade}" stroke-width="2.5" stroke-linecap="round"/>
-    <path d="M20 10 L23 7 L26 8 L27 11 L24 14 Z" fill="${C.steel}"/>
-    <path d="M5 27 L8 24" stroke="${C.goldDk}" stroke-width="3" stroke-linecap="round"/>
-    <line x1="27" y1="5" x2="11" y2="21" stroke="${C.blade}" stroke-width="2.5" stroke-linecap="round"/>
-    <path d="M12 20 L9 23 L6 22 L5 19 L8 16 Z" fill="${C.steel}"/>
-    <path d="M27 5 L24 8" stroke="${C.goldDk}" stroke-width="3" stroke-linecap="round"/>
-    <circle cx="16" cy="16" r="3" fill="${C.gold}" stroke="${C.goldDk}" stroke-width="1"/>
+    <path d="M19 4 L25 8 L13 24 L8 21 Z" fill="${C.steel}" opacity="0.95"/>
+    <path d="M21 5 L24 8 L13 23 L11 22 Z" fill="rgba(220,240,255,0.4)"/>
+    <rect x="7" y="20" width="9" height="3.5" rx="1" transform="rotate(-42,11.5,21.75)" fill="${C.goldDk}"/>
+    <rect x="5" y="24" width="5" height="6" rx="1.5" transform="rotate(-42,7.5,27)" fill="${C.iron}"/>
+    <circle cx="5.5" cy="27.5" r="2" fill="${C.steelDk}"/>
+    <line x1="20" y1="10" x2="22" y2="8" stroke="rgba(220,240,255,0.6)" stroke-width="1.5"/>
   ` },
 
   slot_machine: { content: `
@@ -355,6 +354,84 @@ const ICONS: Record<string, SvgDef> = {
   // ──────────────────────────────────────────
   // アイテム：武器・防具系
   // ──────────────────────────────────────────
+  // 新規追加アイコン
+  golden_bar: { content: `
+    <path d="M6 22 L8 12 L24 12 L26 22 Z" fill="${C.gold}"/>
+    <path d="M8 12 L10 8 L22 8 L24 12 Z" fill="${C.glow}"/>
+    <line x1="8" y1="16" x2="24" y2="16" stroke="${C.goldDk}" stroke-width="1" opacity="0.6"/>
+    <line x1="8" y1="19" x2="24" y2="19" stroke="${C.goldDk}" stroke-width="1" opacity="0.4"/>
+    <line x1="10" y1="8" x2="22" y2="8" stroke="rgba(255,255,200,0.7)" stroke-width="1"/>
+  ` },
+
+  wooden_knife: { content: `
+    <path d="M19 6 L23 8 L12 22 L9 20 Z" fill="${C.wood}" opacity="0.95"/>
+    <path d="M20 7 L22 8 L12 21 L11 20 Z" fill="rgba(255,255,200,0.25)"/>
+    <rect x="8" y="19" width="7" height="3" rx="1" transform="rotate(-42,11.5,20.5)" fill="${C.bark}"/>
+    <rect x="6" y="23" width="5" height="5" rx="1" transform="rotate(-42,8.5,25.5)" fill="${C.woodDk}"/>
+  ` },
+
+  golden_knife: { content: `
+    <path d="M19 5 L24 8 L12 23 L8 21 Z" fill="${C.gold}" opacity="0.95"/>
+    <path d="M20 6 L23 8 L12 22 L11 21 Z" fill="rgba(255,255,200,0.4)"/>
+    <rect x="7" y="20" width="7" height="3" rx="1" transform="rotate(-42,10.5,21.5)" fill="${C.goldDk}"/>
+    <rect x="5" y="24" width="5" height="5" rx="1.5" transform="rotate(-42,7.5,26.5)" fill="${C.goldDk}"/>
+    <circle cx="6.5" cy="27.5" r="1.5" fill="${C.gold}"/>
+  ` },
+
+  diamond_sword: { content: `
+    <path d="M19 4 L25 7 L13 24 L8 22 Z" fill="#58d8f8" opacity="0.95"/>
+    <path d="M21 5 L24 7 L13 23 L11 22 Z" fill="rgba(200,255,255,0.5)"/>
+    <rect x="7" y="20" width="9" height="3.5" rx="1" transform="rotate(-42,11.5,21.75)" fill="${C.steelDk}"/>
+    <rect x="5" y="25" width="5" height="5" rx="1.5" transform="rotate(-42,7.5,27.5)" fill="${C.steelDk}"/>
+    <circle cx="6" cy="28" r="2" fill="#289ab8"/>
+    <circle cx="18" cy="13" r="1.5" fill="rgba(200,255,255,0.7)"/>
+  ` },
+
+  endstone_sword: { content: `
+    <path d="M19 4 L25 7 L13 24 L8 22 Z" fill="#c8d890" opacity="0.95"/>
+    <path d="M21 5 L24 7 L13 23 L11 22 Z" fill="rgba(230,255,190,0.45)"/>
+    <rect x="7" y="20" width="9" height="3.5" rx="1" transform="rotate(-42,11.5,21.75)" fill="#7a9050"/>
+    <rect x="5" y="25" width="5" height="5" rx="1.5" transform="rotate(-42,7.5,27.5)" fill="#8aaa60"/>
+    <circle cx="6" cy="28" r="2" fill="#b8c880"/>
+    <circle cx="20" cy="11" r="1.2" fill="rgba(230,255,190,0.8)"/>
+    <circle cx="16" cy="16" r="1" fill="rgba(230,255,190,0.6)"/>
+    <circle cx="13" cy="20" r="0.9" fill="rgba(230,255,190,0.7)"/>
+  ` },
+
+  // 鉄装備（各部位の形をはっきりと）
+  iron_chestplate: { content: `
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="${C.iron}"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="${C.steelDk}"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="${C.iron}"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="${C.iron}"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="${C.steelDk}" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="${C.steelDk}" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="22" x2="23" y2="22" stroke="${C.steelDk}" stroke-width="1" opacity="0.4"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="${C.steel}" stroke-width="1"/>
+  ` },
+
+  iron_leggings: { content: `
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="${C.steelDk}"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="${C.iron}"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="${C.iron}"/>
+    <line x1="9" y1="14" x2="15" y2="14" stroke="${C.steelDk}" stroke-width="1.5" opacity="0.5"/>
+    <line x1="17" y1="14" x2="23" y2="14" stroke="${C.steelDk}" stroke-width="1.5" opacity="0.5"/>
+    <line x1="9" y1="18" x2="15" y2="18" stroke="${C.steelDk}" stroke-width="1" opacity="0.4"/>
+    <line x1="17" y1="18" x2="23" y2="18" stroke="${C.steelDk}" stroke-width="1" opacity="0.4"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="${C.steel}" stroke-width="1"/>
+  ` },
+
+  iron_boots: { content: `
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="${C.iron}"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="${C.iron}"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="${C.steelDk}"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="${C.steelDk}"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="${C.steel}" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="${C.steel}" stroke-width="1"/>
+    <line x1="8" y1="16" x2="14" y2="16" stroke="${C.steelDk}" stroke-width="1" opacity="0.4"/>
+    <line x1="18" y1="16" x2="24" y2="16" stroke="${C.steelDk}" stroke-width="1" opacity="0.4"/>
+  ` },
+
   dagger: { content: `
     <line x1="8" y1="26" x2="22" y2="12" stroke="${C.blade}" stroke-width="3" stroke-linecap="round"/>
     <path d="M20 10 L24 10 L24 14 L22 12 Z" fill="${C.steel}"/>
@@ -409,6 +486,14 @@ const ICONS: Record<string, SvgDef> = {
     <rect x="16" y="20" width="8" height="4" rx="1" fill="#2a7a40"/>
     <rect x="9" y="9" width="6" height="2" fill="#6dcc80" opacity="0.4"/>
     <rect x="17" y="9" width="6" height="2" fill="#6dcc80" opacity="0.4"/>
+  ` },
+
+  rev_defencer: { content: `
+    <path d="M16 5 L24 9 L24 18 Q24 24 16 27 Q8 24 8 18 L8 9 Z" fill="#3a6ab0"/>
+    <path d="M16 7 L22 10 L22 18 Q22 22 16 25 Q10 22 10 18 L10 10 Z" fill="#4a80d0"/>
+    <path d="M16 10 L20 12 L20 18 Q20 21 16 23 Q12 21 12 18 L12 12 Z" fill="#3a6ab0" opacity="0.5"/>
+    <circle cx="16" cy="17" r="3" fill="#a0d0ff" opacity="0.8"/>
+    <path d="M14 7 Q16 6 18 7" fill="none" stroke="#c0e0ff" stroke-width="1" opacity="0.7"/>
   ` },
 
   soldier_helmet: { content: `

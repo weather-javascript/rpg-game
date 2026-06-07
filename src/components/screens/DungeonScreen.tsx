@@ -413,8 +413,10 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape }: {
     // Heal属性：アイテム固有の回復量で回復
     if (item.itemType === 'Heal') {
       if (!item.useEffect) { addNotification('warning', `${item.name}は使用できません`); return; }
-      const ok = consumeItem(itemId, 1);
-      if (!ok) { addNotification('warning', `${item.name}が足りません`); return; }
+      if (!item.nonconsumable) {
+        const ok = consumeItem(itemId, 1);
+        if (!ok) { addNotification('warning', `${item.name}が足りません`); return; }
+      }
       const { hpRestore, satietyRestore, message } = item.useEffect;
       if (hpRestore && hpRestore > 0) changeHp(hpRestore);
       if (satietyRestore && satietyRestore > 0) changeSatiety(satietyRestore);
