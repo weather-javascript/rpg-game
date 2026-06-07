@@ -70,6 +70,8 @@ export interface ItemMaster {
   svgIcon?: string;
   // PNG base64アイコン（カスタム武器など）
   pngIcon?: string;
+  // 使用しても消費されない（消耗品でない）
+  nonconsumable?: boolean;
   useEffect?: {
     hpRestore?: number;
     satietyRestore?: number;
@@ -194,6 +196,7 @@ export interface PlayerStats {
   expToNextLevel: number;
   hp: number;
   maxHp: number;
+  baseMaxHp?: number;   // ホットバーボーナス適用前の素のmaxHp
   satiety: number;
   maxSatiety: number;
   attack: number;

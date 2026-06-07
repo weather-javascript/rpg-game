@@ -139,8 +139,11 @@ export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (
     if (!item) return { success: false, message: 'アイテムが見つかりません' };
     if (!item.useEffect) return { success: false, message: `${item.name}は使用できません` };
     if ((player.inventory[itemId] ?? 0) <= 0) return { success: false, message: `${item.name}を持っていません` };
-    const ok = consumeItem(itemId, 1);
-    if (!ok) return { success: false, message: 'アイテムの消費に失敗しました' };
+    // 消耗しないアイテムは消費しない
+    if (!item.nonconsumable) {
+      const ok = consumeItem(itemId, 1);
+      if (!ok) return { success: false, message: 'アイテムの消費に失敗しました' };
+    }
     const { hpRestore, satietyRestore, message } = item.useEffect;
     if (hpRestore && hpRestore > 0) changeHp(Math.min(hpRestore, player.stats.maxHp - player.stats.hp));
     if (hpRestore && hpRestore < 0) changeHp(hpRestore);

@@ -46,6 +46,7 @@ interface TurnBattleState {
   poisonBuff: number;           // 毒バフ残りターン数
   poisonDmg: number;            // 毒ダメージ量
   equippedWeaponId: string | null; // バトル中装備武器ID
+  skillTurn: number;            // ターンカウンター（武器スキル周期制御用）
 }
 
 // ============================================================
@@ -211,6 +212,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape }: {
       poisonBuff: 0,
       poisonDmg: 5,
       equippedWeaponId: hotbarWeaponId,
+      skillTurn: 0,
     };
   });
 
@@ -227,13 +229,17 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape }: {
 
     // 武器パッシブスキル処理（モンスターターン開始時）
     const weaponItem = prevBattle.equippedWeaponId ? ITEM_MASTER[prevBattle.equippedWeaponId] : null;
+    const newSkillTurn = prevBattle.skillTurn + 1;
+    newBattle = { ...newBattle, skillTurn: newSkillTurn };
     if (weaponItem?.weaponSkills) {
       for (const skill of weaponItem.weaponSkills) {
-        // 貫通ダメージ（毎ターン）
+        // 貫通ダメージ（3ターンに1回）
         if (skill.type === 'penetrate_per_turn') {
-          const pen = (skill as WeaponPassiveSkill).value;
-          newBattle = { ...newBattle, monsterHp: Math.max(0, newBattle.monsterHp - pen) };
-          newLog.push({ text: `🔱 ${weaponItem.name}の貫通攻撃！ ${pen}ダメージ！`, color: '#9b6df0' });
+          if (newSkillTurn % 3 === 0) {
+            const pen = (skill as WeaponPassiveSkill).value;
+            newBattle = { ...newBattle, monsterHp: Math.max(0, newBattle.monsterHp - pen) };
+            newLog.push({ text: `🔱 ${weaponItem.name}の貫通攻撃！ ${pen}ダメージ！`, color: '#9b6df0' });
+          }
         }
         // HP・満腹度回復（毎ターン）
         if (skill.type === 'regen_per_turn') {

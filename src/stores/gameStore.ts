@@ -5,6 +5,7 @@ import { create } from 'zustand';
 import type { PlayerData, Notification, TabId } from '../types/game';
 import { savePlayer } from '../services/database';
 import { randomInt } from '../utils/random';
+import { ITEM_MASTER } from '../data/masters';
 import { createPlayerSlice, type PlayerSlice } from './slices/playerSlice';
 import { createDungeonSlice, type DungeonSlice } from './slices/dungeonSlice';
 import { createFishingSlice, type FishingSlice } from './slices/fishingSlice';
@@ -36,8 +37,26 @@ export interface GameState extends PlayerSlice, DungeonSlice, FishingSlice, Reli
 // プレイヤーデータのデフォルト値補完
 // ============================================================
 function ensureDefaults(player: PlayerData): PlayerData {
+  // ホットバー内のweaponHpBonusを合算してmaxHpに反映
+  const hotbar = player.equipment?.hotbar ?? [];
+  let hpBonus = 0;
+  for (const itemId of hotbar) {
+    if (itemId) {
+      const item = ITEM_MASTER[itemId];
+      if (item?.weaponHpBonus) hpBonus += item.weaponHpBonus;
+    }
+  }
+  // baseMaxHpを保持（初回のみ設定、以降はbonusを加算）
+  const baseMaxHp = player.stats?.baseMaxHp ?? player.stats?.maxHp ?? 100;
+  const newMaxHp = baseMaxHp + hpBonus;
   return {
     ...player,
+    stats: player.stats ? {
+      ...player.stats,
+      baseMaxHp,
+      maxHp: newMaxHp,
+      hp: Math.min(player.stats.hp, newMaxHp),
+    } : player.stats,
     dungeonClearedCount: player.dungeonClearedCount ?? {},
     fishingScore: player.fishingScore ?? 0,
     equippedRodId: player.equippedRodId ?? 'basic_rod',
