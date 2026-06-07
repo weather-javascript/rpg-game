@@ -19,14 +19,14 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   ancient_shard:{ id:'ancient_shard', name:'古代の欠片', description:'ダンジョンの深部に眠る謎の素材。', category:'material',  itemType:'Item', rarity:'epic', sellPrice:45000, buyPrice:0, maxStack:99, icon:'gem' },
   iron_ingot:  { id:'iron_ingot',  name:'鉄塊',      description:'精錬された鉄。各種製造に必要。', category:'material',  itemType:'Item', rarity:'uncommon', sellPrice:40, buyPrice:0, maxStack:-1, icon:'iron_ingot' },
   plank:       { id:'plank',       name:'板材',      description:'木材を加工した板。製作に使用。', category:'material',  itemType:'Item', rarity:'common',   sellPrice:8,  buyPrice:0, maxStack:-1, icon:'log' },
-  iron_sword:  { id:'iron_sword',  name:'鉄の剣',    description:'鉄塊から作れる武器。攻撃力+5。', category:'weapon',  itemType:'Weapon',   rarity:'uncommon', sellPrice:80, buyPrice:0, maxStack:1, icon:'swords', useEffect:{attackBonus:5, message:'鉄の剣で斬りつけた！', attackType:'physical'} },
+  iron_sword:  { id:'iron_sword',  name:'鉄の剣',    description:'鉄塊から作れる武器。攻撃力+5。', category:'weapon',  itemType:'Weapon',   rarity:'uncommon', sellPrice:80, buyPrice:0, maxStack:1, icon:'iron_sword_png', useEffect:{attackBonus:5, message:'鉄の剣で斬りつけた！', attackType:'physical'} },
   iron_helmet: { id:'iron_helmet', name:'鉄のヘルメット', description:'鉄塊から作れる防具。防御力+3。', category:'armor',  itemType:'Armor', rarity:'uncommon', sellPrice:60, buyPrice:0, maxStack:1, icon:'helmet' },
   // 新規追加武器
   golden_bar:  { id:'golden_bar',  name:'金塊',      description:'金鉱石と石炭を使って金塊を作る。', category:'material', itemType:'Item', rarity:'rare', sellPrice:180, buyPrice:0, maxStack:-1, icon:'golden_bar' },
   wooden_knife:{ id:'wooden_knife',name:'木のナイフ', description:'板材から作れるナイフ。攻撃力+1。', category:'weapon', itemType:'Weapon', rarity:'common', sellPrice:15, buyPrice:0, maxStack:1, icon:'wooden_knife', useEffect:{attackBonus:1, message:'木のナイフで刺した！', attackType:'physical'} },
-  golden_knife:{ id:'golden_knife',name:'金のナイフ', description:'金塊から作れるナイフ。攻撃力+3。', category:'weapon', itemType:'Weapon', rarity:'uncommon', sellPrice:60, buyPrice:0, maxStack:1, icon:'golden_knife', useEffect:{attackBonus:3, message:'金のナイフで斬りつけた！', attackType:'physical'} },
-  diamond_sword:{ id:'diamond_sword',name:'ダイヤの剣', description:'ダイヤモンドから作れる剣。攻撃力+7。', category:'weapon', itemType:'Weapon', rarity:'rare', sellPrice:500, buyPrice:0, maxStack:1, icon:'diamond_sword', useEffect:{attackBonus:7, message:'ダイヤの剣で斬りつけた！', attackType:'physical'} },
-  endstone_sword:{ id:'endstone_sword',name:'エンドストーンの剣', description:'エンドストーンから作れる剣。攻撃力+8。', category:'weapon', itemType:'Weapon', rarity:'rare', sellPrice:600, buyPrice:0, maxStack:1, icon:'endstone_sword', useEffect:{attackBonus:8, message:'エンドストーンの剣で斬りつけた！', attackType:'physical'} },
+  golden_knife:{ id:'golden_knife',name:'金の剣', description:'金塊から作れる剣。攻撃力+3。', category:'weapon', itemType:'Weapon', rarity:'uncommon', sellPrice:60, buyPrice:0, maxStack:1, icon:'gold_sword_png', useEffect:{attackBonus:3, message:'金のナイフで斬りつけた！', attackType:'physical'} },
+  diamond_sword:{ id:'diamond_sword',name:'ダイヤの剣', description:'ダイヤモンドから作れる剣。攻撃力+7。', category:'weapon', itemType:'Weapon', rarity:'rare', sellPrice:500, buyPrice:0, maxStack:1, icon:'diamond_sword_png', useEffect:{attackBonus:7, message:'ダイヤの剣で斬りつけた！', attackType:'physical'} },
+  endstone_sword:{ id:'endstone_sword',name:'エンドストーンの剣', description:'エンドストーンから作れる剣。攻撃力+8。', category:'weapon', itemType:'Weapon', rarity:'rare', sellPrice:600, buyPrice:0, maxStack:1, icon:'endstone_sword_png', useEffect:{attackBonus:8, message:'エンドストーンの剣で斬りつけた！', attackType:'physical'} },
   // 新規追加防具
   iron_chestplate:{ id:'iron_chestplate',name:'鉄のチェストプレート', description:'鉄塊から作れる防具。防御力+5。', category:'armor', itemType:'Armor', rarity:'uncommon', sellPrice:100, buyPrice:0, maxStack:1, icon:'iron_chestplate' },
   iron_leggings:{ id:'iron_leggings',name:'鉄のレギンス', description:'鉄塊から作れる防具。防御力+4。', category:'armor', itemType:'Armor', rarity:'uncommon', sellPrice:80, buyPrice:0, maxStack:1, icon:'iron_leggings' },
@@ -570,8 +570,8 @@ export const MONSTER_MASTER: Record<string, MonsterMaster> = {
   cave_left:    { id:'cave_left',    name:'洞窟王の左腕', description:'洞窟王の側近。',  icon:'shield', maxHp:40,  attack:6,  defense:5,  baseExp:20,  baseGold:10,  dungeonIds:['beginner_cave'], drops:[{itemId:'cave_fragment',baseRate:0.8,minAmount:1,maxAmount:3},{itemId:'contract',baseRate:0.15,minAmount:1,maxAmount:1}] },
   cave_king:    { id:'cave_king',    name:'洞窟王',       description:'初級ダンジョンのボス。', icon:'crown', maxHp:100, attack:15, defense:8,  baseExp:80,  baseGold:50,  dungeonIds:['beginner_cave'], isBoss:true, drops:[{itemId:'cave_fragment',baseRate:1.0,minAmount:2,maxAmount:5},{itemId:'cave_gem',baseRate:0.6,minAmount:1,maxAmount:1},{itemId:'rusty_sword',baseRate:0.01,minAmount:1,maxAmount:1}] },
   // 中級
-  rookie_soldier:  { id:'rookie_soldier', name:'下っ端戦士',  description:'最弱の戦士。', icon:'soldier_helmet', maxHp:10, attack:3, defense:4, baseExp:5, baseGold:4, dungeonIds:['fortress'], drops:[{itemId:'coin',baseRate:1.0,minAmount:4,maxAmount:4},{itemId:'contract',baseRate:0.1,minAmount:1,maxAmount:1}] },
-  gold_soldier:    { id:'gold_soldier',   name:'成金戦士',    description:'全身金装備。',  icon:'gold_medal', maxHp:20, attack:5, defense:4, baseExp:8, baseGold:4, dungeonIds:['fortress'], drops:[{itemId:'coin',baseRate:1.0,minAmount:4,maxAmount:4}] },
+  rookie_soldier:  { id:'rookie_soldier', name:'下っ端戦士',  description:'最弱の戦士。', icon:'soldier_helmet', maxHp:10, attack:3, defense:4, baseExp:5, baseGold:4, dungeonIds:['fortress','underground_fortress'], drops:[{itemId:'coin',baseRate:1.0,minAmount:4,maxAmount:4},{itemId:'contract',baseRate:0.1,minAmount:1,maxAmount:1}] },
+  gold_soldier:    { id:'gold_soldier',   name:'成金戦士',    description:'全身金装備。',  icon:'gold_medal', maxHp:20, attack:5, defense:4, baseExp:8, baseGold:4, dungeonIds:['fortress','underground_fortress'], drops:[{itemId:'coin',baseRate:1.0,minAmount:4,maxAmount:4}] },
   veteran_soldier: { id:'veteran_soldier',name:'いっぱし戦士',description:'それなりに強い。', icon:'swords', maxHp:25, attack:6, defense:4, baseExp:10, baseGold:3, dungeonIds:['fortress','underground_fortress'], drops:[{itemId:'coin',baseRate:1.0,minAmount:3,maxAmount:3}] },
   iron_soldier:    { id:'iron_soldier',   name:'鉄戦士',      description:'高水準なステータス。', icon:'iron_ingot', maxHp:45, attack:12, defense:4, baseExp:20, baseGold:7, dungeonIds:['fortress','underground_fortress'], drops:[{itemId:'coin',baseRate:1.0,minAmount:7,maxAmount:7},{itemId:'fortress_order',baseRate:1.0,minAmount:1,maxAmount:1}] },
   strong_soldier:  { id:'strong_soldier', name:'強戦士',       description:'フルダイヤの危険な奴。', icon:'gem', maxHp:60, attack:16, defense:4, baseExp:30, baseGold:10, dungeonIds:['underground_fortress'], drops:[{itemId:'coin',baseRate:1.0,minAmount:10,maxAmount:10},{itemId:'memento',baseRate:1.0,minAmount:1,maxAmount:1}] },
@@ -618,15 +618,20 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
     monsterIds:['slime','cave_minion','minion_end','cave_right','cave_left'],
     bossId:'cave_king',
     areas:[
-      { name:'洞窟入口', monsters:[{monsterId:'cave_minion',count:3},{monsterId:'minion_end',count:5}] },
-      { name:'洞窟中層', monsters:[{monsterId:'cave_right',count:1},{monsterId:'cave_left',count:1},{monsterId:'cave_minion',count:4}] },
+      { name:'洞窟入口',   monsters:[{monsterId:'cave_minion',count:1},{monsterId:'minion_end',count:1}] },
+      { name:'洞窟中層',   monsters:[{monsterId:'cave_minion',count:1},{monsterId:'minion_end',count:1}] },
+      { name:'洞窟深部',   monsters:[{monsterId:'cave_right',count:1},{monsterId:'cave_left',count:1}] },
       { name:'洞窟最深部', description:'洞窟王が待ち受ける。', monsters:[{monsterId:'cave_king',count:1,isBoss:true}], isHardArea:true },
     ],
   },
   goblin_den: {
     id:'goblin_den', name:'ゴブリンの巣窟', description:'ゴブリンが群れをなして住む危険な場所。',
     icon:'dungeon_building', tier:'beginner', requiredLevel:3, floors:5, expBonus:1.1, goldBonus:1.1,
-    monsterIds:['goblin'],
+    monsterIds:['goblin','slime'],
+    areas:[
+      { name:'巣窟前半', monsters:[{monsterId:'goblin',count:1}] },
+      { name:'巣窟後半', monsters:[{monsterId:'slime',count:1}] },
+    ],
   },
   fortress: {
     id:'fortress', name:'要塞', description:'大砲に注意。正面を走り抜けて中に入ること。',
@@ -641,14 +646,14 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
   underground_fortress: {
     id:'underground_fortress', name:'地下要塞', description:'防御貫通攻撃が初登場。',
     icon:'dungeon_building', tier:'intermediate', requiredLevel:15, floors:5, expBonus:1.5, goldBonus:1.8,
-    monsterIds:['iron_soldier','crusher','blast_archer','spearman','strong_soldier','ultimate_crusher','special_spearman'],
+    monsterIds:['iron_soldier','crusher','blast_archer','spearman','strong_soldier','ultimate_crusher','special_spearman','rookie_soldier','gold_soldier','veteran_soldier'],
     bossId:'biomancer',
     unlockCondition: { dungeonId:'fortress', clearedCount:3, requiredLevel:15 },
     areas:[
-      { name:'地下通路',      monsters:[{monsterId:'iron_soldier',count:2},{monsterId:'crusher',count:1}] },
-      { name:'カーペット通路', monsters:[{monsterId:'spearman',count:2},{monsterId:'strong_soldier',count:1},{monsterId:'crusher',count:2}] },
-      { name:'小広場',        description:'アルティメイトクラッシャーが守る。', monsters:[{monsterId:'ultimate_crusher',count:1},{monsterId:'special_spearman',count:1},{monsterId:'blast_archer',count:4}], isHardArea:true },
-      { name:'食堂',          monsters:[{monsterId:'crusher',count:3},{monsterId:'strong_soldier',count:3},{monsterId:'ultimate_crusher',count:1}], isHardArea:true },
+      { name:'地下通路',      monsters:[{monsterId:'strong_soldier',count:1},{monsterId:'crusher',count:1}] },
+      { name:'カーペット通路', monsters:[{monsterId:'spearman',count:1},{monsterId:'crusher',count:1},{monsterId:'veteran_soldier',count:1},{monsterId:'iron_soldier',count:1},{monsterId:'gold_soldier',count:1},{monsterId:'strong_soldier',count:1}] },
+      { name:'小広場',        description:'精鋭部隊が守る。', monsters:[{monsterId:'iron_soldier',count:1},{monsterId:'blast_archer',count:1},{monsterId:'spearman',count:1},{monsterId:'strong_soldier',count:1},{monsterId:'ultimate_crusher',count:1},{monsterId:'special_spearman',count:1}], isHardArea:true },
+      { name:'食堂',          description:'最精鋭が集結。', monsters:[{monsterId:'crusher',count:1},{monsterId:'spearman',count:1},{monsterId:'iron_soldier',count:1},{monsterId:'veteran_soldier',count:1},{monsterId:'rookie_soldier',count:1},{monsterId:'strong_soldier',count:1},{monsterId:'ultimate_crusher',count:1},{monsterId:'special_spearman',count:1}], isHardArea:true },
       { name:'最後の広場',    description:'バイオマンサーが待ち受ける。', monsters:[{monsterId:'biomancer',count:1,isBoss:true}], isHardArea:true },
     ],
   },
@@ -776,12 +781,12 @@ export const GAMBLE_MASTER: Record<string, GambleMaster> = {
     ],
   },
   treasure_box: {
-    id:'treasure_box', name:'宝箱くじ', description:'宝箱を開けてみよう。1回30,000G',
-    icon:'box', type:'treasure_box', minBet:30000, maxBet:30000, returnRate:0.92,
+    id:'treasure_box', name:'宝箱くじ', description:'宝箱を開けてみよう。1回41,000G',
+    icon:'box', type:'treasure_box', minBet:41000, maxBet:41000, returnRate:0.92,
     rewardTable:[
       { label:'ドラゴンの鱗（超激レア！）', probability:0.008, multiplier:0,   itemRewards:[{itemId:'dragon_scale',amount:1}], symbols:['🐉'] },
-      { label:'古代の欠片×3（激レア）',     probability:0.020, multiplier:0,   itemRewards:[{itemId:'ancient_shard',amount:3}], symbols:['💎'] },
       { label:'300,000G大当り！',           probability:0.010, multiplier:10,     symbols:['💰'] },
+      { label:'古代の欠片×3（激レア）',     probability:0.020, multiplier:0,   itemRewards:[{itemId:'ancient_shard',amount:3}], symbols:['💎'] },
       { label:'100,000G当り！',             probability:0.070, multiplier:3.333,  symbols:['🤑'] },
       { label:'回復セット（メガポ10・焼肉50）', probability:0.170, multiplier:0, itemRewards:[{itemId:'mega_potion',amount:10},{itemId:'roast_meat',amount:50}], symbols:['🧪'] },
       { label:'50,000G',                    probability:0.239, multiplier:1.667,  symbols:['🪙'] },
@@ -845,6 +850,16 @@ export const DEFAULT_PLAYER_STATS = {
 // フォーマット: { version: 'x.x.x', date: 'YYYY-MM-DD', changes: ['変更内容...'] }
 // ============================================================
 export const VERSION_PATCHES = [
+  {
+    version: '2.2.9',
+    date: '2026-06-07',
+    changes: [
+      '💰 宝箱くじの挑戦金額を30,000G → 41,000Gに変更',
+      '🎨 鉄の剣・金の剣・ダイヤの剣・エンドストーンの剣のアイコンをイラスト画像に刷新',
+      '📦 宝箱の中身一覧の表示順を変更（ドラゴンの鱗→30万G→古代の欠片→10万G→回復セット→5万G→ハズレ）',
+      '⚙️ 宝箱くじ画面の金額変更欄を非表示に変更（41,000G固定）',
+    ],
+  },
   {
     version: '2.2.8',
     date: '2026-06-07',
