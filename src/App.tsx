@@ -3,7 +3,7 @@ import { GameIcon } from './components/icons';
 import { useGameStore } from './stores/gameStore';
 import { useAuth } from './hooks/useAuth';
 import { useAutoSave } from './hooks/useAutoSave';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { TabId, BoardMessage } from './types/game';
 import { GatheringScreen } from './components/screens/GatheringScreen';
 import { MarketScreen }    from './components/screens/MarketScreen';
@@ -557,7 +557,7 @@ export default function App() {
   const [showAdminAnnounce, setShowAdminAnnounce] = useState(false);
   const [maintenanceStatus, setMaintenanceStatus] = useState<{ active: boolean; startedAt: number; estimatedMinutes: number; message?: string } | null>(null);
   const [soldPopup, setSoldPopup] = useState<SoldPopupInfo | null>(null);
-  const soldQueueRef = React.useRef<SoldPopupInfo[]>([]);
+  const soldQueueRef = useRef<SoldPopupInfo[]>([]);
   useEffect(() => {
     if (!player) return;
     setShowVersionPopup(true);

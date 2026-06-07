@@ -930,7 +930,7 @@ export const GAMBLE_MASTER: Record<string, GambleMaster> = {
       { label:'300,000G大当り！',           probability:0.010, multiplier:10,     symbols:['💰'] },
       { label:'古代の欠片×3（激レア）',     probability:0.020, multiplier:0,   itemRewards:[{itemId:'ancient_shard',amount:3}], symbols:['💎'] },
       { label:'100,000G当り！',             probability:0.070, multiplier:3.333,  symbols:['🤑'] },
-      { label:'回復セット（メガポ10・焼肉50）', probability:0.170, multiplier:0, itemRewards:[{itemId:'mega_potion',amount:10},{itemId:'roast_meat',amount:50}], symbols:['🧪'] },
+      { label:'回復セット（メガポ2・焼肉50）', probability:0.170, multiplier:0, itemRewards:[{itemId:'mega_potion',amount:2},{itemId:'roast_meat',amount:50}], symbols:['🧪'] },
       { label:'50,000G',                    probability:0.239, multiplier:1.667,  symbols:['🪙'] },
       { label:'ハズレ（空の宝箱）',          probability:0.483, multiplier:0,   symbols:['📭'] },
     ],

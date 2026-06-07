@@ -4,6 +4,8 @@
 import { useEffect, useRef } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { savePlayer } from '../services/database';
+import { db } from '../services/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 import type { PlayerData } from '../types/game';
 
 const AUTO_SAVE_INTERVAL_MS = 15 * 1000; // 15秒ごと
@@ -72,6 +74,24 @@ export function useAutoSave() {
       if (latest) doSave(latest);
     }, AUTO_SAVE_INTERVAL_MS);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player?.uid]);
+
+  // 管理者によるFirestore上書きをリアルタイムで検知してローカルstateに反映
+  useEffect(() => {
+    if (!player?.uid) return;
+    const ref = doc(db, 'players', player.uid);
+    const unsub = onSnapshot(ref, (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data() as PlayerData & { adminOverrideAt?: number };
+      if (!data.adminOverrideAt) return;
+      const latest = useGameStore.getState().player;
+      const localOverride = (latest as PlayerData & { adminOverrideAt?: number })?.adminOverrideAt ?? 0;
+      if (data.adminOverrideAt > localOverride) {
+        useGameStore.setState({ player: { ...(latest ?? {}), ...data } as PlayerData });
+      }
+    });
+    return unsub;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player?.uid]);
 

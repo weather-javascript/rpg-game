@@ -2317,7 +2317,7 @@ export function GambleScreen() {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#e8e6ff' }}>{r.label}</div>
                     <div style={{ fontSize: '0.7rem', color: '#8a92b2', marginTop: 1 }}>
-                      {r.multiplier > 0 && <span>💰 {r.multiplier}倍ゴールド</span>}
+                      {r.multiplier > 0 && <span>💰 41,000G賭け → {Math.floor(41000 * r.multiplier).toLocaleString()}G戻る（+{(Math.floor(41000 * r.multiplier) - 41000).toLocaleString()}G）</span>}
                       {r.itemRewards && r.itemRewards.length > 0 && r.itemRewards.map(ir => (
                         <span key={ir.itemId} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, marginRight: 4 }}>
                           <GameIcon id={ITEM_MASTER[ir.itemId]?.icon ?? ''} size={12} />
@@ -2356,7 +2356,7 @@ export function GambleScreen() {
             {game.rewardTable.map((r, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', padding: '3px 0', borderBottom: '1px solid #2d3752', color: '#8a92b2' }}>
                 <span>{r.label}</span>
-                <span><span style={{ color: '#f0c060' }}>×{r.multiplier}</span><span style={{ color: '#4a5070', marginLeft: 8 }}>{(r.probability * 100).toFixed(2)}%</span></span>
+                <span><span style={{ color: '#f0c060' }}>{activeGame === 'treasure_box' && r.multiplier > 0 ? `+${(Math.floor(41000 * r.multiplier) - 41000).toLocaleString()}G → 計${Math.floor(41000 * r.multiplier).toLocaleString()}G` : r.multiplier > 0 ? `×${r.multiplier}` : 'ハズレ'}</span><span style={{ color: '#4a5070', marginLeft: 8 }}>{(r.probability * 100).toFixed(2)}%</span></span>
               </div>
             ))}
           </div>
