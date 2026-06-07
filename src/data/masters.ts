@@ -310,7 +310,7 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
     category: 'consumable', itemType: 'Item', rarity: 'common',
     sellPrice: 0, buyPrice: 0, maxStack: 99, icon: 'scroll',
   },
-  netherite_ingot:{ id:'netherite_ingot',name:'ネザライトインゴット','description':'最高位の素材。',        category:'material',  itemType:'Item', rarity:'legendary', sellPrice:8000, buyPrice:0, maxStack:64, icon:'trophy' },
+  netherite_ingot:{ id:'netherite_ingot',name:'ネザライトインゴット', description:'最高位の素材。',        category:'material',  itemType:'Item', rarity:'legendary', sellPrice:8000, buyPrice:0, maxStack:64, icon:'trophy' },
 };
 
 // ============================================================
