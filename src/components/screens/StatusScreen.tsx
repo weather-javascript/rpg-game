@@ -492,16 +492,11 @@ export function StatusScreen() {
                   </div>
                   <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0}}>
                     <span style={{color:'#f0c060', fontWeight:700, fontSize:'0.9rem'}}>×{qty}</span>
-                    {item.useEffect && (
-                      <button onClick={() => {
-                        if (item.useEffect?.attackBonus) {
-                          addNotification('info', `${item.name}はダンジョンのホットバーから使用してください`);
-                        } else {
-                          useItem(id);
-                        }
-                      }} style={{padding:'3px 7px', background: item.useEffect.attackBonus ? '#2d3752' : '#9b6df0', color: item.useEffect.attackBonus ? '#8a92b2' : '#fff', border: item.useEffect.attackBonus ? '1px solid #4a5070' : 'none', borderRadius:4, cursor:'pointer', fontSize:'0.7rem'}}>
-                        {item.useEffect.attackBonus ? '⚔️武器' : '使用'}
-                      </button>
+                    {item.useEffect && item.category !== 'weapon' && (
+                      <button onClick={() => useItem(id)} style={{padding:'3px 7px', background:'#9b6df0', color:'#fff', border:'none', borderRadius:4, cursor:'pointer', fontSize:'0.7rem'}}>使用</button>
+                    )}
+                    {item.category === 'weapon' && (
+                      <span style={{padding:'3px 7px', background:'#2d3752', color:'#8a92b2', border:'1px solid #4a5070', borderRadius:4, fontSize:'0.7rem'}}>⚔️武器</span>
                     )}
                   </div>
                 </div>

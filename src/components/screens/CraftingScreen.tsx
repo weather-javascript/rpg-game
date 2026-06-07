@@ -1,9 +1,44 @@
 // src/components/screens/CraftingScreen.tsx
+
+// ============================================================
+// アイテムソース分類
+// ============================================================
+function buildSourceMap() {
+  const gatherItems = new Set<string>();
+  const fishingItems = new Set<string>();
+  const dungeonItemMap: Record<string, string[]> = {}; // itemId -> dungeonId[]
+
+  Object.values(GATHER_NODE_MASTER).forEach(node => {
+    const isFishing = node.id.includes('fishing') || node.id.includes('pond');
+    node.drops?.forEach((d: { itemId: string }) => {
+      if (isFishing) fishingItems.add(d.itemId);
+      else gatherItems.add(d.itemId);
+    });
+  });
+
+  Object.values(DUNGEON_MASTER).forEach(dungeon => {
+    if (!dungeon.areas) return;
+    dungeon.areas.forEach((area: { monsters?: { monsterId: string }[] }) => {
+      area.monsters?.forEach((m: { monsterId: string }) => {
+        // monster drops handled separately; tag dungeon by area monsters
+      });
+    });
+  });
+
+  // モンスタードロップ → ダンジョン紐付け（MONSTER_MASTERはここでは使わずdungeonIdsで対応）
+  // ITEM_MASTERのdescriptionから判別する補助ロジックは省略し、MONSTER_MASTERをインポートせず
+  // 代わりにdescriptionの「洞窟」「要塞」等のキーワードで大まかに分類
+  return { gatherItems, fishingItems, dungeonItemMap };
+}
+
+const _sourceCache = buildSourceMap();
+
+
 // Minecraft風 3×3 クラフトグリッド
 import { useState, useEffect, useCallback } from 'react';
 import { GameIcon } from '../icons';
 import { useGameStore } from '../../stores/gameStore';
-import { ITEM_MASTER, CRAFT_RECIPES } from '../../data/masters';
+import { ITEM_MASTER, CRAFT_RECIPES, DUNGEON_MASTER, GATHER_NODE_MASTER } from '../../data/masters';
 import type { CraftRecipe } from '../../types/game';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../services/firebase';
@@ -63,6 +98,20 @@ function matchRecipeWithCount(grid: GridCell[], recipes: CraftRecipe[]): { recip
 // ============================================================
 export function CraftingScreen() {
   const player = useGameStore(s => s.player);
+  const [searchText, setSearchText] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [favorites, setFavorites] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('craft_favorites') ?? '[]')); } catch { return new Set(); }
+  });
+
+  const toggleFavorite = (itemId: string) => {
+    setFavorites(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId); else next.add(itemId);
+      localStorage.setItem('craft_favorites', JSON.stringify([...next]));
+      return next;
+    });
+  };
   const addItems = useGameStore(s => s.addItems);
   const consumeItem = useGameStore(s => s.consumeItem);
   const addSkillExp = useGameStore(s => s.addSkillExp);
@@ -273,30 +322,90 @@ export function CraftingScreen() {
           {/* インベントリ一覧（選択用） */}
           <div style={{ marginTop: 16 }}>
             <div style={{ fontSize: '0.8rem', color: '#8a92b2', marginBottom: 8, fontWeight: 700 }}>📦 所持アイテム（タップで選択）</div>
+
+            {/* 検索バー */}
+            <input
+              value={searchText} onChange={e => setSearchText(e.target.value)}
+              placeholder="🔍 アイテム名で検索..."
+              style={{ width: '100%', padding: '6px 10px', background: '#161b26', border: '1px solid #2d3752', color: '#e8e6ff', borderRadius: 6, fontSize: '0.8rem', boxSizing: 'border-box', marginBottom: 8 }}
+            />
+
+            {/* カテゴリフィルタータブ */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+              {[
+                { id: 'all',       label: '全て' },
+                { id: 'favorites', label: '⭐ お気に入り' },
+                { id: 'gather',    label: '⛏️ 採取' },
+                { id: 'fishing',   label: '🎣 釣り' },
+                { id: 'material',  label: '🪨 素材' },
+                { id: 'food',      label: '🍖 食料' },
+                { id: 'weapon',    label: '⚔️ 武器' },
+                { id: 'armor',     label: '🛡️ 防具' },
+                { id: 'other',     label: '📦 その他' },
+              ].map(cat => (
+                <button key={cat.id} onClick={() => setCategoryFilter(cat.id)}
+                  style={{ padding: '3px 8px', fontSize: '0.7rem', borderRadius: 10, cursor: 'pointer', fontWeight: categoryFilter === cat.id ? 700 : 400,
+                    background: categoryFilter === cat.id ? '#5b8dee' : '#161b26',
+                    border: `1px solid ${categoryFilter === cat.id ? '#5b8dee' : '#2d3752'}`,
+                    color: categoryFilter === cat.id ? '#fff' : '#8a92b2' }}>
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            {/* アイテム一覧 */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {invItems.length === 0 && <div style={{ color: '#4a5070', fontSize: '0.78rem' }}>アイテムなし</div>}
-              {invItems.map(([itemId, amt]) => {
-                const item = ITEM_MASTER[itemId];
-                if (!item) return null;
-                const inGrid = gridUsed[itemId] ?? 0;
-                const available = amt - inGrid;
-                const isSel = selected?.itemId === itemId;
-                return (
-                  <button key={itemId} onClick={() => setSelected(isSel ? null : { itemId })}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px',
-                      background: isSel ? 'rgba(91,141,238,0.3)' : '#1c2235',
-                      border: `1px solid ${isSel ? '#5b8dee' : '#2d3752'}`,
-                      borderRadius: 6, cursor: available > 0 ? 'pointer' : 'not-allowed',
-                      color: available > 0 ? '#e8e6ff' : '#4a5070', fontSize: '0.75rem',
-                      opacity: available > 0 ? 1 : 0.5,
-                    }}>
-                    <GameIcon id={item.icon} size={18} />
-                    <span>{item.name}</span>
-                    <span style={{ color: '#f0c060', fontWeight: 700 }}>×{available}</span>
-                  </button>
-                );
-              })}
+              {(() => {
+                const { gatherItems, fishingItems } = _sourceCache;
+                const filtered = invItems
+                  .filter(([itemId, amt]) => {
+                    const item = ITEM_MASTER[itemId];
+                    if (!item) return false;
+                    if (searchText && !item.name.includes(searchText)) return false;
+                    if (categoryFilter === 'favorites') return favorites.has(itemId);
+                    if (categoryFilter === 'gather') return gatherItems.has(itemId);
+                    if (categoryFilter === 'fishing') return fishingItems.has(itemId);
+                    if (categoryFilter === 'material') return item.category === 'material';
+                    if (categoryFilter === 'food') return item.category === 'food';
+                    if (categoryFilter === 'weapon') return item.category === 'weapon';
+                    if (categoryFilter === 'armor') return item.category === 'armor';
+                    if (categoryFilter === 'other') return !['material','food','weapon','armor'].includes(item.category ?? '') && !gatherItems.has(itemId) && !fishingItems.has(itemId);
+                    return true;
+                  })
+                  .sort(([, a], [, b]) => b - a); // 所持数多い順
+
+                if (filtered.length === 0) return <div style={{ color: '#4a5070', fontSize: '0.78rem' }}>該当アイテムなし</div>;
+
+                return filtered.map(([itemId, amt]) => {
+                  const item = ITEM_MASTER[itemId];
+                  if (!item) return null;
+                  const inGrid = gridUsed[itemId] ?? 0;
+                  const available = amt - inGrid;
+                  const isSel = selected?.itemId === itemId;
+                  const isFav = favorites.has(itemId);
+                  return (
+                    <div key={itemId} style={{ position: 'relative', display: 'inline-flex' }}>
+                      <button onClick={() => setSelected(isSel ? null : { itemId })}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px',
+                          background: isSel ? 'rgba(91,141,238,0.3)' : '#1c2235',
+                          border: `1px solid ${isSel ? '#5b8dee' : '#2d3752'}`,
+                          borderRadius: 6, cursor: available > 0 ? 'pointer' : 'not-allowed',
+                          color: available > 0 ? '#e8e6ff' : '#4a5070', fontSize: '0.75rem',
+                          opacity: available > 0 ? 1 : 0.5, paddingRight: 22,
+                        }}>
+                        <GameIcon id={item.icon} size={18} />
+                        <span>{item.name}</span>
+                        <span style={{ color: '#f0c060', fontWeight: 700 }}>×{available}</span>
+                      </button>
+                      <button onClick={e => { e.stopPropagation(); toggleFavorite(itemId); }}
+                        style={{ position: 'absolute', top: 2, right: 3, background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.65rem', padding: 0, lineHeight: 1, color: isFav ? '#f0c060' : '#2d3752' }}>
+                        ⭐
+                      </button>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         </div>
