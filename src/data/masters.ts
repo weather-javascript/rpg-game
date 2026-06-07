@@ -846,6 +846,17 @@ export const DEFAULT_PLAYER_STATS = {
 // ============================================================
 export const VERSION_PATCHES = [
   {
+    version: '2.2.8',
+    date: '2026-06-07',
+    changes: [
+      '🎨 金塊・木のナイフ・金のナイフ・ダイヤの剣・エンドストーンの剣のアイコンを改善',
+      '🗡️ 鉄の剣アイコンを剣らしいデザインに変更',
+      '🛡️ 鉄の防具（胸・脚・足）アイコンを各部位の形状に改善',
+      '🔰 Revolution Armor（胸・脚・足）が誤ってRevolution Defencerのアイコンになっていたバグを修正',
+      '🪄 Revolution Healwandがダンジョンで消費されてしまうバグを修正',
+    ],
+  },
+  {
     version: '2.2.7',
     date: '2026-06-07',
     changes: [
