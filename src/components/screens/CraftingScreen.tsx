@@ -19,7 +19,7 @@ function buildSourceMap() {
   Object.values(DUNGEON_MASTER).forEach(dungeon => {
     if (!dungeon.areas) return;
     dungeon.areas.forEach((area: { monsters?: { monsterId: string }[] }) => {
-      area.monsters?.forEach((m: { monsterId: string }) => {
+      area.monsters?.forEach((_m: { monsterId: string }) => {
         // monster drops handled separately; tag dungeon by area monsters
       });
     });
@@ -358,7 +358,7 @@ export function CraftingScreen() {
               {(() => {
                 const { gatherItems, fishingItems } = _sourceCache;
                 const filtered = invItems
-                  .filter(([itemId, amt]) => {
+                  .filter(([itemId, _amt]) => {
                     const item = ITEM_MASTER[itemId];
                     if (!item) return false;
                     if (searchText && !item.name.includes(searchText)) return false;

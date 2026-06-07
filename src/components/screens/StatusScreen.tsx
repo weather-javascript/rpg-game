@@ -30,7 +30,7 @@ function EquipmentPanel() {
   const eligibleFor = (slot: string) => {
     const isArmor = ARMOR_SLOTS.some(s => s.key === slot);
     return Object.entries(player.inventory)
-      .filter(([id, qty]) => qty > 0 && ITEM_MASTER[id] && (isArmor
+      .filter(([id, qty]) => (qty as number) > 0 && ITEM_MASTER[id] && (isArmor
         ? ['armor','weapon'].includes(ITEM_MASTER[id].category)
         : ['consumable','potion','food','weapon','armor'].includes(ITEM_MASTER[id].category)))
       .map(([id]) => id);
@@ -267,12 +267,128 @@ const TITLE_MASTER: { id: string; label: string; condition: (p: PlayerData) => b
 
 const PROFILE_ICONS = ['⚔️','🛡️','🧙','🎣','💰','🏆','🌟','👑','🔥','💎','🐉','⚡','🌊','🌙','🎲','🗡️','🧪','🌱','💀','🦊'];
 
+// ============================================================
+// インベントリグリッド
+// ============================================================
+const INV_CATEGORY_TABS = [
+  { id: 'all',      label: '全て' },
+  { id: 'weapon',   label: '⚔️ 武器' },
+  { id: 'armor',    label: '🛡️ 防具' },
+  { id: 'food',     label: '🍖 食料' },
+  { id: 'potion',   label: '🧪 薬' },
+  { id: 'material', label: '🪨 素材' },
+  { id: 'tool',     label: '🔧 道具' },
+  { id: 'other',    label: '📦 その他' },
+] as const;
+
+const OTHER_CATEGORIES = new Set(['economy','display','job','protect','travel','treasure']);
+
+const RARITY_BORDER: Record<string, string> = {
+  common:'#2d3752', uncommon:'#2d6644', rare:'#2d4488', epic:'#6030a0', legendary:'#a06020',
+};
+
+function InventoryGrid({ player, useItem }: { player: NonNullable<ReturnType<typeof useGameStore.getState>['player']>; useItem: (id: string) => void }) {
+  const [cat, setCat] = useState<string>('all');
+  const [search, setSearch] = useState('');
+  const [detail, setDetail] = useState<string | null>(null);
+
+  const entries = Object.entries(player.inventory)
+    .filter(([, qty]) => (qty as number) > 0)
+    .filter(([id]) => {
+      const item = ITEM_MASTER[id];
+      if (!item) return false;
+      if (search && !item.name.includes(search)) return false;
+      if (cat === 'all') return true;
+      if (cat === 'other') return OTHER_CATEGORIES.has(item.category);
+      return item.category === cat;
+    })
+    .sort(([, a], [, b]) => (b as number) - (a as number));
+
+  const detailItem = detail ? ITEM_MASTER[detail] : null;
+  const detailQty = detail ? (player.inventory[detail] ?? 0) : 0;
+
+  return (
+    <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}}>
+        <h3 style={{fontSize:'0.9rem', color:'#f0c060', margin:0}}>🎒 所持品 ({Object.values(player.inventory).filter(q => (q as number) > 0).length}種)</h3>
+      </div>
+
+      <input
+        value={search} onChange={e => setSearch(e.target.value)}
+        placeholder="🔍 名前で検索..."
+        style={{width:'100%', padding:'6px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', boxSizing:'border-box', marginBottom:8}}
+      />
+
+      <div style={{display:'flex', gap:4, overflowX:'auto', marginBottom:10, paddingBottom:2}}>
+        {INV_CATEGORY_TABS.map(t => (
+          <button key={t.id} onClick={() => setCat(t.id)}
+            style={{flexShrink:0, padding:'4px 8px', fontSize:'0.7rem', background: cat===t.id ? 'rgba(91,141,238,0.25)' : '#161b26', border:`1px solid ${cat===t.id ? '#5b8dee' : '#2d3752'}`, color: cat===t.id ? '#e8e6ff' : '#8a92b2', borderRadius:5, cursor:'pointer', whiteSpace:'nowrap'}}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {entries.length === 0
+        ? <p style={{color:'#4a5070', fontSize:'0.85rem', textAlign:'center', padding:20}}>アイテムがありません</p>
+        : <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:5}}>
+            {entries.map(([id, qty]) => {
+              const item = ITEM_MASTER[id];
+              if (!item) return null;
+              return (
+                <button key={id} onClick={() => setDetail(id)}
+                  title={item.name}
+                  style={{position:'relative', background:'#161b26', border:`2px solid ${RARITY_BORDER[item.rarity] ?? '#2d3752'}`, borderRadius:7, padding:'6px 4px', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:2, minHeight:56}}>
+                  <GameIcon id={item.icon} size={26} />
+                  <span style={{fontSize:'0.58rem', color:'#f0c060', fontWeight:700, lineHeight:1}}>×{qty}</span>
+                </button>
+              );
+            })}
+          </div>
+      }
+
+      {detail && detailItem && (
+        <div style={{position:'fixed', inset:0, zIndex:500, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center'}} onClick={() => setDetail(null)}>
+          <div style={{background:'#1c2235', border:`2px solid ${RARITY_BORDER[detailItem.rarity] ?? '#2d3752'}`, borderRadius:12, padding:18, width:'85%', maxWidth:320}} onClick={e => e.stopPropagation()}>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:12}}>
+              <GameIcon id={detailItem.icon} size={36} />
+              <div>
+                <div style={{fontWeight:700, fontSize:'1rem', color:'#e8e6ff'}}>{detailItem.name}</div>
+                <div style={{fontSize:'0.7rem', color:'#8a92b2'}}>{detailItem.rarity} · ×{detailQty}</div>
+              </div>
+            </div>
+            <div style={{fontSize:'0.8rem', color:'#8a92b2', marginBottom:10}}>{detailItem.description}</div>
+            <div style={{fontSize:'0.75rem', color:'#4a5070', display:'flex', flexDirection:'column', gap:3, marginBottom:12}}>
+              {detailItem.sellPrice > 0 && <span>💰 売値: {detailItem.sellPrice}G/個</span>}
+              {detailItem.useEffect?.hpRestore && <span style={{color:'#4caf87'}}>❤️ HP+{detailItem.useEffect.hpRestore}</span>}
+              {detailItem.useEffect?.satietyRestore && <span style={{color:'#f0a830'}}>🍖 満腹+{detailItem.useEffect.satietyRestore}</span>}
+              {detailItem.useEffect?.attackBonus && <span style={{color:'#f0c060'}}>⚔️ 攻撃+{detailItem.useEffect.attackBonus}</span>}
+              {(detailItem as any).attackBonus && <span style={{color:'#f0c060'}}>⚔️ 攻撃+{(detailItem as any).attackBonus}</span>}
+              {(detailItem as any).defenseBonus && <span style={{color:'#5b8dee'}}>🛡️ 防御+{(detailItem as any).defenseBonus}</span>}
+            </div>
+            <div style={{display:'flex', gap:8}}>
+              {detailItem.useEffect && detailItem.category !== 'weapon' && (
+                <button onClick={() => { useItem(detail); setDetail(null); }}
+                  style={{flex:1, padding:'8px', background:'#9b6df0', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.85rem'}}>
+                  使用する
+                </button>
+              )}
+              <button onClick={() => setDetail(null)}
+                style={{flex:1, padding:'8px', background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:6, cursor:'pointer', fontSize:'0.85rem'}}>
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function StatusScreen() {
   const player = useGameStore(s => s.player);
   const saveGame = useGameStore(s => s.saveGame);
   const isSaving = useGameStore(s => s.isSaving);
   const useItem = useGameStore(s => s.useItem);
-  const addNotification = useGameStore(s => s.addNotification);
   const setActiveTab = useGameStore(s => s.setActiveTab);
   const [activeSection, setActiveSection] = useState<'stats'|'skills'|'inventory'|'equipment'>('stats');
   const [profileIcon, setProfileIcon] = useState(() => player?.profile?.icon ?? '⚔️');
@@ -300,11 +416,6 @@ export function StatusScreen() {
     { id:'inventory', label:'所持', icon:'backpack' },
     { id:'equipment', label:'装備', icon:'swords' },
   ] as const;
-
-  const inventoryEntries = Object.entries(player.inventory).filter(([, qty]) => qty > 0);
-  const RARITY_COLORS: Record<string, string> = {
-    common:'#2d3752', uncommon:'#2d6644', rare:'#2d4488', epic:'#6030a0', legendary:'#a06020',
-  };
 
   return (
     <div style={{padding:'12px 8px 80px'}}>
@@ -469,41 +580,7 @@ export function StatusScreen() {
 
       {/* インベントリ */}
       {activeSection === 'inventory' && (
-        <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
-          <h3 style={{fontSize:'0.9rem', color:'#f0c060', marginBottom:10}}>🎒 所持品 ({inventoryEntries.length}種)</h3>
-          {inventoryEntries.length === 0
-            ? <p style={{color:'#4a5070', fontSize:'0.85rem', textAlign:'center', padding:20}}>アイテムがありません</p>
-            : inventoryEntries.map(([id, qty]) => {
-              const item = ITEM_MASTER[id];
-              if (!item) return null;
-              return (
-                <div key={id} style={{display:'flex', alignItems:'flex-start', gap:8, padding:'7px 8px', background: RARITY_COLORS[item.rarity] ?? '#2d3752', borderRadius:6, marginBottom:4}}>
-                  <span style={{fontSize:'1.2rem', flexShrink:0, marginTop:2}}><GameIcon id={item.icon} size={22} /></span>
-                  <div style={{flex:1, minWidth:0}}>
-                    <div style={{fontSize:'0.82rem', fontWeight:700}}>{item.name}</div>
-                    <div style={{fontSize:'0.68rem', color:'#8a92b2', marginTop:1}}>{item.description}</div>
-                    <div style={{fontSize:'0.65rem', color:'#4a5070', marginTop:2, display:'flex', gap:8, flexWrap:'wrap'}}>
-                      <span>{item.rarity}</span>
-                      {item.sellPrice > 0 && <span>売値: {item.sellPrice}G/個</span>}
-                      {item.useEffect?.hpRestore && <span style={{color:'#4caf87'}}>HP+{item.useEffect.hpRestore}</span>}
-                      {item.useEffect?.satietyRestore && <span style={{color:'#f0a830'}}>満腹+{item.useEffect.satietyRestore}</span>}
-                      {item.useEffect?.attackBonus && <span style={{color:'#f0c060'}}>攻撃+{item.useEffect.attackBonus}</span>}
-                    </div>
-                  </div>
-                  <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0}}>
-                    <span style={{color:'#f0c060', fontWeight:700, fontSize:'0.9rem'}}>×{qty}</span>
-                    {item.useEffect && item.category !== 'weapon' && (
-                      <button onClick={() => useItem(id)} style={{padding:'3px 7px', background:'#9b6df0', color:'#fff', border:'none', borderRadius:4, cursor:'pointer', fontSize:'0.7rem'}}>使用</button>
-                    )}
-                    {item.category === 'weapon' && (
-                      <span style={{padding:'3px 7px', background:'#2d3752', color:'#8a92b2', border:'1px solid #4a5070', borderRadius:4, fontSize:'0.7rem'}}>⚔️武器</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          }
-        </section>
+        <InventoryGrid player={player} useItem={useItem} />
       )}
 
       {/* 装備・ホットバー */}
