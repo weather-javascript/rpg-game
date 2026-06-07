@@ -14,7 +14,9 @@ import {
   postActivityFeed,
   createPokerTable, subscribePokerTables, subscribePokerTable,
   joinPokerTable, cancelPokerTable, leavePokerTable, startPokerGame, pokerAction,
+  subscribeTreasureProbs,
 } from '../../services/multiplayer';
+import type { TreasureProbEntry } from '../../services/multiplayer';
 import type { GambleResult, GambleMaster, PokerTable } from '../../types/game';
 import type { PokerState } from '../../systems/minigames';
 import type { GambleBattle } from '../../types/game';
@@ -2186,6 +2188,12 @@ export function GambleScreen() {
   const [gambleMultipliers, setGambleMultipliers] = useState<Record<string, number>>({});
   const [pokerBetLocked, setPokerBetLocked] = useState(false);
   const [ticketActive, setTicketActive] = useState(false); // チケット1枚使用中
+  const [treasureProbs, setTreasureProbs] = useState<TreasureProbEntry[] | null>(null);
+
+  useEffect(() => {
+    const unsub = subscribeTreasureProbs(setTreasureProbs);
+    return unsub;
+  }, []);
 
   useEffect(() => {
     const unsub = subscribeJackpotPool(setJackpotPool);
@@ -2227,6 +2235,17 @@ export function GambleScreen() {
   const gameMasterKey = activeGame === 'slot' ? 'slot_machine' : activeGame;
   const game = GAMBLE_MASTER[gameMasterKey] ?? GAMBLE_MASTER['chohan'];
   const netProfit = stats.totalWon - stats.totalBet;
+
+  // 宝箱: 管理者オーバーライドがある場合はrewardTableの確率を上書き
+  const treasureGame = treasureProbs
+    ? {
+        ...GAMBLE_MASTER['treasure_box'],
+        rewardTable: GAMBLE_MASTER['treasure_box'].rewardTable.map((r, i) => ({
+          ...r,
+          probability: treasureProbs[i]?.probability ?? r.probability,
+        })),
+      }
+    : GAMBLE_MASTER['treasure_box'];
 
   return (
     <div style={{ padding: '12px 8px' }}>
@@ -2287,12 +2306,12 @@ export function GambleScreen() {
         {activeGame === 'chinchiro'    && <ChinchiroPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chinchiro'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
         {activeGame === 'coin_flip'    && <CoinFlipPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['coin_flip'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
         {activeGame === 'slot'         && <SlotPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['slot_machine'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
-        {activeGame === 'treasure_box' && <GenericPanel game={GAMBLE_MASTER['treasure_box']}  bet={30000} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['treasure_box'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
+        {activeGame === 'treasure_box' && <GenericPanel game={treasureGame}  bet={30000} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['treasure_box'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
         {activeGame === 'treasure_box' && (
           <div style={{ marginTop: 14 }}>
             <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#f0c060', marginBottom: 8 }}>📦 宝箱の中身一覧</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {GAMBLE_MASTER['treasure_box'].rewardTable.map((r, i) => (
+              {treasureGame.rewardTable.map((r, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#161b26', border: '1px solid #2d3752', borderRadius: 6, padding: '7px 10px' }}>
                   <span style={{ fontSize: '1.1rem', minWidth: 24, textAlign: 'center' }}>{r.symbols?.[0] ?? '?'}</span>
                   <div style={{ flex: 1 }}>
