@@ -7,7 +7,36 @@ import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
 import { subscribeItemPrices } from '../../services/multiplayer';
 
-type ShopTab = 'sell' | 'buy' | 'satiety' | 'use';
+type ShopTab = 'sell' | 'buy' | 'satiety' | 'use' | 'trade';
+
+// 取引ブース定義
+interface TradeRecipe {
+  id: string;
+  name: string;
+  inputs: { itemId: string; amount: number }[];
+  outputItemId: string;
+  outputAmount: number;
+  description: string;
+}
+
+const TRADE_RECIPES: TradeRecipe[] = [
+  {
+    id: 'trade_cave_staff',
+    name: '洞窟の杖と交換',
+    description: '洞窟王の宝石を64個納めると、洞窟の杖と交換してもらえる。',
+    inputs: [{ itemId: 'cave_gem', amount: 64 }],
+    outputItemId: 'cave_staff',
+    outputAmount: 1,
+  },
+  {
+    id: 'trade_cave_staff2',
+    name: '岩窟の杖と交換',
+    description: '洞窟の杖1本とモグラの爪4個を納めると、岩窟の杖と交換してもらえる。',
+    inputs: [{ itemId: 'cave_staff', amount: 1 }, { itemId: 'mole_claw', amount: 4 }],
+    outputItemId: 'cave_staff2',
+    outputAmount: 1,
+  },
+];
 
 // 満腹度上限購入価格: 600 * 1.3^n
 const SATIETY_BASE_PRICE = 600;
@@ -120,6 +149,7 @@ export function MarketScreen() {
     { id:'buy',     label:'🛒 購入' },
     { id:'satiety', label:'🍖 満腹' },
     { id:'use',     label:'🧪 使用' },
+    { id:'trade',   label:'🔄 取引' },
   ];
 
   return (
@@ -261,6 +291,70 @@ export function MarketScreen() {
               );
             })
           }
+        </>
+      )}
+
+      {shopTab === 'trade' && (
+        <>
+          <p style={{fontSize:'0.78rem', color:'#8a92b2', marginBottom:12, lineHeight:1.6}}>
+            🏪 素材を納めると特別なアイテムと交換してもらえます。
+          </p>
+          {TRADE_RECIPES.map(recipe => {
+            const outputItem = ITEM_MASTER[recipe.outputItemId];
+            const canTrade = recipe.inputs.every(inp => (player?.inventory[inp.itemId] ?? 0) >= inp.amount);
+            return (
+              <div key={recipe.id} style={{background:'#1c2235', border:`1px solid ${canTrade ? '#4caf87' : '#2d3752'}`, borderRadius:8, padding:'12px 14px', marginBottom:10}}>
+                <div style={{fontWeight:700, fontSize:'0.88rem', color:'#e8e6ff', marginBottom:6}}>{recipe.name}</div>
+                <div style={{fontSize:'0.72rem', color:'#8a92b2', marginBottom:10}}>{recipe.description}</div>
+                {/* 必要素材 */}
+                <div style={{marginBottom:8}}>
+                  <div style={{fontSize:'0.68rem', color:'#4a5070', marginBottom:4}}>必要素材</div>
+                  {recipe.inputs.map(inp => {
+                    const inpItem = ITEM_MASTER[inp.itemId];
+                    const have = player?.inventory[inp.itemId] ?? 0;
+                    const ok = have >= inp.amount;
+                    return (
+                      <div key={inp.itemId} style={{display:'flex', alignItems:'center', gap:6, marginBottom:3}}>
+                        <GameIcon id={inpItem?.icon ?? 'stone'} size={18} />
+                        <span style={{fontSize:'0.8rem', flex:1}}>{inpItem?.name ?? inp.itemId}</span>
+                        <span style={{fontSize:'0.8rem', color: ok ? '#4caf87' : '#e05555'}}>
+                          {have}/{inp.amount}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* 交換先 */}
+                <div style={{display:'flex', alignItems:'center', gap:8, background:'rgba(240,192,96,0.07)', borderRadius:6, padding:'6px 10px', marginBottom:10}}>
+                  <span style={{fontSize:'0.72rem', color:'#f0c060'}}>▶ 交換品</span>
+                  <GameIcon id={outputItem?.icon ?? 'gem'} size={22} />
+                  <span style={{fontSize:'0.85rem', fontWeight:700, color:'#f0c060'}}>{outputItem?.name ?? recipe.outputItemId}</span>
+                  {recipe.outputAmount > 1 && <span style={{fontSize:'0.75rem', color:'#8a92b2'}}>×{recipe.outputAmount}</span>}
+                </div>
+                <button
+                  disabled={!canTrade}
+                  onClick={() => {
+                    if (!canTrade) return;
+                    for (const inp of recipe.inputs) {
+                      if (!consumeItem(inp.itemId, inp.amount)) {
+                        addNotification('error', '素材が足りません');
+                        return;
+                      }
+                    }
+                    addItems([{ itemId: recipe.outputItemId, amount: recipe.outputAmount }]);
+                    addNotification('success', `🔄 ${outputItem?.name ?? recipe.outputItemId} と交換しました！`);
+                  }}
+                  style={{
+                    width:'100%', padding:'8px', fontWeight:700, fontSize:'0.85rem',
+                    background: canTrade ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752',
+                    color: canTrade ? '#fff' : '#4a5070',
+                    border:'none', borderRadius:6, cursor: canTrade ? 'pointer' : 'not-allowed',
+                  }}>
+                  {canTrade ? '🔄 交換する' : '素材不足'}
+                </button>
+              </div>
+            );
+          })}
         </>
       )}
     </div>
