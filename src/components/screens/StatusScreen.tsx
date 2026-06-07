@@ -99,7 +99,9 @@ function EquipmentPanel() {
                   background: item ? 'rgba(76,175,135,0.12)' : '#161b26',
                   border:`1px solid ${item ? '#4caf87' : '#2d3752'}`, borderRadius:8, cursor:'pointer', color:'#e8e6ff', textAlign:'left',
                 }}>
-                <span style={{width:28, textAlign:'center', fontSize:'1.2rem'}}>{label.split(' ')[0]}</span>
+                <span style={{width:32, textAlign:'center', fontSize:'1.4rem', display:'flex', alignItems:'center', justifyContent:'center'}}>
+                  {item ? <GameIcon id={item.icon} size={28} /> : <span style={{fontSize:'1.2rem'}}>{label.split(' ')[0]}</span>}
+                </span>
                 <div style={{flex:1}}>
                   <div style={{fontSize:'0.75rem', color:'#8a92b2'}}>{label.split(' ').slice(1).join(' ')}</div>
                   {item

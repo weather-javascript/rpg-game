@@ -9,7 +9,9 @@ import {
   saveAnnouncementToHistory, getAnnouncementHistory,
   getItemPrices, setItemPrices,
   subscribeProposals, updateProposalStatus, Proposal,
+  getTreasureProbs, setTreasureProbs,
 } from '../../services/multiplayer';
+import type { TreasureProbEntry } from '../../services/multiplayer';
 import { GAMBLE_MASTER, DUNGEON_MASTER, ITEM_MASTER, CRAFT_RECIPES } from '../../data/masters';
 import type { CraftRecipe } from '../../types/game';
 import { useGameStore } from '../../stores/gameStore';
@@ -56,6 +58,8 @@ export function AdminScreen() {
   // 提案管理
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [proposalProcessing, setProposalProcessing] = useState<string | null>(null);
+  // 宝箱確率管理
+  const [treasureProbs, setTreasureProbsState] = useState<TreasureProbEntry[]>([]);
 
   // リアルタイム購読でプレイヤー一覧を取得
   useEffect(() => {
@@ -95,6 +99,16 @@ export function AdminScreen() {
         base[item.id] = { buyPrice: item.buyPrice, sellPrice: item.sellPrice };
       });
       setItemPricesState({ ...base, ...p });
+    }).catch(() => {});
+
+    // 宝箱確率読み込み
+    getTreasureProbs().then(probs => {
+      const master = GAMBLE_MASTER['treasure_box'].rewardTable;
+      if (probs) {
+        setTreasureProbsState(master.map((r, i) => ({ label: r.label, probability: probs[i]?.probability ?? r.probability })));
+      } else {
+        setTreasureProbsState(master.map(r => ({ label: r.label, probability: r.probability })));
+      }
     }).catch(() => {});
 
     // カスタムクラフトレシピ取得
@@ -478,6 +492,51 @@ export function AdminScreen() {
             style={{width:'100%', padding:'10px', background:'linear-gradient(135deg,#e05555,#c03030)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'0.9rem', marginTop:8}}>
             {saving ? '更新中...' : '🎰 全プレイヤーに反映する'}
           </button>
+
+          {/* 宝箱確率編集 */}
+          <div style={{marginTop:20}}>
+            <p style={{fontSize:'0.82rem', fontWeight:700, color:'#f0c060', marginBottom:8}}>📦 宝箱の中身 確率設定</p>
+            <p style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:10}}>合計が100%になるように調整してください。変更後に保存してください。</p>
+            {(() => {
+              const total = treasureProbs.reduce((s, e) => s + e.probability, 0);
+              const isValid = Math.abs(total - 1.0) < 0.001;
+              return (
+                <>
+                  {treasureProbs.map((entry, i) => (
+                    <div key={i} style={{display:'flex', alignItems:'center', gap:8, marginBottom:6, padding:'7px 10px', background:'#1c2235', border:'1px solid #2d3752', borderRadius:6}}>
+                      <span style={{flex:1, fontSize:'0.8rem', color:'#e8e6ff'}}>{entry.label}</span>
+                      <input
+                        type="number" step="0.001" min="0" max="1"
+                        value={(entry.probability * 100).toFixed(3)}
+                        onChange={e => {
+                          const v = Math.max(0, Math.min(100, Number(e.target.value))) / 100;
+                          setTreasureProbsState(prev => prev.map((x, j) => j === i ? { ...x, probability: v } : x));
+                        }}
+                        style={{width:80, padding:'4px 6px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.82rem', textAlign:'right'}}
+                      />
+                      <span style={{fontSize:'0.75rem', color:'#8a92b2'}}>%</span>
+                    </div>
+                  ))}
+                  <div style={{textAlign:'right', fontSize:'0.78rem', marginBottom:8, color: isValid ? '#4caf87' : '#e05555', fontWeight:700}}>
+                    合計: {(total * 100).toFixed(3)}% {isValid ? '✅' : '⚠️ 100%にしてください'}
+                  </div>
+                  <button
+                    disabled={saving || !isValid}
+                    onClick={async () => {
+                      setSaving(true);
+                      try {
+                        await setTreasureProbs(treasureProbs);
+                        addNotification('success', '宝箱確率を保存しました');
+                      } catch { addNotification('error', '保存に失敗しました'); }
+                      setSaving(false);
+                    }}
+                    style={{width:'100%', padding:'9px', background: isValid ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752', color:'#fff', border:'none', borderRadius:8, cursor: isValid ? 'pointer' : 'not-allowed', fontWeight:700, fontSize:'0.85rem'}}>
+                    {saving ? '保存中...' : '📦 宝箱確率を保存する'}
+                  </button>
+                </>
+              );
+            })()}
+          </div>
         </div>
       )}
 
@@ -858,11 +917,22 @@ export function AdminScreen() {
                         setProposalProcessing(p.id);
                         try {
                           await updateProposalStatus(p.id, 'approved');
-                          // 提案チケット付与: updatePlayerAdminでinventory更新
-                          const target = players.find(pl => pl.id === p.uid);
-                          if (target) {
-                            const inv = { ...(target.inventory ?? {}), vote_ticket: (target.inventory?.vote_ticket ?? 0) + 1 };
-                            await updatePlayerAdmin(p.uid, { inventory: inv });
+                          // 提案チケット付与: Firestoreから最新データを直接取得して付与
+                          const { doc: fsDoc, getDoc, setDoc } = await import('firebase/firestore');
+                          const { db: fsDb } = await import('../../services/firebase');
+                          const playerRef = fsDoc(fsDb, 'players', p.uid);
+                          const playerSnap = await getDoc(playerRef);
+                          if (playerSnap.exists()) {
+                            const data = playerSnap.data();
+                            const inv = { ...(data.inventory ?? {}), vote_ticket: ((data.inventory?.vote_ticket) ?? 0) + 1 };
+                            await setDoc(playerRef, { ...data, inventory: inv, adminOverrideAt: Date.now() });
+                          } else {
+                            // ドキュメントが存在しない場合もローカルのplayersから試みる
+                            const target = players.find(pl => pl.id === p.uid);
+                            if (target) {
+                              const inv = { ...(target.inventory ?? {}), vote_ticket: (target.inventory?.vote_ticket ?? 0) + 1 };
+                              await updatePlayerAdmin(p.uid, { inventory: inv });
+                            }
                           }
                           addNotification('success', `提案を承認し提案チケットを付与しました`);
                         } catch { addNotification('error', '処理に失敗しました'); }

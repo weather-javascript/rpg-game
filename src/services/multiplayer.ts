@@ -1125,3 +1125,25 @@ export async function updateProposalStatus(id: string, status: 'approved' | 'rej
   const { updateDoc, doc: firestoreDoc } = await import('firebase/firestore');
   await updateDoc(firestoreDoc(db, 'proposals', id), { status });
 }
+
+// ============================================================
+// 宝箱確率オーバーライド
+// ============================================================
+export interface TreasureProbEntry { label: string; probability: number; }
+
+export async function getTreasureProbs(): Promise<TreasureProbEntry[] | null> {
+  try {
+    const snap = await getDoc(doc(db, 'admin', 'treasure_probs'));
+    return snap.exists() ? (snap.data().entries as TreasureProbEntry[]) : null;
+  } catch { return null; }
+}
+
+export async function setTreasureProbs(entries: TreasureProbEntry[]): Promise<void> {
+  await setDoc(doc(db, 'admin', 'treasure_probs'), { entries });
+}
+
+export function subscribeTreasureProbs(cb: (entries: TreasureProbEntry[] | null) => void): () => void {
+  return onSnapshot(doc(db, 'admin', 'treasure_probs'), snap => {
+    cb(snap.exists() ? (snap.data().entries as TreasureProbEntry[]) : null);
+  });
+}
