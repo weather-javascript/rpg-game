@@ -502,5 +502,3 @@ export function FishingScreen() {
   );
 }
 
-// useGameStore.getState() を使うために追加
-function get() { return useGameStore.getState(); }

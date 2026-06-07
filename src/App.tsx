@@ -557,6 +557,7 @@ export default function App() {
   const [showAdminAnnounce, setShowAdminAnnounce] = useState(false);
   const [maintenanceStatus, setMaintenanceStatus] = useState<{ active: boolean; startedAt: number; estimatedMinutes: number; message?: string } | null>(null);
   const [soldPopup, setSoldPopup] = useState<SoldPopupInfo | null>(null);
+  const soldQueueRef = React.useRef<SoldPopupInfo[]>([]);
   useEffect(() => {
     if (!player) return;
     setShowVersionPopup(true);
@@ -612,9 +613,13 @@ export default function App() {
         const itemName = ITEM_MASTER[n.itemId]?.name ?? n.itemId;
         const itemIcon = ITEM_MASTER[n.itemId]?.icon ?? '📦';
         changeGold(n.totalGold);
-        // 売れましたポップアップ表示（通知トーストの代わり）
-        setSoldPopup({ itemName, itemIcon, amount: n.amount, totalGold: n.totalGold });
+        soldQueueRef.current = [...soldQueueRef.current, { itemName, itemIcon, amount: n.amount, totalGold: n.totalGold }];
         try { await markSoldNotificationRead(n.id); } catch { /* ignore */ }
+      }
+      // バージョンポップアップもAdminお知らせも表示中でなければ即表示
+      if (!showVersionPopup && !showAdminAnnounce && !soldPopup && soldQueueRef.current.length > 0) {
+        setSoldPopup(soldQueueRef.current[0]);
+        soldQueueRef.current = soldQueueRef.current.slice(1);
       }
     });
     return unsub;
@@ -631,8 +636,8 @@ export default function App() {
   return (
     <div style={{ maxWidth:900, margin:'0 auto', minHeight:'100vh', background:'#0d0f14' }}>
       {showVersionPopup && <VersionPopup onClose={handleCloseVersionPopup} />}
-      {showAdminAnnounce && <AdminAnnouncementPopup onClose={() => setShowAdminAnnounce(false)} />}
-      {soldPopup && <SoldPopup info={soldPopup} onClose={() => setSoldPopup(null)} />}
+      {showAdminAnnounce && <AdminAnnouncementPopup onClose={() => { setShowAdminAnnounce(false); const q = soldQueueRef.current; if (q.length > 0) { setSoldPopup(q[0]); soldQueueRef.current = q.slice(1); } }} />}
+      {soldPopup && <SoldPopup info={soldPopup} onClose={() => { setSoldPopup(null); const q = soldQueueRef.current; if (q.length > 0) { setTimeout(() => { setSoldPopup(q[0]); soldQueueRef.current = q.slice(1); }, 300); } }} />}
       <StatusBar />
       <main style={{ paddingBottom:72 }}>
         <ActiveScreen tab={activeTab} />
