@@ -61,6 +61,8 @@ export interface ItemMaster {
   icon: string;
   // 武器固有ステータス
   weaponAtk?: number;       // 武器固有攻撃力（通常攻撃をこの値で上書き）
+  isAreaWeapon?: boolean;   // 範囲攻撃武器（全体攻撃）
+  areaPenetrate?: number;   // 範囲攻撃の貫通ダメージ（防御無視）
   weaponDef?: number;       // 装備時防御ボーナス
   weaponHpBonus?: number;   // 装備時最大HP増加
   // 武器スキル（複数可）
