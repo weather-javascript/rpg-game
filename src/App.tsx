@@ -275,7 +275,7 @@ function AdminAnnouncementPopup({ onClose }: { onClose: () => void }) {
                     onError={e => (e.currentTarget.style.display = 'none')}
                   />
                 )}
-                <div style={{ fontSize:'0.88rem', color:'#e8e6ff', flex:1 }}>{a.text}</div>
+                <div style={{ fontSize:'0.88rem', color:'#e8e6ff', flex:1, whiteSpace:'pre-wrap', wordBreak:'break-word' }}>{a.text}</div>
               </div>
             </div>
           ))

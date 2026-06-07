@@ -251,6 +251,13 @@ export interface PlayerData {
   satietyUpgradeCount?: number;
   // ガチャコイン
   gachaCoins?: number;
+  // プロフィール
+  profile?: {
+    icon: string;          // 絵文字アイコン
+    comment: string;       // 一言コメント
+    titleId: string;       // 称号ID
+    favDungeonId: string;  // 好きなダンジョン
+  };
 }
 
 export interface ActivityEntry {
@@ -325,6 +332,20 @@ export interface AuctionListing {
   createdAt: number;
 }
 
+export interface BoardReply {
+  uid: string;
+  displayName: string;
+  level: number;
+  text: string;
+  createdAt: number;
+}
+
+export interface BoardPoll {
+  question: string;
+  options: string[];
+  votes: Record<string, number>; // optionIndex -> uid[]  stored as uid:optionIndex in Firestore
+}
+
 export interface BoardMessage {
   id: string;
   uid: string;
@@ -332,6 +353,9 @@ export interface BoardMessage {
   level: number;
   text: string;
   createdAt: number;
+  reactions?: Record<string, string[]>; // emoji -> uid[]
+  replies?: BoardReply[];
+  poll?: BoardPoll;
 }
 
 // ============================================================

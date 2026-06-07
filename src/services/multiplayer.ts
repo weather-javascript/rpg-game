@@ -2,9 +2,10 @@
 import {
   doc, setDoc, deleteDoc, collection, query, orderBy, limit,
   onSnapshot, addDoc, getDoc, updateDoc, where, Unsubscribe, increment, getDocs,
+  arrayUnion, arrayRemove,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { OnlineUser, BoardMessage, AuctionListing, GambleBattle, PokerTable, PokerCard, PokerPlayer, PokerPhase } from '../types/game';
+import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, PokerTable, PokerCard, PokerPlayer, PokerPhase } from '../types/game';
 import { calcJackpotContrib, rollJackpot } from '../systems/minigames';
 
 const COLLECTIONS = {
@@ -80,20 +81,46 @@ export function subscribeOnlineUsers(cb: (users: OnlineUser[]) => void): Unsubsc
   };
 }
 
-export async function postBoardMessage(uid: string, displayName: string, level: number, text: string) {
-  await addDoc(collection(db, COLLECTIONS.BOARD), { uid, displayName, level, text: text.slice(0, 100), createdAt: Date.now() });
+export async function postBoardMessage(
+  uid: string, displayName: string, level: number, text: string,
+  poll?: { question: string; options: string[] }
+) {
+  const data: Record<string, unknown> = { uid, displayName, level, text: text.slice(0, 200), createdAt: Date.now(), reactions: {}, replies: [] };
+  if (poll) data['poll'] = { question: poll.question, options: poll.options, votes: {} };
+  await addDoc(collection(db, COLLECTIONS.BOARD), data);
+}
+
+export async function deleteBoardMessage(id: string): Promise<void> {
+  await deleteDoc(doc(db, COLLECTIONS.BOARD, id));
+}
+
+export async function addBoardReaction(id: string, emoji: string, uid: string): Promise<void> {
+  const ref = doc(db, COLLECTIONS.BOARD, id);
+  await updateDoc(ref, { [`reactions.${emoji}`]: arrayUnion(uid) });
+}
+
+export async function removeBoardReaction(id: string, emoji: string, uid: string): Promise<void> {
+  const ref = doc(db, COLLECTIONS.BOARD, id);
+  await updateDoc(ref, { [`reactions.${emoji}`]: arrayRemove(uid) });
+}
+
+export async function addBoardReply(id: string, reply: BoardReply): Promise<void> {
+  const ref = doc(db, COLLECTIONS.BOARD, id);
+  await updateDoc(ref, { replies: arrayUnion(reply) });
+}
+
+export async function voteBoardPoll(id: string, optionIndex: number, uid: string, prevOption?: number): Promise<void> {
+  const ref = doc(db, COLLECTIONS.BOARD, id);
+  const updates: Record<string, unknown> = { [`poll.votes.${uid}`]: optionIndex };
+  await updateDoc(ref, updates);
+  void prevOption; // track via votes map: uid->optionIndex
 }
 
 export function subscribeBoardMessages(cb: (msgs: BoardMessage[]) => void): Unsubscribe {
   const q = query(collection(db, COLLECTIONS.BOARD), orderBy('createdAt', 'desc'), limit(30));
-  let stopped = false;
-  const fetch = () => getDocs(q).then(snap => {
-    if (stopped) return;
+  return onSnapshot(q, snap => {
     cb(snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<BoardMessage,'id'>) })));
-  }).catch(() => {});
-  fetch();
-  const timer = setInterval(fetch, 5_000);
-  return () => { stopped = true; clearInterval(timer); };
+  });
 }
 
 export async function createAuction(listing: Omit<AuctionListing,'id'|'createdAt'>): Promise<string> {
@@ -588,6 +615,16 @@ export async function getAnnouncementHistory(): Promise<AnnouncementRecord[]> {
 export async function saveAnnouncementToHistory(text: string, imageUrl?: string): Promise<void> {
   const { addDoc, collection: col } = await import('firebase/firestore');
   await addDoc(col(db, 'announcements'), { text, timestamp: Date.now(), ...(imageUrl ? { imageUrl } : {}) });
+}
+
+export async function deleteAnnouncementRecord(id: string): Promise<void> {
+  const { doc: d, deleteDoc: del } = await import('firebase/firestore');
+  await del(d(db, 'announcements', id));
+}
+
+export async function updateAnnouncementRecord(id: string, text: string, imageUrl?: string): Promise<void> {
+  const { doc: d, updateDoc: upd } = await import('firebase/firestore');
+  await upd(d(db, 'announcements', id), { text, ...(imageUrl !== undefined ? { imageUrl: imageUrl || null } : {}) });
 }
 
 // ============================================================

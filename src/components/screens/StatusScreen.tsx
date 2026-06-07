@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { GameIcon } from '../icons';
 import { useGameStore } from '../../stores/gameStore';
-import { ITEM_MASTER, SKILL_MASTER, EXP_TABLE, SKILL_EXP_TABLE } from '../../data/masters';
+import { ITEM_MASTER, SKILL_MASTER, EXP_TABLE, SKILL_EXP_TABLE, DUNGEON_MASTER } from '../../data/masters';
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import type { EquipmentSlots } from '../../types/game';
@@ -259,6 +259,11 @@ export function StatusScreen() {
   const addNotification = useGameStore(s => s.addNotification);
   const setActiveTab = useGameStore(s => s.setActiveTab);
   const [activeSection, setActiveSection] = useState<'stats'|'skills'|'inventory'|'equipment'>('stats');
+  const [profileIcon, setProfileIcon] = useState(() => player?.profile?.icon ?? '⚔️');
+  const [profileComment, setProfileComment] = useState(() => player?.profile?.comment ?? '');
+  const [profileTitleId, setProfileTitleId] = useState(() => player?.profile?.titleId ?? '');
+  const [profileDungeonId, setProfileDungeonId] = useState(() => player?.profile?.favDungeonId ?? '');
+  const [showIconPicker, setShowIconPicker] = useState(false);
   const [showRename, setShowRename] = useState(false);
 
   if (!player) return null;
@@ -349,6 +354,72 @@ export function StatusScreen() {
           <div style={{marginTop:12}}>
             <AdminEntry onEnter={() => setActiveTab('admin')} />
           </div>
+        </section>
+      )}
+
+      {/* プロフィール編集 */}
+      {activeSection === 'stats' && (
+        <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
+          <h3 style={{fontSize:'0.9rem', color:'#f0c060', marginBottom:10}}>👤 プロフィール</h3>
+          {/* アイコン */}
+          <div style={{marginBottom:10}}>
+            <div style={{fontSize:'0.72rem', color:'#8a92b2', marginBottom:4}}>アイコン</div>
+            <div style={{display:'flex', gap:8, alignItems:'center'}}>
+              <span style={{fontSize:'2rem'}}>{profileIcon}</span>
+              <button onClick={() => setShowIconPicker(v => !v)}
+                style={{padding:'4px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#8a92b2', borderRadius:6, cursor:'pointer', fontSize:'0.75rem'}}>
+                変更
+              </button>
+            </div>
+            {showIconPicker && (
+              <div style={{display:'flex', flexWrap:'wrap', gap:4, marginTop:6, background:'#161b26', borderRadius:6, padding:8}}>
+                {PROFILE_ICONS.map(e => (
+                  <button key={e} onClick={() => { setProfileIcon(e); setShowIconPicker(false); }}
+                    style={{background: profileIcon === e ? 'rgba(91,141,238,0.3)' : 'none', border: profileIcon === e ? '1px solid #5b8dee' : '1px solid transparent', borderRadius:4, fontSize:'1.3rem', cursor:'pointer', padding:3}}>
+                    {e}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* 一言コメント */}
+          <div style={{marginBottom:10}}>
+            <div style={{fontSize:'0.72rem', color:'#8a92b2', marginBottom:4}}>一言コメント（50文字以内）</div>
+            <input value={profileComment} onChange={e => setProfileComment(e.target.value.slice(0,50))}
+              placeholder="自己紹介を入力..."
+              style={{width:'100%', padding:'6px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', boxSizing:'border-box'}} />
+          </div>
+          {/* 称号 */}
+          <div style={{marginBottom:10}}>
+            <div style={{fontSize:'0.72rem', color:'#8a92b2', marginBottom:4}}>称号（解放済みから選択）</div>
+            <select value={profileTitleId} onChange={e => setProfileTitleId(e.target.value)}
+              style={{width:'100%', padding:'6px 8px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem'}}>
+              <option value="">-- なし --</option>
+              {TITLE_MASTER.filter(t => player && t.condition(player)).map(t => (
+                <option key={t.id} value={t.id}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+          {/* 好きなダンジョン */}
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:'0.72rem', color:'#8a92b2', marginBottom:4}}>好きなダンジョン</div>
+            <select value={profileDungeonId} onChange={e => setProfileDungeonId(e.target.value)}
+              style={{width:'100%', padding:'6px 8px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem'}}>
+              <option value="">-- なし --</option>
+              {Object.values(DUNGEON_MASTER).map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+          {/* 保存ボタン */}
+          <button onClick={async () => {
+            if (!player) return;
+            const profile = { icon: profileIcon, comment: profileComment, titleId: profileTitleId, favDungeonId: profileDungeonId };
+            useGameStore.setState(s => ({ player: s.player ? { ...s.player, profile } : s.player }));
+            await saveGame();
+          }} style={{width:'100%', padding:'8px', background:'#5b8dee', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.85rem'}}>
+            💾 プロフィールを保存
+          </button>
         </section>
       )}
 

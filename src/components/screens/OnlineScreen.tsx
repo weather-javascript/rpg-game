@@ -4,15 +4,19 @@
 // このファイルを変更したら必ず src/data/masters.ts の VERSION_PATCHES[0] に変更内容を追記すること。
 
 import { useState, useEffect, useCallback } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 import { GameIcon } from '../icons';
 import { useGameStore } from '../../stores/gameStore';
-import { ITEM_MASTER } from '../../data/masters';
+import { ITEM_MASTER, DUNGEON_MASTER } from '../../data/masters';
+import type { PlayerData } from '../../types/game';
 import {
   subscribeOnlineUsers, subscribeBoardMessages, postBoardMessage,
   subscribeAuctions, createAuction, buyAuction, cancelAuction,
   subscribeAllPlayersAdmin,
   subscribeActivityFeed, ActivityFeedEntry, postActivityFeed,
   submitProposal,
+  deleteBoardMessage, addBoardReaction, removeBoardReaction, addBoardReply, voteBoardPoll,
 } from '../../services/multiplayer';
 import type { OnlineUser, BoardMessage, AuctionListing } from '../../types/game';
 
@@ -148,12 +152,91 @@ function ActivityPanel() {
   );
 }
 
+
+const TITLE_LABELS: Record<string, string> = {
+  beginner:'🌱 見習い冒険者', lv10:'⚔️ 一人前', lv30:'🗡️ 熟練冒険者', lv50:'💎 エキスパート',
+  lv100:'👑 レジェンド', dungeon10:'🏰 ダンジョンマスター', dungeon50:'🌟 ダンジョン王',
+  rich:'💰 大富豪', fisher:'🎣 釣り名人', crafter:'🔨 名工',
+};
+
+function ProfilePopup({ uid, displayName, onClose }: { uid: string; displayName: string; onClose: () => void }) {
+  const [pdata, setPdata] = useState<PlayerData | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'players', uid));
+        if (snap.exists()) setPdata(snap.data() as PlayerData);
+      } catch { /* ignore */ }
+      setLoading(false);
+    })();
+  }, [uid]);
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:9000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={onClose}>
+      <div style={{background:'#1c2235',border:'1px solid #2d3752',borderRadius:12,padding:20,width:'100%',maxWidth:320,position:'relative'}} onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} style={{position:'absolute',top:10,right:10,background:'none',border:'none',color:'#4a5070',fontSize:'1.2rem',cursor:'pointer'}}>✕</button>
+        {loading ? (
+          <div style={{textAlign:'center',color:'#4a5070',padding:'20px 0'}}>読み込み中...</div>
+        ) : !pdata ? (
+          <div style={{textAlign:'center',color:'#4a5070',padding:'20px 0'}}>プロフィールが見つかりません</div>
+        ) : (
+          <>
+            <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:14}}>
+              <span style={{fontSize:'2.5rem'}}>{pdata.profile?.icon ?? '⚔️'}</span>
+              <div>
+                <div style={{fontSize:'1rem',fontWeight:700,color:'#f0c060'}}>{pdata.displayName}</div>
+                <div style={{fontSize:'0.78rem',color:'#5b8dee'}}>Lv.{pdata.stats.level}</div>
+                {pdata.profile?.titleId && <div style={{fontSize:'0.75rem',color:'#8a92b2',marginTop:2}}>{TITLE_LABELS[pdata.profile.titleId] ?? ''}</div>}
+              </div>
+            </div>
+            {pdata.profile?.comment && (
+              <div style={{background:'#161b26',borderRadius:6,padding:'8px 10px',fontSize:'0.82rem',color:'#e8e6ff',marginBottom:10,fontStyle:'italic'}}>
+                「{pdata.profile.comment}」
+              </div>
+            )}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+              {[
+                ['攻撃力', `⚔️ ${pdata.stats.attack}`],
+                ['防御力', `🛡️ ${pdata.stats.defense}`],
+                ['所持金', `💰 ${pdata.gold.toLocaleString()}G`],
+                ['釣りスコア', `🎣 ${pdata.fishingScore ?? 0}`],
+              ].map(([label, value]) => (
+                <div key={label} style={{background:'#161b26',borderRadius:6,padding:'6px 8px'}}>
+                  <div style={{fontSize:'0.65rem',color:'#4a5070'}}>{label}</div>
+                  <div style={{fontSize:'0.82rem',color:'#e8e6ff',fontWeight:700}}>{value}</div>
+                </div>
+              ))}
+            </div>
+            {pdata.profile?.favDungeonId && (
+              <div style={{marginTop:10,fontSize:'0.78rem',color:'#8a92b2'}}>
+                好きなダンジョン：<span style={{color:'#f0c060'}}>{DUNGEON_MASTER[pdata.profile.favDungeonId]?.name ?? pdata.profile.favDungeonId}</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const EMOJI_LIST = ['😀','😂','😍','🥺','😎','🤔','👍','❤️','🎉','🔥','💯','👀','😭','🙏','⚔️','🛡️','💰','🎲','🏆','😱'];
+const REACTION_EMOJIS = ['👍','❤️','😂','😮','🎉','🔥'];
+
 function BoardPanel() {
   const player = useGameStore(s => s.player);
   const addNotification = useGameStore(s => s.addNotification);
   const [messages, setMessages] = useState<BoardMessage[]>([]);
   const [text, setText] = useState('');
   const [posting, setPosting] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [showPollForm, setShowPollForm] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['', '']);
+  const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
+  const [profileTarget, setProfileTarget] = useState<{uid:string;displayName:string} | null>(null);
 
   useEffect(() => {
     const unsub = subscribeBoardMessages(setMessages);
@@ -162,37 +245,191 @@ function BoardPanel() {
 
   const post = async () => {
     if (!player || !text.trim() || posting) return;
-    if (text.length > 100) { addNotification('warning', '100文字以内で入力してください'); return; }
     setPosting(true);
     try {
-      await postBoardMessage(player.uid, player.displayName, player.stats.level, text.trim());
-      setText('');
+      const poll = showPollForm && pollQuestion.trim() && pollOptions.filter(o => o.trim()).length >= 2
+        ? { question: pollQuestion.trim(), options: pollOptions.filter(o => o.trim()) }
+        : undefined;
+      await postBoardMessage(player.uid, player.displayName, player.stats.level, text.trim(), poll);
+      setText(''); setPollQuestion(''); setPollOptions(['', '']); setShowPollForm(false);
     } catch { addNotification('error', '投稿に失敗しました'); }
     setPosting(false);
   };
 
+  const handleReaction = async (msgId: string, emoji: string) => {
+    if (!player) return;
+    const msg = messages.find(m => m.id === msgId);
+    const uids = msg?.reactions?.[emoji] ?? [];
+    try {
+      if (uids.includes(player.uid)) await removeBoardReaction(msgId, emoji, player.uid);
+      else await addBoardReaction(msgId, emoji, player.uid);
+    } catch { /* ignore */ }
+  };
+
+  const handleReply = async (msgId: string) => {
+    if (!player || !replyText.trim()) return;
+    try {
+      await addBoardReply(msgId, { uid: player.uid, displayName: player.displayName, level: player.stats.level, text: replyText.trim(), createdAt: Date.now() });
+      setReplyText(''); setReplyTarget(null);
+    } catch { addNotification('error', '返信に失敗しました'); }
+  };
+
+  const handleVote = async (msgId: string, optIdx: number) => {
+    if (!player) return;
+    const msg = messages.find(m => m.id === msgId);
+    const prev = msg?.poll?.votes ? Object.entries(msg.poll.votes).find(([uid]) => uid === player.uid)?.[1] as number | undefined : undefined;
+    if (prev === optIdx) return;
+    try { await voteBoardPoll(msgId, optIdx, player.uid, prev); } catch { /* ignore */ }
+  };
+
+  const toggleReplies = (id: string) => setExpandedReplies(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+
+  const msgStyle: React.CSSProperties = {background:'#1c2235', borderRadius:8, padding:'8px 10px', fontSize:'0.82rem', border:'1px solid #2d3752'};
+
   return (
     <div>
       <h3 style={{color:'#5b8dee', marginBottom:8, fontSize:'0.95rem'}}>💬 掲示板</h3>
-      <div style={{height:240, overflowY:'auto', display:'flex', flexDirection:'column', gap:6, marginBottom:10}}>
-        {[...messages].reverse().map(m => (
-          <div key={m.id} style={{background:'#1c2235', borderRadius:6, padding:'6px 10px', fontSize:'0.82rem'}}>
-            <div style={{display:'flex', gap:6, marginBottom:2}}>
-              <span style={{color:'#f0c060', fontWeight:700}}>{m.displayName}</span>
-              <span style={{color:'#4a5070', fontSize:'0.7rem'}}>Lv.{m.level}</span>
-              <span style={{color:'#4a5070', fontSize:'0.7rem', marginLeft:'auto'}}>{new Date(m.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</span>
+      <div style={{maxHeight:420, overflowY:'auto', display:'flex', flexDirection:'column', gap:8, marginBottom:10}}>
+        {[...messages].reverse().map(m => {
+          const isOwn = m.uid === player?.uid;
+          const replies = m.replies ?? [];
+          const showReplies = expandedReplies.has(m.id);
+          return (
+            <div key={m.id} style={msgStyle}>
+              {/* ヘッダー */}
+              <div style={{display:'flex', gap:6, marginBottom:4, alignItems:'center'}}>
+                <span style={{color:'#f0c060', fontWeight:700, fontSize:'0.85rem', cursor:'pointer', textDecoration:'underline dotted'}} onClick={() => setProfileTarget({uid:m.uid, displayName:m.displayName})}>{m.displayName}</span>
+                <span style={{color:'#4a5070', fontSize:'0.68rem'}}>Lv.{m.level}</span>
+                <span style={{color:'#4a5070', fontSize:'0.68rem', marginLeft:'auto'}}>{new Date(m.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</span>
+                {isOwn && (
+                  <button onClick={async () => { try { await deleteBoardMessage(m.id); } catch { addNotification('error', '削除に失敗しました'); } }}
+                    style={{background:'none', border:'none', color:'#e05555', cursor:'pointer', fontSize:'0.75rem', padding:'0 2px'}}>🗑️</button>
+                )}
+              </div>
+              {/* 本文 */}
+              <div style={{color:'#e8e6ff', marginBottom:6, wordBreak:'break-all'}}>{m.text}</div>
+              {/* 投票 */}
+              {m.poll && (() => {
+                const votes = m.poll.votes ?? {};
+                const myVote = player ? votes[player.uid as keyof typeof votes] as number | undefined : undefined;
+                const totals = m.poll.options.map((_: string, i: number) => Object.values(votes).filter((v: unknown) => v === i).length);
+                const total = totals.reduce((a: number, b: number) => a + b, 0);
+                return (
+                  <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px', marginBottom:6}}>
+                    <div style={{fontSize:'0.78rem', color:'#f0c060', fontWeight:700, marginBottom:4}}>📊 {m.poll.question}</div>
+                    {m.poll.options.map((opt: string, i: number) => {
+                      const pct = total > 0 ? Math.round(totals[i] / total * 100) : 0;
+                      const voted = myVote === i;
+                      return (
+                        <div key={i} onClick={() => handleVote(m.id, i)} style={{cursor:'pointer', marginBottom:4}}>
+                          <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.75rem', color: voted ? '#5b8dee' : '#8a92b2', marginBottom:2}}>
+                            <span>{voted ? '✅ ' : ''}{opt}</span><span>{totals[i]}票 ({pct}%)</span>
+                          </div>
+                          <div style={{height:6, background:'#2d3752', borderRadius:3, overflow:'hidden'}}>
+                            <div style={{height:'100%', background: voted ? '#5b8dee' : '#4a5070', width:`${pct}%`, transition:'width 0.3s'}} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div style={{fontSize:'0.68rem', color:'#4a5070', marginTop:2}}>合計 {total}票</div>
+                  </div>
+                );
+              })()}
+              {/* リアクション */}
+              <div style={{display:'flex', gap:4, flexWrap:'wrap', marginBottom:4}}>
+                {REACTION_EMOJIS.map(emoji => {
+                  const uids = m.reactions?.[emoji] ?? [];
+                  const reacted = player ? uids.includes(player.uid) : false;
+                  return (
+                    <button key={emoji} onClick={() => handleReaction(m.id, emoji)}
+                      style={{padding:'2px 6px', background: reacted ? 'rgba(91,141,238,0.25)' : '#161b26', border:`1px solid ${reacted ? '#5b8dee' : '#2d3752'}`, borderRadius:12, cursor:'pointer', fontSize:'0.75rem', color:'#e8e6ff'}}>
+                      {emoji}{uids.length > 0 ? ` ${uids.length}` : ''}
+                    </button>
+                  );
+                })}
+                <button onClick={() => setReplyTarget(replyTarget === m.id ? null : m.id)}
+                  style={{padding:'2px 8px', background:'#161b26', border:'1px solid #2d3752', borderRadius:12, cursor:'pointer', fontSize:'0.72rem', color:'#8a92b2'}}>
+                  💬 返信{replies.length > 0 ? ` (${replies.length})` : ''}
+                </button>
+                {replies.length > 0 && (
+                  <button onClick={() => toggleReplies(m.id)}
+                    style={{padding:'2px 8px', background:'#161b26', border:'1px solid #2d3752', borderRadius:12, cursor:'pointer', fontSize:'0.72rem', color:'#8a92b2'}}>
+                    {showReplies ? '▲ 閉じる' : '▼ 展開'}
+                  </button>
+                )}
+              </div>
+              {/* 返信一覧 */}
+              {showReplies && replies.length > 0 && (
+                <div style={{borderLeft:'2px solid #2d3752', paddingLeft:8, marginBottom:4, display:'flex', flexDirection:'column', gap:4}}>
+                  {replies.map((r, i) => (
+                    <div key={i} style={{fontSize:'0.75rem'}}>
+                      <span style={{color:'#f0c060', fontWeight:700}}>{r.displayName}</span>
+                      <span style={{color:'#4a5070', marginLeft:4}}>Lv.{r.level}</span>
+                      <span style={{color:'#4a5070', marginLeft:6, fontSize:'0.68rem'}}>{new Date(r.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</span>
+                      <div style={{color:'#c8c8e8', marginTop:1}}>{r.text}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* 返信入力 */}
+              {replyTarget === m.id && (
+                <div style={{display:'flex', gap:4, marginTop:4}}>
+                  <input value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={e => e.key==='Enter' && handleReply(m.id)}
+                    placeholder="返信を入力..." maxLength={100}
+                    style={{flex:1, padding:'5px 8px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.78rem'}} />
+                  <button onClick={() => handleReply(m.id)} disabled={!replyText.trim()}
+                    style={{padding:'5px 10px', background: replyText.trim() ? '#5b8dee' : '#2d3752', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:'0.78rem'}}>送信</button>
+                </div>
+              )}
             </div>
-            <div style={{color:'#e8e6ff'}}>{m.text}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
-      <div style={{display:'flex', gap:6}}>
-        <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key==='Enter' && post()} placeholder="メッセージを入力..." maxLength={100}
-          style={{flex:1, padding:'7px 10px', background:'#1c2235', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.85rem'}} />
-        <button onClick={post} disabled={posting || !text.trim()}
-          style={{padding:'7px 14px', background: posting || !text.trim() ? '#2d3752' : '#5b8dee', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700}}>
-          送信
-        </button>
+      {profileTarget && <ProfilePopup uid={profileTarget.uid} displayName={profileTarget.displayName} onClose={() => setProfileTarget(null)} />}
+      {/* 投稿フォーム */}
+      <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'8px 10px'}}>
+        {/* 絵文字ピッカー */}
+        {showEmojiPicker && (
+          <div style={{display:'flex', flexWrap:'wrap', gap:4, marginBottom:8, background:'#161b26', borderRadius:6, padding:8}}>
+            {EMOJI_LIST.map(e => (
+              <button key={e} onClick={() => { setText(t => t + e); setShowEmojiPicker(false); }}
+                style={{background:'none', border:'none', fontSize:'1.2rem', cursor:'pointer', padding:2}}>{e}</button>
+            ))}
+          </div>
+        )}
+        {/* 投票フォーム */}
+        {showPollForm && (
+          <div style={{marginBottom:8, background:'#161b26', borderRadius:6, padding:8}}>
+            <input value={pollQuestion} onChange={e => setPollQuestion(e.target.value)} placeholder="投票の質問..." maxLength={60}
+              style={{width:'100%', padding:'5px 8px', background:'#1c2235', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.8rem', boxSizing:'border-box', marginBottom:4}} />
+            {pollOptions.map((opt, i) => (
+              <div key={i} style={{display:'flex', gap:4, marginBottom:4}}>
+                <input value={opt} onChange={e => setPollOptions(prev => prev.map((o, j) => j === i ? e.target.value : o))}
+                  placeholder={`選択肢 ${i+1}`} maxLength={30}
+                  style={{flex:1, padding:'4px 8px', background:'#1c2235', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.78rem'}} />
+                {pollOptions.length > 2 && <button onClick={() => setPollOptions(prev => prev.filter((_,j) => j !== i))}
+                  style={{background:'none', border:'none', color:'#e05555', cursor:'pointer'}}>✕</button>}
+              </div>
+            ))}
+            {pollOptions.length < 5 && (
+              <button onClick={() => setPollOptions(prev => [...prev, ''])}
+                style={{fontSize:'0.75rem', color:'#5b8dee', background:'none', border:'none', cursor:'pointer', padding:'2px 0'}}>＋ 選択肢を追加</button>
+            )}
+          </div>
+        )}
+        <div style={{display:'flex', gap:6, alignItems:'center'}}>
+          <button onClick={() => setShowEmojiPicker(e => !e)}
+            style={{padding:'6px 8px', background:'#161b26', border:'1px solid #2d3752', borderRadius:6, cursor:'pointer', fontSize:'1rem'}}>😀</button>
+          <button onClick={() => setShowPollForm(e => !e)}
+            style={{padding:'6px 8px', background: showPollForm ? 'rgba(91,141,238,0.2)' : '#161b26', border:`1px solid ${showPollForm ? '#5b8dee' : '#2d3752'}`, borderRadius:6, cursor:'pointer', fontSize:'0.78rem', color: showPollForm ? '#5b8dee' : '#8a92b2'}}>📊</button>
+          <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key==='Enter' && post()}
+            placeholder="メッセージを入力..." maxLength={200}
+            style={{flex:1, padding:'7px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.85rem'}} />
+          <button onClick={post} disabled={posting || !text.trim()}
+            style={{padding:'7px 14px', background: posting || !text.trim() ? '#2d3752' : '#5b8dee', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700}}>
+            送信
+          </button>
+        </div>
       </div>
     </div>
   );

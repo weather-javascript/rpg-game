@@ -6,7 +6,7 @@ import {
   updatePlayerAdmin, getGambleMultipliers, setGambleMultipliers,
   setMaintenanceStatus, getMaintenanceStatus,
   setJackpotRate, getJackpotRate, getJackpotPool,
-  saveAnnouncementToHistory, getAnnouncementHistory,
+  saveAnnouncementToHistory, getAnnouncementHistory, deleteAnnouncementRecord, updateAnnouncementRecord,
   getItemPrices, setItemPrices,
   subscribeProposals, updateProposalStatus, Proposal,
   getTreasureProbs, setTreasureProbs,
@@ -43,7 +43,10 @@ export function AdminScreen() {
   const [maintenanceActive, setMaintenanceActive] = useState(false);
   const [maintenanceMinutes, setMaintenanceMinutes] = useState(30);
   const [maintenanceMessage, setMaintenanceMessage] = useState('');
-  const [announceHistory, setAnnounceHistory] = useState<Array<{ id: string; text: string; timestamp: number }>>([]);
+  const [announceHistory, setAnnounceHistory] = useState<Array<{ id: string; text: string; timestamp: number; imageUrl?: string }>>([]);
+  const [editingAnnounceId, setEditingAnnounceId] = useState<string | null>(null);
+  const [editingAnnounceText, setEditingAnnounceText] = useState('');
+  const [editingAnnounceImageUrl, setEditingAnnounceImageUrl] = useState('');
   const [itemPrices, setItemPricesState] = useState<Record<string, { buyPrice: number; sellPrice: number }>>({});
   const [itemFilter, setItemFilter] = useState('');
   // インベントリ編集
@@ -665,11 +668,44 @@ export function AdminScreen() {
               <div style={{color:'#4a5070', fontSize:'0.78rem', textAlign:'center', padding:'10px 0'}}>履歴なし</div>
             ) : announceHistory.map(a => (
               <div key={a.id} style={{background:'#161b26', border:'1px solid #2d3752', borderRadius:6, padding:'8px 10px', marginBottom:6}}>
-                <div style={{fontSize:'0.68rem', color:'#4a5070', marginBottom:3}}>{new Date(a.timestamp).toLocaleString('ja-JP')}</div>
-                <div style={{display:'flex', alignItems:'flex-start', gap:8}}>
-                  {(a as any).imageUrl && <img src={(a as any).imageUrl} alt="" style={{width:36, height:36, objectFit:'contain', borderRadius:4, flexShrink:0}} />}
-                  <div style={{fontSize:'0.82rem', color:'#e8e6ff'}}>{a.text}</div>
+                <div style={{fontSize:'0.68rem', color:'#4a5070', marginBottom:3, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                  <span>{new Date(a.timestamp).toLocaleString('ja-JP')}</span>
+                  <div style={{display:'flex', gap:4}}>
+                    <button onClick={() => { setEditingAnnounceId(a.id); setEditingAnnounceText(a.text); setEditingAnnounceImageUrl(a.imageUrl ?? ''); }}
+                      style={{fontSize:'0.7rem', padding:'2px 7px', background:'#2d3752', border:'1px solid #5b8dee', color:'#5b8dee', borderRadius:4, cursor:'pointer'}}>✏️ 編集</button>
+                    <button onClick={async () => {
+                      if (!window.confirm('このお知らせを削除しますか？')) return;
+                      await deleteAnnouncementRecord(a.id);
+                      setAnnounceHistory(h => h.filter(x => x.id !== a.id));
+                      addNotification('success', '削除しました');
+                    }} style={{fontSize:'0.7rem', padding:'2px 7px', background:'#2d3752', border:'1px solid #e05555', color:'#e05555', borderRadius:4, cursor:'pointer'}}>🗑️ 削除</button>
+                  </div>
                 </div>
+                {editingAnnounceId === a.id ? (
+                  <div style={{display:'flex', flexDirection:'column', gap:4}}>
+                    <input value={editingAnnounceImageUrl} onChange={e => setEditingAnnounceImageUrl(e.target.value)}
+                      placeholder="画像URL（任意）"
+                      style={{padding:'5px 8px', background:'#1c2235', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.78rem'}} />
+                    <textarea value={editingAnnounceText} onChange={e => setEditingAnnounceText(e.target.value.slice(0, 500))}
+                      rows={3} style={{padding:'5px 8px', background:'#1c2235', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.78rem', resize:'vertical'}} />
+                    <div style={{display:'flex', gap:4}}>
+                      <button onClick={async () => {
+                        await updateAnnouncementRecord(a.id, editingAnnounceText, editingAnnounceImageUrl);
+                        const h = await getAnnouncementHistory();
+                        setAnnounceHistory(h);
+                        setEditingAnnounceId(null);
+                        addNotification('success', '更新しました');
+                      }} style={{flex:1, padding:'5px', background:'#5b8dee', color:'#fff', border:'none', borderRadius:4, cursor:'pointer', fontSize:'0.78rem', fontWeight:700}}>💾 保存</button>
+                      <button onClick={() => setEditingAnnounceId(null)}
+                        style={{padding:'5px 10px', background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:4, cursor:'pointer', fontSize:'0.78rem'}}>キャンセル</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{display:'flex', alignItems:'flex-start', gap:8}}>
+                    {a.imageUrl && <img src={a.imageUrl} alt="" style={{width:36, height:36, objectFit:'contain', borderRadius:4, flexShrink:0}} />}
+                    <div style={{fontSize:'0.82rem', color:'#e8e6ff', whiteSpace:'pre-wrap', wordBreak:'break-word'}}>{a.text}</div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

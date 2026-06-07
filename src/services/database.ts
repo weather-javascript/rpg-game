@@ -104,6 +104,7 @@ function createNewPlayerData(uid: string): PlayerData {
     emailNotifications: { auction: true, events: true, updates: true },
     activityLog: [],
     settings: {},
+    profile: { icon: '⚔️', comment: '', titleId: '', favDungeonId: '' },
   };
 }
 
