@@ -159,7 +159,7 @@ const TITLE_LABELS: Record<string, string> = {
   rich:'💰 大富豪', fisher:'🎣 釣り名人', crafter:'🔨 名工',
 };
 
-function ProfilePopup({ uid, displayName, onClose }: { uid: string; displayName: string; onClose: () => void }) {
+function ProfilePopup({ uid, onClose }: { uid: string; onClose: () => void }) {
   const [pdata, setPdata] = useState<PlayerData | null>(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -236,7 +236,7 @@ function BoardPanel() {
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
-  const [profileTarget, setProfileTarget] = useState<{uid:string;displayName:string} | null>(null);
+  const [profileTarget, setProfileTarget] = useState<{uid:string} | null>(null);
 
   useEffect(() => {
     const unsub = subscribeBoardMessages(setMessages);
@@ -298,7 +298,7 @@ function BoardPanel() {
             <div key={m.id} style={msgStyle}>
               {/* ヘッダー */}
               <div style={{display:'flex', gap:6, marginBottom:4, alignItems:'center'}}>
-                <span style={{color:'#f0c060', fontWeight:700, fontSize:'0.85rem', cursor:'pointer', textDecoration:'underline dotted'}} onClick={() => setProfileTarget({uid:m.uid, displayName:m.displayName})}>{m.displayName}</span>
+                <span style={{color:'#f0c060', fontWeight:700, fontSize:'0.85rem', cursor:'pointer', textDecoration:'underline dotted'}} onClick={() => setProfileTarget({uid:m.uid})}>{m.displayName}</span>
                 <span style={{color:'#4a5070', fontSize:'0.68rem'}}>Lv.{m.level}</span>
                 <span style={{color:'#4a5070', fontSize:'0.68rem', marginLeft:'auto'}}>{new Date(m.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</span>
                 {isOwn && (
@@ -385,7 +385,7 @@ function BoardPanel() {
           );
         })}
       </div>
-      {profileTarget && <ProfilePopup uid={profileTarget.uid} displayName={profileTarget.displayName} onClose={() => setProfileTarget(null)} />}
+      {profileTarget && <ProfilePopup uid={profileTarget.uid} onClose={() => setProfileTarget(null)} />}
       {/* 投稿フォーム */}
       <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'8px 10px'}}>
         {/* 絵文字ピッカー */}

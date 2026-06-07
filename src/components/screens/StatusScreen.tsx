@@ -5,7 +5,7 @@ import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER, SKILL_MASTER, EXP_TABLE, SKILL_EXP_TABLE, DUNGEON_MASTER } from '../../data/masters';
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import type { EquipmentSlots } from '../../types/game';
+import type { EquipmentSlots, PlayerData } from '../../types/game';
 import { defaultEquipmentSlots } from '../../types/game';
 
 // ============================================================
@@ -251,6 +251,22 @@ function AdminEntry({ onEnter }: { onEnter: () => void }) {
 // ============================================================
 // メインステータス画面
 // ============================================================
+
+const TITLE_MASTER: { id: string; label: string; condition: (p: PlayerData) => boolean }[] = [
+  { id: 'beginner',  label: '🌱 見習い冒険者',     condition: () => true },
+  { id: 'lv10',     label: '⚔️ 一人前',            condition: p => p.stats.level >= 10 },
+  { id: 'lv30',     label: '🗡️ 熟練冒険者',        condition: p => p.stats.level >= 30 },
+  { id: 'lv50',     label: '💎 エキスパート',       condition: p => p.stats.level >= 50 },
+  { id: 'lv100',    label: '👑 レジェンド',         condition: p => p.stats.level >= 100 },
+  { id: 'dungeon10',label: '🏰 ダンジョンマスター', condition: p => Object.values(p.dungeonClearedCount ?? {}).reduce((a,b)=>a+b,0) >= 10 },
+  { id: 'dungeon50',label: '🌟 ダンジョン王',       condition: p => Object.values(p.dungeonClearedCount ?? {}).reduce((a,b)=>a+b,0) >= 50 },
+  { id: 'rich',     label: '💰 大富豪',             condition: p => p.gold >= 1_000_000 },
+  { id: 'fisher',   label: '🎣 釣り名人',           condition: p => (p.fishingScore ?? 0) >= 100 },
+  { id: 'crafter',  label: '🔨 名工',               condition: p => (p.skillLevels?.crafting ?? 0) >= 10 },
+];
+
+const PROFILE_ICONS = ['⚔️','🛡️','🧙','🎣','💰','🏆','🌟','👑','🔥','💎','🐉','⚡','🌊','🌙','🎲','🗡️','🧪','🌱','💀','🦊'];
+
 export function StatusScreen() {
   const player = useGameStore(s => s.player);
   const saveGame = useGameStore(s => s.saveGame);
