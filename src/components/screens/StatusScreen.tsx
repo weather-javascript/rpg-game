@@ -32,7 +32,6 @@ function EquipmentPanel() {
     return Object.entries(player.inventory)
       .filter(([id, qty]) => (qty as number) > 0 && ITEM_MASTER[id] && (isArmor
         ? (ITEM_MASTER[id].category === 'armor' && (!ITEM_MASTER[id].armorSlot || ITEM_MASTER[id].armorSlot === slot))
-          || ITEM_MASTER[id].category === 'weapon'
         : ['consumable','potion','food','weapon','armor'].includes(ITEM_MASTER[id].category)))
       .map(([id]) => id);
   };

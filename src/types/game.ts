@@ -133,7 +133,7 @@ export interface GatherNodeMaster {
 export interface DungeonArea {
   name: string;
   description?: string;
-  monsters: { monsterId: string; count: number; isBoss?: boolean }[];
+  monsters: { monsterId: string; count: number; isBoss?: boolean; isMidBoss?: boolean }[];
   isHardArea?: boolean;
 }
 
@@ -150,6 +150,7 @@ export interface MonsterMaster {
   drops: DropEntry[];
   dungeonIds: string[];
   isBoss?: boolean;
+  isMidBoss?: boolean;
   specialAttack?: string;
 }
 
@@ -267,6 +268,7 @@ export interface PlayerData {
   settings?: { gambleMultiplierBonus?: number };
   // 満腹度上限アップグレード購入回数
   satietyUpgradeCount?: number;
+  hpUpgradeCount?: number;
   // ガチャコイン
   gachaCoins?: number;
   // プロフィール

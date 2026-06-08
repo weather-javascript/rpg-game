@@ -36,6 +36,13 @@ function satietyUpgradePrice(n: number): number {
   return Math.floor(SATIETY_BASE_PRICE * Math.pow(SATIETY_RATE, n));
 }
 
+// HP上限購入価格: 1000 * 1.4^n
+const HP_BASE_PRICE = 1000;
+const HP_RATE = 1.4;
+function hpUpgradePrice(n: number): number {
+  return Math.floor(HP_BASE_PRICE * Math.pow(HP_RATE, n));
+}
+
 export function MarketScreen() {
   const player = useGameStore(s => s.player);
   const changeGold = useGameStore(s => s.changeGold);
@@ -132,6 +139,30 @@ export function MarketScreen() {
     addNotification('success', `🍖 満腹度上限が ${newMaxSatiety} になりました！`);
   };
 
+  const handleHpUpgrade = () => {
+    if (!player) return;
+    const count = player.hpUpgradeCount ?? 0;
+    const price = hpUpgradePrice(count);
+    if ((player.gold ?? 0) < price) {
+      addNotification('error', 'ゴールドが足りません！');
+      return;
+    }
+    changeGold(-price);
+    const newMaxHp = player.stats.maxHp + 5;
+    const latest = useGameStore.getState().player;
+    if (latest) {
+      useGameStore.setState({
+        player: {
+          ...latest,
+          stats: { ...latest.stats, maxHp: newMaxHp },
+          hpUpgradeCount: count + 1,
+        }
+      });
+      try { localStorage.setItem('rpg_backup', JSON.stringify({ data: useGameStore.getState().player, savedAt: Date.now() })); } catch { /* ignore */ }
+    }
+    addNotification('success', `❤️ HP上限が ${newMaxHp} になりました！`);
+  };
+
   const inventoryEntries = Object.entries(player?.inventory ?? {}).filter(([, qty]) => (qty as number) > 0);
   const sellable = inventoryEntries.map(([id, qty]) => ({ item: ITEM_MASTER[id], qty: qty as number, id, sellPrice: getEffectivePrice(id).sellPrice })).filter(e => e.item && e.sellPrice > 0);
   const buyable = Object.values(ITEM_MASTER).filter(item => getEffectivePrice(item.id).buyPrice > 0);
@@ -140,13 +171,16 @@ export function MarketScreen() {
   const satietyCount = player?.satietyUpgradeCount ?? 0;
   const nextPrice = satietyUpgradePrice(satietyCount);
   const currentMaxSatiety = player?.stats.maxSatiety ?? 100;
+  const hpCount = player?.hpUpgradeCount ?? 0;
+  const nextHpPrice = hpUpgradePrice(hpCount);
+  const currentMaxHp = player?.stats.maxHp ?? 100;
 
   const ROW = { display:'flex', alignItems:'center', gap:10, background:'#1c2235', border:'1px solid #2d3752', borderRadius:6, padding:'8px 12px', marginBottom:4 } as const;
   const BTN = (bg: string) => ({ padding:'5px 12px', background:bg, color:'#fff', border:'none', borderRadius:4, cursor:'pointer', fontSize:'0.8rem', whiteSpace:'nowrap' as const });
   const TABS_DEF: { id: ShopTab; label: string }[] = [
     { id:'sell',    label:'💰 売却' },
     { id:'buy',     label:'🛒 購入' },
-    { id:'satiety', label:'🍖 満腹' },
+    { id:'satiety', label:'📊 ステータス' },
     { id:'use',     label:'🧪 使用' },
     { id:'trade',   label:'🔄 取引' },
   ];
@@ -249,6 +283,32 @@ export function MarketScreen() {
               }}
             >
               🍖 満腹度上限を +10 増やす
+            </button>
+          </div>
+          <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:16, marginBottom:12}}>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
+              <span style={{color:'#8a92b2', fontSize:'0.82rem'}}>現在のHP上限</span>
+              <span style={{color:'#e05555', fontWeight:700, fontSize:'1.1rem'}}>❤️ {currentMaxHp}</span>
+            </div>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
+              <span style={{color:'#8a92b2', fontSize:'0.82rem'}}>購入後の上限</span>
+              <span style={{color:'#4caf87', fontWeight:700, fontSize:'1.1rem'}}>❤️ {currentMaxHp + 5}</span>
+            </div>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14}}>
+              <span style={{color:'#8a92b2', fontSize:'0.82rem'}}>購入価格</span>
+              <span style={{color:'#f0c060', fontWeight:700, fontSize:'1.1rem'}}>{nextHpPrice.toLocaleString()}G</span>
+            </div>
+            <button
+              onClick={handleHpUpgrade}
+              disabled={(player?.gold ?? 0) < nextHpPrice}
+              style={{
+                width:'100%', padding:'10px 0', fontSize:'0.9rem', fontWeight:700,
+                background: (player?.gold ?? 0) >= nextHpPrice ? 'linear-gradient(135deg,#e05555,#c03030)' : '#2d3752',
+                color: (player?.gold ?? 0) >= nextHpPrice ? '#fff' : '#4a5070',
+                border:'none', borderRadius:8, cursor: (player?.gold ?? 0) >= nextHpPrice ? 'pointer' : 'not-allowed',
+              }}
+            >
+              ❤️ HP上限を +5 増やす
             </button>
           </div>
           <div style={{background:'rgba(240,168,48,0.05)', border:'1px solid rgba(240,168,48,0.15)', borderRadius:8, padding:'10px 14px'}}>

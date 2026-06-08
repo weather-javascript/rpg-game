@@ -129,13 +129,22 @@ function spawnEnemies(dungeon: DungeonMaster, areaIdx: number, _kxPhase?: number
       const m = getMergedMonster(bossEntry.monsterId);
       return [{ monsterId: bossEntry.monsterId, hp: m?.maxHp ?? 50, maxHp: m?.maxHp ?? 50 }];
     }
+    // 中ボスエリアは中ボスのみ単体（複数体禁止）
+    const midBossEntry = area.monsters.find(m => {
+      const mon = getMergedMonster(m.monsterId);
+      return mon?.isMidBoss;
+    });
+    if (midBossEntry) {
+      const m = getMergedMonster(midBossEntry.monsterId);
+      return [{ monsterId: midBossEntry.monsterId, hp: m?.maxHp ?? 50, maxHp: m?.maxHp ?? 50 }];
+    }
     pool = area.monsters.flatMap(m => Array(m.count).fill(m.monsterId));
   } else {
     pool = (dungeon.monsterIds ?? []).filter(id => !getMergedMonster(id)?.isBoss);
   }
   if (pool.length === 0) return [];
-  // ボス含まれていれば除外
-  const nonBossPool = pool.filter(id => !getMergedMonster(id)?.isBoss);
+  // ボス・中ボス含まれていれば除外
+  const nonBossPool = pool.filter(id => !getMergedMonster(id)?.isBoss && !getMergedMonster(id)?.isMidBoss);
   const finalPool = nonBossPool.length > 0 ? nonBossPool : pool;
   const maxEnemies = dungeon.id === 'sky_castle_ex' ? 15 : 3;
   const count = Math.min(finalPool.length, randomIntRange(1, maxEnemies));
@@ -1226,9 +1235,10 @@ function KXBattlePanel({ player, runState, onVictory, onDefeat }: {
   onVictory: (isAwakened: boolean) => void;
   onDefeat: () => void;
 }) {
-  const { changeHp, addItems } = useGameStore(s => ({
-    changeHp: s.changeHp, addItems: s.addItems,
+  const { changeHp, addItems, consumeItem } = useGameStore(s => ({
+    changeHp: s.changeHp, addItems: s.addItems, consumeItem: s.consumeItem,
   }));
+  const equipment = player.equipment ?? defaultEquipmentSlots();
 
   const KX_MAX_HP = 38750;
   const AWAKE_MAX_HP = 1900;
@@ -1496,6 +1506,30 @@ function KXBattlePanel({ player, runState, onVictory, onDefeat }: {
         </div>
       )}
 
+
+      {/* ホットバー（回復アイテム使用） */}
+      <div style={{ display:'flex', gap: 4, marginBottom: 8, flexWrap:'wrap' }}>
+        {equipment.hotbar.map((itemId, i) => {
+          const item = itemId ? ITEM_MASTER[itemId] : null;
+          const qty = itemId ? (player.inventory[itemId] ?? 0) : 0;
+          if (!item || item.itemType === 'Weapon' || item.itemType === 'Armor') return null;
+          if (!item.useEffect || (!item.useEffect.hpRestore && !item.useEffect.satietyRestore)) return null;
+          return (
+            <button key={i} disabled={turn !== 'player' || qty <= 0}
+              onClick={() => {
+                if (!item.useEffect || turn !== 'player' || qty <= 0) return;
+                consumeItem(itemId!, 1);
+                if (item.useEffect.hpRestore) changeHp(item.useEffect.hpRestore);
+                addLog(`🧪 ${item.name} 使用${item.useEffect.message ? '：' + item.useEffect.message : ''}`, '#4caf87');
+              }}
+              style={{ padding: '6px 8px', background: qty > 0 && turn === 'player' ? '#1c2235' : '#161b26', border: `1px solid ${qty > 0 ? '#2d3752' : '#1c2235'}`, borderRadius: 6, cursor: qty > 0 && turn === 'player' ? 'pointer' : 'not-allowed', fontSize: '0.72rem', color: qty > 0 ? '#e8e6ff' : '#4a5070', minWidth: 48, textAlign: 'center' }}>
+              <div style={{ fontSize: '1rem' }}>{item.icon?.length <= 2 ? item.icon : '🧪'}</div>
+              <div style={{ fontSize: '0.65rem', color: '#8a92b2' }}>×{qty}</div>
+            </button>
+          );
+        })}
+      </div>
+
       {/* バトルログ */}
       <div style={{ background:'#0e1220', borderRadius:6, padding:'6px 10px', maxHeight:120, overflowY:'auto', fontSize:'0.72rem' }}>
         {log.slice(-12).map((l, i) => <div key={i} style={{ color:l.color, marginBottom:1 }}>{l.text}</div>)}
@@ -1623,18 +1657,29 @@ export function DungeonScreen() {
         addNotification('info', `✅ ${areas[nextAreaIdx].name} に進んだ！`);
         setRunLog(prev => [...prev, `📍 ${areas[nextAreaIdx].name} へ進んだ！`]);
       } else {
-        // ボスエリア最終撃破 → クリアor継続の選択を表示
+        // ボスエリア最終撃破 → 初級ダンジョンのみ継続選択、他はクリア
         recordDungeonClear(runState.dungeonId);
         const gachaCoinReward = ({ beginner:1, intermediate:2, advanced:3, super:4, extreme:5, volcano:4 } as Record<string,number>)[dungeon?.tier ?? 'beginner'] ?? 1;
         addNotification('success', `🏆 ${dungeon?.name} ボス撃破！🪙 ガチャコイン+${gachaCoinReward}枚！`);
         if (player) postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'dungeon_clear', message: `が「${dungeon?.name}」をクリアしました！` }).catch(() => {});
-        setRunState(prev => prev ? {
-          ...prev, currentAreaIdx: nextAreaIdx,
-          currentAreaName: areas?.[nextAreaIdx]?.name ?? prev.currentAreaName,
-          monstersDefeated: newDefeated, totalExp: newExp, totalGold: newGold,
-          totalDrops: allDrops, isComplete: false, currentFloor: Math.min(prev.currentFloor + 1, dungeon?.floors ?? 1),
-        } : null);
-        setShowBossChoice(true);
+        if (runState.dungeonId === 'beginner_cave') {
+          // 初級のみ：帰還or継続の選択を表示
+          setRunState(prev => prev ? {
+            ...prev, currentAreaIdx: nextAreaIdx,
+            currentAreaName: areas?.[nextAreaIdx]?.name ?? prev.currentAreaName,
+            monstersDefeated: newDefeated, totalExp: newExp, totalGold: newGold,
+            totalDrops: allDrops, isComplete: false, currentFloor: Math.min(prev.currentFloor + 1, dungeon?.floors ?? 1),
+          } : null);
+          setShowBossChoice(true);
+        } else {
+          // 他のダンジョンはそのままクリア
+          setRunState(prev => prev ? {
+            ...prev, currentAreaIdx: nextAreaIdx,
+            currentAreaName: areas?.[nextAreaIdx]?.name ?? prev.currentAreaName,
+            monstersDefeated: newDefeated, totalExp: newExp, totalGold: newGold,
+            totalDrops: allDrops, isComplete: true, currentFloor: Math.min(prev.currentFloor + 1, dungeon?.floors ?? 1),
+          } : null);
+        }
         return;
       }
     }

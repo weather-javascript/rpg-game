@@ -147,12 +147,13 @@ export async function buyAuction(listingId: string, buyerUid: string, buyerGold:
   return { success: true, listing };
 }
 
-export async function cancelAuction(listingId: string, sellerUid: string): Promise<boolean> {
+export async function cancelAuction(listingId: string, sellerUid: string): Promise<{ itemId: string; amount: number } | null> {
   const ref = doc(db, COLLECTIONS.AUCTIONS, listingId);
   const snap = await getDoc(ref);
-  if (!snap.exists() || snap.data()['sellerUid'] !== sellerUid) return false;
+  if (!snap.exists() || snap.data()['sellerUid'] !== sellerUid) return null;
+  const data = snap.data() as AuctionListing;
   await deleteDoc(ref);
-  return true;
+  return { itemId: data.itemId, amount: data.amount };
 }
 
 export function subscribeAuctions(cb: (listings: AuctionListing[]) => void): Unsubscribe {
@@ -1231,7 +1232,7 @@ export interface MonsterOverride {
 
 export interface DungeonAreaOverride {
   name: string;
-  monsters: { monsterId: string; count: number; isBoss?: boolean }[];
+  monsters: { monsterId: string; count: number; isBoss?: boolean; isMidBoss?: boolean }[];
   isHardArea?: boolean;
   description?: string;
 }

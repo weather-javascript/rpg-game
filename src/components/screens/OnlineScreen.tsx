@@ -516,7 +516,14 @@ function AuctionPanel() {
                   <span style={{color:'#f0c060', fontWeight:700}}>{total.toLocaleString()}G</span>
                 </div>
                 {isMine ? (
-                  <button onClick={() => cancelAuction(l.id, player!.uid).then(() => addNotification('info', '出品を取り消しました'))}
+                  <button onClick={() => cancelAuction(l.id, player!.uid).then(result => {
+                    if (result) {
+                      addItems([{ itemId: result.itemId, amount: result.amount }]);
+                      addNotification('info', '出品を取り消しました（アイテムを返却しました）');
+                    } else {
+                      addNotification('error', '取り消しに失敗しました');
+                    }
+                  })}
                     style={{width:'100%', padding:'5px', background:'rgba(240,168,48,0.15)', color:'#f0a830', border:'1px solid #f0a830', borderRadius:4, cursor:'pointer', fontSize:'0.75rem'}}>
                     取り消す
                   </button>

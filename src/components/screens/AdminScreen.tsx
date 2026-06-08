@@ -1279,6 +1279,14 @@ export function AdminScreen() {
                                 setDungeonOverridesState(prev => ({ ...prev, [selectedDungeonId]: { id: selectedDungeonId, areas } }));
                               }} />ボス
                             </label>
+                            <label style={{fontSize:'0.65rem', color:'#f0a830', display:'flex', alignItems:'center', gap:2}}>
+                              <input type='checkbox' checked={!!mob.isMidBoss} onChange={e => {
+                                const areas = curDungeonAreas.map((a, ai) => ai !== aIdx ? a : {
+                                  ...a, monsters: a.monsters.map((m, mi) => mi !== mIdx ? m : { ...m, isMidBoss: e.target.checked })
+                                });
+                                setDungeonOverridesState(prev => ({ ...prev, [selectedDungeonId]: { id: selectedDungeonId, areas } }));
+                              }} />中ボス
+                            </label>
                             <button onClick={() => {
                               const areas = curDungeonAreas.map((a, ai) => ai !== aIdx ? a : {
                                 ...a, monsters: a.monsters.filter((_, mi) => mi !== mIdx)
