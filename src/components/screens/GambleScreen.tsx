@@ -281,7 +281,7 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
   const [chinLogs, setChinLogs] = useState<ChinchiroLog[]>([]);
   const [chinRolling, setChinRolling] = useState<'me'|'opp'|null>(null);
   const [chinDice, setChinDice] = useState<{me:number[]|null; opp:number[]|null}>({me:null,opp:null});
-  const [chinTurnState, setChinTurnState] = useState<'idle'|'rolling_opp'|'rolling_me'|'checking'|'done'>('idle'); // 演出用（表示のみ）
+  // chinTurnState removed
 
   // スロット
   type SlotLog = { who:'me'|'opp'; symbols:string[]; rank: number; label:string };
@@ -469,7 +469,6 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
         setTimeout(runNext, delay);
       }, 1400);
     };
-    setChinTurnState('rolling_opp');
     const t = setTimeout(runNext, 300);
     return () => clearTimeout(t);
   }, [phase]);
