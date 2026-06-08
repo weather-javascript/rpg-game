@@ -281,7 +281,7 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
   const [chinLogs, setChinLogs] = useState<ChinchiroLog[]>([]);
   const [chinRolling, setChinRolling] = useState<'me'|'opp'|null>(null);
   const [chinDice, setChinDice] = useState<{me:number[]|null; opp:number[]|null}>({me:null,opp:null});
-  const [chinTurnState, setChinTurnState] = useState<'idle'|'rolling_opp'|'rolling_me'|'checking'|'done'>('idle');
+  const [chinTurnState, setChinTurnState] = useState<'idle'|'rolling_opp'|'rolling_me'|'checking'|'done'>('idle'); // 演出用（表示のみ）
 
   // スロット
   type SlotLog = { who:'me'|'opp'; symbols:string[]; rank: number; label:string };
@@ -289,7 +289,7 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
   const [slotSpinning, setSlotSpinning] = useState(false);
   const [slotSymbols, setSlotSymbols] = useState<string[]|null>(null);
   const [slotTurn, setSlotTurn] = useState<'me'|'opp'>('me');
-  const [slotTurnState, setSlotTurnState] = useState<'idle'|'spinning'|'done'>('idle');
+  // slotTurnState removed - now managed via slotStep
 
   const overlayStyle: React.CSSProperties = {
     position:'fixed', inset:0, zIndex:600, background:'rgba(0,0,0,0.97)',
@@ -414,157 +414,173 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
     if (phase !== 'chinchiro_battle') return;
     setChinLogs([]);
     setChinDice({me:null,opp:null});
-    setChinTurnState('rolling_opp'); // 子（相手）から先
-  }, [phase]);
+    // 事前に結果を決定：勝者は役あり、敗者は役なし
+    const winner: 'me'|'opp' = result.won ? 'me' : 'opp';
+    const loser: 'me'|'opp' = winner === 'me' ? 'opp' : 'me';
 
-  useEffect(() => {
-    if (phase !== 'chinchiro_battle') return;
-
-    const runTurn = (who: 'me'|'opp', logs: ChinchiroLog[]) => {
-      setChinRolling(who);
-      setChinDice(prev => ({ ...prev, [who]: null }));
-      const t = setTimeout(() => {
-        let dice: number[];
-        let rank: ChinchiroRank;
-        let attempts = 0;
-        do {
-          dice = rollDice3();
-          rank = evalChinchiro(dice);
-          attempts++;
-        } while (rank.type === 'nashi' && attempts < 8);
-        // 最終ターンはサーバー結果に合わせる（勝敗整合）
-        setChinDice(prev => ({ ...prev, [who]: dice }));
-        setChinRolling(null);
-        const newLog: ChinchiroLog = { who, dice, rank };
-        const newLogs = [...logs, newLog];
-        setChinLogs(newLogs);
-
-        // 役なしならもう一度
-        if (rank.type === 'nashi') {
-          setTimeout(() => runTurn(who, newLogs), 1400);
-        } else {
-          // 相手→自分の順で終わったら勝敗
-          const oppDone = newLogs.some(l => l.who === 'opp' && l.rank.type !== 'nashi');
-          const meDone = newLogs.some(l => l.who === 'me' && l.rank.type !== 'nashi');
-          if (oppDone && !meDone) {
-            setTimeout(() => runTurn('me', newLogs), 1400);
-          } else if (oppDone && meDone) {
-            setTimeout(() => setChinTurnState('done'), 800);
-          } else if (!oppDone && who === 'me') {
-            setTimeout(() => runTurn('opp', newLogs), 1400);
-          }
-        }
-      }, 1400);
-      return () => clearTimeout(t);
+    const makeWinDice = (): { dice: number[]; rank: ChinchiroRank } => {
+      let d: number[], r: ChinchiroRank;
+      do { d = rollDice3(); r = evalChinchiro(d); } while (r.type === 'nashi');
+      return { dice: d, rank: r };
+    };
+    const makeLoseDice = (): { dice: number[]; rank: ChinchiroRank } => {
+      let d: number[], r: ChinchiroRank, attempts = 0;
+      do { d = rollDice3(); r = evalChinchiro(d); attempts++; } while (r.type !== 'nashi' && attempts < 10);
+      if (r.type !== 'nashi') { d = [1,2,4]; r = evalChinchiro(d); } // fallback 役なし確定
+      return { dice: d, rank: r };
     };
 
-    if (chinTurnState === 'rolling_opp') {
-      runTurn('opp', []);
+    // 演出用：1〜2回役なし後に結果
+    const oppFirst = true; // 相手（子）が先攻
+    const rounds: Array<{who:'me'|'opp'; dice:number[]; rank:ChinchiroRank}[]> = [];
+    const extraRounds = Math.floor(secureRandom() * 2); // 0〜1回の役なしラウンド
+    for (let i = 0; i < extraRounds; i++) {
+      rounds.push([
+        { who: oppFirst ? 'opp' : 'me', ...makeLoseDice() },
+        { who: oppFirst ? 'me' : 'opp', ...makeLoseDice() },
+      ]);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, chinTurnState]);
+    // 最終ラウンド
+    const finalOpp = oppFirst ? loser : winner;
+    const finalMe = oppFirst ? winner : loser;
+    rounds.push([
+      { who: 'opp', ...(finalOpp === winner ? makeWinDice() : makeLoseDice()) },
+      { who: 'me', ...(finalMe === winner ? makeWinDice() : makeLoseDice()) },
+    ]);
 
-  useEffect(() => {
-    if (chinTurnState === 'done') setTimeout(() => setPhase('final'), 1200);
-  }, [chinTurnState]);
+    // 順番に表示するキュー
+    const queue: Array<{who:'me'|'opp'; dice:number[]; rank:ChinchiroRank}> = rounds.flat();
+    let idx = 0;
+    const runNext = () => {
+      if (idx >= queue.length) {
+        setTimeout(() => setPhase('final'), 1200);
+        return;
+      }
+      const entry = queue[idx++];
+      setChinRolling(entry.who);
+      setChinDice(prev => ({ ...prev, [entry.who]: null }));
+      setTimeout(() => {
+        setChinDice(prev => ({ ...prev, [entry.who]: entry.dice }));
+        setChinRolling(null);
+        setChinLogs(prev => [...prev, entry]);
+        // 次のエントリへ
+        const isEndOfRound = idx % 2 === 0;
+        const delay = isEndOfRound ? 1800 : 1400;
+        setTimeout(runNext, delay);
+      }, 1400);
+    };
+    setChinTurnState('rolling_opp');
+    const t = setTimeout(runNext, 300);
+    return () => clearTimeout(t);
+  }, [phase]);
 
-  // ========== スロット: 交互に役が出るまで回す ==========
+  // ========== スロット: 事前生成した結果を順番に表示 ==========
+  type SlotRound = { first: SlotLog; second: SlotLog };
+  const [slotRounds, setSlotRounds] = useState<SlotRound[]>([]);
+  const [slotRoundIdx, setSlotRoundIdx] = useState(0);
+  const [slotStep, setSlotStep] = useState<'first'|'second'|'between'>('first');
+
   useEffect(() => {
     if (phase !== 'slot_battle') return;
+    // 事前に最大5ラウンド分の結果を生成（result.wonに合わせて勝者の役を保証）
+    const getRank = (s: string[]) => {
+      if (s[0]===s[1] && s[1]===s[2]) return { rank: SLOT_RANKS[s[0]]??10, label:`${s[0]}${s[0]}${s[0]} ゾロ目！`, hasRole: true };
+      if (s[0]===s[1] || s[1]===s[2] || s[0]===s[2]) return { rank: 1, label:'2つ揃い', hasRole: true };
+      return { rank: 0, label:'役なし', hasRole: false };
+    };
+    const randSyms = (): string[] => [
+      SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+      SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+      SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+    ];
+    const winSyms = (): string[] => { const s = SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)]; return [s,s,s]; };
+    const loseSyms = (): string[] => {
+      let s: string[];
+      do { s = randSyms(); } while (getRank(s).hasRole);
+      return s;
+    };
+
+    const firstPlayer: 'me'|'opp' = isFirst ? 'me' : 'opp';
+    const secondPlayer: 'me'|'opp' = isFirst ? 'opp' : 'me';
+    const rounds: SlotRound[] = [];
+    // 最初の4ラウンドは両者役なし（盛り上げ演出）、最終ラウンドで勝者に役
+    const totalRounds = 2 + Math.floor(secureRandom() * 2); // 2〜3ラウンド
+    for (let i = 0; i < totalRounds - 1; i++) {
+      const fs = loseSyms(); const fr = getRank(fs);
+      const ss = loseSyms(); const sr = getRank(ss);
+      rounds.push({
+        first: { who: firstPlayer, symbols: fs, rank: fr.rank, label: fr.label },
+        second: { who: secondPlayer, symbols: ss, rank: sr.rank, label: sr.label },
+      });
+    }
+    // 最終ラウンド
+    const winner: 'me'|'opp' = result.won ? 'me' : 'opp';
+    const winnerIsFirst = winner === firstPlayer;
+    const finalFirstSyms = winnerIsFirst ? winSyms() : loseSyms();
+    const finalFirstRank = getRank(finalFirstSyms);
+    const finalSecondSyms = winnerIsFirst ? loseSyms() : winSyms();
+    const finalSecondRank = getRank(finalSecondSyms);
+    rounds.push({
+      first: { who: firstPlayer, symbols: finalFirstSyms, rank: finalFirstRank.rank, label: finalFirstRank.label },
+      second: { who: secondPlayer, symbols: finalSecondSyms, rank: finalSecondRank.rank, label: finalSecondRank.label },
+    });
+
+    setSlotRounds(rounds);
+    setSlotRoundIdx(0);
+    setSlotStep('first');
     setSlotLogs([]);
     setSlotSpinning(false);
     setSlotSymbols(null);
-    setSlotTurn(isFirst ? 'me' : 'opp');
-    setSlotTurnState('idle');
+    setSlotTurn(firstPlayer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
+  // スロット演出進行
   useEffect(() => {
-    if (phase !== 'slot_battle' || slotTurnState !== 'idle') return;
-    // 両者が振り終わって役なし → ログリセットして再ラウンド
-    setSlotLogs(prev => {
-      const firstPlayer = isFirst ? 'me' : 'opp';
-      const secondPlayer = isFirst ? 'opp' : 'me';
-      const firstDone = prev.some(l => l.who === firstPlayer);
-      const secondDone = prev.some(l => l.who === secondPlayer);
-      const anyRole = prev.some(l => l.rank > 0);
-      if (firstDone && secondDone && !anyRole) return []; // 両方役なし → リセット
-      return prev;
-    });
-    setSlotTurnState('spinning');
-    setSlotSpinning(true);
-    setSlotSymbols(null);
-    const t = setTimeout(() => {
-      const syms = [
-        SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
-        SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
-        SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
-      ];
-      // 役判定: 3つ揃い or 2つ揃い
-      const getRank = (s: string[]) => {
-        if (s[0]===s[1] && s[1]===s[2]) return { rank: SLOT_RANKS[s[0]]??10, label:`${s[0]}${s[0]}${s[0]} ゾロ目！`, hasRole: true };
-        if (s[0]===s[1] || s[1]===s[2] || s[0]===s[2]) return { rank: 1, label:'2つ揃い', hasRole: true };
-        return { rank: 0, label:'役なし', hasRole: false };
-      };
-      const r = getRank(syms);
-      setSlotSymbols(syms);
-      setSlotSpinning(false);
-      const newLog: SlotLog = { who: slotTurn, symbols: syms, rank: r.rank, label: r.label };
-      setSlotLogs(prev => {
-        const newLogs = [...prev, newLog];
-        setTimeout(() => {
-          // 先攻・後攻をisFirstで判断
-          const firstPlayer = isFirst ? 'me' : 'opp';
-          const secondPlayer = isFirst ? 'opp' : 'me';
+    if (phase !== 'slot_battle' || slotRounds.length === 0) return;
+    if (slotRoundIdx >= slotRounds.length) return;
+    const round = slotRounds[slotRoundIdx];
 
-          // 同ラウンドで先攻が役あり → 後攻が振った結果を確認
-          const firstLogs = newLogs.filter(l => l.who === firstPlayer);
-          const secondLogs = newLogs.filter(l => l.who === secondPlayer);
-          const firstHasRole = firstLogs.some(l => l.rank > 0);
-          const secondHasRole = secondLogs.some(l => l.rank > 0);
-
-          if (firstHasRole && secondHasRole) {
-            // 両者役あり → 役の強さで比較（result.wonで判定済み）→ 終了
-            setSlotTurnState('done');
-            setTimeout(() => setPhase('final'), 1200);
-          } else if (firstHasRole && secondLogs.length > 0 && !secondHasRole) {
-            // 先攻役あり・後攻役なし → 後攻の勝ち → 終了
-            setSlotTurnState('done');
-            setTimeout(() => setPhase('final'), 1200);
-          } else if (firstHasRole && secondLogs.length === 0) {
-            // 先攻役あり・後攻まだ未回転 → 後攻のターンへ
-            setSlotTurn(secondPlayer);
-            setSlotTurnState('idle');
-          } else if (!firstHasRole && firstLogs.length > 0 && secondLogs.length === 0) {
-            // 先攻役なし・後攻未回転 → 後攻のターンへ
-            setSlotTurn(secondPlayer);
-            setSlotTurnState('idle');
-          } else if (!firstHasRole && !secondHasRole) {
-            // 両者役なし → logsリセットして先攻から再スタート
-            // ただし後攻がまだ未回転の場合は後攻へ渡す（両方振ってからリセット）
-            if (firstLogs.length > 0 && secondLogs.length > 0) {
-              // 両方振り終わった → リセット
-              // setSlotLogs([])はsetSlotLogsのprev内からは呼べないので外でやる
-            }
-            setSlotTurn(firstPlayer);
-            setSlotTurnState('idle');
-          } else if (!firstHasRole && secondHasRole) {
-            // 先攻役なし・後攻役あり → 後攻の勝ち → 終了
-            setSlotTurnState('done');
-            setTimeout(() => setPhase('final'), 1200);
-          } else {
-            // その他: 相手のターンへ
-            const nextTurn = slotTurn === 'me' ? 'opp' : 'me';
-            setSlotTurn(nextTurn);
-            setSlotTurnState('idle');
-          }
-        }, 1500);
-        return newLogs;
-      });
-    }, 2000);
-    return () => clearTimeout(t);
+    if (slotStep === 'first') {
+      setSlotSpinning(true);
+      setSlotSymbols(null);
+      setSlotTurn(round.first.who);
+      const t = setTimeout(() => {
+        setSlotSymbols(round.first.symbols);
+        setSlotSpinning(false);
+        setSlotLogs(prev => [...prev, round.first]);
+        setTimeout(() => setSlotStep('second'), 1200);
+      }, 2000);
+      return () => clearTimeout(t);
+    }
+    if (slotStep === 'second') {
+      setSlotSpinning(true);
+      setSlotSymbols(null);
+      setSlotTurn(round.second.who);
+      const t = setTimeout(() => {
+        setSlotSymbols(round.second.symbols);
+        setSlotSpinning(false);
+        setSlotLogs(prev => [...prev, round.second]);
+        if (slotRoundIdx >= slotRounds.length - 1) {
+          // 最終ラウンド終了
+          setTimeout(() => setPhase('final'), 1500);
+        } else {
+          setTimeout(() => setSlotStep('between'), 1200);
+        }
+      }, 2000);
+      return () => clearTimeout(t);
+    }
+    if (slotStep === 'between') {
+      // 両者役なし表示して次ラウンドへ
+      const t = setTimeout(() => {
+        setSlotRoundIdx(prev => prev + 1);
+        setSlotStep('first');
+        setSlotLogs([]); // 次ラウンド開始時にログリセット
+      }, 800);
+      return () => clearTimeout(t);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, slotTurnState, slotTurn]);
+  }, [phase, slotRounds, slotRoundIdx, slotStep]);
 
   // ========== render ==========
   return (
