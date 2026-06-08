@@ -120,6 +120,7 @@ export function CraftingScreen() {
   const [grid, setGrid] = useState<GridCell[]>(EMPTY_GRID.map(c => ({ ...c })));
   const [selected, setSelected] = useState<{ itemId: string } | null>(null); // インベントリ選択中アイテム
   const [customRecipes, setCustomRecipes] = useState<CraftRecipe[]>([]);
+  const [deletedDefaultRecipeIds, setDeletedDefaultRecipeIds] = useState<string[]>([]);
   const [tab, setTab] = useState<'craft' | 'recipes'>('craft');
 
   // Firestoreからカスタムレシピを購読
@@ -128,12 +129,13 @@ export function CraftingScreen() {
       if (snap.exists()) {
         const data = snap.data();
         setCustomRecipes(Array.isArray(data.recipes) ? data.recipes : []);
+        setDeletedDefaultRecipeIds(Array.isArray(data.deletedDefaults) ? data.deletedDefaults : []);
       }
     });
     return unsub;
   }, []);
 
-  const allRecipes = [...CRAFT_RECIPES, ...customRecipes];
+  const allRecipes = [...CRAFT_RECIPES.filter(r => !deletedDefaultRecipeIds.includes(r.id)), ...customRecipes];
   const matchResult = matchRecipeWithCount(grid, allRecipes);
   const matchedRecipe = matchResult?.recipe ?? null;
   const craftTimes = matchResult?.times ?? 1;

@@ -59,6 +59,7 @@ export function AdminScreen() {
   const [invFilter, setInvFilter] = useState('');
   // クラフトレシピ管理
   const [customRecipes, setCustomRecipes] = useState<CraftRecipe[]>([]);
+  const [deletedDefaultRecipeIds, setDeletedDefaultRecipeIds] = useState<string[]>([]);
   const [newRecipe, setNewRecipe] = useState<Partial<CraftRecipe>>({ inputs: [], outputAmount: 1, requiredCraftingLevel: 1, craftingExpGain: 10 });
   const [newShape, setNewShape] = useState<string[]>(Array(9).fill(''));
   const [selectedShapeItem, setSelectedShapeItem] = useState('');
@@ -139,6 +140,7 @@ export function AdminScreen() {
           if (snap.exists()) {
             const data = snap.data();
             setCustomRecipes(Array.isArray(data.recipes) ? data.recipes : []);
+            setDeletedDefaultRecipeIds(Array.isArray(data.deletedDefaults) ? data.deletedDefaults : []);
           }
         }).catch(() => {})
       )
@@ -877,7 +879,7 @@ export function AdminScreen() {
                   const updated = [...customRecipes.filter(r => r.id !== recipe.id), recipe];
                   const { setDoc, doc } = await import('firebase/firestore');
                   const { db } = await import('../../services/firebase');
-                  await setDoc(doc(db, 'admin', 'craft_recipes'), { recipes: updated });
+                  await setDoc(doc(db, 'admin', 'craft_recipes'), { recipes: updated, deletedDefaults: deletedDefaultRecipeIds });
                   setCustomRecipes(updated);
                   setNewRecipe({ inputs: [], outputAmount: 1, requiredCraftingLevel: 1, craftingExpGain: 10 });
                   setNewShape(Array(9).fill(''));
@@ -911,7 +913,7 @@ export function AdminScreen() {
                       const updated = customRecipes.filter(r => r.id !== recipe.id);
                       const { setDoc, doc } = await import('firebase/firestore');
                       const { db } = await import('../../services/firebase');
-                      await setDoc(doc(db, 'admin', 'craft_recipes'), { recipes: updated });
+                      await setDoc(doc(db, 'admin', 'craft_recipes'), { recipes: updated, deletedDefaults: deletedDefaultRecipeIds });
                       setCustomRecipes(updated);
                       addNotification('success', `レシピ「${recipe.name}」を削除しました`);
                     } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
@@ -937,14 +939,22 @@ export function AdminScreen() {
             ))
           }
 
-          {/* ビルトインレシピ一覧（参照用） */}
-          <div style={{fontSize:'0.78rem', color:'#8a92b2', fontWeight:700, marginTop:14, marginBottom:6}}>📚 デフォルトレシピ（編集不可）</div>
-          {CRAFT_RECIPES.map(recipe => (
+          {/* ビルトインレシピ一覧（削除可能） */}
+          <div style={{fontSize:'0.78rem', color:'#8a92b2', fontWeight:700, marginTop:14, marginBottom:6}}>📚 デフォルトレシピ</div>
+          {CRAFT_RECIPES.filter(r => !deletedDefaultRecipeIds.includes(r.id)).map(recipe => (
             <div key={recipe.id} style={{background:'#161b26', border:'1px solid #2d3752', borderRadius:4, padding:'6px 8px', marginBottom:4}}>
               <div style={{display:'flex', alignItems:'center', gap:6}}>
                 <GameIcon id={ITEM_MASTER[recipe.outputItemId]?.icon ?? 'gem'} size={16} />
                 <span style={{fontSize:'0.75rem', color:'#8a92b2'}}>{recipe.name}</span>
                 <span style={{marginLeft:'auto', fontSize:'0.65rem', color:'#4a5070'}}>Lv{recipe.requiredCraftingLevel}~</span>
+                <button onClick={async () => {
+                  const updated = [...deletedDefaultRecipeIds, recipe.id];
+                  setDeletedDefaultRecipeIds(updated);
+                  const { setDoc, doc } = await import('firebase/firestore');
+                  const { db } = await import('../../services/firebase');
+                  await setDoc(doc(db, 'admin', 'craft_recipes'), { recipes: customRecipes, deletedDefaults: updated });
+                  addNotification('success', `デフォルトレシピ「${recipe.name}」を無効化しました`);
+                }} style={{padding:'2px 7px', background:'#e05555', color:'#fff', border:'none', borderRadius:3, cursor:'pointer', fontSize:'0.65rem'}}>削除</button>
               </div>
             </div>
           ))}
@@ -1013,15 +1023,19 @@ export function AdminScreen() {
                     <div style={{fontSize:'0.72rem', color:'#4a5070', marginBottom:4}}>必要素材</div>
                     {recipe.inputs.map((inp, i) => (
                       <div key={i} style={{display:'flex', gap:4, marginBottom:4, alignItems:'center'}}>
-                        <input value={inp.itemId}
+                        <select value={inp.itemId}
                           onChange={e => setRecipe(r => {
                             if (!r) return r;
                             const inputs = [...r.inputs];
                             inputs[i] = { ...inputs[i], itemId: e.target.value };
                             return { ...r, inputs };
                           })}
-                          placeholder="アイテムID" style={{...inputStyle, flex:2}} />
-                        <span style={{fontSize:'0.7rem', color:'#8a92b2'}}>{ITEM_MASTER[inp.itemId]?.name ?? ''}</span>
+                          style={{...inputStyle, flex:2, background:'#1c2235', color:'#e8e6ff'}}>
+                          <option value="">-- アイテムを選択 --</option>
+                          {Object.values(ITEM_MASTER).map(item => (
+                            <option key={item.id} value={item.id}>{item.name}</option>
+                          ))}
+                        </select>
                         <input type="number" min={1} value={inp.amount}
                           onChange={e => setRecipe(r => {
                             if (!r) return r;
@@ -1042,10 +1056,14 @@ export function AdminScreen() {
                   </div>
                   {/* 交換品 */}
                   <div style={{display:'flex', gap:6, alignItems:'center'}}>
-                    <input value={recipe.outputItemId}
+                    <select value={recipe.outputItemId}
                       onChange={e => setRecipe(r => r ? { ...r, outputItemId: e.target.value } : { ...recipe, outputItemId: e.target.value })}
-                      placeholder="交換品アイテムID" style={{...inputStyle, flex:2}} />
-                    <span style={{fontSize:'0.7rem', color:'#f0c060'}}>{ITEM_MASTER[recipe.outputItemId]?.name ?? ''}</span>
+                      style={{...inputStyle, flex:2, background:'#1c2235', color:'#f0c060'}}>
+                      <option value="">-- 交換品を選択 --</option>
+                      {Object.values(ITEM_MASTER).map(item => (
+                        <option key={item.id} value={item.id}>{item.name}</option>
+                      ))}
+                    </select>
                     <input type="number" min={1} value={recipe.outputAmount}
                       onChange={e => setRecipe(r => r ? { ...r, outputAmount: Math.max(1, Number(e.target.value)) } : { ...recipe, outputAmount: Math.max(1, Number(e.target.value)) })}
                       style={{...inputStyle, width:60}} />

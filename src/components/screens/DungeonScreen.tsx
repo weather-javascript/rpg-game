@@ -53,6 +53,8 @@ interface TurnBattleState {
   poisonDmg: number;
   equippedWeaponId: string | null;
   skillTurn: number;
+  // アイテムクールダウン管理 { itemId: 残りターン数 }
+  itemCooldowns: Record<string, number>;
   // 単発攻撃の一時保存（ターゲット選択後に使う）
   pendingAction: null | { type: 'attack' | 'weapon' | 'ultimate'; itemId?: string };
 }
@@ -315,13 +317,39 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       poisonDmg: 5,
       equippedWeaponId: hotbarWeaponId,
       skillTurn: 0,
+      itemCooldowns: {},
       pendingAction: null,
     };
   });
 
+  const updateEquipment = useGameStore(s => s.updateEquipment);
   const [showHotbar, setShowHotbar] = useState(false);
   const [hotbarModal, setHotbarModal] = useState<{slot:string;idx?:number} | null>(null);
   const [localEquip, setLocalEquip] = useState<EquipmentSlots>(equipment);
+
+  // Fix 7: sync localEquip changes to store so they persist after battle
+  const setLocalEquipAndSave = useCallback((updater: (prev: EquipmentSlots) => EquipmentSlots) => {
+    setLocalEquip(prev => {
+      const next = updater(prev);
+      updateEquipment(next);
+      return next;
+    });
+  }, [updateEquipment]);
+
+  // Fix 6: effective player defense including equipped item bonuses
+  const getPlayerDef = useCallback((equip: EquipmentSlots = localEquip) => {
+    let def = player.stats.defense;
+    const allSlots: (string | null)[] = [
+      ...equip.hotbar,
+      equip.helmet, equip.chestplate, equip.leggings, equip.boots, equip.offhand,
+    ];
+    for (const itemId of allSlots) {
+      if (!itemId) continue;
+      const item = ITEM_MASTER[itemId];
+      if (item?.weaponDef) def += item.weaponDef;
+    }
+    return def;
+  }, [player.stats.defense, localEquip]);
 
   // 生存敵リスト（未使用だが将来用に保持）
   void battle.enemies.filter(e => e.hp > 0);
@@ -355,6 +383,12 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     const weaponItem = prevBattle.equippedWeaponId ? ITEM_MASTER[prevBattle.equippedWeaponId] : null;
     const newSkillTurn = prevBattle.skillTurn + 1;
     newBattle = { ...newBattle, skillTurn: newSkillTurn };
+    // クールダウンをデクリメント
+    const newCooldowns: Record<string, number> = {};
+    for (const [id, cd] of Object.entries(prevBattle.itemCooldowns)) {
+      if (cd > 1) newCooldowns[id] = cd - 1;
+    }
+    newBattle = { ...newBattle, itemCooldowns: newCooldowns };
     if (weaponItem?.weaponSkills) {
       for (const skill of weaponItem.weaponSkills) {
         if (skill.type === 'penetrate_per_turn') {
@@ -379,6 +413,30 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
             newLog.push({ text: `⭐ 必殺技「${weaponItem.weaponUltimate?.name}」が使えるようになった！`, color: '#f0c060' });
           }
         }
+        if (skill.type === 'mana_per_turn_random') {
+          const s = skill as import('../../types/game').WeaponManaPerTurnRandomSkill;
+          const steps = Math.floor((s.manaMax - s.manaMin) / s.manaStep) + 1;
+          const gain = s.manaMin + Math.floor(secureRandom() * steps) * s.manaStep;
+          const newMana = Math.min(newBattle.weaponMana + gain, newBattle.weaponManaMax);
+          newBattle = { ...newBattle, weaponMana: newMana, ultimateReady: newMana >= newBattle.weaponManaMax };
+          newLog.push({ text: `💠 ${weaponItem.name}がMana+${gain}付与！(${newMana}/${newBattle.weaponManaMax})`, color: '#4fc3f7' });
+        }
+      }
+    }
+    // オフハンド装備のスキル処理（hotbarの全アイテムをチェック）
+    for (const slotId of localEquip.hotbar) {
+      if (!slotId || slotId === prevBattle.equippedWeaponId) continue;
+      const offItem = ITEM_MASTER[slotId];
+      if (!offItem?.isOffhand || !offItem.weaponSkills) continue;
+      for (const skill of offItem.weaponSkills) {
+        if (skill.type === 'mana_per_turn_random') {
+          const s = skill as import('../../types/game').WeaponManaPerTurnRandomSkill;
+          const steps = Math.floor((s.manaMax - s.manaMin) / s.manaStep) + 1;
+          const gain = s.manaMin + Math.floor(secureRandom() * steps) * s.manaStep;
+          const newMana = Math.min(newBattle.weaponMana + gain, newBattle.weaponManaMax);
+          newBattle = { ...newBattle, weaponMana: newMana, ultimateReady: newMana >= newBattle.weaponManaMax };
+          newLog.push({ text: `💠 ${offItem.name}がMana+${gain}付与！(${newMana}/${newBattle.weaponManaMax})`, color: '#4fc3f7' });
+        }
       }
     }
     // 毒バフ
@@ -401,10 +459,42 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     for (const enemy of aliveAfterPassive) {
       const monster = getMergedMonster(enemy.monsterId);
       if (!monster) continue;
+
+      // デビルアーマー系スキル処理
+      if (monster.id === 'devil_armor' || monster.id === 'dead_armor') {
+        const warningInterval = monster.id === 'dead_armor' ? 5 : 10;
+        const penetrateInterval = warningInterval;
+        // 警告ターン（貫通の1ターン前）
+        if (newSkillTurn % penetrateInterval === penetrateInterval - 1) {
+          newLog.push({ text: `😨 ${monster.name}：「不穏な予感がする....」`, color: '#cc44ff' });
+        }
+        // 貫通攻撃ターン
+        if (newSkillTurn % penetrateInterval === 0 && newSkillTurn > 0) {
+          const penDmg = 10000;
+          changeHp(-penDmg);
+          const newPlayerHp = Math.max(0, player.stats.hp - penDmg);
+          newLog.push({ text: `💀 ${monster.name}の貫通攻撃！ 防御無視で${penDmg}ダメージ！`, color: '#ff0055' });
+          if (newPlayerHp <= 0) {
+            return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
+          }
+          continue;
+        }
+        // 通常攻撃
+        const mDmg = calcDamage(monster.attack, newBattle.isDefending ? getPlayerDef() * 2 : getPlayerDef());
+        const reducedDmg = newBattle.isDefending ? Math.floor(mDmg * 0.5) : mDmg;
+        changeHp(-reducedDmg);
+        const newPlayerHp2 = Math.max(0, player.stats.hp - reducedDmg);
+        newLog.push({ text: `🐉 ${monster.name}の攻撃！ あなたに${reducedDmg}ダメージ${newBattle.isDefending ? '（防御中）' : ''}`, color: '#e05555' });
+        if (newPlayerHp2 <= 0) {
+          return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
+        }
+        continue;
+      }
+
       const isSpecial = monster.isBoss && randomChance(0.2);
       let mDmg = isSpecial
-        ? Math.floor(calcDamage(monster.attack, player.stats.defense) * 1.5)
-        : calcDamage(monster.attack, newBattle.isDefending ? player.stats.defense * 2 : player.stats.defense);
+        ? Math.floor(calcDamage(monster.attack, getPlayerDef()) * 1.5)
+        : calcDamage(monster.attack, newBattle.isDefending ? getPlayerDef() * 2 : getPlayerDef());
       if (weaponItem?.weaponSkills) {
         const shield = weaponItem.weaponSkills.find(s => s.type === 'hotbar_shield') as WeaponShieldSkill | undefined;
         if (shield) {
@@ -424,7 +514,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       }
     }
     return { ...newBattle, log: newLog, turn: 'player', isDefending: false };
-  }, [player.stats, changeHp, changeSatiety, dungeon, combatLv]);
+  }, [player.stats, changeHp, changeSatiety, dungeon, combatLv, localEquip, getPlayerDef]);
 
 
   // 攻撃実行（範囲 or ターゲット選択後）
@@ -537,6 +627,9 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     if (!itemId) { addNotification('warning', `スロット${idx+1}にアイテムがありません`); return; }
     const item = ITEM_MASTER[itemId];
     if (!item) { addNotification('warning', `アイテムが見つかりません`); return; }
+    // クールダウンチェック
+    const remainingCd = battle.itemCooldowns[itemId] ?? 0;
+    if (remainingCd > 0) { addNotification('warning', `${item.name}はクールダウン中です（残り${remainingCd}ターン）`); return; }
 
     if (item.itemType === 'Weapon') {
       const isArea = !!item.isAreaWeapon;
@@ -583,8 +676,29 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       if (hpRestore && hpRestore > 0) healParts.push(`HP+${hpRestore}`);
       if (satietyRestore && satietyRestore > 0) healParts.push(`満腹+${satietyRestore}`);
       const logMsg = message ?? `${item.name}を使用した`;
-      const log = [...battle.log, { text: `🧪 ${logMsg}${healParts.length ? ` (${healParts.join(', ')})` : ''}`, color: '#4caf87' }];
-      const afterItem: TurnBattleState = { ...battle, log, turn: 'monster', isDefending: false };
+      const logEntries: { text: string; color: string }[] = [{ text: `🧪 ${logMsg}${healParts.length ? ` (${healParts.join(', ')})` : ''}`, color: '#4caf87' }];
+      // クールダウン設定
+      const newCooldownsAfterHeal = { ...battle.itemCooldowns };
+      if (item.cooldownTurns && item.cooldownTurns > 0) newCooldownsAfterHeal[itemId] = item.cooldownTurns;
+      // offhand_mana_on_heal: 装備中の全アイテムのスキルをチェック
+      let manaAfterHeal = battle.weaponMana;
+      for (const slotId of localEquip.hotbar) {
+        if (!slotId) continue;
+        const slotItem = ITEM_MASTER[slotId];
+        if (!slotItem?.weaponSkills) continue;
+        for (const skill of slotItem.weaponSkills) {
+          if (skill.type === 'offhand_mana_on_heal') {
+            const s = skill as import('../../types/game').WeaponOffhandManaOnHealSkill;
+            // オフハンドアイテムがhotbarにあれば発動
+            const hasOffhand = localEquip.hotbar.includes(s.offhandItemId);
+            if (hasOffhand && secureRandom() < s.chance) {
+              manaAfterHeal = Math.min(manaAfterHeal + s.manaGain, battle.weaponManaMax);
+              logEntries.push({ text: `✨ ${slotItem.name}のスキル発動！Mana+${s.manaGain}！(${manaAfterHeal}/${battle.weaponManaMax})`, color: '#f0c060' });
+            }
+          }
+        }
+      }
+      const afterItem: TurnBattleState = { ...battle, log: [...battle.log, ...logEntries], turn: 'monster', isDefending: false, itemCooldowns: newCooldownsAfterHeal, weaponMana: manaAfterHeal, ultimateReady: manaAfterHeal >= battle.weaponManaMax };
       setBattle(afterItem);
       setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
       return;
@@ -771,18 +885,23 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
             {localEquip.hotbar.map((itemId, i) => {
               const item = itemId ? ITEM_MASTER[itemId] : null;
               const qty = itemId ? (player.inventory[itemId] ?? 0) : 0;
+              const cd = itemId ? (battle.itemCooldowns[itemId] ?? 0) : 0;
               return (
                 <button key={i} onClick={() => handleUseHotbarItem(i)}
-                  disabled={battle.turn !== 'player' || !item || qty === 0}
-                  title={item ? `${item.name} ×${qty}` : `スロット${i+1}（空）`}
+                  disabled={battle.turn !== 'player' || !item || qty === 0 || cd > 0}
+                  title={item ? `${item.name} ×${qty}${cd > 0 ? ` (CD:${cd})` : ''}` : `スロット${i+1}（空）`}
                   style={{
-                    width: 38, height: 38, background: item && qty > 0 ? 'rgba(155,109,240,0.2)' : '#161b26',
-                    border: `1px solid ${item && qty > 0 ? '#9b6df0' : '#2d3752'}`, borderRadius: 6,
-                    cursor: item && qty > 0 && battle.turn === 'player' ? 'pointer' : 'not-allowed',
+                    width: 38, height: 38, background: cd > 0 ? 'rgba(80,80,80,0.4)' : item && qty > 0 ? 'rgba(155,109,240,0.2)' : '#161b26',
+                    border: `1px solid ${cd > 0 ? '#555' : item && qty > 0 ? '#9b6df0' : '#2d3752'}`, borderRadius: 6,
+                    cursor: item && qty > 0 && battle.turn === 'player' && cd === 0 ? 'pointer' : 'not-allowed',
                     position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
                   {item
-                    ? <><GameIcon id={item.icon} size={18} /><span style={{ position:'absolute', bottom:1, right:2, fontSize:'0.5rem', color:'#f0c060' }}>{qty}</span></>
+                    ? <><GameIcon id={item.icon} size={18} />
+                        {cd > 0
+                          ? <span style={{ position:'absolute', bottom:1, right:2, fontSize:'0.5rem', color:'#ff9999' }}>{cd}</span>
+                          : <span style={{ position:'absolute', bottom:1, right:2, fontSize:'0.5rem', color:'#f0c060' }}>{qty}</span>}
+                      </>
                     : <span style={{ fontSize: '0.6rem', color: '#4a5070' }}>{i+1}</span>}
                 </button>
               );
@@ -809,7 +928,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           slot={hotbarModal.slot} idx={hotbarModal.idx}
           equipment={localEquip} inventory={player.inventory}
           onSet={itemId => {
-            setLocalEquip(prev => {
+            setLocalEquipAndSave(prev => {
               const next = { ...prev, hotbar: [...prev.hotbar] };
               if (hotbarModal.slot === 'hotbar' && hotbarModal.idx !== undefined) {
                 next.hotbar[hotbarModal.idx] = itemId;
@@ -930,7 +1049,7 @@ function GachaPanel({ player, addItems, changeGold, addNotification }: {
     // コイン消費
     setPlayer({ ...player, gachaCoins: coins - 1 });
     // ガチャ抽選
-    const roll = Math.random();
+    const roll = secureRandom();
     let cumulative = 0;
     let result = GACHA_TABLE[GACHA_TABLE.length - 1];
     for (const entry of GACHA_TABLE) {
@@ -1026,6 +1145,7 @@ const TRAP_MOBS: TrapMob[] = [
 ];
 
 const TRAP_MOB_HP = 20;
+const ELITE_MOB_HP = 120;
 const ELITE_CHANCE = 0.05;
 
 function TrapWorldPanel({ player, addItems, addNotification }: {
@@ -1036,6 +1156,7 @@ function TrapWorldPanel({ player, addItems, addNotification }: {
   const [_selectedMob, setSelectedMob] = useState<TrapMobId | null>(null);
   const [inTrap, setInTrap] = useState(false);
   const [mobHp, setMobHp] = useState(TRAP_MOB_HP);
+  const [mobMaxHp, setMobMaxHp] = useState(TRAP_MOB_HP);
   const [isElite, setIsElite] = useState(false);
   const [currentMob, setCurrentMob] = useState<TrapMob | null>(null);
   const [log, setLog] = useState<{ text: string; color: string }[]>([]);
@@ -1055,8 +1176,10 @@ function TrapWorldPanel({ player, addItems, addNotification }: {
 
   const spawnMob = (mob: TrapMob) => {
     const elite = randomChance(ELITE_CHANCE);
+    const maxHp = elite ? ELITE_MOB_HP : TRAP_MOB_HP;
     setIsElite(elite);
-    setMobHp(TRAP_MOB_HP);
+    setMobMaxHp(maxHp);
+    setMobHp(maxHp);
     setCurrentMob(mob);
     setLog([{ text: `${elite ? mob.eliteEmoji + ' [エリート] ' + mob.eliteName : mob.emoji + ' ' + mob.name} が現れた！`, color: elite ? '#f0c060' : '#e8e6ff' }]);
   };
@@ -1104,7 +1227,7 @@ function TrapWorldPanel({ player, addItems, addNotification }: {
       // 即座に次のモブを湧き出す
       setTimeout(() => spawnMob(currentMob), 300);
     } else {
-      setLog(prev => [...prev.slice(-5), { text: `⚔️ ${dmg} ダメージ！残りHP: ${newHp}/${TRAP_MOB_HP}`, color: '#5b8dee' }]);
+      setLog(prev => [...prev.slice(-5), { text: `⚔️ ${dmg} ダメージ！残りHP: ${newHp}/${mobMaxHp}`, color: '#5b8dee' }]);
     }
   };
 
@@ -1142,7 +1265,7 @@ function TrapWorldPanel({ player, addItems, addNotification }: {
   }
 
   const mob = currentMob!;
-  const hpPct = (mobHp / TRAP_MOB_HP) * 100;
+  const hpPct = (mobHp / mobMaxHp) * 100;
   // ホットバー表示用
   const hotbarWeapon = equipment.hotbar.find(id => id && ITEM_MASTER[id]?.itemType === 'Weapon');
   const weaponItem = hotbarWeapon ? ITEM_MASTER[hotbarWeapon] : null;
@@ -1174,7 +1297,7 @@ function TrapWorldPanel({ player, addItems, addNotification }: {
               {isElite ? `⭐ [エリート] ${mob.eliteName}` : mob.name}
             </div>
             <div style={{ fontSize: '0.72rem', color: '#8a92b2' }}>
-              HP {mobHp}/{TRAP_MOB_HP}
+              HP {mobHp}/{mobMaxHp}
             </div>
           </div>
         </div>
@@ -1316,7 +1439,7 @@ function KXBattlePanel({ player, runState, onVictory, onDefeat }: {
       addItems([{ itemId: m.id === 'roam_armor' ? 'mech_armor_oparts' : 'rusty_mystery_obj', amount: 1 }]);
       if (newKxHp <= 0) {
         // KX撃破 → 20%で覚醒
-        if (Math.random() < 0.2) {
+        if (secureRandom() < 0.2) {
           addLog('「さぁ、延長戦の始まりだ！」 KX-G21が覚醒した！', '#ff00ff');
           setIsAwakened(true);
           setAwakeHp(AWAKE_MAX_HP);
@@ -1375,7 +1498,7 @@ function KXBattlePanel({ player, runState, onVictory, onDefeat }: {
     if (phase >= 2) actions.push('stork_ex', 'slash');
     if (phase >= 3) actions.push('chaos_flare', 'lightning_bolt', 'summon_tech_snipe');
 
-    const action = actions[Math.floor(Math.random() * actions.length)];
+    const action = actions[Math.floor(secureRandom() * actions.length)];
     // action selected
 
     let dmg = 0;
@@ -1383,17 +1506,17 @@ function KXBattlePanel({ player, runState, onVictory, onDefeat }: {
     let logColor = '#e05555';
 
     if (action === 'slash') {
-      dmg = 15 + Math.floor(Math.random() * 20);
+      dmg = 15 + Math.floor(secureRandom() * 20);
       logText = `⚔️ 「貴様など叩き切ってくれるわ！」 KX-G21が貫通斬撃！${dmg}ダメ！`;
       changeHp(-dmg);
     } else if (action === 'chaos_flare') {
-      dmg = 20 + Math.floor(Math.random() * 15);
+      dmg = 20 + Math.floor(secureRandom() * 15);
       setBurnTurns(4);
       logText = `🔥 カオスフレア！${dmg}ダメ＋燃焼4ターン！`;
       changeHp(-dmg);
       logColor = '#ff6b00';
     } else if (action === 'lightning_bolt') {
-      dmg = 60 + Math.floor(Math.random() * 40);
+      dmg = 60 + Math.floor(secureRandom() * 40);
       logText = `⚡ ライトニングボルト！超高火力${dmg}ダメ！`;
       changeHp(-dmg);
       logColor = '#f0f000';
@@ -1545,7 +1668,6 @@ export function DungeonScreen() {
   const addExp = useGameStore(s => s.addExp);
   const addSkillExp = useGameStore(s => s.addSkillExp);
   const changeSatiety = useGameStore(s => s.changeSatiety);
-  const applyHungerPenalty = useGameStore(s => s.applyHungerPenalty);
   const addNotification = useGameStore(s => s.addNotification);
   const recordDungeonClear = useGameStore(s => s.recordDungeonClear);
   const isDungeonUnlocked = useGameStore(s => s.isDungeonUnlocked);
@@ -1588,6 +1710,9 @@ export function DungeonScreen() {
   const [dungeonMana, setDungeonMana] = useState(0);
   const [showBossChoice, setShowBossChoice] = useState(false);
   const [kxBossMode, setKxBossMode] = useState(false);
+  const [showDevilArmorChoice, setShowDevilArmorChoice] = useState(false);
+  // 0=なし, 1=デビルアーマー戦, 2=デッドアーマー戦
+  const [devilArmorPhase, setDevilArmorPhase] = useState(0);
 
   const dungeons = Object.values(DUNGEON_MASTER);
   const lockedDungeons = dungeons.filter(d => !isDungeonUnlocked(d.id));
@@ -1613,7 +1738,6 @@ export function DungeonScreen() {
     if (!runState || !player) return;
     const dungeon = getDungeon(runState.dungeonId);
 
-    applyHungerPenalty();
     changeSatiety(-3);
 
     if (!won) {
@@ -1656,6 +1780,17 @@ export function DungeonScreen() {
         nextAreaIdx = nextAreaIdx + 1;
         addNotification('info', `✅ ${areas[nextAreaIdx].name} に進んだ！`);
         setRunLog(prev => [...prev, `📍 ${areas[nextAreaIdx].name} へ進んだ！`]);
+        // 天空城の最上部（ボスエリア）に進む直前でデビルアーマーに挑戦するか選択
+        if (runState.dungeonId === 'sky_castle' && nextAreaIdx === areas.length - 1) {
+          setRunState(prev => prev ? {
+            ...prev, currentAreaIdx: nextAreaIdx,
+            currentAreaName: areas?.[nextAreaIdx]?.name ?? prev.currentAreaName,
+            monstersDefeated: newDefeated, totalExp: newExp, totalGold: newGold,
+            totalDrops: allDrops, isComplete, currentFloor: Math.min(prev.currentFloor + 1, dungeon?.floors ?? 1),
+          } : null);
+          setShowDevilArmorChoice(true);
+          return;
+        }
       } else {
         // ボスエリア最終撃破 → 初級ダンジョンのみ継続選択、他はクリア
         recordDungeonClear(runState.dungeonId);
@@ -1690,16 +1825,53 @@ export function DungeonScreen() {
       monstersDefeated: newDefeated, totalExp: newExp, totalGold: newGold,
       totalDrops: allDrops, isComplete, currentFloor: Math.min(prev.currentFloor + 1, dungeon?.floors ?? 1),
     } : null);
-  }, [runState, player, applyHungerPenalty, changeSatiety, addExp, addSkillExp, changeGold, addItems, addNotification, recordDungeonClear]);
+  }, [runState, player, changeSatiety, addExp, addSkillExp, changeGold, addItems, addNotification, recordDungeonClear]);
 
   const handleEscapeBattle = useCallback(() => {
     setInBattle(false);
     setRunLog(prev => [...prev, '🏃 逃走した。']);
   }, []);
 
+  // デビルアーマー戦終了ハンドラ
+  const handleDevilArmorBattleEnd = useCallback((won: boolean, expGained: number, goldGained: number, drops: {itemId:string;amount:number}[], _hpDelta: number) => {
+    setInBattle(false);
+    changeSatiety(-3);
+    if (!won) {
+      addNotification('error', '敗北... HPが0になった。');
+      setRunState(prev => prev ? { ...prev, isFailed: true } : null);
+      setDevilArmorPhase(0);
+      setShowDevilArmorChoice(false);
+      return;
+    }
+    addExp(expGained);
+    addSkillExp('combat', Math.floor(expGained / 2));
+    changeGold(goldGained);
+    addItems(drops);
+    // デビルアーマーを倒した時2%で覚醒（DEAD ARMORは覚醒しない）
+    if (devilArmorPhase === 1 && secureRandom() < 0.02) {
+      addNotification('warning', '⚠️ デビルアーマーが覚醒した！DEAD ARMORに変貌！');
+      setRunLog(prev => [...prev, '⚠️ DEAD ARMORに覚醒！']);
+      setDevilArmorPhase(2);
+      setInBattle(true);
+      setBattleKey(k => k + 1);
+    } else {
+      // 撃破後、通常通りマッドガイポット戦へ
+      addNotification('success', '🗡️ デビルアーマーを撃破！マッドガイボットとの決戦へ！');
+      setRunLog(prev => [...prev, '✅ デビルアーマー撃破！']);
+      setDevilArmorPhase(0);
+      setShowDevilArmorChoice(false);
+    }
+  }, [devilArmorPhase, changeSatiety, addExp, addSkillExp, changeGold, addItems, addNotification]);
+
+  const handleDevilArmorEscape = useCallback(() => {
+    setInBattle(false);
+    setDevilArmorPhase(0);
+    setRunLog(prev => [...prev, '🏃 逃走した。']);
+  }, []);
+
   const escape = useCallback(() => {
     addNotification('info', '🏃 ダンジョンから離脱した。');
-    setRunState(null); setInBattle(false); setRunLog([]); setShowBossChoice(false);
+    setRunState(null); setInBattle(false); setRunLog([]); setShowBossChoice(false); setShowDevilArmorChoice(false); setDevilArmorPhase(0);
   }, [addNotification]);
 
   if (!player) return null;
@@ -1854,6 +2026,37 @@ export function DungeonScreen() {
                 ダンジョン出口へ
               </button>
             </div>
+          ) : showDevilArmorChoice && devilArmorPhase === 0 ? (
+            <div style={{ background: '#161b26', border: '2px solid #cc44ff', borderRadius: 12, padding: 18, textAlign: 'center' }}>
+              <div style={{ fontSize: '1.5rem', marginBottom: 6 }}>😈</div>
+              <div style={{ color: '#cc44ff', fontWeight: 700, fontSize: '1rem', marginBottom: 4 }}>デビルアーマーが立ちはだかる！</div>
+              <div style={{ color: '#8a92b2', fontSize: '0.8rem', marginBottom: 4 }}>HP: ❤️×640 | 攻撃力: 30 | 10ターンに1回 貫通10000ダメージ</div>
+              <div style={{ color: '#8a92b2', fontSize: '0.75rem', marginBottom: 16 }}>天空城の道中でデビルアーマーに挑戦しますか？</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => {
+                  setDevilArmorPhase(1);
+                  setInBattle(true);
+                  setBattleKey(k => k + 1);
+                }} style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg,#cc44ff,#8800cc)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+                  ⚔️ 挑戦する
+                </button>
+                <button onClick={() => {
+                  setShowDevilArmorChoice(false);
+                }} style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg,#4caf87,#2d8f6f)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+                  🚶 戦わない
+                </button>
+              </div>
+            </div>
+          ) : (devilArmorPhase === 1 || devilArmorPhase === 2) && inBattle ? (
+            <TurnBattle
+              key={battleKey}
+              runState={{ ...runState, dungeonId: devilArmorPhase === 2 ? 'dead_armor_fight' : 'devil_armor_fight', currentAreaIdx: 0 }}
+              equipment={equipment}
+              onBattleEnd={handleDevilArmorBattleEnd}
+              onEscape={handleDevilArmorEscape}
+              initialMana={dungeonMana}
+              onManaUpdate={setDungeonMana}
+            />
           ) : showBossChoice ? (
             <div style={{ background: '#161b26', border: '2px solid #f0c060', borderRadius: 12, padding: 18, textAlign: 'center' }}>
               <div style={{ fontSize: '1.3rem', marginBottom: 6 }}>👑</div>

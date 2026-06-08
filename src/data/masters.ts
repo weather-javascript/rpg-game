@@ -785,6 +785,8 @@ export const MONSTER_MASTER: Record<string, MonsterMaster> = {
   zero_boss:    { id:'zero_boss', name:'零',      description:'洞窟そのもの。',       icon:'lightning', maxHp:100000,attack:1,  defense:99,  baseExp:5000, baseGold:3000, dungeonIds:['frozen_cave'], isBoss:true, drops:[{itemId:'stalactite',baseRate:1.0,minAmount:8,maxAmount:8}] },
   roam_armor:   { id:'roam_armor', name:'ロウムアーマー',description:'打ち上げスキル。', icon:'robot', maxHp:60,  attack:20, defense:10,  baseExp:50,   baseGold:30,   dungeonIds:['sky_castle','sky_castle_ex'], drops:[{itemId:'mech_armor_oparts',baseRate:1.0,minAmount:1,maxAmount:1}] },
   death_armor:  { id:'death_armor',name:'デスアーマー',  description:'斬撃5回。',        icon:'skull', maxHp:75,  attack:30, defense:12,  baseExp:65,   baseGold:40,   dungeonIds:['sky_castle','sky_castle_ex'], drops:[{itemId:'rusty_mystery_obj',baseRate:1.0,minAmount:1,maxAmount:1}] },
+  devil_armor:  { id:'devil_armor', name:'デビルアーマー', description:'天空城の中ボス。10ターンに1回貫通10000ダメージ。', icon:'skull', maxHp:750, attack:30, defense:0, baseExp:400, baseGold:250, dungeonIds:['sky_castle'], isMidBoss:true, drops:[] },
+  dead_armor:   { id:'dead_armor',  name:'DEAD ARMOR',   description:'覚醒したデビルアーマー。5ターンに1回貫通10000ダメージ。', icon:'skull', maxHp:1500, attack:60, defense:0, baseExp:800, baseGold:500, dungeonIds:['sky_castle'], isMidBoss:true, drops:[] },
   mad_guy_bot:  { id:'mad_guy_bot',name:'マッドガイボット',description:'天空城ボス。スパナと魔改備品を落とす。',  icon:'robot', maxHp:500, attack:10, defense:20,  baseExp:600,  baseGold:400,  dungeonIds:['sky_castle'], isBoss:true, drops:[{itemId:'makai_bihin',baseRate:1.0,minAmount:1,maxAmount:3},{itemId:'super_spanner',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'mad_guy_diary',baseRate:0.05,minAmount:1,maxAmount:1}] },
   kx_g21:       { id:'kx_g21',     name:'KX-G21',        description:'天空城の裏ボス。HPで形態変化。眷属を倒すとダメージ。', icon:'robot', maxHp:38750, attack:80, defense:999, baseExp:5000, baseGold:3000, dungeonIds:['sky_castle_ex'], isBoss:true, drops:[{itemId:'super_spanner',baseRate:1.0,minAmount:10,maxAmount:10},{itemId:'makai_bihin',baseRate:1.0,minAmount:10,maxAmount:10},{itemId:'kx_mech_track',baseRate:1.0,minAmount:1,maxAmount:1}] },
   kx_g21_awake: { id:'kx_g21_awake',name:'KX-G21[ライフエナジー]',description:'覚醒したKX。通常攻撃が通る。', icon:'lightning', maxHp:1900, attack:120, defense:0, baseExp:8000, baseGold:5000, dungeonIds:['sky_castle_ex'], isBoss:true, drops:[{itemId:'life_control_core',baseRate:1.0,minAmount:1,maxAmount:1}] },
@@ -893,6 +895,20 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
       { name:'天空城4層', monsters:[{monsterId:'death_armor',count:3},{monsterId:'roam_armor',count:3}] },
       { name:'天空城最上部', description:'マッドガイボットと決戦。通行書を持っていれば使用でKXに挑戦！', monsters:[{monsterId:'mad_guy_bot',count:1,isBoss:true}], isHardArea:true },
     ],
+  },
+  devil_armor_fight: {
+    id:'devil_armor_fight', name:'デビルアーマー戦', description:'中ボス戦。',
+    icon:'skull', tier:'super', requiredLevel:0, floors:1, expBonus:4.0, goldBonus:3.5,
+    monsterIds:['devil_armor'],
+    bossId:'devil_armor',
+    areas:[ { name:'デビルアーマー', monsters:[{monsterId:'devil_armor',count:1,isMidBoss:true}], isHardArea:true } ],
+  },
+  dead_armor_fight: {
+    id:'dead_armor_fight', name:'DEAD ARMOR戦', description:'覚醒中ボス戦。',
+    icon:'skull', tier:'super', requiredLevel:0, floors:1, expBonus:4.0, goldBonus:3.5,
+    monsterIds:['dead_armor'],
+    bossId:'dead_armor',
+    areas:[ { name:'DEAD ARMOR', monsters:[{monsterId:'dead_armor',count:1,isMidBoss:true}], isHardArea:true } ],
   },
   sky_castle_ex: {
     id:'sky_castle_ex', name:'天空城（裏超上級）', description:'KX-G21との決戦。通行書でのみ入場可能。',
@@ -1061,6 +1077,22 @@ export const DEFAULT_PLAYER_STATS = {
 // フォーマット: { version: 'x.x.x', date: 'YYYY-MM-DD', changes: ['変更内容...'] }
 // ============================================================
 export const VERSION_PATCHES = [
+  {
+    version: '2.5.1',
+    date: '2026-06-09',
+    changes: [
+      '🐛 アイテムのクールダウン（cooldownTurns）をダンジョン戦闘で正しく機能するよう実装（ホットバーにCD残ターン数を赤字表示）',
+      '✨ 武器スキル「offhand_mana_on_heal」実装：オフハンド装備時に回復アイテム使用で確率発動しMANA蓄積',
+      '✨ 武器スキル「mana_per_turn_random」実装：毎ターンランダム量のMANAを付与（メイン・オフハンド両対応）',
+      '🎲 ガチャ・KX戦など全乱数処理をsecureRandom()に統一（Math.random()混在を解消）',
+      '🩺 KXバトルパネルにホットバー回復アイテム使用UIを追加',
+      '↩️ オークション取り消し時にアイテムをインベントリへ正しく返却するよう修正',
+      '❤️ 市場ステータスタブにHP上限アップグレード機能を追加（1000G×1.4ⁿ、+5HP/回）',
+      '🛡️ 状態タブ装備選択時に防具スロットに合致する防具のみ表示するよう修正',
+      '😈 天空城道中にデビルアーマー（中ボス）を追加：HPは❤️×640、10ターンに1回貫通10000ダメージ',
+      '💀 デビルアーマー撃破時2%でDEAD ARMORに覚醒（5ターンに1回貫通10000ダメージ、攻撃力60）',
+    ],
+  },
   {
     version: '2.5.0',
     date: '2026-06-08',

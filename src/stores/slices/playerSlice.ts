@@ -3,7 +3,7 @@
 
 import type { StateCreator } from 'zustand';
 import type { GameState } from '../gameStore';
-import type { IdMap } from '../../types/game';
+import type { IdMap, EquipmentSlots } from '../../types/game';
 import { EXP_TABLE, SKILL_EXP_TABLE, ITEM_MASTER } from '../../data/masters';
 
 export interface PlayerSlice {
@@ -18,6 +18,7 @@ export interface PlayerSlice {
   applyHungerPenalty: () => void;
   useItem:            (itemId: string) => { success: boolean; message: string };
   changeDisplayName:  (name: string) => boolean;
+  updateEquipment:    (equipment: EquipmentSlots) => void;
 }
 
 export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (set, get) => ({
@@ -169,5 +170,9 @@ export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (
     set((state) => state.player ? { player: { ...state.player, displayName: trimmed } } : state);
     addNotification('success', `名前を「${trimmed}」に変更しました（100G消費）`);
     return true;
+  },
+
+  updateEquipment: (equipment: EquipmentSlots) => {
+    set((state) => state.player ? { player: { ...state.player, equipment } } : state);
   },
 });
