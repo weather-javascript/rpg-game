@@ -1904,7 +1904,7 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
 }
 
 // 倍々チキンレース コインフリップ
-function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
+function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, onLockChange }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number; onLockChange?: (locked: boolean) => void }) {
   const { player, changeGold, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addNotification: s.addNotification }));
   // phase: idle=未開始, choosing=表裏選択中, playing=進行中, busted=負け, cashed=利確
   const [phase, setPhase] = useState<'idle'|'choosing'|'playing'|'busted'|'cashed'>('idle');
@@ -1923,6 +1923,7 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
     setScore(0);
     setFlips(0);
     setLastFlip(null);
+    onLockChange?.(true);
   };
 
   // 表/裏を選んで投げる（初回 or 継続）
@@ -1954,6 +1955,7 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
     } else {
       setFlips(prev => prev + 1);
       setPhase('busted');
+      onLockChange?.(false);
       const r: GambleResult = { rewardLabel: `${pick === 'omote' ? '裏' : '表'}が出た！全没収！`, multiplier: 0, goldDelta: -bet, itemRewards: [], symbols: ['🌑','💥'] };
       onResult(r);
       setAnimating(false);
@@ -1967,12 +1969,13 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
     const winGold = Math.floor(bet * multiplier);
     changeGold(winGold);
     setPhase('cashed');
+    onLockChange?.(false);
     const r: GambleResult = { rewardLabel: `利確！×${score}倍！`, multiplier, goldDelta: winGold - bet, itemRewards: [], symbols: ['🌕','✨'] };
     onResult(r);
     try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
   };
 
-  const reset = () => { setPhase('idle'); setScore(0); setFlips(0); setLastFlip(null); };
+  const reset = () => { setPhase('idle'); setScore(0); setFlips(0); setLastFlip(null); onLockChange?.(false); };
 
   const scoreGold = Math.floor(bet * score * multiplierBonus);
 
@@ -2187,6 +2190,7 @@ export function GambleScreen() {
   const [jackpotPool, setJackpotPool] = useState(0);
   const [gambleMultipliers, setGambleMultipliers] = useState<Record<string, number>>({});
   const [pokerBetLocked, setPokerBetLocked] = useState(false);
+  const [coinFlipBetLocked, setCoinFlipBetLocked] = useState(false);
   const [ticketActive, setTicketActive] = useState(false); // チケット1枚使用中
   const [treasureProbs, setTreasureProbs] = useState<TreasureProbEntry[] | null>(null);
 
@@ -2300,11 +2304,11 @@ export function GambleScreen() {
             <div style={{ fontSize: '0.78rem', color: '#8a92b2', marginTop: 2 }}>{game.description}</div>
           </div>
         )}
-        {activeGame !== 'pvp' && activeGame !== 'treasure_box' && <BetInput game={game} bet={bet} setBet={setBet} disabled={activeGame === 'poker' && pokerBetLocked} />}
+        {activeGame !== 'pvp' && activeGame !== 'treasure_box' && <BetInput game={game} bet={bet} setBet={setBet} disabled={(activeGame === 'poker' && pokerBetLocked) || (activeGame === 'coin_flip' && coinFlipBetLocked)} />}
 
         {activeGame === 'chohan'       && <ChohanPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chohan'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
         {activeGame === 'chinchiro'    && <ChinchiroPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chinchiro'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
-        {activeGame === 'coin_flip'    && <CoinFlipPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['coin_flip'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
+        {activeGame === 'coin_flip'    && <CoinFlipPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['coin_flip'] ?? 1.0) * (ticketActive ? 2 : 1)} onLockChange={setCoinFlipBetLocked} />}
         {activeGame === 'slot'         && <SlotPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['slot_machine'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
         {activeGame === 'treasure_box' && <GenericPanel game={treasureGame}  bet={41000} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['treasure_box'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
         {activeGame === 'treasure_box' && (
