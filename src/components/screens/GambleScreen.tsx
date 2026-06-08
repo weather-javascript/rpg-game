@@ -159,7 +159,7 @@ function evalChinchiro(dice: number[]): ChinchiroRank {
   return { type:'nashi', value:-1, label:'役なし（やり直し）' };
 }
 
-function rollDice3(): number[] {
+function _rollDice3(): number[] {
   return [Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1];
 }
 
@@ -2032,7 +2032,10 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0,
     }
     setPick(choice);
     setAnimating(true);
-    pendingRef.isHeads = rng() < 0.5;
+    // 選んだ面が出る確率40%、出ない確率60%
+    const pickedOmoteNow = choice === 'omote';
+    const hitNow = secureRandom() < 0.4;
+    pendingRef.isHeads = hitNow ? pickedOmoteNow : !pickedOmoteNow;
     setShowAnim(true);
   };
 
