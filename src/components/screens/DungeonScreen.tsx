@@ -1152,10 +1152,37 @@ function TrapWorldPanel({ player, addItems, addNotification }: {
       </div>
 
       {/* 攻撃ボタン */}
-      <button onClick={handleAttack}
-        style={{ width: '100%', padding: '16px', fontWeight: 700, fontSize: '1.1rem', background: 'linear-gradient(135deg,#e05555,#c03030)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', marginBottom: 10 }}>
-        ⚔️ 攻撃！
+      <button onClick={handleAttack} disabled={attackCooldown}
+        style={{ width: '100%', padding: '16px', fontWeight: 700, fontSize: '1.1rem', background: attackCooldown ? '#2d3752' : 'linear-gradient(135deg,#e05555,#c03030)', color: attackCooldown ? '#4a5070' : '#fff', border: 'none', borderRadius: 8, cursor: attackCooldown ? 'not-allowed' : 'pointer', marginBottom: 10, transition: 'background 0.15s, color 0.15s' }}>
+        {attackCooldown ? '…' : '⚔️ 攻撃！'}
       </button>
+
+      {/* ホットバー（消耗品使用） */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
+        {equipment.hotbar.map((itemId, i) => {
+          const item = itemId ? ITEM_MASTER[itemId] : null;
+          const qty = itemId ? (player.inventory[itemId] ?? 0) : 0;
+          if (!item || item.itemType === 'Weapon' || item.itemType === 'Armor') return null;
+          if (!item.useEffect || (!item.useEffect.hpRestore && !item.useEffect.satietyRestore)) return null;
+          return (
+            <button key={i} disabled={attackCooldown || qty <= 0}
+              onClick={() => {
+                if (!item.useEffect || attackCooldown || qty <= 0) return;
+                setAttackCooldown(true);
+                setTimeout(() => setAttackCooldown(false), 500);
+                const { hpRestore, satietyRestore, message } = item.useEffect;
+                useGameStore.getState().consumeItem(itemId!, 1);
+                if (hpRestore) useGameStore.getState().changeHp(hpRestore);
+                if (satietyRestore) useGameStore.getState().changeSatiety(satietyRestore);
+                setLog(prev => [...prev.slice(-5), { text: `🧪 ${item.name} 使用${message ? '：' + message : ''}`, color: '#4caf87' }]);
+              }}
+              style={{ padding: '6px 8px', background: qty > 0 && !attackCooldown ? '#1c2235' : '#161b26', border: `1px solid ${qty > 0 ? '#2d3752' : '#1c2235'}`, borderRadius: 6, cursor: qty > 0 && !attackCooldown ? 'pointer' : 'not-allowed', fontSize: '0.72rem', color: qty > 0 ? '#e8e6ff' : '#4a5070', minWidth: 48, textAlign: 'center' }}>
+              <div style={{ fontSize: '1rem' }}>{item.icon?.length <= 2 ? item.icon : '🧪'}</div>
+              <div style={{ fontSize: '0.65rem', color: '#8a92b2' }}>×{qty}</div>
+            </button>
+          );
+        })}
+      </div>
 
       {/* ログ */}
       <div style={{ background: '#0e1220', borderRadius: 6, padding: '6px 10px', fontSize: '0.75rem', maxHeight: 100, overflowY: 'auto' }}>
@@ -1186,6 +1213,7 @@ export function DungeonScreen() {
   const [runLog, setRunLog] = useState<string[]>([]);
   const [dungeonInnerTab, setDungeonInnerTab] = useState<'dungeon' | 'gacha' | 'trap'>('dungeon');
   const [dungeonMana, setDungeonMana] = useState(0);
+  const [showBossChoice, setShowBossChoice] = useState(false);
 
   const dungeons = Object.values(DUNGEON_MASTER);
   const lockedDungeons = dungeons.filter(d => !isDungeonUnlocked(d.id));
@@ -1236,6 +1264,15 @@ export function DungeonScreen() {
 
     setRunLog(prev => [...prev, `✅ 撃破！EXP+${expGained} G+${goldGained}`]);
 
+    // ボス周回モード中はエリアを固定してループ
+    if (runState.bossLoopMode) {
+      setRunState(prev => prev ? {
+        ...prev,
+        monstersDefeated: newDefeated, totalExp: newExp, totalGold: newGold, totalDrops: allDrops,
+      } : null);
+      return;
+    }
+
     const areaThreshold = 5;
     const areas = dungeon?.areas;
     let nextAreaIdx = runState.currentAreaIdx ?? 0;
@@ -1246,11 +1283,19 @@ export function DungeonScreen() {
         addNotification('info', `✅ ${areas[nextAreaIdx].name} に進んだ！`);
         setRunLog(prev => [...prev, `📍 ${areas[nextAreaIdx].name} へ進んだ！`]);
       } else {
-        isComplete = true;
+        // ボスエリア最終撃破 → クリアor継続の選択を表示
         recordDungeonClear(runState.dungeonId);
         const gachaCoinReward = ({ beginner:1, intermediate:2, advanced:3, super:4, extreme:5, volcano:4 } as Record<string,number>)[dungeon?.tier ?? 'beginner'] ?? 1;
-        addNotification('success', `🏆 ${dungeon?.name} 攻略完了！🪙 ガチャコイン+${gachaCoinReward}枚！`);
+        addNotification('success', `🏆 ${dungeon?.name} ボス撃破！🪙 ガチャコイン+${gachaCoinReward}枚！`);
         if (player) postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'dungeon_clear', message: `が「${dungeon?.name}」をクリアしました！` }).catch(() => {});
+        setRunState(prev => prev ? {
+          ...prev, currentAreaIdx: nextAreaIdx,
+          currentAreaName: areas?.[nextAreaIdx]?.name ?? prev.currentAreaName,
+          monstersDefeated: newDefeated, totalExp: newExp, totalGold: newGold,
+          totalDrops: allDrops, isComplete: false, currentFloor: Math.min(prev.currentFloor + 1, dungeon?.floors ?? 1),
+        } : null);
+        setShowBossChoice(true);
+        return;
       }
     }
 
@@ -1269,7 +1314,7 @@ export function DungeonScreen() {
 
   const escape = useCallback(() => {
     addNotification('info', '🏃 ダンジョンから離脱した。');
-    setRunState(null); setInBattle(false); setRunLog([]);
+    setRunState(null); setInBattle(false); setRunLog([]); setShowBossChoice(false);
   }, [addNotification]);
 
   if (!player) return null;
@@ -1424,6 +1469,26 @@ export function DungeonScreen() {
                 ダンジョン出口へ
               </button>
             </div>
+          ) : showBossChoice ? (
+            <div style={{ background: '#161b26', border: '2px solid #f0c060', borderRadius: 12, padding: 18, textAlign: 'center' }}>
+              <div style={{ fontSize: '1.3rem', marginBottom: 6 }}>👑</div>
+              <div style={{ color: '#f0c060', fontWeight: 700, fontSize: '1rem', marginBottom: 4 }}>洞窟王を撃破！</div>
+              <div style={{ color: '#8a92b2', fontSize: '0.8rem', marginBottom: 16 }}>このままクリアしますか？それとも洞窟王と戦い続けますか？</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => {
+                  setShowBossChoice(false);
+                  setRunState(prev => prev ? { ...prev, isComplete: true } : null);
+                }} style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg,#4caf87,#2d8f6f)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+                  🏆 クリアする！
+                </button>
+                <button onClick={() => {
+                  setShowBossChoice(false);
+                  setRunState(prev => prev ? { ...prev, bossLoopMode: true } : null);
+                }} style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg,#e05555,#c03030)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+                  ⚔️ 戦闘を継続する！
+                </button>
+              </div>
+            </div>
           ) : inBattle ? (
             <TurnBattle
               key={battleKey}
@@ -1435,15 +1500,23 @@ export function DungeonScreen() {
               onManaUpdate={setDungeonMana}
             />
           ) : (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { setInBattle(true); setBattleKey(k => k + 1); }}
-                disabled={player.stats.hp <= 0}
-                style={{ flex: 2, padding: '12px', fontWeight: 700, background: player.stats.hp > 0 ? 'linear-gradient(135deg,#e05555,#c03030)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 8, cursor: player.stats.hp > 0 ? 'pointer' : 'not-allowed' }}>
-                ⚔️ 次の敵と戦う
-              </button>
-              <button onClick={escape} style={{ flex: 1, padding: '12px', background: '#2d3752', color: '#8a92b2', border: '1px solid #2d3752', borderRadius: 8, cursor: 'pointer' }}>
-                🏃 離脱
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {runState.bossLoopMode && (
+                <button onClick={() => setRunState(prev => prev ? { ...prev, isComplete: true } : null)}
+                  style={{ padding: '10px', background: 'linear-gradient(135deg,#4caf87,#2d8f6f)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
+                  🏆 クリアして出る
+                </button>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { setInBattle(true); setBattleKey(k => k + 1); }}
+                  disabled={player.stats.hp <= 0}
+                  style={{ flex: 2, padding: '12px', fontWeight: 700, background: player.stats.hp > 0 ? 'linear-gradient(135deg,#e05555,#c03030)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 8, cursor: player.stats.hp > 0 ? 'pointer' : 'not-allowed' }}>
+                  {runState.bossLoopMode ? '👑 洞窟王に挑む' : '⚔️ 次の敵と戦う'}
+                </button>
+                <button onClick={escape} style={{ flex: 1, padding: '12px', background: '#2d3752', color: '#8a92b2', border: '1px solid #2d3752', borderRadius: 8, cursor: 'pointer' }}>
+                  🏃 離脱
+                </button>
+              </div>
             </div>
           )}
         </>

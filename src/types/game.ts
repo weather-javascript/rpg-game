@@ -322,6 +322,7 @@ export interface DungeonRunState {
   totalDrops: { itemId: string; amount: number }[];
   isComplete: boolean;
   isFailed: boolean;
+  bossLoopMode?: boolean; // ボス周回モード（倒し続ける）
 }
 
 export interface GambleResult {
