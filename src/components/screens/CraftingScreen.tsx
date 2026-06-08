@@ -392,15 +392,16 @@ export function CraftingScreen() {
                           border: `1px solid ${isSel ? '#5b8dee' : '#2d3752'}`,
                           borderRadius: 6, cursor: available > 0 ? 'pointer' : 'not-allowed',
                           color: available > 0 ? '#e8e6ff' : '#4a5070', fontSize: '0.75rem',
-                          opacity: available > 0 ? 1 : 0.5, paddingRight: 22,
+                          opacity: available > 0 ? 1 : 0.5, paddingRight: 24,
                         }}>
                         <GameIcon id={item.icon} size={18} />
                         <span>{item.name}</span>
                         <span style={{ color: '#f0c060', fontWeight: 700 }}>×{available}</span>
                       </button>
                       <button onClick={e => { e.stopPropagation(); toggleFavorite(itemId); }}
-                        style={{ position: 'absolute', top: 2, right: 3, background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.65rem', padding: 0, lineHeight: 1, color: isFav ? '#f0c060' : '#2d3752' }}>
-                        ⭐
+                        title={isFav ? 'お気に入りを外す' : 'お気に入りに追加'}
+                        style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 22, background: isFav ? 'rgba(240,192,96,0.15)' : 'rgba(255,255,255,0.04)', border: 'none', borderLeft: `1px solid ${isFav ? '#f0c06044' : '#2d3752'}`, borderRadius: '0 6px 6px 0', cursor: 'pointer', fontSize: '0.75rem', padding: 0, lineHeight: 1, color: isFav ? '#f0c060' : '#8a92b2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {isFav ? '⭐' : '☆'}
                       </button>
                     </div>
                   );
