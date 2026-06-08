@@ -323,6 +323,10 @@ export interface DungeonRunState {
   isComplete: boolean;
   isFailed: boolean;
   bossLoopMode?: boolean; // ボス周回モード（倒し続ける）
+  kxBossMode?: boolean;   // KX裏ボス戦モード
+  kxPhase?: number;       // KX形態（1-4）
+  kxHp?: number;          // KX現在HP
+  kxIsAwakened?: boolean; // KX覚醒状態
 }
 
 export interface GambleResult {

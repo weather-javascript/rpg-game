@@ -159,9 +159,6 @@ function evalChinchiro(dice: number[]): ChinchiroRank {
   return { type:'nashi', value:-1, label:'役なし（やり直し）' };
 }
 
-// function _rollDice3(): number[] {
-//   return [Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1];
-// }
 
 const DICE_EMOJI = ['⚀','⚁','⚂','⚃','⚄','⚅'];
 const SLOT_SYMBOLS = ['🍒','💰','🌟','🍋','🔄','👑','🔔','⭐'];

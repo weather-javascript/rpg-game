@@ -42,6 +42,18 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   // モンスタードロップ
   cave_fragment:   { id:'cave_fragment',    name:'洞窟の欠片',    description:'洞窟王の手下が落とす欠片。', category:'material',  itemType:'Item', rarity:'common',   sellPrice:8,   buyPrice:0, maxStack:-1, icon:'stone_idol' },
   cave_gem:        { id:'cave_gem',         name:'洞窟王の宝石',  description:'洞窟王が落とす輝く宝石。',  category:'material',  itemType:'Item', rarity:'rare',     sellPrice:200, buyPrice:0, maxStack:99, icon:'gem_blue' },
+  // 天空城関連アイテム
+  sky_pass:        { id:'sky_pass',         name:'天空城通行書',   description:'天空城5ターン目に使用するとKXに挑戦できる。洞窟王の宝石64個+ダイヤモンド64個から作成。', category:'material', itemType:'Item', rarity:'legendary', sellPrice:0, buyPrice:0, maxStack:1, icon:'scroll' },
+  mech_armor_oparts:{ id:'mech_armor_oparts',name:'機械鎧のオーパーツ',description:'ロウムアーマーが落とす。', category:'material', itemType:'Item', rarity:'rare', sellPrice:100, buyPrice:0, maxStack:-1, icon:'robot' },
+  rusty_mystery_obj:{ id:'rusty_mystery_obj',name:'錆びついた謎の物体',description:'デスアーマーが落とす。', category:'material', itemType:'Item', rarity:'rare', sellPrice:120, buyPrice:0, maxStack:-1, icon:'sword_iron' },
+  upper_magic_book: { id:'upper_magic_book', name:'上級魔導書',    description:'ウィザード、マッドガイボットが落とす。', category:'material', itemType:'Item', rarity:'rare', sellPrice:300, buyPrice:0, maxStack:-1, icon:'scroll' },
+  devil_reactor:    { id:'devil_reactor',    name:'सैतान अणुभट्टी（デビルリアクター）',description:'デビルアーマーが落とす。', category:'material', itemType:'Item', rarity:'epic', sellPrice:500, buyPrice:0, maxStack:-1, icon:'gem_red' },
+  chaos_reactor:    { id:'chaos_reactor',    name:'カオスリアクター', description:'デッドアーマーが落とす。', category:'material', itemType:'Item', rarity:'epic', sellPrice:600, buyPrice:0, maxStack:-1, icon:'flame' },
+  makai_bihin:      { id:'makai_bihin',      name:'魔改備品',       description:'エクス、マッドガイボットが落とす。KX討伐報酬にも。', category:'material', itemType:'Item', rarity:'rare', sellPrice:200, buyPrice:0, maxStack:-1, icon:'hammer' },
+  super_spanner:    { id:'super_spanner',    name:'超鋼低工学改戯万能スパナ', description:'マッドガイボット・KX-G21が落とす。', category:'material', itemType:'Item', rarity:'epic', sellPrice:800, buyPrice:0, maxStack:-1, icon:'pickaxe_hammer' },
+  mad_guy_diary:    { id:'mad_guy_diary',    name:'マッドガイボットの日記', description:'低確率でドロップ。', category:'treasure', itemType:'Item', rarity:'legendary', sellPrice:2000, buyPrice:0, maxStack:1, icon:'scroll' },
+  kx_mech_track:    { id:'kx_mech_track',   name:'KX-MECHANIC-TRACK', description:'KX-G21が確定ドロップ。メカトラと呼ばれる。', category:'material', itemType:'Item', rarity:'legendary', sellPrice:5000, buyPrice:0, maxStack:-1, icon:'robot' },
+  life_control_core:{ id:'life_control_core',name:'LIFE CONTROL SYSTEM CORE', description:'KX-G21[ライフエナジー]が確定ドロップ。LCSCと略される。', category:'material', itemType:'Item', rarity:'legendary', sellPrice:10000, buyPrice:0, maxStack:-1, icon:'lightning' },
   rusty_sword:     { id:'rusty_sword',      name:'錆びた剣',      description:'洞窟王が落とす古い剣。攻撃力+3。',    category:'weapon',  itemType:'Weapon',   rarity:'uncommon', sellPrice:50,  buyPrice:0, maxStack:1,  icon:'dagger', useEffect:{attackBonus:3, message:'錆びた剣で斬りつけた！', attackType:'physical'} },
   contract:        { id:'contract',         name:'契約書',        description:'各ダンジョンのモブが低確率で落とす。', category:'treasure',  itemType:'Item', rarity:'uncommon', sellPrice:30, buyPrice:0, maxStack:-1, icon:'scroll' },
   coin:            { id:'coin',             name:'硬貨',          description:'中級ダンジョンの通貨。',    category:'material',  itemType:'Item', rarity:'common',   sellPrice:1,   buyPrice:0, maxStack:-1, icon:'coin' },
@@ -659,6 +671,17 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     requiredCraftingLevel: 1,
     craftingExpGain: 500,
   },
+  {
+    id: 'sky_pass_from_gems',
+    name: '天空城通行書を作る',
+    description: '洞窟王の宝石×64とダイヤモンド×64から天空城通行書を作成する。',
+    outputItemId: 'sky_pass',
+    outputAmount: 1,
+    inputs: [{ itemId: 'cave_gem', amount: 64 }, { itemId: 'diamond', amount: 64 }],
+    shape: ['cave_gem','cave_gem','cave_gem', 'cave_gem','diamond','cave_gem', 'cave_gem','cave_gem','cave_gem'],
+    requiredCraftingLevel: 1,
+    craftingExpGain: 1000,
+  },
 ];
 
 // ============================================================
@@ -760,9 +783,15 @@ export const MONSTER_MASTER: Record<string, MonsterMaster> = {
   extreme_cold: { id:'extreme_cold',name:'極冷',  description:'炎系攻撃で即死。',     icon:'blizzard', maxHp:2180,  attack:25, defense:20,  baseExp:400,  baseGold:200,  dungeonIds:['frozen_cave'], specialAttack:'アイスビーム', drops:[{itemId:'spirit_ice',baseRate:0.5,minAmount:2,maxAmount:3},{itemId:'ancient_shard',baseRate:0.3,minAmount:1,maxAmount:2}] },
   extreme_fire: { id:'extreme_fire',name:'極焦',  description:'氷系攻撃で即死。',     icon:'volcano', maxHp:2180,  attack:25, defense:20,  baseExp:400,  baseGold:200,  dungeonIds:['frozen_cave'], specialAttack:'ラバクロップ', drops:[{itemId:'ancient_shard',baseRate:0.5,minAmount:2,maxAmount:3}] },
   zero_boss:    { id:'zero_boss', name:'零',      description:'洞窟そのもの。',       icon:'lightning', maxHp:100000,attack:1,  defense:99,  baseExp:5000, baseGold:3000, dungeonIds:['frozen_cave'], isBoss:true, drops:[{itemId:'stalactite',baseRate:1.0,minAmount:8,maxAmount:8}] },
-  roam_armor:   { id:'roam_armor', name:'ロウムアーマー',description:'打ち上げスキル。', icon:'robot', maxHp:60,  attack:20, defense:10,  baseExp:50,   baseGold:30,   dungeonIds:['sky_castle'], drops:[{itemId:'ancient_shard',baseRate:0.3,minAmount:1,maxAmount:2}] },
-  death_armor:  { id:'death_armor',name:'デスアーマー',  description:'斬撃5回。',        icon:'skull', maxHp:75,  attack:30, defense:12,  baseExp:65,   baseGold:40,   dungeonIds:['sky_castle'], drops:[{itemId:'ancient_shard',baseRate:0.4,minAmount:1,maxAmount:2}] },
-  mad_guy_bot:  { id:'mad_guy_bot',name:'マッドガイボット',description:'天空城ボス。',  icon:'robot', maxHp:500, attack:10, defense:20,  baseExp:600,  baseGold:400,  dungeonIds:['sky_castle'], isBoss:true, drops:[{itemId:'ancient_shard',baseRate:1.0,minAmount:3,maxAmount:5},{itemId:'dragon_scale',baseRate:0.1,minAmount:1,maxAmount:1}] },
+  roam_armor:   { id:'roam_armor', name:'ロウムアーマー',description:'打ち上げスキル。', icon:'robot', maxHp:60,  attack:20, defense:10,  baseExp:50,   baseGold:30,   dungeonIds:['sky_castle','sky_castle_ex'], drops:[{itemId:'mech_armor_oparts',baseRate:1.0,minAmount:1,maxAmount:1}] },
+  death_armor:  { id:'death_armor',name:'デスアーマー',  description:'斬撃5回。',        icon:'skull', maxHp:75,  attack:30, defense:12,  baseExp:65,   baseGold:40,   dungeonIds:['sky_castle','sky_castle_ex'], drops:[{itemId:'rusty_mystery_obj',baseRate:1.0,minAmount:1,maxAmount:1}] },
+  mad_guy_bot:  { id:'mad_guy_bot',name:'マッドガイボット',description:'天空城ボス。スパナと魔改備品を落とす。',  icon:'robot', maxHp:500, attack:10, defense:20,  baseExp:600,  baseGold:400,  dungeonIds:['sky_castle'], isBoss:true, drops:[{itemId:'makai_bihin',baseRate:1.0,minAmount:1,maxAmount:3},{itemId:'super_spanner',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'mad_guy_diary',baseRate:0.05,minAmount:1,maxAmount:1}] },
+  kx_g21:       { id:'kx_g21',     name:'KX-G21',        description:'天空城の裏ボス。HPで形態変化。眷属を倒すとダメージ。', icon:'robot', maxHp:38750, attack:80, defense:999, baseExp:5000, baseGold:3000, dungeonIds:['sky_castle_ex'], isBoss:true, drops:[{itemId:'super_spanner',baseRate:1.0,minAmount:10,maxAmount:10},{itemId:'makai_bihin',baseRate:1.0,minAmount:10,maxAmount:10},{itemId:'kx_mech_track',baseRate:1.0,minAmount:1,maxAmount:1}] },
+  kx_g21_awake: { id:'kx_g21_awake',name:'KX-G21[ライフエナジー]',description:'覚醒したKX。通常攻撃が通る。', icon:'lightning', maxHp:1900, attack:120, defense:0, baseExp:8000, baseGold:5000, dungeonIds:['sky_castle_ex'], isBoss:true, drops:[{itemId:'life_control_core',baseRate:1.0,minAmount:1,maxAmount:1}] },
+  cannon_zombie: { id:'cannon_zombie',name:'キャノン付きゾンビ',description:'単体攻撃を吸収する。', icon:'skull', maxHp:120, attack:15, defense:30, baseExp:80, baseGold:50, dungeonIds:['sky_castle_ex'], drops:[] },
+  combat_minion: { id:'combat_minion',name:'コンバット',description:'コンバット系モンスター。', icon:'swords', maxHp:80, attack:25, defense:8, baseExp:60, baseGold:30, dungeonIds:['sky_castle_ex'], drops:[] },
+  exs_minion:    { id:'exs_minion',  name:'エクス',          description:'魔改造品をドロップ。', icon:'gem', maxHp:100, attack:35, defense:10, baseExp:80, baseGold:50, dungeonIds:['sky_castle_ex'], drops:[{itemId:'makai_bihin',baseRate:1.0,minAmount:1,maxAmount:1}] },
+  lightning_minion:{ id:'lightning_minion',name:'ライトニングボルト',description:'高火力の雷攻撃。', icon:'lightning', maxHp:60, attack:60, defense:5, baseExp:70, baseGold:40, dungeonIds:['sky_castle_ex'], drops:[] },
   // 火山モンスター
   dwarf_leather:   { id:'dwarf_leather',  name:'ドワーフ[皮]',  description:'皮防具のドワーフ。基本的な強さ。', icon:'mage', maxHp:60,  attack:8,  defense:3,  baseExp:25, baseGold:8,  dungeonIds:['volcano'], drops:[{itemId:'dwarf_fragment',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'magma_stone',baseRate:0.3,minAmount:1,maxAmount:1}] },
   dwarf_iron:      { id:'dwarf_iron',     name:'ドワーフ[鉄]',  description:'鉄防具のドワーフ。それなりに硬い。', icon:'pickaxe_hammer', maxHp:80,  attack:12, defense:6,  baseExp:35, baseGold:12, dungeonIds:['volcano'], drops:[{itemId:'dwarf_fragment',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'magma_stone',baseRate:0.5,minAmount:1,maxAmount:1}] },
@@ -852,7 +881,7 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
     ],
   },
   sky_castle: {
-    id:'sky_castle', name:'天空城', description:'超上級ダンジョン。遠距離攻撃推奨。',
+    id:'sky_castle', name:'天空城', description:'超上級ダンジョン。遠距離攻撃推奨。5ターン目に通行書を使うとKXに挑戦可能。',
     icon:'castle_jp', tier:'super', requiredLevel:40, floors:5, expBonus:4.0, goldBonus:3.5,
     monsterIds:['roam_armor','death_armor'],
     bossId:'mad_guy_bot',
@@ -860,7 +889,19 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
     areas:[
       { name:'天空城1層', monsters:[{monsterId:'roam_armor',count:3}] },
       { name:'天空城2層', monsters:[{monsterId:'death_armor',count:2},{monsterId:'roam_armor',count:2}] },
-      { name:'天空城最上部', description:'マッドガイボットと決戦。', monsters:[{monsterId:'mad_guy_bot',count:1,isBoss:true}], isHardArea:true },
+      { name:'天空城3層', monsters:[{monsterId:'roam_armor',count:3},{monsterId:'death_armor',count:2}] },
+      { name:'天空城4層', monsters:[{monsterId:'death_armor',count:3},{monsterId:'roam_armor',count:3}] },
+      { name:'天空城最上部', description:'マッドガイボットと決戦。通行書を持っていれば使用でKXに挑戦！', monsters:[{monsterId:'mad_guy_bot',count:1,isBoss:true}], isHardArea:true },
+    ],
+  },
+  sky_castle_ex: {
+    id:'sky_castle_ex', name:'天空城（裏超上級）', description:'KX-G21との決戦。通行書でのみ入場可能。',
+    icon:'castle_jp', tier:'super', requiredLevel:40, floors:1, expBonus:5.0, goldBonus:5.0,
+    monsterIds:['roam_armor','death_armor','cannon_zombie','combat_minion','exs_minion','lightning_minion'],
+    bossId:'kx_g21',
+    unlockCondition: { dungeonId:'sky_castle', clearedCount:1 },
+    areas:[
+      { name:'KX-G21 決戦', description:'KX-G21との決戦。眷属を倒してダメージを与えよ！', monsters:[{monsterId:'kx_g21',count:1,isBoss:true},{monsterId:'roam_armor',count:3},{monsterId:'death_armor',count:3}], isHardArea:true },
     ],
   },
   dragons_lair: {
@@ -1020,6 +1061,21 @@ export const DEFAULT_PLAYER_STATS = {
 // フォーマット: { version: 'x.x.x', date: 'YYYY-MM-DD', changes: ['変更内容...'] }
 // ============================================================
 export const VERSION_PATCHES = [
+  {
+    version: '2.4.3',
+    date: '2026-06-08',
+    changes: [
+      '🏰 天空城：5ターン目に「天空城通行書」を使用すると裏ボス KX-G21 に挑戦可能',
+      '📜 天空城通行書：洞窟王の宝石×64＋ダイヤモンド×64でクラフト可能',
+      '🤖 KX-G21：HP割合で第1〜第4形態まで変化する裏ボス（HP38750）',
+      '👾 KX戦：眷属（ロウムアーマー/デスアーマー）を倒すとKXのHPが減る（4%/8%）',
+      '⚡ KX-G21[ライフエナジー]：撃破時20%で覚醒、通常攻撃が通るようになる',
+      '🏆 KX討伐で「生命の超越」達成、活動フィードに水色テキストで表示',
+      '🎰 ソロコインフリップ：選んだ面の当選確率を40%（非選択側60%）に変更',
+      '⚔️ 天空城（裏超上級）：最大15体同時出現に対応',
+      '🛠️ 新ドロップアイテム多数追加（メカトラ・LCSC・魔改備品・超鋼スパナ等）',
+    ],
+  },
   {
     version: '2.4.1',
     date: '2026-06-08',
