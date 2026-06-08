@@ -830,11 +830,18 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       </div>
 
       {/* ログ */}
-      <div style={{ background: '#0e1220', borderRadius: 6, padding: '6px 8px', maxHeight: 90, overflowY: 'auto', marginBottom: 10, fontSize: '0.75rem' }}>
-        {battle.log.slice(-6).map((l, i) => (
-          <div key={i} style={{ color: l.color, padding: '1px 0' }}>{l.text}</div>
-        ))}
-      </div>
+      {(() => {
+        return (
+          <div
+            style={{ background: '#0e1220', borderRadius: 6, padding: '6px 8px', height: 160, overflowY: 'auto', marginBottom: 10, fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: 1 }}
+            ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}
+          >
+            {battle.log.map((l, i) => (
+              <div key={i} style={{ color: l.color, padding: '1px 0', lineHeight: 1.4 }}>{l.text}</div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* 行動ボタン */}
       {!battle.result && battle.turn !== 'select_target' && (
@@ -1341,8 +1348,9 @@ function TrapWorldPanel({ player, addItems, addNotification }: {
       </div>
 
       {/* ログ */}
-      <div style={{ background: '#0e1220', borderRadius: 6, padding: '6px 10px', fontSize: '0.75rem', maxHeight: 100, overflowY: 'auto' }}>
-        {log.slice(-6).map((l, i) => <div key={i} style={{ color: l.color }}>{l.text}</div>)}
+      <div style={{ background: '#0e1220', borderRadius: 6, padding: '6px 10px', fontSize: '0.75rem', height: 120, overflowY: 'auto' }}
+        ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}>
+        {log.map((l, i) => <div key={i} style={{ color: l.color, lineHeight: 1.4 }}>{l.text}</div>)}
       </div>
     </div>
   );
@@ -1654,8 +1662,9 @@ function KXBattlePanel({ player, runState, onVictory, onDefeat }: {
       </div>
 
       {/* バトルログ */}
-      <div style={{ background:'#0e1220', borderRadius:6, padding:'6px 10px', maxHeight:120, overflowY:'auto', fontSize:'0.72rem' }}>
-        {log.slice(-12).map((l, i) => <div key={i} style={{ color:l.color, marginBottom:1 }}>{l.text}</div>)}
+      <div style={{ background:'#0e1220', borderRadius:6, padding:'6px 10px', height:140, overflowY:'auto', fontSize:'0.72rem' }}
+        ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}>
+        {log.map((l, i) => <div key={i} style={{ color:l.color, marginBottom:1, lineHeight:1.4 }}>{l.text}</div>)}
       </div>
     </div>
   );

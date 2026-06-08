@@ -53,6 +53,8 @@ export function MarketScreen() {
   const [shopTab, setShopTab] = useState<ShopTab>('sell');
   const [priceOverrides, setPriceOverrides] = useState<Record<string, { buyPrice: number; sellPrice: number }>>({});
   const [tradeRecipes, setTradeRecipes] = useState<TradeRecipe[]>(DEFAULT_TRADE_RECIPES);
+  const [sellSearch, setSellSearch] = useState('');
+  const [sellCat, setSellCat] = useState('all');
 
   useEffect(() => {
     const unsub = subscribeItemPrices(p => setPriceOverrides(p));
@@ -164,7 +166,24 @@ export function MarketScreen() {
   };
 
   const inventoryEntries = Object.entries(player?.inventory ?? {}).filter(([, qty]) => (qty as number) > 0);
-  const sellable = inventoryEntries.map(([id, qty]) => ({ item: ITEM_MASTER[id], qty: qty as number, id, sellPrice: getEffectivePrice(id).sellPrice })).filter(e => e.item && e.sellPrice > 0);
+  const sellableAll = inventoryEntries.map(([id, qty]) => ({ item: ITEM_MASTER[id], qty: qty as number, id, sellPrice: getEffectivePrice(id).sellPrice })).filter(e => e.item && e.sellPrice > 0);
+  const SELL_CATS = [
+    { id: 'all', label: '全て' },
+    { id: 'weapon', label: '⚔️ 武器' },
+    { id: 'armor', label: '🛡️ 防具' },
+    { id: 'food', label: '🍖 食料' },
+    { id: 'potion', label: '🧪 薬' },
+    { id: 'material', label: '🪨 素材' },
+    { id: 'other', label: '📦 その他' },
+  ];
+  const OTHER_SELL_CATS = new Set(['economy','display','job','protect','travel','treasure','tool']);
+  const sellable = sellableAll.filter(({ item, id: itemId }) => {
+    if (!item) return false;
+    if (sellSearch && !item.name.includes(sellSearch) && !itemId.includes(sellSearch)) return false;
+    if (sellCat === 'all') return true;
+    if (sellCat === 'other') return OTHER_SELL_CATS.has(item.category);
+    return item.category === sellCat;
+  });
   const buyable = Object.values(ITEM_MASTER).filter(item => getEffectivePrice(item.id).buyPrice > 0);
   const usable = inventoryEntries.map(([id, qty]) => ({ item: ITEM_MASTER[id], qty, id })).filter(e => e.item?.useEffect && e.item?.category === 'food');
 
@@ -206,20 +225,36 @@ export function MarketScreen() {
       </div>
 
       {shopTab === 'sell' && (
-        sellable.length === 0
-          ? <p style={{color:'#4a5070', fontSize:'0.85rem', textAlign:'center', padding:20}}>売れるアイテムがありません</p>
-          : sellable.map(({ item, qty, id, sellPrice }) => (
-            <div key={id} style={ROW}>
-              <span style={{fontSize:'1.4rem'}}><GameIcon id={item!.icon} size={28} /></span>
-              <div style={{flex:1}}>
-                <div style={{fontWeight:600, fontSize:'0.9rem'}}>{item!.name}</div>
-                <div style={{fontSize:'0.72rem', color:'#8a92b2'}}>所持: {qty}個</div>
+        <>
+          <input
+            value={sellSearch} onChange={e => setSellSearch(e.target.value)}
+            placeholder="🔍 名前で検索..."
+            style={{width:'100%', padding:'6px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', boxSizing:'border-box', marginBottom:6}}
+          />
+          <div style={{display:'flex', gap:4, overflowX:'auto', marginBottom:8, paddingBottom:2}}>
+            {SELL_CATS.map(t => (
+              <button key={t.id} onClick={() => setSellCat(t.id)}
+                style={{flexShrink:0, padding:'4px 8px', fontSize:'0.7rem', background: sellCat===t.id ? 'rgba(91,141,238,0.25)' : '#161b26', border:`1px solid ${sellCat===t.id ? '#5b8dee' : '#2d3752'}`, color: sellCat===t.id ? '#e8e6ff' : '#8a92b2', borderRadius:5, cursor:'pointer', whiteSpace:'nowrap'}}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {sellable.length === 0
+            ? <p style={{color:'#4a5070', fontSize:'0.85rem', textAlign:'center', padding:20}}>売れるアイテムがありません</p>
+            : sellable.map(({ item, qty, id, sellPrice }) => (
+              <div key={id} style={ROW}>
+                <span style={{fontSize:'1.4rem'}}><GameIcon id={item!.icon} size={28} /></span>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:600, fontSize:'0.9rem'}}>{item!.name}</div>
+                  <div style={{fontSize:'0.72rem', color:'#8a92b2'}}>所持: {qty}個</div>
+                </div>
+                <span style={{color:'#f0c060', fontSize:'0.85rem', whiteSpace:'nowrap'}}>{sellPrice}G/個</span>
+                <button style={BTN('#4caf87')} onClick={() => handleSell(id, 1)}>×1</button>
+                <button style={BTN('#2d8060')} onClick={() => handleSell(id, qty)}>全部</button>
               </div>
-              <span style={{color:'#f0c060', fontSize:'0.85rem', whiteSpace:'nowrap'}}>{sellPrice}G/個</span>
-              <button style={BTN('#4caf87')} onClick={() => handleSell(id, 1)}>×1</button>
-              <button style={BTN('#2d8060')} onClick={() => handleSell(id, qty)}>全部</button>
-            </div>
-          ))
+            ))
+          }
+        </>
       )}
 
       {shopTab === 'buy' && (
