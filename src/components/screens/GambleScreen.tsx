@@ -474,113 +474,149 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
     return () => clearTimeout(t);
   }, [phase]);
 
-  // ========== スロット: 事前生成した結果を順番に表示 ==========
-  type SlotRound = { first: SlotLog; second: SlotLog };
-  const [slotRounds, setSlotRounds] = useState<SlotRound[]>([]);
-  const [slotRoundIdx, setSlotRoundIdx] = useState(0);
-  const [slotStep, setSlotStep] = useState<'first'|'second'|'between'>('first');
+  // ========== スロット: 止める！ボタン式 ==========
+  // slotPhase: 'spinning'=回転中(自分のターン), 'opp_spinning'=相手ターン(自動), 'result'=結果表示中, 'done'=終了
+  const [slotPhase, setSlotPhase] = useState<'spinning'|'opp_spinning'|'result'|'done'>('spinning');
+  const [slotMyResult, setSlotMyResult] = useState<SlotLog|null>(null);
+  const [slotOppResult, setSlotOppResult] = useState<SlotLog|null>(null);
 
   useEffect(() => {
     if (phase !== 'slot_battle') return;
-    // 事前に最大5ラウンド分の結果を生成（result.wonに合わせて勝者の役を保証）
-    const getRank = (s: string[]) => {
-      if (s[0]===s[1] && s[1]===s[2]) return { rank: SLOT_RANKS[s[0]]??10, label:`${s[0]}${s[0]}${s[0]} ゾロ目！`, hasRole: true };
-      if (s[0]===s[1] || s[1]===s[2] || s[0]===s[2]) return { rank: 1, label:'2つ揃い', hasRole: true };
-      return { rank: 0, label:'役なし', hasRole: false };
-    };
-    const randSyms = (): string[] => [
-      SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
-      SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
-      SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
-    ];
-    const winSyms = (): string[] => { const s = SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)]; return [s,s,s]; };
-    const loseSyms = (): string[] => {
-      let s: string[];
-      do { s = randSyms(); } while (getRank(s).hasRole);
-      return s;
-    };
-
-    const firstPlayer: 'me'|'opp' = isFirst ? 'me' : 'opp';
-    const secondPlayer: 'me'|'opp' = isFirst ? 'opp' : 'me';
-    const rounds: SlotRound[] = [];
-    // 最初の4ラウンドは両者役なし（盛り上げ演出）、最終ラウンドで勝者に役
-    const totalRounds = 2 + Math.floor(secureRandom() * 2); // 2〜3ラウンド
-    for (let i = 0; i < totalRounds - 1; i++) {
-      const fs = loseSyms(); const fr = getRank(fs);
-      const ss = loseSyms(); const sr = getRank(ss);
-      rounds.push({
-        first: { who: firstPlayer, symbols: fs, rank: fr.rank, label: fr.label },
-        second: { who: secondPlayer, symbols: ss, rank: sr.rank, label: sr.label },
-      });
-    }
-    // 最終ラウンド
-    const winner: 'me'|'opp' = result.won ? 'me' : 'opp';
-    const winnerIsFirst = winner === firstPlayer;
-    const finalFirstSyms = winnerIsFirst ? winSyms() : loseSyms();
-    const finalFirstRank = getRank(finalFirstSyms);
-    const finalSecondSyms = winnerIsFirst ? loseSyms() : winSyms();
-    const finalSecondRank = getRank(finalSecondSyms);
-    rounds.push({
-      first: { who: firstPlayer, symbols: finalFirstSyms, rank: finalFirstRank.rank, label: finalFirstRank.label },
-      second: { who: secondPlayer, symbols: finalSecondSyms, rank: finalSecondRank.rank, label: finalSecondRank.label },
-    });
-
-    setSlotRounds(rounds);
-    setSlotRoundIdx(0);
-    setSlotStep('first');
     setSlotLogs([]);
-    setSlotSpinning(false);
     setSlotSymbols(null);
+    setSlotSpinning(false);
+    setSlotMyResult(null);
+    setSlotOppResult(null);
+    const firstPlayer: 'me'|'opp' = isFirst ? 'me' : 'opp';
     setSlotTurn(firstPlayer);
+    // 自分が先攻なら最初から回転
+    if (isFirst) {
+      setSlotPhase('spinning');
+      setSlotSpinning(true);
+    } else {
+      // 後攻: まず相手（先攻）が自動で回す
+      setSlotPhase('opp_spinning');
+      setSlotSpinning(true);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  // スロット演出進行
+  // 相手ターン自動進行
   useEffect(() => {
-    if (phase !== 'slot_battle' || slotRounds.length === 0) return;
-    if (slotRoundIdx >= slotRounds.length) return;
-    const round = slotRounds[slotRoundIdx];
-
-    if (slotStep === 'first') {
-      setSlotSpinning(true);
-      setSlotSymbols(null);
-      setSlotTurn(round.first.who);
-      const t = setTimeout(() => {
-        setSlotSymbols(round.first.symbols);
-        setSlotSpinning(false);
-        setSlotLogs(prev => [...prev, round.first]);
-        setTimeout(() => setSlotStep('second'), 1200);
-      }, 2000);
-      return () => clearTimeout(t);
-    }
-    if (slotStep === 'second') {
-      setSlotSpinning(true);
-      setSlotSymbols(null);
-      setSlotTurn(round.second.who);
-      const t = setTimeout(() => {
-        setSlotSymbols(round.second.symbols);
-        setSlotSpinning(false);
-        setSlotLogs(prev => [...prev, round.second]);
-        if (slotRoundIdx >= slotRounds.length - 1) {
-          // 最終ラウンド終了
-          setTimeout(() => setPhase('final'), 1500);
-        } else {
-          setTimeout(() => setSlotStep('between'), 1200);
-        }
-      }, 2000);
-      return () => clearTimeout(t);
-    }
-    if (slotStep === 'between') {
-      // 両者役なし表示して次ラウンドへ
-      const t = setTimeout(() => {
-        setSlotRoundIdx(prev => prev + 1);
-        setSlotStep('first');
-        setSlotLogs([]); // 次ラウンド開始時にログリセット
-      }, 800);
-      return () => clearTimeout(t);
-    }
+    if (phase !== 'slot_battle' || slotPhase !== 'opp_spinning') return;
+    // 相手は2〜3秒後に自動で止まる
+    const delay = 2000 + Math.floor(secureRandom() * 1500);
+    const t = setTimeout(() => {
+      const getRank = (s: string[]) => {
+        if (s[0]===s[1] && s[1]===s[2]) return { rank: SLOT_RANKS[s[0]]??10, label:`${s[0]}${s[0]}${s[0]} ゾロ目！` };
+        if (s[0]===s[1] || s[1]===s[2] || s[0]===s[2]) return { rank: 1, label:'2つ揃い' };
+        return { rank: 0, label:'役なし' };
+      };
+      // result.wonを元に相手の出目を決定（相手=先攻 → 自分が勝つなら相手は役なし）
+      let syms: string[];
+      if (!result.won) {
+        // 自分が負け → 相手が先攻かつ勝者 → 役あり
+        const s = SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)];
+        syms = [s, s, s];
+      } else {
+        // 自分が勝ち → 相手は役なし
+        do {
+          syms = [
+            SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+            SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+            SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+          ];
+        } while (getRank(syms).rank > 0);
+      }
+      const r = getRank(syms);
+      const log: SlotLog = { who: 'opp', symbols: syms, rank: r.rank, label: r.label };
+      setSlotOppResult(log);
+      setSlotSymbols(syms);
+      setSlotSpinning(false);
+      setSlotLogs([log]);
+      setSlotTurn('me');
+      // 相手が止まったら少し待って自分のターン開始
+      setTimeout(() => {
+        setSlotSymbols(null);
+        setSlotSpinning(true);
+        setSlotPhase('spinning');
+      }, 1500);
+    }, delay);
+    return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, slotRounds, slotRoundIdx, slotStep]);
+  }, [phase, slotPhase]);
+
+  const handleSlotStop = () => {
+    if (phase !== 'slot_battle' || slotPhase !== 'spinning') return;
+    const getRank = (s: string[]) => {
+      if (s[0]===s[1] && s[1]===s[2]) return { rank: SLOT_RANKS[s[0]]??10, label:`${s[0]}${s[0]}${s[0]} ゾロ目！` };
+      if (s[0]===s[1] || s[1]===s[2] || s[0]===s[2]) return { rank: 1, label:'2つ揃い' };
+      return { rank: 0, label:'役なし' };
+    };
+    // 自分の出目: result.wonに合わせて決定
+    let syms: string[];
+    if (result.won) {
+      const s = SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)];
+      syms = [s, s, s];
+    } else {
+      // 自分は負け: 相手が先攻なら役なし。後攻でも役なし（相手は先攻で勝ち）
+      // ただし自分が先攻で負ける場合は役なしにする
+      do {
+        syms = [
+          SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+          SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+          SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+        ];
+      } while (getRank(syms).rank > 0);
+    }
+    const r = getRank(syms);
+    const log: SlotLog = { who: 'me', symbols: syms, rank: r.rank, label: r.label };
+    setSlotMyResult(log);
+    setSlotSymbols(syms);
+    setSlotSpinning(false);
+    setSlotLogs(prev => [...prev, log]);
+    setSlotPhase('result');
+    // 自分が止めたあと相手のターン（自分が先攻の場合）か終了（自分が後攻の場合）
+    if (isFirst) {
+      // 自分が先攻 → 相手が後攻 → 相手が自動で回す
+      setTimeout(() => {
+        setSlotTurn('opp');
+        setSlotSymbols(null);
+        setSlotSpinning(true);
+        setSlotPhase('opp_spinning');
+        // 後攻相手の自動処理
+        const oppDelay = 2000 + Math.floor(secureRandom() * 1500);
+        setTimeout(() => {
+          let oppSyms: string[];
+          if (!result.won) {
+            // 自分が負け = 相手（後攻）が勝者: でもこれは矛盾（先攻で役なし自分、後攻で役あり相手）
+            const s = SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)];
+            oppSyms = [s, s, s];
+          } else {
+            do {
+              oppSyms = [
+                SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+                SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+                SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+              ];
+            } while (getRank(oppSyms).rank > 0);
+          }
+          const or = getRank(oppSyms);
+          const oppLog: SlotLog = { who: 'opp', symbols: oppSyms, rank: or.rank, label: or.label };
+          setSlotOppResult(oppLog);
+          setSlotSymbols(oppSyms);
+          setSlotSpinning(false);
+          setSlotLogs(prev => [...prev, oppLog]);
+          setSlotPhase('done');
+          setTimeout(() => setPhase('final'), 1800);
+        }, oppDelay);
+      }, 1200);
+    } else {
+      // 自分が後攻 → 終了
+      setSlotPhase('done');
+      setTimeout(() => setPhase('final'), 1800);
+    }
+  };
 
   // ========== render ==========
   return (
@@ -769,12 +805,12 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
         </>
       )}
 
-      {/* スロット: 交互演出 */}
+      {/* スロット: 止める！ボタン式 */}
       {phase === 'slot_battle' && (
         <>
-          <div style={{ fontSize:'1.1rem', color:'#f0c060', fontWeight:700 }}>🎰 スロット — 交互対決！</div>
+          <div style={{ fontSize:'1.1rem', color:'#f0c060', fontWeight:700 }}>🎰 スロット — 止めて勝負！</div>
           <div style={{ fontSize:'0.82rem', color: slotTurn==='me'?'#5b8dee':'#e05555', fontWeight:700 }}>
-            {slotTurn==='me'?'⬇ あなたのターン！':` ⬇ ${opponentName}のターン！`}
+            {slotPhase === 'opp_spinning' ? `⏳ ${opponentName}が回転中...` : slotPhase === 'spinning' ? '⬇ あなたのターン！止めて！' : ''}
           </div>
           {/* リール */}
           <div style={{ background:'rgba(0,0,0,0.5)', border:'3px solid #f0c060', borderRadius:16, padding:'16px 20px' }}>
@@ -790,14 +826,29 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
               </div>
             )}
           </div>
-          {/* ログ */}
-          <div style={{ maxHeight:120, overflowY:'auto', width:'100%', maxWidth:320 }}>
-            {slotLogs.map((l,i) => (
-              <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:'0.75rem', padding:'3px 0', color: l.rank>0?(l.who==='me'?'#5b8dee':'#e05555'):'#4a5070', animation:'slideIn 0.3s ease' }}>
-                <span>{l.who==='me'?'あなた':opponentName}: {l.symbols.join('')}</span>
-                <span>{l.label}</span>
+          {/* 止めるボタン */}
+          {slotPhase === 'spinning' && (
+            <button onClick={handleSlotStop}
+              style={{ padding:'14px 48px', background:'linear-gradient(135deg,#e05555,#a02020)', color:'#fff', border:'none', borderRadius:12, cursor:'pointer', fontWeight:900, fontSize:'1.2rem', animation:'glow 0.8s infinite', boxShadow:'0 0 20px rgba(224,85,85,0.5)' }}>
+              🛑 止める！
+            </button>
+          )}
+          {/* 結果ログ */}
+          <div style={{ display:'flex', gap:12, width:'100%', maxWidth:320 }}>
+            {slotMyResult && (
+              <div style={{ flex:1, background:'rgba(91,141,238,0.1)', border:'1px solid #5b8dee', borderRadius:8, padding:'8px 10px', textAlign:'center' }}>
+                <div style={{ fontSize:'0.7rem', color:'#5b8dee', marginBottom:4 }}>あなた</div>
+                <div style={{ fontSize:'1.2rem' }}>{slotMyResult.symbols.join('')}</div>
+                <div style={{ fontSize:'0.72rem', color: slotMyResult.rank>0?'#f0c060':'#4a5070', marginTop:2 }}>{slotMyResult.label}</div>
               </div>
-            ))}
+            )}
+            {slotOppResult && (
+              <div style={{ flex:1, background:'rgba(224,85,85,0.1)', border:'1px solid #e05555', borderRadius:8, padding:'8px 10px', textAlign:'center' }}>
+                <div style={{ fontSize:'0.7rem', color:'#e05555', marginBottom:4 }}>{opponentName}</div>
+                <div style={{ fontSize:'1.2rem' }}>{slotOppResult.symbols.join('')}</div>
+                <div style={{ fontSize:'0.72rem', color: slotOppResult.rank>0?'#f0c060':'#4a5070', marginTop:2 }}>{slotOppResult.label}</div>
+              </div>
+            )}
           </div>
         </>
       )}
