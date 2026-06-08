@@ -3,7 +3,7 @@
 // PvP対戦機能追加
 import { GameIcon } from '../icons';
 import { secureRandom } from '../../utils/random';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { GAMBLE_MASTER, ITEM_MASTER } from '../../data/masters';
 import { playChohan, playChinchiro, dealPoker, drawPoker } from '../../systems/minigames';
@@ -242,10 +242,23 @@ function SlotReel({ finalSymbol, spinning, delay = 0 }: { finalSymbol: string|nu
   );
 }
 
-function BattleAnimation({ opponentName, gameName, result, onDone }: {
+// 決定論的擬似乱数（battleIdをシードに）
+function makeSeededRng(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) { h = Math.imul(31, h) + seed.charCodeAt(i) | 0; }
+  let s = h >>> 0;
+  return () => {
+    s ^= s << 13; s ^= s >> 17; s ^= s << 5;
+    return (s >>> 0) / 0xffffffff;
+  };
+}
+
+function BattleAnimation({ opponentName, gameName, result, battleId, iAmHost, onDone }: {
   opponentName: string;
   gameName: string;
   result: { won: boolean; amount: number };
+  battleId: string;
+  iAmHost: boolean;
   onDone: () => void;
 }) {
   const GAME_NAMES_JP: Record<string, string> = {
@@ -253,14 +266,25 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
   };
   const gameNameJp = GAME_NAMES_JP[gameName] ?? gameName;
 
+  // battleIdをシードにした決定論的乱数（両プレイヤーで同じ結果になる）
+  const rng = useMemo(() => makeSeededRng(battleId), [battleId]);
+
   type Phase = 'dice_roll' | 'choose' | 'chohan_roll' | 'coin_toss' | 'chinchiro_battle' | 'slot_battle' | 'final';
   const [phase, setPhase] = useState<Phase>('dice_roll');
 
-  // 先攻決め
+  // 先攻決め（battleIdから決定論的に計算）
+  // hostのサイコロ > guestのサイコロ → hostが先攻
+  const hostDiceVal = useMemo(() => Math.floor(rng()*6)+1, []);  // eslint-disable-line
+  const guestDiceVal = useMemo(() => { let v; do { v = Math.floor(rng()*6)+1; } while (v === hostDiceVal); return v; }, []); // eslint-disable-line
+  // iAmHost=trueなら自分=host, falseなら自分=guest
+  const myDiceFixed = iAmHost ? hostDiceVal : guestDiceVal;
+  const oppDiceFixed = iAmHost ? guestDiceVal : hostDiceVal;
+  const isFirstFixed = myDiceFixed > oppDiceFixed; // 自分が先攻か
+
   const [myDice, setMyDice] = useState(0);
   const [oppDice, setOppDice] = useState(0);
   const [diceRolling, setDiceRolling] = useState(true);
-  const [isFirst, setIsFirst] = useState(true);
+  const [isFirst] = useState(isFirstFixed);
   const [myChoice, setMyChoice] = useState<string>('');
 
   // 丁半
@@ -305,11 +329,7 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
       cnt++;
       if (cnt >= 20) {
         clearInterval(t);
-        const my = Math.floor(secureRandom()*6)+1;
-        let opp = Math.floor(secureRandom()*6)+1;
-        while (opp === my) opp = Math.floor(secureRandom()*6)+1;
-        setMyDice(my); setOppDice(opp);
-        setIsFirst(my > opp);
+        setMyDice(myDiceFixed); setOppDice(oppDiceFixed);
         setDiceRolling(false);
         setTimeout(() => setPhase('choose'), 1200);
       }
@@ -351,8 +371,8 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
     setChohanRolling(true);
     setChohanDice(null);
     const t = setTimeout(() => {
-      const d1 = Math.floor(secureRandom()*6)+1;
-      const d2 = Math.floor(secureRandom()*6)+1;
+      const d1 = Math.floor(rng()*6)+1;
+      const d2 = Math.floor(rng()*6)+1;
       const sum = d1+d2;
       const isEven = sum%2===0;
       setChohanDice([d1,d2]);
@@ -384,7 +404,7 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
     setCoinFlipping(true);
     setCoinFace(null);
     const t = setTimeout(() => {
-      const face: 'omote'|'ura' = secureRandom() < 0.5 ? 'omote' : 'ura';
+      const face: 'omote'|'ura' = rng() < 0.5 ? 'omote' : 'ura';
       // 先攻は「表」を選んだとする（myChoiceで管理）
       const myPickOmote = (isFirst ? myChoice : (myChoice||'ura')) === 'omote';
       // ターン: 0=先攻, 1=後攻, 2=先攻, 3=後攻, 4=先攻, 5=後攻
@@ -418,22 +438,24 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
     const winner: 'me'|'opp' = result.won ? 'me' : 'opp';
     const loser: 'me'|'opp' = winner === 'me' ? 'opp' : 'me';
 
+    const rollD3 = () => [Math.floor(rng()*6)+1, Math.floor(rng()*6)+1, Math.floor(rng()*6)+1];
+
     const makeWinDice = (): { dice: number[]; rank: ChinchiroRank } => {
       let d: number[], r: ChinchiroRank;
-      do { d = rollDice3(); r = evalChinchiro(d); } while (r.type === 'nashi');
+      do { d = rollD3(); r = evalChinchiro(d); } while (r.type === 'nashi');
       return { dice: d, rank: r };
     };
     const makeLoseDice = (): { dice: number[]; rank: ChinchiroRank } => {
       let d: number[], r: ChinchiroRank, attempts = 0;
-      do { d = rollDice3(); r = evalChinchiro(d); attempts++; } while (r.type !== 'nashi' && attempts < 10);
-      if (r.type !== 'nashi') { d = [1,2,4]; r = evalChinchiro(d); } // fallback 役なし確定
+      do { d = rollD3(); r = evalChinchiro(d); attempts++; } while (r.type !== 'nashi' && attempts < 10);
+      if (r.type !== 'nashi') { d = [1,2,4]; r = evalChinchiro(d); }
       return { dice: d, rank: r };
     };
 
     // 演出用：1〜2回役なし後に結果
     const oppFirst = true; // 相手（子）が先攻
     const rounds: Array<{who:'me'|'opp'; dice:number[]; rank:ChinchiroRank}[]> = [];
-    const extraRounds = Math.floor(secureRandom() * 2); // 0〜1回の役なしラウンド
+    const extraRounds = Math.floor(rng() * 2); // 0〜1回の役なしラウンド
     for (let i = 0; i < extraRounds; i++) {
       rounds.push([
         { who: oppFirst ? 'opp' : 'me', ...makeLoseDice() },
@@ -504,7 +526,7 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
   useEffect(() => {
     if (phase !== 'slot_battle' || slotPhase !== 'opp_spinning') return;
     // 相手は2〜3秒後に自動で止まる
-    const delay = 2000 + Math.floor(secureRandom() * 1500);
+    const delay = 2000 + Math.floor(rng() * 1500);
     const t = setTimeout(() => {
       const getRank = (s: string[]) => {
         if (s[0]===s[1] && s[1]===s[2]) return { rank: SLOT_RANKS[s[0]]??10, label:`${s[0]}${s[0]}${s[0]} ゾロ目！` };
@@ -515,15 +537,15 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
       let syms: string[];
       if (!result.won) {
         // 自分が負け → 相手が先攻かつ勝者 → 役あり
-        const s = SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)];
+        const s = SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)];
         syms = [s, s, s];
       } else {
         // 自分が勝ち → 相手は役なし
         do {
           syms = [
-            SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
-            SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
-            SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+            SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
+            SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
+            SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
           ];
         } while (getRank(syms).rank > 0);
       }
@@ -555,16 +577,16 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
     // 自分の出目: result.wonに合わせて決定
     let syms: string[];
     if (result.won) {
-      const s = SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)];
+      const s = SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)];
       syms = [s, s, s];
     } else {
       // 自分は負け: 相手が先攻なら役なし。後攻でも役なし（相手は先攻で勝ち）
       // ただし自分が先攻で負ける場合は役なしにする
       do {
         syms = [
-          SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
-          SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
-          SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+          SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
+          SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
+          SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
         ];
       } while (getRank(syms).rank > 0);
     }
@@ -584,19 +606,19 @@ function BattleAnimation({ opponentName, gameName, result, onDone }: {
         setSlotSpinning(true);
         setSlotPhase('opp_spinning');
         // 後攻相手の自動処理
-        const oppDelay = 2000 + Math.floor(secureRandom() * 1500);
+        const oppDelay = 2000 + Math.floor(rng() * 1500);
         setTimeout(() => {
           let oppSyms: string[];
           if (!result.won) {
             // 自分が負け = 相手（後攻）が勝者: でもこれは矛盾（先攻で役なし自分、後攻で役あり相手）
-            const s = SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)];
+            const s = SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)];
             oppSyms = [s, s, s];
           } else {
             do {
               oppSyms = [
-                SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
-                SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
-                SLOT_SYMBOLS[Math.floor(secureRandom()*SLOT_SYMBOLS.length)],
+                SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
+                SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
+                SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
               ];
             } while (getRank(oppSyms).rank > 0);
           }
@@ -1435,7 +1457,7 @@ function PvPPanel({ bet }: { bet: number }) {
   const [myBattleId, setMyBattleId] = useState<string | null>(null);
   const [selectedGame, setSelectedGame] = useState('chohan');
   const [loading, setLoading] = useState(false);
-  const [battleAnim, setBattleAnim] = useState<{ opponentName: string; gameName: string; result: { won: boolean; amount: number } } | null>(null);
+  const [battleAnim, setBattleAnim] = useState<{ opponentName: string; gameName: string; result: { won: boolean; amount: number }; battleId: string; iAmHost: boolean } | null>(null);
   // ホスト側：既に金を処理済みかフラグ管理
   const processedBattleRef = useState<Set<string>>(() => new Set())[0];
 
@@ -1461,6 +1483,8 @@ function PvPPanel({ bet }: { bet: number }) {
           opponentName: battle.guestName ?? '相手',
           gameName: battle.gambleType,
           result: { won: iWon, amount: battle.betAmount },
+          battleId: battle.id,
+          iAmHost: true,
         });
         setMyBattleId(null);
       }
@@ -1524,6 +1548,8 @@ function PvPPanel({ bet }: { bet: number }) {
           opponentName: battle.hostName,
           gameName: battle.gambleType,
           result: { won: iWon, amount: battle.betAmount },
+          battleId: battle.id,
+          iAmHost: false,
         });
       } else {
         // 参加失敗→返金
@@ -1547,6 +1573,8 @@ function PvPPanel({ bet }: { bet: number }) {
           opponentName={battleAnim.opponentName}
           gameName={battleAnim.gameName}
           result={battleAnim.result}
+          battleId={battleAnim.battleId}
+          iAmHost={battleAnim.iAmHost}
           onDone={() => setBattleAnim(null)}
         />
       )}
@@ -2004,7 +2032,7 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0,
     }
     setPick(choice);
     setAnimating(true);
-    pendingRef.isHeads = secureRandom() < 0.5;
+    pendingRef.isHeads = rng() < 0.5;
     setShowAnim(true);
   };
 
