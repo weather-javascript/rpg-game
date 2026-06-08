@@ -7,7 +7,8 @@ import { DUNGEON_MASTER, MONSTER_MASTER, ITEM_MASTER } from '../../data/masters'
 import type { MonsterMaster, DungeonRunState, DungeonMaster, WeaponPassiveSkill, WeaponRegenSkill, WeaponShieldSkill, WeaponManaSkill, PlayerData } from '../../types/game';
 import type { EquipmentSlots } from '../../types/game';
 import { defaultEquipmentSlots } from '../../types/game';
-import { postActivityFeed } from '../../services/multiplayer';
+import { postActivityFeed, subscribeMonsterOverrides, subscribeDungeonOverrides } from '../../services/multiplayer';
+import type { MonsterOverride, DungeonOverride } from '../../services/multiplayer';
 
 // ============================================================
 // 戦闘ロジック（1ターン分）
@@ -56,6 +57,28 @@ interface TurnBattleState {
   pendingAction: null | { type: 'attack' | 'weapon' | 'ultimate'; itemId?: string };
 }
 
+// ============================================================
+// モンスター・ダンジョンオーバーライドキャッシュ（モジュールレベル）
+// ============================================================
+let _monsterOverrideCache: Record<string, MonsterOverride> = {};
+let _dungeonOverrideCache: Record<string, DungeonOverride> = {};
+
+function getMergedMonster(id: string): MonsterMaster {
+  const base = MONSTER_MASTER[id];
+  const ov = _monsterOverrideCache[id];
+  if (!base || !ov) return base;
+  return {
+    ...base,
+    maxHp: ov.maxHp ?? base.maxHp,
+    attack: ov.attack ?? base.attack,
+    defense: ov.defense ?? base.defense,
+    baseExp: ov.baseExp ?? base.baseExp,
+    baseGold: ov.baseGold ?? base.baseGold,
+    specialAttack: ov.specialAttack ?? base.specialAttack,
+    drops: ov.drops ?? base.drops,
+  };
+}
+
 // ターゲット選択モーダル
 function TargetSelectModal({ enemies, onSelect, onCancel }: {
   enemies: EnemyState[];
@@ -68,7 +91,7 @@ function TargetSelectModal({ enemies, onSelect, onCancel }: {
         <div style={{ fontWeight:700, color:'#e05555', marginBottom:12, textAlign:'center' }}>🎯 誰に攻撃する？</div>
         {enemies.map((e, i) => {
           if (e.hp <= 0) return null;
-          const m = MONSTER_MASTER[e.monsterId];
+          const m = getMergedMonster(e.monsterId);
           const pct = (e.hp / e.maxHp) * 100;
           return (
             <button key={i} onClick={() => onSelect(i)}
@@ -99,20 +122,20 @@ function spawnEnemies(dungeon: DungeonMaster, areaIdx: number, _kxPhase?: number
     const area = areas[areaIdx];
     // ボスエリアはボスのみ単体
     const bossEntry = area.monsters.find(m => {
-      const mon = MONSTER_MASTER[m.monsterId];
+      const mon = getMergedMonster(m.monsterId);
       return mon?.isBoss;
     });
     if (bossEntry) {
-      const m = MONSTER_MASTER[bossEntry.monsterId];
+      const m = getMergedMonster(bossEntry.monsterId);
       return [{ monsterId: bossEntry.monsterId, hp: m?.maxHp ?? 50, maxHp: m?.maxHp ?? 50 }];
     }
     pool = area.monsters.flatMap(m => Array(m.count).fill(m.monsterId));
   } else {
-    pool = (dungeon.monsterIds ?? []).filter(id => !MONSTER_MASTER[id]?.isBoss);
+    pool = (dungeon.monsterIds ?? []).filter(id => !getMergedMonster(id)?.isBoss);
   }
   if (pool.length === 0) return [];
   // ボス含まれていれば除外
-  const nonBossPool = pool.filter(id => !MONSTER_MASTER[id]?.isBoss);
+  const nonBossPool = pool.filter(id => !getMergedMonster(id)?.isBoss);
   const finalPool = nonBossPool.length > 0 ? nonBossPool : pool;
   const maxEnemies = dungeon.id === 'sky_castle_ex' ? 15 : 3;
   const count = Math.min(finalPool.length, randomIntRange(1, maxEnemies));
@@ -120,7 +143,7 @@ function spawnEnemies(dungeon: DungeonMaster, areaIdx: number, _kxPhase?: number
   const result: EnemyState[] = [];
   for (let i = 0; i < count; i++) {
     const id = finalPool[randomInt(finalPool.length)];
-    const m = MONSTER_MASTER[id];
+    const m = getMergedMonster(id);
     result.push({ monsterId: id, hp: m?.maxHp ?? 50, maxHp: m?.maxHp ?? 50 });
   }
   return result;
@@ -256,7 +279,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
   const changeSatiety = useGameStore(s => s.changeSatiety);
   const addNotification = useGameStore(s => s.addNotification);
 
-  const dungeon = DUNGEON_MASTER[runState.dungeonId];
+  const dungeon = { ...DUNGEON_MASTER[runState.dungeonId], areas: _dungeonOverrideCache[runState.dungeonId]?.areas ?? DUNGEON_MASTER[runState.dungeonId]?.areas };
   const combatLv = player.skillLevels['combat'] ?? 1;
 
   // 初期敵グループ生成
@@ -266,7 +289,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     const hotbarWeaponId = equipment.hotbar.find(id => id && ITEM_MASTER[id]?.itemType === 'Weapon') ?? null;
     const weaponItem = hotbarWeaponId ? ITEM_MASTER[hotbarWeaponId] : null;
     const manaSkill = weaponItem?.weaponSkills?.find((s): s is WeaponManaSkill => s.type === 'mana_charge');
-    const names = enemies.map(e => MONSTER_MASTER[e.monsterId]?.name ?? '?').join('、');
+    const names = enemies.map(e => getMergedMonster(e.monsterId)?.name ?? '?').join('、');
     return {
       enemies,
       targetIdx: 0,
@@ -299,7 +322,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     let totalExp = 0, totalGold = 0;
     const totalDrops: { itemId: string; amount: number }[] = [];
     for (const e of enemies) {
-      const m = MONSTER_MASTER[e.monsterId];
+      const m = getMergedMonster(e.monsterId);
       if (!m) continue;
       const exp = Math.floor(m.baseExp * dungeon.expBonus * (1 + combatLv * 0.01));
       const gold = Math.floor(m.baseGold * dungeon.goldBonus * (0.8 + secureRandom() * 0.4));
@@ -367,7 +390,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
 
     // 生存敵が順に攻撃
     for (const enemy of aliveAfterPassive) {
-      const monster = MONSTER_MASTER[enemy.monsterId];
+      const monster = getMergedMonster(enemy.monsterId);
       if (!monster) continue;
       const isSpecial = monster.isBoss && randomChance(0.2);
       let mDmg = isSpecial
@@ -406,7 +429,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     const newEnemies = battle.enemies.map((e, i) => {
       if (e.hp <= 0) return e;
       if (!isArea && i !== targetIdx) return e;
-      const mon = MONSTER_MASTER[e.monsterId];
+      const mon = getMergedMonster(e.monsterId);
       const dmg = areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0);
       return { ...e, hp: Math.max(0, e.hp - dmg) };
     });
@@ -414,7 +437,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     const totalDmg = battle.enemies.reduce((acc, e, i) => {
       if (e.hp <= 0) return acc;
       if (!isArea && i !== targetIdx) return acc;
-      const mon = MONSTER_MASTER[e.monsterId];
+      const mon = getMergedMonster(e.monsterId);
       return acc + (areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0));
     }, 0);
 
@@ -518,7 +541,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       const newEnemies = battle.enemies.map((e, i) => {
         if (e.hp <= 0) return e;
         if (!isArea && i !== targetIdx) return e;
-        const mon = MONSTER_MASTER[e.monsterId];
+        const mon = getMergedMonster(e.monsterId);
         const atkBase = item.weaponAtk ?? (item.useEffect?.attackBonus ? player.stats.attack + item.useEffect.attackBonus : player.stats.attack);
         const dmg = areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0);
         return { ...e, hp: Math.max(0, e.hp - dmg) };
@@ -625,7 +648,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
                 setBattle(prev => {
                   const newEnemies = prev.enemies.map((e, i) => {
                     if (e.hp <= 0 || i !== idx) return e;
-                    const mon = MONSTER_MASTER[e.monsterId];
+                    const mon = getMergedMonster(e.monsterId);
                     const dmg = calcDamage(atkBase, mon?.defense ?? 0);
                     return { ...e, hp: Math.max(0, e.hp - dmg) };
                   });
@@ -649,7 +672,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       {/* 敵HP表示（複数対応） */}
       <div style={{ marginBottom: 10 }}>
         {battle.enemies.map((enemy, i) => {
-          const monster = MONSTER_MASTER[enemy.monsterId];
+          const monster = getMergedMonster(enemy.monsterId);
           const mHpPct = (enemy.hp / enemy.maxHp) * 100;
           const isDead = enemy.hp <= 0;
           return (
@@ -1493,6 +1516,33 @@ export function DungeonScreen() {
   const recordDungeonClear = useGameStore(s => s.recordDungeonClear);
   const isDungeonUnlocked = useGameStore(s => s.isDungeonUnlocked);
 
+  const [monsterOverrides, setMonsterOverridesState] = useState<Record<string, MonsterOverride>>({});
+  const [dungeonOverrides, setDungeonOverridesState] = useState<Record<string, DungeonOverride>>({});
+
+  useEffect(() => {
+    const u1 = subscribeMonsterOverrides(o => {
+      if (o) { setMonsterOverridesState(o); _monsterOverrideCache = o; }
+    });
+    const u2 = subscribeDungeonOverrides(o => {
+      if (o) { setDungeonOverridesState(o); _dungeonOverrideCache = o; }
+    });
+    return () => { u1(); u2(); };
+  }, []);
+
+  // マスターデータにオーバーライドをマージ
+
+  const getDungeon = (id: string): typeof DUNGEON_MASTER[string] => {
+    const base = DUNGEON_MASTER[id];
+    const ov = dungeonOverrides[id];
+    if (!base || !ov) return base;
+    return {
+      ...base,
+      areas: ov.areas ?? base.areas,
+    };
+  };
+
+  void monsterOverrides; // suppress unused warning
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [runState, setRunState] = useState<DungeonRunState | null>(null);
   const [inBattle, setInBattle] = useState(false);
@@ -1510,7 +1560,7 @@ export function DungeonScreen() {
 
   const startDungeon = useCallback(() => {
     if (!player || !selectedId) return;
-    const dungeon = DUNGEON_MASTER[selectedId];
+    const dungeon = getDungeon(selectedId);
     const combatLv = player.skillLevels['combat'] ?? 1;
     if (!dungeon || combatLv < dungeon.requiredLevel) {
       addNotification('warning', `戦闘スキルLv.${dungeon?.requiredLevel}以上が必要です（現在: Lv.${combatLv}）`);
@@ -1518,7 +1568,7 @@ export function DungeonScreen() {
     }
     if (!isDungeonUnlocked(selectedId)) { addNotification('error', '🔒 このダンジョンはまだ解放されていません'); return; }
     if (player.stats.hp <= 0) { addNotification('error', 'HPが0です。回復してから挑戦してください。'); return; }
-    setRunState({ dungeonId: selectedId, currentFloor: 1, currentAreaName: DUNGEON_MASTER[selectedId]?.areas?.[0]?.name ?? 'エリア1', monstersDefeated: 0, totalExp: 0, totalGold: 0, totalDrops: [], isComplete: false, isFailed: false, currentAreaIdx: 0 });
+    setRunState({ dungeonId: selectedId, currentFloor: 1, currentAreaName: getDungeon(selectedId)?.areas?.[0]?.name ?? 'エリア1', monstersDefeated: 0, totalExp: 0, totalGold: 0, totalDrops: [], isComplete: false, isFailed: false, currentAreaIdx: 0 });
     setRunLog([`⚔️ ${dungeon.name} に突入！`]);
     setInBattle(false);
     setDungeonMana(0);
@@ -1527,7 +1577,7 @@ export function DungeonScreen() {
   const handleBattleEnd = useCallback((won: boolean, expGained: number, goldGained: number, drops: {itemId:string;amount:number}[], _hpDelta: number) => {
     setInBattle(false);
     if (!runState || !player) return;
-    const dungeon = DUNGEON_MASTER[runState.dungeonId];
+    const dungeon = getDungeon(runState.dungeonId);
 
     applyHungerPenalty();
     changeSatiety(-3);

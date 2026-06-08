@@ -5,21 +5,12 @@ import { useState, useEffect } from 'react';
 import { GameIcon } from '../icons';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
-import { subscribeItemPrices } from '../../services/multiplayer';
+import { subscribeItemPrices, subscribeTradeRecipes } from '../../services/multiplayer';
+import type { TradeRecipe } from '../../services/multiplayer';
 
 type ShopTab = 'sell' | 'buy' | 'satiety' | 'use' | 'trade';
 
-// 取引ブース定義
-interface TradeRecipe {
-  id: string;
-  name: string;
-  inputs: { itemId: string; amount: number }[];
-  outputItemId: string;
-  outputAmount: number;
-  description: string;
-}
-
-const TRADE_RECIPES: TradeRecipe[] = [
+const DEFAULT_TRADE_RECIPES: TradeRecipe[] = [
   {
     id: 'trade_cave_staff',
     name: '洞窟の杖と交換',
@@ -54,9 +45,17 @@ export function MarketScreen() {
   const addNotification = useGameStore(s => s.addNotification);
   const [shopTab, setShopTab] = useState<ShopTab>('sell');
   const [priceOverrides, setPriceOverrides] = useState<Record<string, { buyPrice: number; sellPrice: number }>>({});
+  const [tradeRecipes, setTradeRecipes] = useState<TradeRecipe[]>(DEFAULT_TRADE_RECIPES);
 
   useEffect(() => {
     const unsub = subscribeItemPrices(p => setPriceOverrides(p));
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeTradeRecipes(r => {
+      if (r && r.length > 0) setTradeRecipes(r);
+    });
     return unsub;
   }, []);
 
@@ -133,8 +132,8 @@ export function MarketScreen() {
     addNotification('success', `🍖 満腹度上限が ${newMaxSatiety} になりました！`);
   };
 
-  const inventoryEntries = Object.entries(player?.inventory ?? {}).filter(([, qty]) => qty > 0);
-  const sellable = inventoryEntries.map(([id, qty]) => ({ item: ITEM_MASTER[id], qty, id, sellPrice: getEffectivePrice(id).sellPrice })).filter(e => e.item && e.sellPrice > 0);
+  const inventoryEntries = Object.entries(player?.inventory ?? {}).filter(([, qty]) => (qty as number) > 0);
+  const sellable = inventoryEntries.map(([id, qty]) => ({ item: ITEM_MASTER[id], qty: qty as number, id, sellPrice: getEffectivePrice(id).sellPrice })).filter(e => e.item && e.sellPrice > 0);
   const buyable = Object.values(ITEM_MASTER).filter(item => getEffectivePrice(item.id).buyPrice > 0);
   const usable = inventoryEntries.map(([id, qty]) => ({ item: ITEM_MASTER[id], qty, id })).filter(e => e.item?.useEffect && e.item?.category === 'food');
 
@@ -299,7 +298,7 @@ export function MarketScreen() {
           <p style={{fontSize:'0.78rem', color:'#8a92b2', marginBottom:12, lineHeight:1.6}}>
             🏪 素材を納めると特別なアイテムと交換してもらえます。
           </p>
-          {TRADE_RECIPES.map(recipe => {
+          {tradeRecipes.map(recipe => {
             const outputItem = ITEM_MASTER[recipe.outputItemId];
             const canTrade = recipe.inputs.every(inp => (player?.inventory[inp.itemId] ?? 0) >= inp.amount);
             return (

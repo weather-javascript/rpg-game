@@ -1184,3 +1184,93 @@ export function subscribeTreasureProbs(cb: (entries: TreasureProbEntry[] | null)
     cb(snap.exists() ? (snap.data().entries as TreasureProbEntry[]) : null);
   });
 }
+
+// ============================================================
+// 取引レシピ管理
+// ============================================================
+export interface TradeRecipeInput { itemId: string; amount: number; }
+export interface TradeRecipe {
+  id: string;
+  name: string;
+  description: string;
+  inputs: TradeRecipeInput[];
+  outputItemId: string;
+  outputAmount: number;
+}
+
+export async function getTradeRecipes(): Promise<TradeRecipe[] | null> {
+  try {
+    const snap = await getDoc(doc(db, 'admin', 'trade_recipes'));
+    return snap.exists() ? (snap.data().recipes as TradeRecipe[]) : null;
+  } catch { return null; }
+}
+
+export async function setTradeRecipes(recipes: TradeRecipe[]): Promise<void> {
+  await setDoc(doc(db, 'admin', 'trade_recipes'), { recipes });
+}
+
+export function subscribeTradeRecipes(cb: (recipes: TradeRecipe[] | null) => void): () => void {
+  return onSnapshot(doc(db, 'admin', 'trade_recipes'), snap => {
+    cb(snap.exists() ? (snap.data().recipes as TradeRecipe[]) : null);
+  });
+}
+
+// ============================================================
+// ダンジョン・モンスターオーバーライド
+// ============================================================
+export interface MonsterOverride {
+  id: string;
+  maxHp?: number;
+  attack?: number;
+  defense?: number;
+  baseExp?: number;
+  baseGold?: number;
+  specialAttack?: string;
+  drops?: { itemId: string; baseRate: number; minAmount: number; maxAmount: number }[];
+}
+
+export interface DungeonAreaOverride {
+  name: string;
+  monsters: { monsterId: string; count: number; isBoss?: boolean }[];
+  isHardArea?: boolean;
+  description?: string;
+}
+
+export interface DungeonOverride {
+  id: string;
+  areas?: DungeonAreaOverride[];
+}
+
+export async function getMonsterOverrides(): Promise<Record<string, MonsterOverride> | null> {
+  try {
+    const snap = await getDoc(doc(db, 'admin', 'monster_overrides'));
+    return snap.exists() ? (snap.data().overrides as Record<string, MonsterOverride>) : null;
+  } catch { return null; }
+}
+
+export async function setMonsterOverrides(overrides: Record<string, MonsterOverride>): Promise<void> {
+  await setDoc(doc(db, 'admin', 'monster_overrides'), { overrides });
+}
+
+export function subscribeMonsterOverrides(cb: (o: Record<string, MonsterOverride> | null) => void): () => void {
+  return onSnapshot(doc(db, 'admin', 'monster_overrides'), snap => {
+    cb(snap.exists() ? (snap.data().overrides as Record<string, MonsterOverride>) : null);
+  });
+}
+
+export async function getDungeonOverrides(): Promise<Record<string, DungeonOverride> | null> {
+  try {
+    const snap = await getDoc(doc(db, 'admin', 'dungeon_overrides'));
+    return snap.exists() ? (snap.data().overrides as Record<string, DungeonOverride>) : null;
+  } catch { return null; }
+}
+
+export async function setDungeonOverrides(overrides: Record<string, DungeonOverride>): Promise<void> {
+  await setDoc(doc(db, 'admin', 'dungeon_overrides'), { overrides });
+}
+
+export function subscribeDungeonOverrides(cb: (o: Record<string, DungeonOverride> | null) => void): () => void {
+  return onSnapshot(doc(db, 'admin', 'dungeon_overrides'), snap => {
+    cb(snap.exists() ? (snap.data().overrides as Record<string, DungeonOverride>) : null);
+  });
+}

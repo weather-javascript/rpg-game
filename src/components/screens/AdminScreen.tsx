@@ -1,4 +1,5 @@
 // src/components/screens/AdminScreen.tsx
+import React from 'react';
 import { GameIcon } from '../icons';
 import { useState, useEffect } from 'react';
 import {
@@ -10,13 +11,16 @@ import {
   getItemPrices, setItemPrices,
   subscribeProposals, updateProposalStatus, Proposal,
   getTreasureProbs, setTreasureProbs,
+  getTradeRecipes, setTradeRecipes as saveTradeRecipes,
+  getMonsterOverrides, setMonsterOverrides,
+  getDungeonOverrides, setDungeonOverrides,
 } from '../../services/multiplayer';
-import type { TreasureProbEntry } from '../../services/multiplayer';
-import { GAMBLE_MASTER, DUNGEON_MASTER, ITEM_MASTER, CRAFT_RECIPES } from '../../data/masters';
+import type { TreasureProbEntry, TradeRecipe, MonsterOverride, DungeonOverride } from '../../services/multiplayer';
+import { GAMBLE_MASTER, DUNGEON_MASTER, ITEM_MASTER, MONSTER_MASTER, CRAFT_RECIPES } from '../../data/masters';
 import type { CraftRecipe } from '../../types/game';
 import { useGameStore } from '../../stores/gameStore';
 
-type SubTab = 'players' | 'gamble' | 'items' | 'announce' | 'stats' | 'system' | 'recipes' | 'proposals';
+type SubTab = 'players' | 'gamble' | 'items' | 'announce' | 'stats' | 'system' | 'recipes' | 'proposals' | 'trade' | 'dungeon';
 
 export function AdminScreen() {
   const player = useGameStore(s => s.player);
@@ -63,6 +67,17 @@ export function AdminScreen() {
   const [proposalProcessing, setProposalProcessing] = useState<string | null>(null);
   // 宝箱確率管理
   const [treasureProbs, setTreasureProbsState] = useState<TreasureProbEntry[]>([]);
+  // 取引レシピ管理
+  const [tradeRecipes, setTradeRecipesState] = useState<TradeRecipe[]>([]);
+  const [editingTradeRecipe, setEditingTradeRecipe] = useState<TradeRecipe | null>(null);
+  const [tradeRecipeSaving, setTradeRecipeSaving] = useState(false);
+  // ダンジョン・モンスター管理
+  const [monsterOverrides, setMonsterOverridesState] = useState<Record<string, MonsterOverride>>({});
+  const [dungeonOverrides, setDungeonOverridesState] = useState<Record<string, DungeonOverride>>({});
+  const [dungeonAdminTab, setDungeonAdminTab] = useState<'monsters' | 'areas'>('monsters');
+  const [selectedDungeonId, setSelectedDungeonId] = useState<string>('');
+  const [selectedMonsterId, setSelectedMonsterId] = useState<string>('');
+  const [dungeonSaving, setDungeonSaving] = useState(false);
 
   // リアルタイム購読でプレイヤー一覧を取得
   useEffect(() => {
@@ -113,6 +128,9 @@ export function AdminScreen() {
         setTreasureProbsState(master.map(r => ({ label: r.label, probability: r.probability })));
       }
     }).catch(() => {});
+    getTradeRecipes().then(r => { if (r) setTradeRecipesState(r); }).catch(() => {});
+    getMonsterOverrides().then(o => { if (o) setMonsterOverridesState(o); }).catch(() => {});
+    getDungeonOverrides().then(o => { if (o) setDungeonOverridesState(o); }).catch(() => {});
 
     // カスタムクラフトレシピ取得
     import('firebase/firestore').then(({ doc, getDoc }) =>
@@ -239,11 +257,18 @@ export function AdminScreen() {
     !playerFilter || (p.displayName ?? '').includes(playerFilter) || p.id.includes(playerFilter)
   );
 
+  const inputStyle: React.CSSProperties = {
+    flex: 1, padding: '5px 8px', background: '#161b26', border: '1px solid #2d3752',
+    color: '#e8e6ff', borderRadius: 4, fontSize: '0.78rem', boxSizing: 'border-box',
+  };
+
   const SUB_TABS: { id: SubTab; label: string; icon: string }[] = [
     { id: 'players',   label: 'プレイヤー', icon: '👥' },
     { id: 'gamble',    label: 'ギャンブル', icon: '🎰' },
     { id: 'items',     label: 'アイテム',   icon: '🎒' },
     { id: 'recipes',   label: 'レシピ',     icon: '📖' },
+    { id: 'trade',     label: '取引',       icon: '🔄' },
+    { id: 'dungeon',   label: 'ダンジョン', icon: '⚔️' },
     { id: 'proposals', label: '提案',       icon: '💡' },
     { id: 'announce',  label: 'お知らせ',   icon: '📢' },
     { id: 'system',    label: 'システム',   icon: '⚙️' },
@@ -925,6 +950,384 @@ export function AdminScreen() {
           ))}
         </div>
       )}
+
+      {/* ===== 取引レシピ管理 ===== */}
+      {subTab === 'trade' && (
+        <div>
+          <p style={{fontSize:'0.8rem', color:'#8a92b2', marginBottom:12, lineHeight:1.6}}>
+            市場の「取引」タブに表示されるレシピを管理します。複数素材→1アイテムの交換に対応しています。
+          </p>
+          {/* レシピ一覧 */}
+          {tradeRecipes.map((recipe, idx) => (
+            <div key={recipe.id} style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'10px 12px', marginBottom:8}}>
+              <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6}}>
+                <span style={{fontWeight:700, fontSize:'0.88rem', color:'#e8e6ff'}}>{recipe.name}</span>
+                <div style={{display:'flex', gap:4}}>
+                  <button
+                    onClick={() => setEditingTradeRecipe({ ...recipe, inputs: recipe.inputs.map(i => ({ ...i })) })}
+                    style={{padding:'3px 10px', background:'#5b8dee', color:'#fff', border:'none', borderRadius:4, cursor:'pointer', fontSize:'0.75rem'}}>
+                    編集
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const updated = tradeRecipes.filter((_, i) => i !== idx);
+                      setTradeRecipesState(updated);
+                      await saveTradeRecipes(updated);
+                      addNotification('success', 'レシピを削除しました');
+                    }}
+                    style={{padding:'3px 10px', background:'#e05555', color:'#fff', border:'none', borderRadius:4, cursor:'pointer', fontSize:'0.75rem'}}>
+                    削除
+                  </button>
+                </div>
+              </div>
+              <div style={{fontSize:'0.72rem', color:'#8a92b2', marginBottom:6}}>{recipe.description}</div>
+              <div style={{fontSize:'0.72rem', color:'#4a5070'}}>
+                必要素材: {recipe.inputs.map(inp => `${ITEM_MASTER[inp.itemId]?.name ?? inp.itemId} ×${inp.amount}`).join('、')}
+              </div>
+              <div style={{fontSize:'0.72rem', color:'#f0c060', marginTop:2}}>
+                交換品: {ITEM_MASTER[recipe.outputItemId]?.name ?? recipe.outputItemId} ×{recipe.outputAmount}
+              </div>
+            </div>
+          ))}
+
+          {/* 新規追加 / 編集フォーム */}
+          <div style={{background:'rgba(91,141,238,0.08)', border:'1px solid rgba(91,141,238,0.3)', borderRadius:8, padding:'12px 14px', marginTop:12}}>
+            <div style={{fontWeight:700, fontSize:'0.88rem', color:'#5b8dee', marginBottom:10}}>
+              {editingTradeRecipe?.id && tradeRecipes.find(r => r.id === editingTradeRecipe.id) ? '✏️ レシピを編集' : '➕ 新しいレシピを追加'}
+            </div>
+            {(() => {
+              const recipe = editingTradeRecipe ?? { id: '', name: '', description: '', inputs: [], outputItemId: '', outputAmount: 1 };
+              const setRecipe = setEditingTradeRecipe as React.Dispatch<React.SetStateAction<TradeRecipe | null>>;
+              return (
+                <div style={{display:'flex', flexDirection:'column', gap:8}}>
+                  <div style={{display:'flex', gap:6}}>
+                    <input value={recipe.id} onChange={e => setRecipe(r => r ? { ...r, id: e.target.value } : { ...recipe, id: e.target.value })}
+                      placeholder="ID (例: trade_sword)" style={inputStyle} />
+                    <input value={recipe.name} onChange={e => setRecipe(r => r ? { ...r, name: e.target.value } : { ...recipe, name: e.target.value })}
+                      placeholder="名前 (例: 鉄の剣と交換)" style={inputStyle} />
+                  </div>
+                  <input value={recipe.description} onChange={e => setRecipe(r => r ? { ...r, description: e.target.value } : { ...recipe, description: e.target.value })}
+                    placeholder="説明文" style={inputStyle} />
+                  {/* 必要素材リスト */}
+                  <div>
+                    <div style={{fontSize:'0.72rem', color:'#4a5070', marginBottom:4}}>必要素材</div>
+                    {recipe.inputs.map((inp, i) => (
+                      <div key={i} style={{display:'flex', gap:4, marginBottom:4, alignItems:'center'}}>
+                        <input value={inp.itemId}
+                          onChange={e => setRecipe(r => {
+                            if (!r) return r;
+                            const inputs = [...r.inputs];
+                            inputs[i] = { ...inputs[i], itemId: e.target.value };
+                            return { ...r, inputs };
+                          })}
+                          placeholder="アイテムID" style={{...inputStyle, flex:2}} />
+                        <span style={{fontSize:'0.7rem', color:'#8a92b2'}}>{ITEM_MASTER[inp.itemId]?.name ?? ''}</span>
+                        <input type="number" min={1} value={inp.amount}
+                          onChange={e => setRecipe(r => {
+                            if (!r) return r;
+                            const inputs = [...r.inputs];
+                            inputs[i] = { ...inputs[i], amount: Math.max(1, Number(e.target.value)) };
+                            return { ...r, inputs };
+                          })}
+                          style={{...inputStyle, width:60}} />
+                        <button onClick={() => setRecipe(r => r ? { ...r, inputs: r.inputs.filter((_, j) => j !== i) } : r)}
+                          style={{padding:'3px 8px', background:'#e05555', color:'#fff', border:'none', borderRadius:4, cursor:'pointer', fontSize:'0.75rem'}}>✕</button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => setRecipe(r => r ? { ...r, inputs: [...r.inputs, { itemId: '', amount: 1 }] } : { ...recipe, inputs: [...recipe.inputs, { itemId: '', amount: 1 }] })}
+                      style={{padding:'4px 10px', background:'#2d3752', color:'#8a92b2', border:'1px solid #3d4762', borderRadius:4, cursor:'pointer', fontSize:'0.75rem', marginTop:2}}>
+                      ＋ 素材を追加
+                    </button>
+                  </div>
+                  {/* 交換品 */}
+                  <div style={{display:'flex', gap:6, alignItems:'center'}}>
+                    <input value={recipe.outputItemId}
+                      onChange={e => setRecipe(r => r ? { ...r, outputItemId: e.target.value } : { ...recipe, outputItemId: e.target.value })}
+                      placeholder="交換品アイテムID" style={{...inputStyle, flex:2}} />
+                    <span style={{fontSize:'0.7rem', color:'#f0c060'}}>{ITEM_MASTER[recipe.outputItemId]?.name ?? ''}</span>
+                    <input type="number" min={1} value={recipe.outputAmount}
+                      onChange={e => setRecipe(r => r ? { ...r, outputAmount: Math.max(1, Number(e.target.value)) } : { ...recipe, outputAmount: Math.max(1, Number(e.target.value)) })}
+                      style={{...inputStyle, width:60}} />
+                    <span style={{fontSize:'0.7rem', color:'#4a5070'}}>個</span>
+                  </div>
+                  <div style={{display:'flex', gap:6}}>
+                    <button
+                      disabled={tradeRecipeSaving}
+                      onClick={async () => {
+                        if (!editingTradeRecipe) return;
+                        if (!editingTradeRecipe.id || !editingTradeRecipe.name || !editingTradeRecipe.outputItemId) {
+                          addNotification('error', 'ID・名前・交換品は必須です');
+                          return;
+                        }
+                        setTradeRecipeSaving(true);
+                        try {
+                          const exists = tradeRecipes.findIndex(r => r.id === editingTradeRecipe.id);
+                          const updated = exists >= 0
+                            ? tradeRecipes.map((r, i) => i === exists ? editingTradeRecipe : r)
+                            : [...tradeRecipes, editingTradeRecipe];
+                          setTradeRecipesState(updated);
+                          await saveTradeRecipes(updated);
+                          addNotification('success', '取引レシピを保存しました');
+                          setEditingTradeRecipe(null);
+                        } catch { addNotification('error', '保存に失敗しました'); }
+                        setTradeRecipeSaving(false);
+                      }}
+                      style={{flex:1, padding:'8px', background: tradeRecipeSaving ? '#2d3752' : 'linear-gradient(135deg,#4caf87,#2d8060)', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.85rem'}}>
+                      {tradeRecipeSaving ? '保存中...' : '💾 保存'}
+                    </button>
+                    {editingTradeRecipe && (
+                      <button onClick={() => setEditingTradeRecipe(null)}
+                        style={{padding:'8px 16px', background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:6, cursor:'pointer', fontSize:'0.85rem'}}>
+                        キャンセル
+                      </button>
+                    )}
+                    {!editingTradeRecipe && (
+                      <button onClick={() => setEditingTradeRecipe({ id: '', name: '', description: '', inputs: [{ itemId: '', amount: 1 }], outputItemId: '', outputAmount: 1 })}
+                        style={{padding:'8px 16px', background:'#5b8dee', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:'0.85rem'}}>
+                        ✨ 新規作成
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* ===== ダンジョン管理 ===== */}
+      {subTab === 'dungeon' && (() => {
+        const allMonsters = Object.values(MONSTER_MASTER);
+        const allDungeons = Object.values(DUNGEON_MASTER);
+        const curMon = selectedMonsterId ? { ...MONSTER_MASTER[selectedMonsterId], ...monsterOverrides[selectedMonsterId] } : null;
+        const curDungeon = selectedDungeonId ? DUNGEON_MASTER[selectedDungeonId] : null;
+        const curDungeonAreas = selectedDungeonId
+          ? (dungeonOverrides[selectedDungeonId]?.areas ?? curDungeon?.areas ?? [])
+          : [];
+
+        return (
+          <div>
+            <div style={{display:'flex', gap:6, marginBottom:12}}>
+              {(['monsters','areas'] as const).map(t => (
+                <button key={t} onClick={() => setDungeonAdminTab(t)}
+                  style={{flex:1, padding:'7px', fontSize:'0.8rem',
+                    background: dungeonAdminTab===t ? 'rgba(224,85,85,0.2)' : '#1c2235',
+                    border:`1px solid ${dungeonAdminTab===t ? '#e05555' : '#2d3752'}`,
+                    color: dungeonAdminTab===t ? '#e8e6ff' : '#8a92b2', borderRadius:6, cursor:'pointer'}}>
+                  {t === 'monsters' ? '👾 モンスター編集' : '🗺️ エリア出現MOB編集'}
+                </button>
+              ))}
+            </div>
+
+            {dungeonAdminTab === 'monsters' && (
+              <div>
+                <select value={selectedMonsterId} onChange={e => setSelectedMonsterId(e.target.value)}
+                  style={{width:'100%', padding:'6px 8px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', marginBottom:10, boxSizing:'border-box'}}>
+                  <option value=''>-- モンスターを選択 --</option>
+                  {allMonsters.map(m => (
+                    <option key={m.id} value={m.id}>{m.name} ({m.id}){monsterOverrides[m.id] ? ' ✏️' : ''}</option>
+                  ))}
+                </select>
+                {curMon && (() => {
+                  const base = MONSTER_MASTER[selectedMonsterId];
+                  const ov = monsterOverrides[selectedMonsterId] ?? {};
+                  const setField = (field: keyof MonsterOverride, val: string | number) =>
+                    setMonsterOverridesState(prev => ({
+                      ...prev,
+                      [selectedMonsterId]: { ...prev[selectedMonsterId], id: selectedMonsterId, [field]: val }
+                    }));
+                  const numField = (label: string, field: 'maxHp'|'attack'|'defense'|'baseExp'|'baseGold', color: string) => (
+                    <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:6}}>
+                      <span style={{width:80, fontSize:'0.78rem', color}}>{label}</span>
+                      <span style={{fontSize:'0.7rem', color:'#4a5070', width:40}}>元:{(base as any)[field]}</span>
+                      <input type='number' min={0}
+                        value={ov[field] ?? (base as any)[field]}
+                        onChange={e => setField(field, Number(e.target.value))}
+                        style={{flex:1, padding:'4px 6px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.8rem'}} />
+                    </div>
+                  );
+                  return (
+                    <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'12px 14px', marginBottom:8}}>
+                      <div style={{fontWeight:700, fontSize:'0.88rem', color:'#e8e6ff', marginBottom:10, display:'flex', alignItems:'center', gap:8}}>
+                        <GameIcon id={base.icon} size={22} />{base.name}
+                      </div>
+                      {numField('HP', 'maxHp', '#e05555')}
+                      {numField('攻撃力', 'attack', '#f0a830')}
+                      {numField('防御力', 'defense', '#5b8dee')}
+                      {numField('経験値', 'baseExp', '#9b6df0')}
+                      {numField('ゴールド', 'baseGold', '#f0c060')}
+                      <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:10}}>
+                        <span style={{width:80, fontSize:'0.78rem', color:'#8a92b2'}}>特殊技</span>
+                        <input value={ov.specialAttack ?? base.specialAttack ?? ''}
+                          onChange={e => setField('specialAttack', e.target.value)}
+                          placeholder='特殊攻撃名（空欄=なし）'
+                          style={{flex:1, padding:'4px 6px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.8rem'}} />
+                      </div>
+                      {/* ドロップ編集 */}
+                      <div style={{marginBottom:8}}>
+                        <div style={{fontSize:'0.72rem', color:'#4a5070', marginBottom:4}}>ドロップアイテム</div>
+                        {(ov.drops ?? base.drops).map((d, i) => (
+                          <div key={i} style={{display:'flex', gap:4, alignItems:'center', marginBottom:4, flexWrap:'wrap'}}>
+                            <input value={d.itemId} onChange={e => {
+                              const drops = [...(ov.drops ?? base.drops)];
+                              drops[i] = { ...drops[i], itemId: e.target.value };
+                              setMonsterOverridesState(prev => ({ ...prev, [selectedMonsterId]: { ...prev[selectedMonsterId], id: selectedMonsterId, drops } }));
+                            }} placeholder='アイテムID' style={{flex:2, padding:'3px 5px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.72rem'}} />
+                            <span style={{fontSize:'0.65rem', color:'#8a92b2', minWidth:40}}>{ITEM_MASTER[d.itemId]?.name ?? ''}</span>
+                            <span style={{fontSize:'0.65rem', color:'#4a5070'}}>確率</span>
+                            <input type='number' min={0} max={1} step={0.01} value={d.baseRate} onChange={e => {
+                              const drops = [...(ov.drops ?? base.drops)];
+                              drops[i] = { ...drops[i], baseRate: Math.min(1, Math.max(0, Number(e.target.value))) };
+                              setMonsterOverridesState(prev => ({ ...prev, [selectedMonsterId]: { ...prev[selectedMonsterId], id: selectedMonsterId, drops } }));
+                            }} style={{width:50, padding:'3px 4px', background:'#161b26', border:'1px solid #2d3752', color:'#4caf87', borderRadius:4, fontSize:'0.72rem'}} />
+                            <span style={{fontSize:'0.65rem', color:'#4a5070'}}>個数</span>
+                            <input type='number' min={1} value={d.minAmount} onChange={e => {
+                              const drops = [...(ov.drops ?? base.drops)];
+                              drops[i] = { ...drops[i], minAmount: Number(e.target.value) };
+                              setMonsterOverridesState(prev => ({ ...prev, [selectedMonsterId]: { ...prev[selectedMonsterId], id: selectedMonsterId, drops } }));
+                            }} style={{width:40, padding:'3px 4px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.72rem'}} />
+                            <span style={{fontSize:'0.65rem', color:'#4a5070'}}>~</span>
+                            <input type='number' min={1} value={d.maxAmount} onChange={e => {
+                              const drops = [...(ov.drops ?? base.drops)];
+                              drops[i] = { ...drops[i], maxAmount: Number(e.target.value) };
+                              setMonsterOverridesState(prev => ({ ...prev, [selectedMonsterId]: { ...prev[selectedMonsterId], id: selectedMonsterId, drops } }));
+                            }} style={{width:40, padding:'3px 4px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.72rem'}} />
+                            <button onClick={() => {
+                              const drops = (ov.drops ?? base.drops).filter((_, j) => j !== i);
+                              setMonsterOverridesState(prev => ({ ...prev, [selectedMonsterId]: { ...prev[selectedMonsterId], id: selectedMonsterId, drops } }));
+                            }} style={{padding:'2px 6px', background:'#e05555', color:'#fff', border:'none', borderRadius:4, cursor:'pointer', fontSize:'0.7rem'}}>✕</button>
+                          </div>
+                        ))}
+                        <button onClick={() => {
+                          const drops = [...(ov.drops ?? base.drops), { itemId: '', baseRate: 1.0, minAmount: 1, maxAmount: 1 }];
+                          setMonsterOverridesState(prev => ({ ...prev, [selectedMonsterId]: { ...prev[selectedMonsterId], id: selectedMonsterId, drops } }));
+                        }} style={{padding:'3px 10px', background:'#2d3752', color:'#8a92b2', border:'1px solid #3d4762', borderRadius:4, cursor:'pointer', fontSize:'0.72rem', marginTop:2}}>
+                          ＋ ドロップ追加
+                        </button>
+                      </div>
+                      <div style={{display:'flex', gap:6, marginTop:4}}>
+                        <button disabled={dungeonSaving} onClick={async () => {
+                          setDungeonSaving(true);
+                          try {
+                            await setMonsterOverrides(monsterOverrides);
+                            addNotification('success', `${base.name}のデータを保存しました`);
+                          } catch { addNotification('error', '保存に失敗しました'); }
+                          setDungeonSaving(false);
+                        }} style={{flex:1, padding:'8px', background: dungeonSaving ? '#2d3752' : 'linear-gradient(135deg,#4caf87,#2d8060)', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.85rem'}}>
+                          {dungeonSaving ? '保存中...' : '💾 保存'}
+                        </button>
+                        {monsterOverrides[selectedMonsterId] && (
+                          <button onClick={async () => {
+                            const updated = { ...monsterOverrides };
+                            delete updated[selectedMonsterId];
+                            setMonsterOverridesState(updated);
+                            await setMonsterOverrides(updated);
+                            addNotification('success', 'オーバーライドをリセットしました');
+                          }} style={{padding:'8px 12px', background:'#e05555', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:'0.82rem'}}>
+                            🔄 リセット
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {dungeonAdminTab === 'areas' && (
+              <div>
+                <select value={selectedDungeonId} onChange={e => setSelectedDungeonId(e.target.value)}
+                  style={{width:'100%', padding:'6px 8px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', marginBottom:10, boxSizing:'border-box'}}>
+                  <option value=''>-- ダンジョンを選択 --</option>
+                  {allDungeons.map(d => (
+                    <option key={d.id} value={d.id}>{d.name} ({d.id}){dungeonOverrides[d.id] ? ' ✏️' : ''}</option>
+                  ))}
+                </select>
+                {selectedDungeonId && curDungeon && (
+                  <div>
+                    {curDungeonAreas.map((area, aIdx) => (
+                      <div key={aIdx} style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'10px 12px', marginBottom:8}}>
+                        <div style={{fontWeight:700, fontSize:'0.85rem', color:'#e8e6ff', marginBottom:6}}>{aIdx+1}: {area.name}</div>
+                        <div style={{fontSize:'0.72rem', color:'#4a5070', marginBottom:6}}>出現MOB</div>
+                        {area.monsters.map((mob, mIdx) => (
+                          <div key={mIdx} style={{display:'flex', gap:4, alignItems:'center', marginBottom:4}}>
+                            <select value={mob.monsterId}
+                              onChange={e => {
+                                const areas = curDungeonAreas.map((a, ai) => ai !== aIdx ? a : {
+                                  ...a, monsters: a.monsters.map((m, mi) => mi !== mIdx ? m : { ...m, monsterId: e.target.value })
+                                });
+                                setDungeonOverridesState(prev => ({ ...prev, [selectedDungeonId]: { id: selectedDungeonId, areas } }));
+                              }}
+                              style={{flex:2, padding:'3px 5px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.72rem'}}>
+                              {allMonsters.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                            </select>
+                            <span style={{fontSize:'0.65rem', color:'#4a5070'}}>数</span>
+                            <input type='number' min={1} max={20} value={mob.count}
+                              onChange={e => {
+                                const areas = curDungeonAreas.map((a, ai) => ai !== aIdx ? a : {
+                                  ...a, monsters: a.monsters.map((m, mi) => mi !== mIdx ? m : { ...m, count: Math.max(1, Number(e.target.value)) })
+                                });
+                                setDungeonOverridesState(prev => ({ ...prev, [selectedDungeonId]: { id: selectedDungeonId, areas } }));
+                              }}
+                              style={{width:44, padding:'3px 4px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.72rem'}} />
+                            <label style={{fontSize:'0.65rem', color:'#e05555', display:'flex', alignItems:'center', gap:2}}>
+                              <input type='checkbox' checked={!!mob.isBoss} onChange={e => {
+                                const areas = curDungeonAreas.map((a, ai) => ai !== aIdx ? a : {
+                                  ...a, monsters: a.monsters.map((m, mi) => mi !== mIdx ? m : { ...m, isBoss: e.target.checked })
+                                });
+                                setDungeonOverridesState(prev => ({ ...prev, [selectedDungeonId]: { id: selectedDungeonId, areas } }));
+                              }} />ボス
+                            </label>
+                            <button onClick={() => {
+                              const areas = curDungeonAreas.map((a, ai) => ai !== aIdx ? a : {
+                                ...a, monsters: a.monsters.filter((_, mi) => mi !== mIdx)
+                              });
+                              setDungeonOverridesState(prev => ({ ...prev, [selectedDungeonId]: { id: selectedDungeonId, areas } }));
+                            }} style={{padding:'2px 6px', background:'#e05555', color:'#fff', border:'none', borderRadius:4, cursor:'pointer', fontSize:'0.7rem'}}>✕</button>
+                          </div>
+                        ))}
+                        <button onClick={() => {
+                          const defaultMon = allMonsters[0]?.id ?? '';
+                          const areas = curDungeonAreas.map((a, ai) => ai !== aIdx ? a : {
+                            ...a, monsters: [...a.monsters, { monsterId: defaultMon, count: 1 }]
+                          });
+                          setDungeonOverridesState(prev => ({ ...prev, [selectedDungeonId]: { id: selectedDungeonId, areas } }));
+                        }} style={{padding:'3px 10px', background:'#2d3752', color:'#8a92b2', border:'1px solid #3d4762', borderRadius:4, cursor:'pointer', fontSize:'0.72rem', marginTop:2}}>
+                          ＋ MOB追加
+                        </button>
+                      </div>
+                    ))}
+                    <div style={{display:'flex', gap:6, marginTop:4}}>
+                      <button disabled={dungeonSaving} onClick={async () => {
+                        setDungeonSaving(true);
+                        try {
+                          await setDungeonOverrides(dungeonOverrides);
+                          addNotification('success', `${curDungeon.name}のエリアを保存しました`);
+                        } catch { addNotification('error', '保存に失敗しました'); }
+                        setDungeonSaving(false);
+                      }} style={{flex:1, padding:'8px', background: dungeonSaving ? '#2d3752' : 'linear-gradient(135deg,#4caf87,#2d8060)', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.85rem'}}>
+                        {dungeonSaving ? '保存中...' : '💾 エリアを保存'}
+                      </button>
+                      {dungeonOverrides[selectedDungeonId] && (
+                        <button onClick={async () => {
+                          const updated = { ...dungeonOverrides };
+                          delete updated[selectedDungeonId];
+                          setDungeonOverridesState(updated);
+                          await setDungeonOverrides(updated);
+                          addNotification('success', 'エリアをリセットしました');
+                        }} style={{padding:'8px 12px', background:'#e05555', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:'0.82rem'}}>
+                          🔄 リセット
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ===== 提案管理 ===== */}
       {subTab === 'proposals' && (
