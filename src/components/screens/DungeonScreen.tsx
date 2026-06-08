@@ -241,11 +241,13 @@ function HotbarSetModal({ slot, idx, equipment, inventory, onSet, onClose }: {
 // ============================================================
 // ターン制バトル画面
 // ============================================================
-function TurnBattle({ runState, equipment, onBattleEnd, onEscape }: {
+function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, onManaUpdate }: {
   runState: DungeonRunState;
   equipment: EquipmentSlots;
   onBattleEnd: (won: boolean, expGained: number, goldGained: number, drops: {itemId:string;amount:number}[], hpDelta: number) => void;
   onEscape: () => void;
+  initialMana?: number;
+  onManaUpdate?: (mana: number) => void;
 }) {
   const player = useGameStore(s => s.player)!;
   const consumeItem = useGameStore(s => s.consumeItem);
@@ -273,7 +275,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape }: {
       result: null,
       expGained: 0, goldGained: 0, drops: [],
       isDefending: false,
-      weaponMana: 0,
+      weaponMana: initialMana ?? 0,
       weaponManaMax: manaSkill?.manaMax ?? 1200,
       ultimateReady: false,
       poisonBuff: 0,
@@ -581,13 +583,22 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape }: {
   };
 
   // 結果確定後に親へ通知
+  // マナ変化を親へ通知
+  useEffect(() => {
+    if (!battle.result) onManaUpdate?.(battle.weaponMana);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [battle.weaponMana]);
+
   useEffect(() => {
     if (!battle.result) return;
     if (battle.result === 'win') {
+      onManaUpdate?.(0);
       onBattleEnd(true, battle.expGained, battle.goldGained, battle.drops, 0);
     } else if (battle.result === 'lose') {
+      onManaUpdate?.(0);
       onBattleEnd(false, 0, 0, [], 0);
     } else if (battle.result === 'escaped') {
+      onManaUpdate?.(battle.weaponMana);
       onEscape();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1174,6 +1185,7 @@ export function DungeonScreen() {
   const [showUnlockGuide, setShowUnlockGuide] = useState(false);
   const [runLog, setRunLog] = useState<string[]>([]);
   const [dungeonInnerTab, setDungeonInnerTab] = useState<'dungeon' | 'gacha' | 'trap'>('dungeon');
+  const [dungeonMana, setDungeonMana] = useState(0);
 
   const dungeons = Object.values(DUNGEON_MASTER);
   const lockedDungeons = dungeons.filter(d => !isDungeonUnlocked(d.id));
@@ -1191,6 +1203,7 @@ export function DungeonScreen() {
     setRunState({ dungeonId: selectedId, currentFloor: 1, currentAreaName: DUNGEON_MASTER[selectedId]?.areas?.[0]?.name ?? 'エリア1', monstersDefeated: 0, totalExp: 0, totalGold: 0, totalDrops: [], isComplete: false, isFailed: false, currentAreaIdx: 0 });
     setRunLog([`⚔️ ${dungeon.name} に突入！`]);
     setInBattle(false);
+    setDungeonMana(0);
   }, [player, selectedId, isDungeonUnlocked, addNotification]);
 
   const handleBattleEnd = useCallback((won: boolean, expGained: number, goldGained: number, drops: {itemId:string;amount:number}[], _hpDelta: number) => {
@@ -1372,6 +1385,27 @@ export function DungeonScreen() {
                 </div>
               </div>
             </div>
+            {/* MANAバー（mana_chargeスキル付き武器装備時） */}
+            {(() => {
+              const weaponId = equipment.hotbar.find(id => id && ITEM_MASTER[id]?.itemType === 'Weapon') ?? null;
+              const wi = weaponId ? ITEM_MASTER[weaponId] : null;
+              const manaSkill = wi?.weaponSkills?.find(s => s.type === 'mana_charge') as import('../../types/game').WeaponManaSkill | undefined;
+              if (!manaSkill) return null;
+              const manaMax = manaSkill.manaMax;
+              const mana = Math.min(dungeonMana, manaMax);
+              const ready = mana >= manaMax;
+              return (
+                <div style={{ marginTop: 6 }}>
+                  <div style={{ fontSize: '0.7rem', color: ready ? '#f0c060' : '#9b6df0', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>⭐ MANA{ready ? '（必殺技 準備完了！）' : ''}</span>
+                    <span>{mana}/{manaMax}</span>
+                  </div>
+                  <div style={{ height: 6, background: '#2d3752', borderRadius: 3, overflow: 'hidden', marginTop: 2 }}>
+                    <div style={{ height: '100%', background: ready ? '#f0c060' : '#9b6df0', width: `${(mana / manaMax) * 100}%`, transition: 'width 0.3s' }} />
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* 直近ログ */}
@@ -1397,6 +1431,8 @@ export function DungeonScreen() {
               equipment={equipment}
               onBattleEnd={handleBattleEnd}
               onEscape={handleEscapeBattle}
+              initialMana={dungeonMana}
+              onManaUpdate={setDungeonMana}
             />
           ) : (
             <div style={{ display: 'flex', gap: 8 }}>

@@ -27,7 +27,19 @@ export interface WeaponManaSkill {
   manaPerTurn: number;
   manaMax: number;
 }
-export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill;
+export interface WeaponOffhandManaOnHealSkill {
+  type: 'offhand_mana_on_heal';  // オフハンド装備時に回復使用で一定確率でMana蓄積
+  offhandItemId: string;
+  chance: number;
+  manaGain: number;
+}
+export interface WeaponManaPerTurnRandomSkill {
+  type: 'mana_per_turn_random';  // 毎ターンランダムにMana付与（サポート武器）
+  manaMin: number;
+  manaMax: number;
+  manaStep: number;
+}
+export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill;
 
 export interface WeaponUltimate {
   name: string;
@@ -74,6 +86,12 @@ export interface ItemMaster {
   pngIcon?: string;
   // 使用しても消費されない（消耗品でない）
   nonconsumable?: boolean;
+  // 使用後クールダウンターン数
+  cooldownTurns?: number;
+  // オフハンド専用武器
+  isOffhand?: boolean;
+  // 防具スロット制限 (helmet / chestplate / leggings / boots)
+  armorSlot?: 'helmet' | 'chestplate' | 'leggings' | 'boots';
   useEffect?: {
     hpRestore?: number;
     satietyRestore?: number;
