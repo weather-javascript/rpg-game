@@ -2,6 +2,7 @@
 // ゲーム内全アイコンをSVGで定義するコンポーネント
 
 import React from 'react';
+import { ICON_ASSETS } from './iconAssets';
 
 interface IconProps {
   id: string;
@@ -1283,7 +1284,6 @@ const ICONS: Record<string, SvgDef> = {
 // GameIcon コンポーネント
 // ============================================================
 // PNG アイコンマップ（base64データを使用）
-import { ICON_ASSETS } from './iconAssets';
 const PNG_ICONS: Record<string, string> = ICON_ASSETS;
 
 export function GameIcon({ id, size = 24, className, style }: IconProps) {
