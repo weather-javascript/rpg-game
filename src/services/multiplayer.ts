@@ -305,16 +305,6 @@ function _rollDice(n = 6) { return Math.floor(Math.random() * n) + 1; }
 function _resolveChohan(): { hostWins: boolean; battleData: import('../types/game').ChohanBattleData } {
   const hostDice: [number, number] = [_rollDice(), _rollDice()];
   const guestDice: [number, number] = [_rollDice(), _rollDice()];
-  const hostSum = hostDice[0] + hostDice[1];
-  const guestSum = guestDice[0] + guestDice[1];
-  // 丁半: ホストが丁（偶数）を選ぶ
-  const _hostWins = (hostSum % 2 === 0) === (guestSum % 2 !== 0)
-    ? true // ホスト丁、ゲスト半の場合ホスト丁判定
-    : (() => {
-        // 実際のロジック: ホストが丁を選ぶ → 出目合計の偶奇で勝敗
-        const sum = hostDice[0] + hostDice[1]; // 丁半は1セットのサイコロ
-        return sum % 2 === 0; // 偶数=丁=ホスト勝ち
-      })();
   return {
     hostWins: (hostDice[0] + hostDice[1]) % 2 === 0, // 偶数=丁=ホスト勝ち
     battleData: { type: 'chohan', hostDice, guestDice },
