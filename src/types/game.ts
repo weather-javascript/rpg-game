@@ -408,6 +408,29 @@ export interface OnlineUser {
 // ============================================================
 // PvPギャンブル対戦型
 // ============================================================
+export interface ChohanBattleData {
+  type: 'chohan';
+  hostDice: [number, number];
+  guestDice: [number, number];
+}
+export interface ChinchiroBattleData {
+  type: 'chinchiro';
+  hostDice: number[];
+  guestDice: number[];
+  hostRole: string;
+  guestRole: string;
+}
+export interface CoinFlipBattleData {
+  type: 'coin_flip';
+  flips: ('heads' | 'tails')[];
+}
+export interface SlotBattleData {
+  type: 'slot_machine';
+  hostReels: string[];
+  guestReels: string[];
+}
+export type GambleBattleData = ChohanBattleData | ChinchiroBattleData | CoinFlipBattleData | SlotBattleData;
+
 export interface GambleBattle {
   id: string;
   hostUid: string;
@@ -419,6 +442,7 @@ export interface GambleBattle {
   guestUid?: string;
   guestName?: string;
   winnerId?: string;
+  battleData?: GambleBattleData;
   createdAt: number;
   expiresAt: number;
 }

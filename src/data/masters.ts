@@ -1073,6 +1073,16 @@ export const DEFAULT_PLAYER_STATS = {
 // ============================================================
 export const VERSION_PATCHES = [
   {
+    version: '2.5.4',
+    date: '2026-06-10',
+    changes: [
+      '⚔️ PvP同期バグ修正：ホストと参加者の対戦演出が完全一致するよう修正（丁半・チンチロリン・コイントス・スロット）',
+      '💾 battleDataをFirestoreに保存：サイコロ結果・コイン結果・スロットリール等の実際の対戦データを記録',
+      '🔒 PvP参加処理をFirestore Transactionに変更：同時参加による競合状態を解消',
+      '📺 将来的な観戦機能に対応した同期基盤を構築',
+    ],
+  },
+  {
     version: '2.5.3',
     date: '2026-06-09',
     changes: [

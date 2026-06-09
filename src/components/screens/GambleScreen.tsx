@@ -240,21 +240,13 @@ function SlotReel({ finalSymbol, spinning, delay = 0 }: { finalSymbol: string|nu
 }
 
 // 決定論的擬似乱数（battleIdをシードに）
-function makeSeededRng(seed: string) {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) { h = Math.imul(31, h) + seed.charCodeAt(i) | 0; }
-  let s = h >>> 0;
-  return () => {
-    s ^= s << 13; s ^= s >> 17; s ^= s << 5;
-    return (s >>> 0) / 0xffffffff;
-  };
-}
+import type { GambleBattleData } from '../../types/game';
 
-function BattleAnimation({ opponentName, gameName, result, battleId, iAmHost, onDone }: {
+function BattleAnimation({ opponentName, gameName, result, battleData, iAmHost, onDone }: {
   opponentName: string;
   gameName: string;
   result: { won: boolean; amount: number };
-  battleId: string;
+  battleData: GambleBattleData | undefined;
   iAmHost: boolean;
   onDone: () => void;
 }) {
@@ -263,20 +255,22 @@ function BattleAnimation({ opponentName, gameName, result, battleId, iAmHost, on
   };
   const gameNameJp = GAME_NAMES_JP[gameName] ?? gameName;
 
-  // battleIdをシードにした決定論的乱数（両プレイヤーで同じ結果になる）
-  const rng = useMemo(() => makeSeededRng(battleId), [battleId]);
+  // 先攻決め: チンチロの場合ホストが親(後攻)、ゲストが子(先攻)
+  // それ以外: battleDataがない場合はresult.wonで仮決め
+  const isFirstFixed = useMemo(() => {
+    if (gameName === 'chinchiro') return !iAmHost; // 子=先攻=ゲスト
+    return result.won; // fallback
+  }, [gameName, iAmHost, result.won]);
 
   type Phase = 'dice_roll' | 'choose' | 'chohan_roll' | 'coin_toss' | 'chinchiro_battle' | 'slot_battle' | 'final';
-  const [phase, setPhase] = useState<Phase>('dice_roll');
+  const [phase, setPhase] = useState<Phase>(() => {
+    // battleDataがあればdice_rollフェーズをスキップしてもよいが演出として残す
+    return 'dice_roll';
+  });
 
-  // 先攻決め（battleIdから決定論的に計算）
-  // hostのサイコロ > guestのサイコロ → hostが先攻
-  const hostDiceVal = useMemo(() => Math.floor(rng()*6)+1, []);  // eslint-disable-line
-  const guestDiceVal = useMemo(() => { let v; do { v = Math.floor(rng()*6)+1; } while (v === hostDiceVal); return v; }, []); // eslint-disable-line
-  // iAmHost=trueなら自分=host, falseなら自分=guest
-  const myDiceFixed = iAmHost ? hostDiceVal : guestDiceVal;
-  const oppDiceFixed = iAmHost ? guestDiceVal : hostDiceVal;
-  const isFirstFixed = myDiceFixed > oppDiceFixed; // 自分が先攻か
+  // 先攻決めサイコロ演出用（battleDataとは無関係な純粋演出）
+  const myDiceFixed = iAmHost ? 4 : 3; // 演出用固定値（実際の勝敗はbattleDataで決まる）
+  const oppDiceFixed = iAmHost ? 3 : 4;
 
   const [myDice, setMyDice] = useState(0);
   const [oppDice, setOppDice] = useState(0);
@@ -368,16 +362,19 @@ function BattleAnimation({ opponentName, gameName, result, battleId, iAmHost, on
     setChohanRolling(true);
     setChohanDice(null);
     const t = setTimeout(() => {
-      const d1 = Math.floor(rng()*6)+1;
-      const d2 = Math.floor(rng()*6)+1;
-      const sum = d1+d2;
-      const isEven = sum%2===0;
-      setChohanDice([d1,d2]);
+      let d1: number, d2: number;
+      if (battleData?.type === 'chohan') {
+        [d1, d2] = battleData.hostDice;
+      } else {
+        d1 = 3; d2 = 4;
+      }
+      const sum = d1 + d2;
+      const isEven = sum % 2 === 0;
+      setChohanDice([d1, d2]);
       setChohanRolling(false);
       const myC = isFirst ? myChoice : (myChoice || 'han');
-      // result.wonを優先（サーバー決定）
-      const oppC = myC==='cho' ? '半（奇数）' : '丁（偶数）';
-      setChohanResult(`🎲 ${d1} ＋ ${d2} ＝ ${sum}（${isEven?'偶数＝丁':'奇数＝半'}）\nあなた:${myC==='cho'?'丁':'半'} / ${opponentName}:${oppC}`);
+      const oppC = myC === 'cho' ? '半（奇数）' : '丁（偶数）';
+      setChohanResult(`🎲 ${d1} ＋ ${d2} ＝ ${sum}（${isEven ? '偶数＝丁' : '奇数＝半'}）\nあなた:${myC === 'cho' ? '丁' : '半'} / ${opponentName}:${oppC}`);
       setTimeout(() => setPhase('final'), 2200);
     }, 1600);
     return () => clearTimeout(t);
@@ -393,7 +390,9 @@ function BattleAnimation({ opponentName, gameName, result, battleId, iAmHost, on
   }, [phase]);
 
   const runNextCoinToss = (currentIdx: number, logs: CoinLog[]) => {
-    if (currentIdx >= 6) {
+    const flips = battleData?.type === 'coin_flip' ? battleData.flips : [];
+    const totalFlips = flips.length || 6;
+    if (currentIdx >= totalFlips) {
       setCoinPhase('done');
       setTimeout(() => setPhase('final'), 1000);
       return;
@@ -401,12 +400,11 @@ function BattleAnimation({ opponentName, gameName, result, battleId, iAmHost, on
     setCoinFlipping(true);
     setCoinFace(null);
     const t = setTimeout(() => {
-      const face: 'omote'|'ura' = rng() < 0.5 ? 'omote' : 'ura';
-      // 先攻は「表」を選んだとする（myChoiceで管理）
+      // battleDataから実際のフリップ結果を使用
+      const rawFace = flips[currentIdx] ?? (Math.random() < 0.5 ? 'heads' : 'tails');
+      const face: 'omote'|'ura' = rawFace === 'heads' ? 'omote' : 'ura';
       const myPickOmote = (isFirst ? myChoice : (myChoice||'ura')) === 'omote';
-      // ターン: 0=先攻, 1=後攻, 2=先攻, 3=後攻, 4=先攻, 5=後攻
-      // 先攻選択面が出たら先攻ポイント
-      const myWon = (face==='omote') === myPickOmote;
+      const myWon = (face === 'omote') === myPickOmote;
       const newLog: CoinLog = { flip: currentIdx+1, face, myWon };
       const newLogs = [...logs, newLog];
       setCoinLogs(newLogs);
@@ -431,44 +429,23 @@ function BattleAnimation({ opponentName, gameName, result, battleId, iAmHost, on
     if (phase !== 'chinchiro_battle') return;
     setChinLogs([]);
     setChinDice({me:null,opp:null});
-    // 事前に結果を決定：勝者は役あり、敗者は役なし
-    const winner: 'me'|'opp' = result.won ? 'me' : 'opp';
-    const loser: 'me'|'opp' = winner === 'me' ? 'opp' : 'me';
+    // battleDataから実際のサイコロ結果を取得して再生
+    const myDiceArr = battleData?.type === 'chinchiro' ? (iAmHost ? battleData.hostDice : battleData.guestDice) : [1,2,4];
+    const oppDiceArr = battleData?.type === 'chinchiro' ? (iAmHost ? battleData.guestDice : battleData.hostDice) : [1,2,3];
+    const myRoleLabel = battleData?.type === 'chinchiro' ? (iAmHost ? battleData.hostRole : battleData.guestRole) : '目なし';
+    const oppRoleLabel = battleData?.type === 'chinchiro' ? (iAmHost ? battleData.guestRole : battleData.hostRole) : '目なし';
 
-    const rollD3 = () => [Math.floor(rng()*6)+1, Math.floor(rng()*6)+1, Math.floor(rng()*6)+1];
+    const myRank: ChinchiroRank = evalChinchiro(myDiceArr);
+    const oppRank: ChinchiroRank = evalChinchiro(oppDiceArr);
+    // 役ラベルはサーバー保存値を優先
+    const myRankDisplay: ChinchiroRank = { ...myRank, label: myRoleLabel };
+    const oppRankDisplay: ChinchiroRank = { ...oppRank, label: oppRoleLabel };
 
-    const makeWinDice = (): { dice: number[]; rank: ChinchiroRank } => {
-      let d: number[], r: ChinchiroRank;
-      do { d = rollD3(); r = evalChinchiro(d); } while (r.type === 'nashi');
-      return { dice: d, rank: r };
-    };
-    const makeLoseDice = (): { dice: number[]; rank: ChinchiroRank } => {
-      let d: number[], r: ChinchiroRank, attempts = 0;
-      do { d = rollD3(); r = evalChinchiro(d); attempts++; } while (r.type !== 'nashi' && attempts < 10);
-      if (r.type !== 'nashi') { d = [1,2,4]; r = evalChinchiro(d); }
-      return { dice: d, rank: r };
-    };
-
-    // 演出用：1〜2回役なし後に結果
-    const oppFirst = true; // 相手（子）が先攻
-    const rounds: Array<{who:'me'|'opp'; dice:number[]; rank:ChinchiroRank}[]> = [];
-    const extraRounds = Math.floor(rng() * 2); // 0〜1回の役なしラウンド
-    for (let i = 0; i < extraRounds; i++) {
-      rounds.push([
-        { who: oppFirst ? 'opp' : 'me', ...makeLoseDice() },
-        { who: oppFirst ? 'me' : 'opp', ...makeLoseDice() },
-      ]);
-    }
-    // 最終ラウンド
-    const finalOpp = oppFirst ? loser : winner;
-    const finalMe = oppFirst ? winner : loser;
-    rounds.push([
-      { who: 'opp', ...(finalOpp === winner ? makeWinDice() : makeLoseDice()) },
-      { who: 'me', ...(finalMe === winner ? makeWinDice() : makeLoseDice()) },
-    ]);
-
-    // 順番に表示するキュー
-    const queue: Array<{who:'me'|'opp'; dice:number[]; rank:ChinchiroRank}> = rounds.flat();
+    // 相手（子）→ 自分（親）の順に表示
+    const queue: Array<{who:'me'|'opp'; dice:number[]; rank:ChinchiroRank}> = [
+      { who: 'opp', dice: oppDiceArr, rank: oppRankDisplay },
+      { who: 'me', dice: myDiceArr, rank: myRankDisplay },
+    ];
     let idx = 0;
     const runNext = () => {
       if (idx >= queue.length) {
@@ -482,10 +459,7 @@ function BattleAnimation({ opponentName, gameName, result, battleId, iAmHost, on
         setChinDice(prev => ({ ...prev, [entry.who]: entry.dice }));
         setChinRolling(null);
         setChinLogs(prev => [...prev, entry]);
-        // 次のエントリへ
-        const isEndOfRound = idx % 2 === 0;
-        const delay = isEndOfRound ? 1800 : 1400;
-        setTimeout(runNext, delay);
+        setTimeout(runNext, 1800);
       }, 1400);
     };
     const t = setTimeout(runNext, 300);
@@ -493,11 +467,18 @@ function BattleAnimation({ opponentName, gameName, result, battleId, iAmHost, on
   }, [phase]);
 
   // ========== スロット: 止める！ボタン式 ==========
-  // slotPhase: 'spinning'=回転中(自分のターン), 'opp_spinning'=相手ターン(自動), 'result'=結果表示中, 'done'=終了
-  const [slotPhase, setSlotPhase] = useState<'spinning'|'opp_spinning'|'result'|'done'>('spinning');
+  // slotPhase: 'idle'=待機, 'opp_spinning'=相手ターン自動, 'spinning'=自分ターン, 'done'=終了
+  const [slotPhase, setSlotPhase] = useState<'idle'|'opp_spinning'|'spinning'|'result'|'done'>('idle');
   const [slotMyResult, setSlotMyResult] = useState<SlotLog|null>(null);
   const [slotOppResult, setSlotOppResult] = useState<SlotLog|null>(null);
 
+  const _getSlotRank = (s: string[]) => {
+    if (s[0]===s[1] && s[1]===s[2]) return { rank: SLOT_RANKS[s[0]]??10, label:`${s[0]}${s[0]}${s[0]} ゾロ目！` };
+    if (s[0]===s[1] || s[1]===s[2] || s[0]===s[2]) return { rank: 1, label:'2つ揃い' };
+    return { rank: 0, label:'役なし' };
+  };
+
+  // スロット開始: battleDataからmy/oppリールを決定して順番に再生
   useEffect(() => {
     if (phase !== 'slot_battle') return;
     setSlotLogs([]);
@@ -505,132 +486,71 @@ function BattleAnimation({ opponentName, gameName, result, battleId, iAmHost, on
     setSlotSpinning(false);
     setSlotMyResult(null);
     setSlotOppResult(null);
+    // battleDataからリールを取得
+    const myReels = battleData?.type === 'slot_machine' ? (iAmHost ? battleData.hostReels : battleData.guestReels) : ['❓','❓','❓'];
+    const oppReels = battleData?.type === 'slot_machine' ? (iAmHost ? battleData.guestReels : battleData.hostReels) : ['❓','❓','❓'];
     const firstPlayer: 'me'|'opp' = isFirst ? 'me' : 'opp';
     setSlotTurn(firstPlayer);
-    // 自分が先攻なら最初から回転
+
     if (isFirst) {
+      // 自分先攻: まず自分が回す（止めるボタン付き、実際にはbattleDataの結果を使う）
       setSlotPhase('spinning');
       setSlotSpinning(true);
     } else {
-      // 後攻: まず相手（先攻）が自動で回す
+      // 後攻: 相手が先に自動で回す
       setSlotPhase('opp_spinning');
       setSlotSpinning(true);
+      // 2秒後に相手のリール表示
+      const t = setTimeout(() => {
+        const r = _getSlotRank(oppReels);
+        const log: SlotLog = { who: 'opp', symbols: oppReels, rank: r.rank, label: r.label };
+        setSlotOppResult(log);
+        setSlotSymbols(oppReels);
+        setSlotSpinning(false);
+        setSlotLogs([log]);
+        setSlotTurn('me');
+        setTimeout(() => {
+          setSlotSymbols(null);
+          setSlotSpinning(true);
+          setSlotPhase('spinning');
+        }, 1500);
+      }, 2500);
+      return () => clearTimeout(t);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  // 相手ターン自動進行
-  useEffect(() => {
-    if (phase !== 'slot_battle' || slotPhase !== 'opp_spinning') return;
-    // 相手は2〜3秒後に自動で止まる
-    const delay = 2000 + Math.floor(rng() * 1500);
-    const t = setTimeout(() => {
-      const getRank = (s: string[]) => {
-        if (s[0]===s[1] && s[1]===s[2]) return { rank: SLOT_RANKS[s[0]]??10, label:`${s[0]}${s[0]}${s[0]} ゾロ目！` };
-        if (s[0]===s[1] || s[1]===s[2] || s[0]===s[2]) return { rank: 1, label:'2つ揃い' };
-        return { rank: 0, label:'役なし' };
-      };
-      // result.wonを元に相手の出目を決定（相手=先攻 → 自分が勝つなら相手は役なし）
-      let syms: string[];
-      if (!result.won) {
-        // 自分が負け → 相手が先攻かつ勝者 → 役あり
-        const s = SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)];
-        syms = [s, s, s];
-      } else {
-        // 自分が勝ち → 相手は役なし
-        do {
-          syms = [
-            SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
-            SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
-            SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
-          ];
-        } while (getRank(syms).rank > 0);
-      }
-      const r = getRank(syms);
-      const log: SlotLog = { who: 'opp', symbols: syms, rank: r.rank, label: r.label };
-      setSlotOppResult(log);
-      setSlotSymbols(syms);
-      setSlotSpinning(false);
-      setSlotLogs([log]);
-      setSlotTurn('me');
-      // 相手が止まったら少し待って自分のターン開始
-      setTimeout(() => {
-        setSlotSymbols(null);
-        setSlotSpinning(true);
-        setSlotPhase('spinning');
-      }, 1500);
-    }, delay);
-    return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, slotPhase]);
-
   const handleSlotStop = () => {
     if (phase !== 'slot_battle' || slotPhase !== 'spinning') return;
-    const getRank = (s: string[]) => {
-      if (s[0]===s[1] && s[1]===s[2]) return { rank: SLOT_RANKS[s[0]]??10, label:`${s[0]}${s[0]}${s[0]} ゾロ目！` };
-      if (s[0]===s[1] || s[1]===s[2] || s[0]===s[2]) return { rank: 1, label:'2つ揃い' };
-      return { rank: 0, label:'役なし' };
-    };
-    // 自分の出目: result.wonに合わせて決定
-    let syms: string[];
-    if (result.won) {
-      const s = SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)];
-      syms = [s, s, s];
-    } else {
-      // 自分は負け: 相手が先攻なら役なし。後攻でも役なし（相手は先攻で勝ち）
-      // ただし自分が先攻で負ける場合は役なしにする
-      do {
-        syms = [
-          SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
-          SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
-          SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
-        ];
-      } while (getRank(syms).rank > 0);
-    }
-    const r = getRank(syms);
-    const log: SlotLog = { who: 'me', symbols: syms, rank: r.rank, label: r.label };
+    // battleDataから自分のリール結果を使用
+    const myReels = battleData?.type === 'slot_machine' ? (iAmHost ? battleData.hostReels : battleData.guestReels) : ['❓','❓','❓'];
+    const oppReels = battleData?.type === 'slot_machine' ? (iAmHost ? battleData.guestReels : battleData.hostReels) : ['❓','❓','❓'];
+    const r = _getSlotRank(myReels);
+    const log: SlotLog = { who: 'me', symbols: myReels, rank: r.rank, label: r.label };
     setSlotMyResult(log);
-    setSlotSymbols(syms);
+    setSlotSymbols(myReels);
     setSlotSpinning(false);
     setSlotLogs(prev => [...prev, log]);
     setSlotPhase('result');
-    // 自分が止めたあと相手のターン（自分が先攻の場合）か終了（自分が後攻の場合）
     if (isFirst) {
-      // 自分が先攻 → 相手が後攻 → 相手が自動で回す
+      // 自分先攻 → 相手後攻を自動で回す
       setTimeout(() => {
         setSlotTurn('opp');
         setSlotSymbols(null);
         setSlotSpinning(true);
         setSlotPhase('opp_spinning');
-        // 後攻相手の自動処理
-        const oppDelay = 2000 + Math.floor(rng() * 1500);
         setTimeout(() => {
-          let oppSyms: string[];
-          if (!result.won) {
-            // 自分が負け = 相手（後攻）が勝者: でもこれは矛盾（先攻で役なし自分、後攻で役あり相手）
-            const s = SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)];
-            oppSyms = [s, s, s];
-          } else {
-            do {
-              oppSyms = [
-                SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
-                SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
-                SLOT_SYMBOLS[Math.floor(rng()*SLOT_SYMBOLS.length)],
-              ];
-            } while (getRank(oppSyms).rank > 0);
-          }
-          const or = getRank(oppSyms);
-          const oppLog: SlotLog = { who: 'opp', symbols: oppSyms, rank: or.rank, label: or.label };
+          const or = _getSlotRank(oppReels);
+          const oppLog: SlotLog = { who: 'opp', symbols: oppReels, rank: or.rank, label: or.label };
           setSlotOppResult(oppLog);
-          setSlotSymbols(oppSyms);
+          setSlotSymbols(oppReels);
           setSlotSpinning(false);
           setSlotLogs(prev => [...prev, oppLog]);
           setSlotPhase('done');
           setTimeout(() => setPhase('final'), 1800);
-        }, oppDelay);
+        }, 2500);
       }, 1200);
     } else {
-      // 自分が後攻 → 終了
       setSlotPhase('done');
       setTimeout(() => setPhase('final'), 1800);
     }
@@ -1454,7 +1374,7 @@ function PvPPanel({ bet }: { bet: number }) {
   const [myBattleId, setMyBattleId] = useState<string | null>(null);
   const [selectedGame, setSelectedGame] = useState('chohan');
   const [loading, setLoading] = useState(false);
-  const [battleAnim, setBattleAnim] = useState<{ opponentName: string; gameName: string; result: { won: boolean; amount: number }; battleId: string; iAmHost: boolean } | null>(null);
+  const [battleAnim, setBattleAnim] = useState<{ opponentName: string; gameName: string; result: { won: boolean; amount: number }; battleData: import('../../types/game').GambleBattleData | undefined; iAmHost: boolean } | null>(null);
   // ホスト側：既に金を処理済みかフラグ管理
   const processedBattleRef = useState<Set<string>>(() => new Set())[0];
 
@@ -1480,7 +1400,7 @@ function PvPPanel({ bet }: { bet: number }) {
           opponentName: battle.guestName ?? '相手',
           gameName: battle.gambleType,
           result: { won: iWon, amount: battle.betAmount },
-          battleId: battle.id,
+          battleData: battle.battleData,
           iAmHost: true,
         });
         setMyBattleId(null);
@@ -1545,7 +1465,7 @@ function PvPPanel({ bet }: { bet: number }) {
           opponentName: battle.hostName,
           gameName: battle.gambleType,
           result: { won: iWon, amount: battle.betAmount },
-          battleId: battle.id,
+          battleData: result?.battleData,
           iAmHost: false,
         });
       } else {
@@ -1570,7 +1490,7 @@ function PvPPanel({ bet }: { bet: number }) {
           opponentName={battleAnim.opponentName}
           gameName={battleAnim.gameName}
           result={battleAnim.result}
-          battleId={battleAnim.battleId}
+          battleData={battleAnim.battleData}
           iAmHost={battleAnim.iAmHost}
           onDone={() => setBattleAnim(null)}
         />

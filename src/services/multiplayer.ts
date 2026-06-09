@@ -2,10 +2,10 @@
 import {
   doc, setDoc, deleteDoc, collection, query, orderBy, limit,
   onSnapshot, addDoc, getDoc, updateDoc, where, Unsubscribe, increment, getDocs,
-  arrayUnion, arrayRemove,
+  arrayUnion, arrayRemove, runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, PokerTable, PokerCard, PokerPlayer, PokerPhase } from '../types/game';
+import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, PokerTable, PokerCard, PokerPlayer, PokerPhase } from '../types/game';
 import { calcJackpotContrib, rollJackpot } from '../systems/minigames';
 
 const COLLECTIONS = {
@@ -302,65 +302,84 @@ export function subscribeGambleBattles(cb: (battles: GambleBattle[]) => void): U
 
 function _rollDice(n = 6) { return Math.floor(Math.random() * n) + 1; }
 
-function _resolveChohan(): boolean {
-  // 先行決め: 1個ずつ振って出目が大きい方が先攻（丁/半を選べる）
-  let hostOrder = _rollDice(), guestOrder = _rollDice();
-  while (hostOrder === guestOrder) { hostOrder = _rollDice(); guestOrder = _rollDice(); }
-  const hostGoesFirst = hostOrder > guestOrder;
-  const d1 = _rollDice(), d2 = _rollDice();
-  const isEven = (d1 + d2) % 2 === 0;
-  // 先行が丁を選ぶ、後攻は半が自動選択
-  return hostGoesFirst ? isEven : !isEven;
+function _resolveChohan(): { hostWins: boolean; battleData: import('../types/game').ChohanBattleData } {
+  const hostDice: [number, number] = [_rollDice(), _rollDice()];
+  const guestDice: [number, number] = [_rollDice(), _rollDice()];
+  const hostSum = hostDice[0] + hostDice[1];
+  const guestSum = guestDice[0] + guestDice[1];
+  // 丁半: ホストが丁（偶数）を選ぶ
+  const hostWins = (hostSum % 2 === 0) === (guestSum % 2 !== 0)
+    ? true // ホスト丁、ゲスト半の場合ホスト丁判定
+    : (() => {
+        // 実際のロジック: ホストが丁を選ぶ → 出目合計の偶奇で勝敗
+        const sum = hostDice[0] + hostDice[1]; // 丁半は1セットのサイコロ
+        return sum % 2 === 0; // 偶数=丁=ホスト勝ち
+      })();
+  return {
+    hostWins: (hostDice[0] + hostDice[1]) % 2 === 0, // 偶数=丁=ホスト勝ち
+    battleData: { type: 'chohan', hostDice, guestDice },
+  };
 }
 
 function _chinchiroScore(dice: number[]): number {
   const d = dice.slice().sort((a,b)=>a-b);
-  if (d[0]===1 && d[1]===1 && d[2]===1) return 1000; // ピンゾロ
-  if (d[0]===1 && d[1]===2 && d[2]===3) return -1;   // ヒフミ（負け）
-  if (d[0]===4 && d[1]===5 && d[2]===6) return 500;  // シゴロ
-  if (d[0]===d[1] && d[1]===d[2]) return 300 + d[0]; // アラシ（ゾロ目）数字大きい方が強い
-  // 通常目: 2つ被り + 残り1つ。残りの1つが目 (6が最強、1が最弱)
+  if (d[0]===1 && d[1]===1 && d[2]===1) return 1000;
+  if (d[0]===1 && d[1]===2 && d[2]===3) return -1;
+  if (d[0]===4 && d[1]===5 && d[2]===6) return 500;
+  if (d[0]===d[1] && d[1]===d[2]) return 300 + d[0];
   const counts: Record<number,number> = {};
   for (const v of d) counts[v] = (counts[v]??0)+1;
   const singles = Object.entries(counts).filter(([,c])=>c===1).map(([v])=>Number(v));
   const pairs = Object.entries(counts).filter(([,c])=>c===2);
-  if (pairs.length === 1 && singles.length === 1) return singles[0]; // 1〜6
-  return 0; // 目なし（振り直し扱い → 0点）
+  if (pairs.length === 1 && singles.length === 1) return singles[0];
+  return 0;
 }
 
-function _resolveChinchiro(): boolean {
-  // 役が出るまで最大3回振り、スコアが高い方が勝ち
-  // ヒフミ(-1)は即負け、0は目なし（振り直し）
-  const roll = () => [_rollDice(),_rollDice(),_rollDice()];
-  let hostScore = 0;
-  let hostInstantLoss = false;
-  for (let i = 0; i < 3; i++) {
-    hostScore = _chinchiroScore(roll());
-    if (hostScore !== 0) break;
-  }
-  if (hostScore === -1) hostInstantLoss = true;
-  // 親の一発終了ルール: ピンゾロ(1000)/シゴロ(500)/アラシ(300+) → 親総取り
-  // ヒフミ(-1)/目なし3投目(0) → 親総負け
-  if (hostScore >= 300 || hostScore === 500 || hostScore === 1000) return true;  // 親の即勝ち
-  if (hostInstantLoss || hostScore === 0) return false; // 親の即負け
-  // 通常目(1-6): 子もサイコロを振る
-  let guestScore = 0;
-  for (let i = 0; i < 3; i++) {
-    guestScore = _chinchiroScore(roll());
-    if (guestScore !== 0) break;
-  }
-  if (guestScore === -1 || guestScore === 0) return true; // 子がヒフミ/目なし → 親勝ち
-  if (hostScore === guestScore) return Math.random() < 0.5;
-  return hostScore > guestScore;
+function _chinchiroRoleName(score: number): string {
+  if (score === 1000) return 'ピンゾロ';
+  if (score === -1) return 'ヒフミ';
+  if (score === 500) return 'シゴロ';
+  if (score >= 301) return `アラシ(${score - 300})`;
+  if (score >= 1) return `${score}の目`;
+  return '目なし';
 }
 
-function _resolveCoinFlip(): boolean {
-  // 先行決めサイコロ → 先行が丁（偶数）を選ぶ、コインはランダム（丁半と同じロジック）
-  const hostFirst = _rollDice() >= _rollDice();
-  const d1 = _rollDice(), d2 = _rollDice();
-  const isEven = (d1 + d2) % 2 === 0;
-  // 先行が丁（偶数）を選ぶ
-  return hostFirst ? isEven : !isEven;
+function _resolveChinchiro(): { hostWins: boolean; battleData: import('../types/game').ChinchiroBattleData } {
+  const roll = () => [_rollDice(), _rollDice(), _rollDice()];
+  let hostDice = roll(); let hostScore = _chinchiroScore(hostDice);
+  for (let i = 1; i < 3 && hostScore === 0; i++) { hostDice = roll(); hostScore = _chinchiroScore(hostDice); }
+  let guestDice = roll(); let guestScore = _chinchiroScore(guestDice);
+  for (let i = 1; i < 3 && guestScore === 0; i++) { guestDice = roll(); guestScore = _chinchiroScore(guestDice); }
+  let hostWins: boolean;
+  if (hostScore >= 300 || hostScore === 500 || hostScore === 1000) hostWins = true;
+  else if (hostScore === -1 || hostScore === 0) hostWins = false;
+  else if (guestScore === -1 || guestScore === 0) hostWins = true;
+  else if (hostScore === guestScore) hostWins = Math.random() < 0.5;
+  else hostWins = hostScore > guestScore;
+  return {
+    hostWins,
+    battleData: {
+      type: 'chinchiro',
+      hostDice, guestDice,
+      hostRole: _chinchiroRoleName(hostScore),
+      guestRole: _chinchiroRoleName(guestScore),
+    },
+  };
+}
+
+function _resolveCoinFlip(): { hostWins: boolean; battleData: import('../types/game').CoinFlipBattleData } {
+  const flips: ('heads' | 'tails')[] = [];
+  let hostWins = 0, guestWins = 0;
+  for (let i = 0; i < 6; i++) {
+    const face: 'heads' | 'tails' = Math.random() < 0.5 ? 'heads' : 'tails';
+    flips.push(face);
+    // ホストは表(heads)を選ぶ
+    if (face === 'heads') hostWins++; else guestWins++;
+  }
+  return {
+    hostWins: hostWins >= guestWins,
+    battleData: { type: 'coin_flip', flips },
+  };
 }
 
 const SLOT_SYMBOLS = ['🍒','🍋','💎','7️⃣','🔔','💰'];
@@ -372,20 +391,17 @@ function _slotRank(reels: string[]): number {
   return 0;
 }
 
-function _resolveSlot(): boolean {
-  // 先行決めサイコロ → スロットを回して役が出るまで（最大5回）
-  const spinUntilRoll = (): number => {
-    for (let i = 0; i < 5; i++) {
-      const reels = [0,1,2].map(() => SLOT_SYMBOLS[Math.floor(Math.random()*SLOT_SYMBOLS.length)]);
-      const rank = _slotRank(reels);
-      if (rank > 0) return rank;
-    }
-    return 0;
+function _resolveSlot(): { hostWins: boolean; battleData: import('../types/game').SlotBattleData } {
+  const spin = () => [0,1,2].map(() => SLOT_SYMBOLS[Math.floor(Math.random()*SLOT_SYMBOLS.length)]);
+  let hostReels = spin(); let hostRank = _slotRank(hostReels);
+  for (let i = 1; i < 5 && hostRank === 0; i++) { hostReels = spin(); hostRank = _slotRank(hostReels); }
+  let guestReels = spin(); let guestRank = _slotRank(guestReels);
+  for (let i = 1; i < 5 && guestRank === 0; i++) { guestReels = spin(); guestRank = _slotRank(guestReels); }
+  const hostWins = hostRank >= guestRank ? (hostRank > guestRank ? true : Math.random() < 0.5) : false;
+  return {
+    hostWins,
+    battleData: { type: 'slot_machine', hostReels, guestReels },
   };
-  const hostRank = spinUntilRoll();
-  const guestRank = spinUntilRoll();
-  if (hostRank === guestRank) return Math.random() < 0.5;
-  return hostRank > guestRank;
 }
 
 export async function joinGambleBattle(
@@ -393,39 +409,68 @@ export async function joinGambleBattle(
   guestUid: string, guestName: string
 ): Promise<{ success: boolean; battle: GambleBattle | null }> {
   const ref = doc(db, COLLECTIONS.BATTLES, battleId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) return { success: false, battle: null };
-  const battle = { id: snap.id, ...(snap.data() as Omit<GambleBattle,'id'>) };
-  if (battle.status !== 'waiting') return { success: false, battle };
-  if (battle.hostUid === guestUid) return { success: false, battle };
+  let finalBattle: GambleBattle | null = null;
+  let success = false;
 
-  // ゲームタイプに応じた対戦ロジック
-  let hostWins: boolean;
-  const gt = battle.gambleType;
-  if (gt === 'chohan') hostWins = _resolveChohan();
-  else if (gt === 'chinchiro') hostWins = _resolveChinchiro();
-  else if (gt === 'coin_flip') hostWins = _resolveCoinFlip();
-  else if (gt === 'slot_machine') hostWins = _resolveSlot();
-  else hostWins = Math.random() < 0.5;
+  try {
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(ref);
+      if (!snap.exists()) throw new Error('not_found');
+      const battle = { id: snap.id, ...(snap.data() as Omit<GambleBattle,'id'>) };
+      if (battle.status !== 'waiting') throw new Error('not_waiting');
+      if (battle.hostUid === guestUid) throw new Error('self_join');
 
-  const winnerId = hostWins ? battle.hostUid : guestUid;
-  await updateDoc(ref, { status: 'finished', guestUid, guestName, winnerId });
+      // ゲームタイプに応じた対戦ロジック
+      const gt = battle.gambleType;
+      let hostWins: boolean;
+      let battleData: GambleBattleData;
 
-  // アクティビティフィード投稿
-  const GAME_NAMES_JP: Record<string, string> = {
-    chohan: '丁半', chinchiro: 'チンチロリン', coin_flip: 'コイントス', slot_machine: 'スロット',
-  };
-  const gameNameJp = GAME_NAMES_JP[gt] ?? gt;
-  const winnerName = hostWins ? battle.hostName : guestName;
-  const loserName = hostWins ? guestName : battle.hostName;
-  postActivityFeed({
-    uid: winnerId,
-    displayName: winnerName,
-    type: 'gamble_battle',
-    message: `が${loserName}との${gameNameJp}対戦に勝利！${battle.betAmount.toLocaleString()}G獲得！`,
-  }).catch(() => {});
+      if (gt === 'chohan') {
+        const r = _resolveChohan(); hostWins = r.hostWins; battleData = r.battleData;
+      } else if (gt === 'chinchiro') {
+        const r = _resolveChinchiro(); hostWins = r.hostWins; battleData = r.battleData;
+      } else if (gt === 'coin_flip') {
+        const r = _resolveCoinFlip(); hostWins = r.hostWins; battleData = r.battleData;
+      } else if (gt === 'slot_machine') {
+        const r = _resolveSlot(); hostWins = r.hostWins; battleData = r.battleData;
+      } else {
+        hostWins = Math.random() < 0.5;
+        battleData = { type: 'coin_flip', flips: [hostWins ? 'heads' : 'tails'] };
+      }
 
-  return { success: true, battle: { ...battle, guestUid, guestName, winnerId, status: 'finished' } };
+      const winnerId = hostWins ? battle.hostUid : guestUid;
+      transaction.update(ref, { status: 'finished', guestUid, guestName, winnerId, battleData });
+
+      finalBattle = { ...battle, guestUid, guestName, winnerId, battleData, status: 'finished' };
+      success = true;
+    });
+  } catch {
+    if (!finalBattle) {
+      const snap = await getDoc(ref).catch(() => null);
+      if (snap && snap.exists()) {
+        finalBattle = { id: snap.id, ...(snap.data() as Omit<GambleBattle,'id'>) };
+      }
+    }
+    return { success: false, battle: finalBattle };
+  }
+
+  if (finalBattle && success) {
+    const battle = finalBattle as GambleBattle;
+    const GAME_NAMES_JP: Record<string, string> = {
+      chohan: '丁半', chinchiro: 'チンチロリン', coin_flip: 'コイントス', slot_machine: 'スロット',
+    };
+    const gameNameJp = GAME_NAMES_JP[battle.gambleType] ?? battle.gambleType;
+    const winnerName = battle.winnerId === battle.hostUid ? battle.hostName : guestName;
+    const loserName = battle.winnerId === battle.hostUid ? guestName : battle.hostName;
+    postActivityFeed({
+      uid: battle.winnerId!,
+      displayName: winnerName,
+      type: 'gamble_battle',
+      message: `が${loserName}との${gameNameJp}対戦に勝利！${battle.betAmount.toLocaleString()}G獲得！`,
+    }).catch(() => {});
+  }
+
+  return { success, battle: finalBattle };
 }
 
 // ホストが自分のバトルの状態変化（finished）を監視するための購読
