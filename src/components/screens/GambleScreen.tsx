@@ -960,7 +960,7 @@ function THRulesPanel() {
 
 function TexasHoldemPanel() {
   const player = useGameStore(s => s.player);
-  const changeGold = useGameStore(s => s.changeGold);
+  const changeWealthCoin = useGameStore(s => s.changeWealthCoin);
   const addNotification = useGameStore(s => s.addNotification);
 
   // ロビービュー
@@ -1368,7 +1368,7 @@ function TexasHoldemPanel() {
 // ============================================================
 function PvPPanel({ bet }: { bet: number }) {
   const player = useGameStore(s => s.player);
-  const changeGold = useGameStore(s => s.changeGold);
+  const changeWealthCoin = useGameStore(s => s.changeWealthCoin);
   const addNotification = useGameStore(s => s.addNotification);
   const [battles, setBattles] = useState<GambleBattle[]>([]);
   const [myBattleId, setMyBattleId] = useState<string | null>(null);
