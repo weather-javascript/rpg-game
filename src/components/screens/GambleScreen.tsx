@@ -487,7 +487,6 @@ function BattleAnimation({ opponentName, gameName, result, battleData, iAmHost, 
     setSlotMyResult(null);
     setSlotOppResult(null);
     // battleDataからリールを取得
-    const _myReels = battleData?.type === 'slot_machine' ? (iAmHost ? battleData.hostReels : battleData.guestReels) : ['❓','❓','❓'];
     const oppReels = battleData?.type === 'slot_machine' ? (iAmHost ? battleData.guestReels : battleData.hostReels) : ['❓','❓','❓'];
     const firstPlayer: 'me'|'opp' = isFirst ? 'me' : 'opp';
     setSlotTurn(firstPlayer);
