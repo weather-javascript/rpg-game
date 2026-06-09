@@ -1366,10 +1366,20 @@ function KXBattlePanel({ player, runState, onVictory, onDefeat }: {
   onVictory: (isAwakened: boolean) => void;
   onDefeat: () => void;
 }) {
-  const { changeHp, addItems, consumeItem } = useGameStore(s => ({
-    changeHp: s.changeHp, addItems: s.addItems, consumeItem: s.consumeItem,
+  const { changeHp, addItems, consumeItem, updateEquipment } = useGameStore(s => ({
+    changeHp: s.changeHp, addItems: s.addItems, consumeItem: s.consumeItem, updateEquipment: s.updateEquipment,
   }));
-  const equipment = player.equipment ?? defaultEquipmentSlots();
+  const [localEquip, setLocalEquip] = useState<EquipmentSlots>(() => player.equipment ?? defaultEquipmentSlots());
+  const [showHotbar, setShowHotbar] = useState(false);
+  const [hotbarModal, setHotbarModal] = useState<{slot:string;idx?:number} | null>(null);
+
+  const setLocalEquipAndSave = (updater: (prev: EquipmentSlots) => EquipmentSlots) => {
+    setLocalEquip(prev => {
+      const next = updater(prev);
+      updateEquipment(next);
+      return next;
+    });
+  };
 
   const KX_MAX_HP = 38750;
   const AWAKE_MAX_HP = 1900;
@@ -1640,7 +1650,7 @@ function KXBattlePanel({ player, runState, onVictory, onDefeat }: {
 
       {/* ホットバー（通常ダンジョンと同様の表示） */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
-        {equipment.hotbar.map((itemId, i) => {
+        {localEquip.hotbar.map((itemId, i) => {
           const item = itemId ? ITEM_MASTER[itemId] : null;
           const qty = itemId ? (player.inventory[itemId] ?? 0) : 0;
           const canUse = item && qty > 0 && turn === 'player' && item.itemType !== 'Weapon' && item.itemType !== 'Armor' && item.useEffect && (item.useEffect.hpRestore || item.useEffect.satietyRestore);
@@ -1670,7 +1680,36 @@ function KXBattlePanel({ player, runState, onVictory, onDefeat }: {
             </button>
           );
         })}
+        <button onClick={() => setShowHotbar(h => !h)} disabled={turn !== 'player'}
+          style={{ padding: '0 10px', height: 38, background: '#161b26', border: '1px dashed #5b8dee', borderRadius: 6, color: '#5b8dee', cursor: 'pointer', fontSize: '0.72rem' }}>
+          🎒 装備
+        </button>
       </div>
+
+      {showHotbar && (
+        <HotbarPanel equipment={localEquip} inventory={player.inventory}
+          onSlotClick={(slot, idx) => setHotbarModal({ slot, idx })} />
+      )}
+
+      {hotbarModal && (
+        <HotbarSetModal
+          slot={hotbarModal.slot} idx={hotbarModal.idx}
+          equipment={localEquip} inventory={player.inventory}
+          onSet={itemId => {
+            setLocalEquipAndSave(prev => {
+              const next = { ...prev, hotbar: [...prev.hotbar] };
+              if (hotbarModal.slot === 'hotbar' && hotbarModal.idx !== undefined) {
+                next.hotbar[hotbarModal.idx] = itemId;
+              } else {
+                (next as any)[hotbarModal.slot] = itemId;
+              }
+              return next;
+            });
+            setHotbarModal(null);
+          }}
+          onClose={() => setHotbarModal(null)}
+        />
+      )}
 
       {/* バトルログ */}
       <div style={{ background:'#0e1220', borderRadius:6, padding:'6px 10px', height:140, overflowY:'auto', fontSize:'0.72rem' }}

@@ -807,7 +807,7 @@ export const MONSTER_MASTER: Record<string, MonsterMaster> = {
   // 汎用
   slime:  { id:'slime',  name:'スライム', description:'初歩的なモンスター。', icon:'bubbles', maxHp:30,  attack:5,  defense:2,  baseExp:15,  baseGold:8,   dungeonIds:['beginner_cave'], drops:[{itemId:'slime_gel',baseRate:0.8,minAmount:1,maxAmount:3}] },
   goblin: { id:'goblin', name:'ゴブリン', description:'小さいが油断できない。', icon:'goblin', maxHp:60,  attack:12, defense:5,  baseExp:35,  baseGold:20,  dungeonIds:['goblin_den'], drops:[{itemId:'goblin_ear',baseRate:0.6,minAmount:1,maxAmount:2}] },
-  dragon: { id:'dragon', name:'ドラゴン', description:'最強クラスの古代生命体。', icon:'dragon', maxHp:1000,attack:80, defense:50, baseExp:800, baseGold:500, dungeonIds:['dragons_lair'], isBoss:true, drops:[{itemId:'dragon_scale',baseRate:0.3,minAmount:1,maxAmount:3},{itemId:'ancient_shard',baseRate:0.8,minAmount:2,maxAmount:5}] },
+  dragon: { id:'dragon', name:'ドラゴン', description:'最強クラスの古代生命体。', icon:'dragon', maxHp:1000,attack:80, defense:50, baseExp:800, baseGold:500, dungeonIds:[], isBoss:true, drops:[{itemId:'dragon_scale',baseRate:0.3,minAmount:1,maxAmount:3},{itemId:'ancient_shard',baseRate:0.8,minAmount:2,maxAmount:5}] },
 };
 
 // ============================================================

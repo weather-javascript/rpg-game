@@ -204,7 +204,7 @@ function evaluatePokerHand(hand: Card[], bet: number): GambleResult {
   else if (counts[0]===3)                    { handName='スリーカード';                 multiplier=3;   }
   else if (counts[0]===2 && counts[1]===2)   { handName='ツーペア';                    multiplier=2;   }
   else if (counts[0]===2 && Math.max(...Object.keys(rankCounts).filter(k => rankCounts[Number(k)]===2).map(Number)) >= 11) {
-    handName='ワンペア（JJ以上）'; multiplier=1;
+    handName='ワンペア（JJ以上）'; multiplier=1.5;
   }
   else { handName='ブタ（役なし）'; multiplier=0; }
 
