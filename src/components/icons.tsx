@@ -1282,17 +1282,9 @@ const ICONS: Record<string, SvgDef> = {
 // ============================================================
 // GameIcon コンポーネント
 // ============================================================
-// PNG アイコンマップ（SVGの代わりに画像ファイルを使用するアイコン）
-const PNG_ICONS: Record<string, string> = {
-  iron_sword_png:    './icons/鉄の剣.png',
-  gold_sword_png:    './icons/金の剣.png',
-  diamond_sword_png: './icons/ダイヤ剣.png',
-  endstone_sword_png:'./icons/Memory_of_Flower.png',
-  hengen:            './icons/hengen.png',
-  gacha_sword:       './icons/Revolution_Heelwand.png',
-  gacha_shield:      './icons/Revolution_Defencer.png',
-  gacha_wand:        './icons/Diamond_Staff.png',
-};
+// PNG アイコンマップ（base64データを使用）
+import { ICON_ASSETS } from './iconAssets';
+const PNG_ICONS: Record<string, string> = ICON_ASSETS;
 
 export function GameIcon({ id, size = 24, className, style }: IconProps) {
   // PNGアイコンが定義されている場合はimgタグで表示
