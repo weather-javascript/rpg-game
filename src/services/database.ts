@@ -74,6 +74,7 @@ function createNewPlayerData(uid: string): PlayerData {
     uid,
     displayName: `冒険者#${uid.slice(0, 6)}`,
     gold: 100,
+    wealthCoin: 0,
     stats: { ...DEFAULT_PLAYER_STATS },
     inventory: {},
     skillLevels: {

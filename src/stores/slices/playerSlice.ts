@@ -10,6 +10,7 @@ export interface PlayerSlice {
   addItems:           (drops: { itemId: string; amount: number }[]) => void;
   consumeItem:        (itemId: string, amount: number) => boolean;
   changeGold:         (delta: number) => boolean;
+  changeWealthCoin:   (delta: number) => boolean;
   addExp:             (amount: number) => void;
   addSkillExp:        (skillId: string, amount: number) => void;
   changeHp:           (delta: number) => void;
@@ -54,6 +55,16 @@ export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (
     const newGold = player.gold + delta;
     if (newGold < 0) return false;
     set((state) => ({ player: state.player ? { ...state.player, gold: newGold } : null }));
+    return true;
+  },
+
+  changeWealthCoin: (delta) => {
+    const { player } = get();
+    if (!player) return false;
+    const current = player.wealthCoin ?? 0;
+    const newWC = current + delta;
+    if (newWC < 0) return false;
+    set((state) => ({ player: state.player ? { ...state.player, wealthCoin: newWC } : null }));
     return true;
   },
 

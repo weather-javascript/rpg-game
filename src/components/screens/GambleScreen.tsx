@@ -55,7 +55,7 @@ function ResultDisplay({ result, bet = 0 }: { result: GambleResult; bet?: number
         {result.symbols?.join(' ') ?? ''} {result.rewardLabel}
       </div>
       <div style={{ fontSize: '1rem', fontWeight: 700, color: labelColor }}>
-        {isReplay ? `🔄 掛け金返還 (+${bet.toLocaleString()}G)` : isWin ? `+${totalReturn.toLocaleString()}G` : `${result.goldDelta.toLocaleString()}G`}
+        {isReplay ? `🔄 掛け金返還 (+${bet.toLocaleString()}WC)` : isWin ? `+${totalReturn.toLocaleString()}WC` : `${result.goldDelta.toLocaleString()}WC`}
       </div>
       {result.itemRewards.length > 0 && (
         <div style={{ marginTop: 6, fontSize: '0.8rem' }}>
@@ -72,7 +72,7 @@ function JackpotBanner({ pool }: { pool: number }) {
   return (
     <div style={{ background: 'linear-gradient(135deg,rgba(240,192,96,0.15),rgba(240,168,48,0.15))', border: '2px solid #f0c060', borderRadius: 10, padding: '10px 14px', marginBottom: 12, textAlign: 'center' }}>
       <div style={{ fontSize: '0.8rem', color: '#8a92b2', marginBottom: 2 }}>🌟 現在のジャックポットプール</div>
-      <div style={{ fontSize: '2rem', fontWeight: 700, color: '#f0c060' }}>{pool.toLocaleString()}G</div>
+      <div style={{ fontSize: '2rem', fontWeight: 700, color: '#f0c060' }}>{pool.toLocaleString()}WC</div>
       <div style={{ fontSize: '0.72rem', color: '#4a5070', marginTop: 4 }}>他のギャンブルをプレイするたびに蓄積されます。超低確率で自動当選！</div>
     </div>
   );
@@ -87,15 +87,15 @@ function BetInput({ game, bet, setBet, disabled = false }: { game: GambleMaster;
       {disabled && <div style={{ fontSize: '0.72rem', color: '#e05555', marginBottom: 4 }}>⚠ ゲーム中は賭け金を変更できません</div>}
       <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
         {presets.map(p => (
-          <button key={p} onClick={() => !disabled && setBet(Math.min(p, player?.gold ?? 0))}
+          <button key={p} onClick={() => !disabled && setBet(Math.min(p, player?.wealthCoin ?? 0))}
             style={{ padding: '3px 8px', background: bet === p ? '#5b8dee' : '#1c2235', color: bet === p ? '#fff' : '#8a92b2', border: `1px solid ${bet === p ? '#5b8dee' : '#2d3752'}`, borderRadius: 4, cursor: disabled ? 'not-allowed' : 'pointer', fontSize: '0.75rem', opacity: disabled ? 0.5 : 1 }}>
             {p.toLocaleString()}G
           </button>
         ))}
-        <button onClick={() => !disabled && setBet(Math.min(player?.gold ?? 0, game.maxBet))}
+        <button onClick={() => !disabled && setBet(Math.min(player?.wealthCoin ?? 0, game.maxBet))}
           style={{ padding: '3px 8px', background: '#1c2235', color: '#f0c060', border: '1px solid #f0c060', borderRadius: 4, cursor: disabled ? 'not-allowed' : 'pointer', fontSize: '0.75rem', opacity: disabled ? 0.5 : 1 }}>MAX</button>
       </div>
-      <input type="number" value={bet} min={game.minBet} max={Math.min(game.maxBet, player?.gold ?? 0)}
+      <input type="number" value={bet} min={game.minBet} max={Math.min(game.maxBet, player?.wealthCoin ?? 0)}
         onChange={e => !disabled && setBet(Math.max(game.minBet, Math.min(game.maxBet, Number(e.target.value))))}
         disabled={disabled}
         style={{ width: '100%', padding: '6px 10px', background: disabled ? '#161b26' : '#1c2235', border: `1px solid ${disabled ? '#4a5070' : '#2d3752'}`, color: disabled ? '#4a5070' : '#e8e6ff', borderRadius: 6, fontSize: '0.9rem', boxSizing: 'border-box' as const, cursor: disabled ? 'not-allowed' : 'text' }}
@@ -993,7 +993,7 @@ function TexasHoldemPanel() {
       if (t.status === 'finished' && player) {
         const me = t.players.find(p => p.uid === player.uid);
         if (me && me.chips > 0) {
-          changeGold(me.chips);
+          changeWealthCoin(me.chips);
         }
       }
     });
@@ -1003,16 +1003,16 @@ function TexasHoldemPanel() {
 
   const handleCreate = async () => {
     if (!player) return;
-    if (player.gold < createForm.buyIn) { addNotification('error', 'ゴールドが足りません'); return; }
+    if ((player.wealthCoin ?? 0) < createForm.buyIn) { addNotification('error', 'WCが足りません'); return; }
     setLoading(true);
     try {
-      changeGold(-createForm.buyIn);
+      changeWealthCoin(-createForm.buyIn);
       const id = await createPokerTable(player.uid, player.displayName, player.stats.level, createForm.maxPlayers, createForm.buyIn);
       setMyTableId(id);
       setShowCreateForm(false);
       addNotification('success', `♠ テーブルを作成しました！参加者を待っています (${createForm.buyIn.toLocaleString()}G)`);
     } catch (e) {
-      changeGold(createForm.buyIn);
+      changeWealthCoin(createForm.buyIn);
       addNotification('error', '作成に失敗しました');
     }
     setLoading(false);
@@ -1020,20 +1020,20 @@ function TexasHoldemPanel() {
 
   const handleJoin = async (table: PokerTable) => {
     if (!player) return;
-    if (player.gold < table.buyIn) { addNotification('error', 'ゴールドが足りません'); return; }
+    if ((player.wealthCoin ?? 0) < table.buyIn) { addNotification('error', 'WCが足りません'); return; }
     setLoading(true);
     try {
-      changeGold(-table.buyIn);
+      changeWealthCoin(-table.buyIn);
       const res = await joinPokerTable(table.id, player.uid, player.displayName, player.stats.level, table.buyIn);
       if (res.success) {
         setMyTableId(table.id);
         addNotification('success', `テーブルに参加しました！`);
       } else {
-        changeGold(table.buyIn);
+        changeWealthCoin(table.buyIn);
         addNotification('error', res.message ?? '参加に失敗しました');
       }
     } catch {
-      changeGold(table.buyIn);
+      changeWealthCoin(table.buyIn);
       addNotification('error', '参加に失敗しました');
     }
     setLoading(false);
@@ -1044,7 +1044,7 @@ function TexasHoldemPanel() {
     setLoading(true);
     try {
       await cancelPokerTable(myTableId, player.uid);
-      changeGold(createForm.buyIn); // 返金
+      changeWealthCoin(createForm.buyIn); // 返金
       setMyTableId(null);
       addNotification('info', 'テーブルを取り消しました（返金済み）');
     } catch { addNotification('error', '取り消しに失敗しました'); }
@@ -1057,7 +1057,7 @@ function TexasHoldemPanel() {
     try {
       await leavePokerTable(myTableId, player.uid);
       const me = activeTable.players.find(p => p.uid === player.uid);
-      if (me) changeGold(me.chips); // 返金
+      if (me) changeWealthCoin(me.chips); // 返金
       setMyTableId(null);
       addNotification('info', 'テーブルから退出しました（返金済み）');
     } catch { addNotification('error', '退出に失敗しました'); }
@@ -1103,7 +1103,7 @@ function TexasHoldemPanel() {
             <span style={{ fontWeight:700, fontSize:'0.9rem', color:'#f0c060' }}>♠ テキサスホールデム</span>
             <span style={{ marginLeft:8, fontSize:'0.75rem', background:'rgba(91,141,238,0.2)', color:'#5b8dee', border:'1px solid #5b8dee', borderRadius:4, padding:'1px 6px' }}>{phaseName[phase] ?? phase}</span>
           </div>
-          <span style={{ fontSize:'0.8rem', color:'#8a92b2' }}>ポット: <span style={{color:'#f0c060',fontWeight:700}}>{activeTable.pot.toLocaleString()}G</span></span>
+          <span style={{ fontSize:'0.8rem', color:'#8a92b2' }}>ポット: <span style={{color:'#f0c060',fontWeight:700}}>{activeTable.pot.toLocaleString()}WC</span></span>
         </div>
 
         {/* コミュニティカード */}
@@ -1179,7 +1179,7 @@ function TexasHoldemPanel() {
         {phase === 'waiting' && isHost && (
           <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
             <div style={{ fontSize:'0.78rem', color:'#8a92b2', textAlign:'center' }}>
-              参加者: {activeTable.players.length}/{activeTable.maxPlayers}人 | 参加費: {activeTable.buyIn.toLocaleString()}G
+              参加者: {activeTable.players.length}/{activeTable.maxPlayers}人 | 参加費: {activeTable.buyIn.toLocaleString()}WC
             </div>
             <button onClick={handleStart} disabled={loading || activeTable.players.length < 2}
               style={{ padding:'9px', background: activeTable.players.length >= 3 ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontWeight:700, fontSize:'0.85rem' }}>
@@ -1304,9 +1304,9 @@ function TexasHoldemPanel() {
               ブラインド: SB {Math.max(1,Math.floor(createForm.buyIn*0.01)).toLocaleString()}G / BB {Math.max(2,Math.floor(createForm.buyIn*0.02)).toLocaleString()}G<br/>
               ※ 参加費は先払い。キャンセルで全額返金。{createForm.maxPlayers}人全員が揃ったらホストがゲームを開始します。
             </div>
-            <button onClick={handleCreate} disabled={loading || (player?.gold ?? 0) < createForm.buyIn}
-              style={{ width:'100%', padding:'8px', background:(player?.gold ?? 0) >= createForm.buyIn ? 'linear-gradient(135deg,#5b8dee,#3a6fd0)' : '#2d3752', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.85rem' }}>
-              {(player?.gold ?? 0) >= createForm.buyIn ? `♠ テーブルを作成 (${createForm.buyIn.toLocaleString()}G)` : 'Gが足りない'}
+            <button onClick={handleCreate} disabled={loading || (player?.wealthCoin ?? 0) < createForm.buyIn}
+              style={{ width:'100%', padding:'8px', background:(player?.wealthCoin ?? 0) >= createForm.buyIn ? 'linear-gradient(135deg,#5b8dee,#3a6fd0)' : '#2d3752', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.85rem' }}>
+              {(player?.wealthCoin ?? 0) >= createForm.buyIn ? `♠ テーブルを作成 (${createForm.buyIn.toLocaleString()}WC)` : 'WCが足りない'}
             </button>
           </div>
         )}
@@ -1349,9 +1349,9 @@ function TexasHoldemPanel() {
               </div>
               <button
                 onClick={() => handleJoin(t)}
-                disabled={loading || isFull || alreadyIn || (player?.gold ?? 0) < t.buyIn}
-                style={{ width:'100%', padding:'6px', background: (!isFull && !alreadyIn && (player?.gold??0) >= t.buyIn) ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.82rem' }}>
-                {alreadyIn ? '参加済み' : isFull ? '満員' : (player?.gold??0) < t.buyIn ? 'Gが足りない' : `参加する (${t.buyIn.toLocaleString()}G)`}
+                disabled={loading || isFull || alreadyIn || (player?.wealthCoin ?? 0) < t.buyIn}
+                style={{ width:'100%', padding:'6px', background: (!isFull && !alreadyIn && (player?.wealthCoin??0) >= t.buyIn) ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.82rem' }}>
+                {alreadyIn ? '参加済み' : isFull ? '満員' : (player?.wealthCoin??0) < t.buyIn ? 'WCが足りない' : `参加する (${t.buyIn.toLocaleString()}WC)`}
               </button>
             </div>
           );
@@ -1393,7 +1393,7 @@ function PvPPanel({ bet }: { bet: number }) {
         const iWon = battle.winnerId === player.uid;
         // ホストは募集時に金を引いていないので、勝ちなら+betAmount×2、負けなら-betAmount
         if (iWon) {
-          changeGold(battle.betAmount * 2); // 自分の掛け金 + 相手の掛け金
+          changeWealthCoin(battle.betAmount * 2); // 自分の掛け金 + 相手の掛け金
         }
         // 負けの場合は handleHost で既に -betAmount してあるので追加処理なし
         setBattleAnim({
@@ -1415,18 +1415,18 @@ function PvPPanel({ bet }: { bet: number }) {
   };
 
   const handleHost = async () => {
-    if (!player || player.gold < bet) { addNotification('error', 'ゴールドが足りません'); return; }
+    if (!player || (player.wealthCoin ?? 0) < bet) { addNotification('error', 'WCが足りません'); return; }
     if (myBattleId) { addNotification('warning', '既に募集中です'); return; }
     setLoading(true);
     try {
       // 募集時に掛け金を先払い（エスクロー）
-      changeGold(-bet);
+      changeWealthCoin(-bet);
       const id = await createGambleBattle(player.uid, player.displayName, player.stats.level, selectedGame, bet);
       setMyBattleId(id);
       addNotification('success', `⚔️ 対戦を募集開始しました！ (${bet.toLocaleString()}G)`);
     } catch (e) {
       // 失敗したら返金
-      changeGold(bet);
+      changeWealthCoin(bet);
       const msg = e instanceof Error ? e.message : String(e);
       addNotification('error', `募集に失敗しました: ${msg.slice(0, 60)}`);
     }
@@ -1439,7 +1439,7 @@ function PvPPanel({ bet }: { bet: number }) {
     try {
       await cancelGambleBattle(myBattleId, player.uid);
       // キャンセル時は返金
-      changeGold(bet);
+      changeWealthCoin(bet);
       setMyBattleId(null);
       addNotification('info', '募集をキャンセルしました（返金済み）');
     } catch { addNotification('error', 'キャンセルに失敗しました'); }
@@ -1448,17 +1448,17 @@ function PvPPanel({ bet }: { bet: number }) {
 
   const handleJoin = async (battle: GambleBattle) => {
     if (!player) return;
-    if (player.gold < battle.betAmount) { addNotification('error', 'ゴールドが足りません'); return; }
+    if ((player.wealthCoin ?? 0) < battle.betAmount) { addNotification('error', 'WCが足りません'); return; }
     setLoading(true);
     try {
       // 参加時に掛け金を払う
-      changeGold(-battle.betAmount);
+      changeWealthCoin(-battle.betAmount);
       const { success, battle: result } = await joinGambleBattle(battle.id, player.uid, player.displayName);
       if (success && result) {
         const iWon = result.winnerId === player.uid;
         if (iWon) {
           // 勝ちなら自分の掛け金 + 相手の掛け金を受取
-          changeGold(battle.betAmount * 2);
+          changeWealthCoin(battle.betAmount * 2);
         }
         // 負けの場合は既に -betAmount 済みなので追加処理なし
         setBattleAnim({
@@ -1470,11 +1470,11 @@ function PvPPanel({ bet }: { bet: number }) {
         });
       } else {
         // 参加失敗→返金
-        changeGold(battle.betAmount);
+        changeWealthCoin(battle.betAmount);
         addNotification('error', '参加に失敗しました（既に終了）');
       }
     } catch {
-      changeGold(battle.betAmount);
+      changeWealthCoin(battle.betAmount);
       addNotification('error', '参加に失敗しました');
     }
     setLoading(false);
@@ -1515,8 +1515,8 @@ function PvPPanel({ bet }: { bet: number }) {
             <button onClick={handleCancelHost} disabled={loading} style={{ padding: '4px 10px', background: '#e05555', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.75rem' }}>取消</button>
           </div>
         ) : (
-          <button onClick={handleHost} disabled={loading || (player?.gold ?? 0) < bet}
-            style={{ width: '100%', padding: '8px', background: (player?.gold ?? 0) >= bet ? 'linear-gradient(135deg,#5b8dee,#3a6fd0)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
+          <button onClick={handleHost} disabled={loading || (player?.wealthCoin ?? 0) < bet}
+            style={{ width: '100%', padding: '8px', background: (player?.wealthCoin ?? 0) >= bet ? 'linear-gradient(135deg,#5b8dee,#3a6fd0)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
             ⚔️ {bet.toLocaleString()}G で対戦を募集する
           </button>
         )}
@@ -1538,9 +1538,9 @@ function PvPPanel({ bet }: { bet: number }) {
             <div style={{ fontSize: '0.78rem', color: '#8a92b2', marginBottom: 8 }}>
               ゲーム: {GAME_NAMES[b.gambleType] ?? b.gambleType} | 勝者獲得: {(b.betAmount * 2).toLocaleString()}G
             </div>
-            <button onClick={() => handleJoin(b)} disabled={loading || (player?.gold ?? 0) < b.betAmount}
-              style={{ width: '100%', padding: '6px', background: (player?.gold ?? 0) >= b.betAmount ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem' }}>
-              {(player?.gold ?? 0) >= b.betAmount ? `参加する (${b.betAmount.toLocaleString()}G)` : 'Gが足りない'}
+            <button onClick={() => handleJoin(b)} disabled={loading || (player?.wealthCoin ?? 0) < b.betAmount}
+              style={{ width: '100%', padding: '6px', background: (player?.wealthCoin ?? 0) >= b.betAmount ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem' }}>
+              {(player?.wealthCoin ?? 0) >= b.betAmount ? `参加する (${b.betAmount.toLocaleString()}WC)` : 'WCが足りない'}
             </button>
           </div>
         ))
@@ -1555,7 +1555,7 @@ function PvPPanel({ bet }: { bet: number }) {
 
 // スロット専用パネル（リール本格演出）
 function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
-  const { player, changeGold, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addItems: s.addItems, addNotification: s.addNotification }));
+  const { player, changeGold: _cg1, changeWealthCoin, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, changeWealthCoin: s.changeWealthCoin, addItems: s.addItems, addNotification: s.addNotification }));
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
   const [spinning, setSpinning] = useState(false);
@@ -1565,9 +1565,9 @@ function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
   const game = GAMBLE_MASTER['slot_machine'];
 
   const play = async () => {
-    if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
+    if (animating || !player || (player.wealthCoin ?? 0) < bet) { addNotification('error', 'WCが足りません！'); return; }
     setAnimating(true); setResult(null); setFinalSyms(null);
-    changeGold(-bet); onJackpotContrib(bet);
+    changeWealthCoin(-bet); onJackpotContrib(bet);
     const r = resolveGenericGamble(game, bet, multiplierBonus);
 
     setSpinning(true);
@@ -1598,7 +1598,7 @@ function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
       clearInterval(t);
       setSpinning(false);
       setFinalSyms(syms as string[]);
-      if (r.multiplier > 0) changeGold(r.goldDelta + bet);
+      if (r.multiplier > 0) changeWealthCoin(r.goldDelta + bet);
       if (r.itemRewards.length > 0) addItems(r.itemRewards);
       // REPLAY役（×1.0）は「掛け金返還」として通知
       if (r.rewardLabel.includes('REPLAY')) {
@@ -1608,10 +1608,10 @@ function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
       if (player) {
         const winGold = Math.floor(bet * r.multiplier);
         const type = r.multiplier > 0 ? 'gamble_win' : 'gamble_lose';
-        const msg = r.multiplier > 0 ? `が${game.name}で${(winGold-bet).toLocaleString()}G勝利しました！` : `が${game.name}で${bet.toLocaleString()}G負けました`;
+        const msg = r.multiplier > 0 ? `が${game.name}で${(winGold-bet).toLocaleString()}WC勝利しました！` : `が${game.name}で${bet.toLocaleString()}WC負けました`;
         postActivityFeed({ uid: player.uid, displayName: player.displayName, type, message: msg }).catch(() => {});
       }
-      try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟🌟🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /**/ }
+      try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeWealthCoin(pool); addNotification('success', `🌟🌟🌟 JACKPOT!! ${pool.toLocaleString()}WC！`); } } catch { /**/ }
       setAnimating(false);
     }, 2300);
   };
@@ -1670,17 +1670,17 @@ function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
 }
 
 function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { game: GambleMaster; bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
-  const { player, changeGold, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addItems: s.addItems, addNotification: s.addNotification }));
+  const { player, changeGold: _cg2, changeWealthCoin, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, changeWealthCoin: s.changeWealthCoin, addItems: s.addItems, addNotification: s.addNotification }));
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
   const [showAnim, setShowAnim] = useState(false);
   const pendingRef = useState<{ r: GambleResult | null }>({ r: null })[0];
 
   const play = async () => {
-    if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
+    if (animating || !player || (player.wealthCoin ?? 0) < bet) { addNotification('error', 'WCが足りません！'); return; }
     setAnimating(true);
     setResult(null);
-    changeGold(-bet);
+    changeWealthCoin(-bet);
     onJackpotContrib(bet); // ジャックポット積立
 
     const r = resolveGenericGamble(game, bet, multiplierBonus);
@@ -1692,7 +1692,7 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus =
     setShowAnim(false);
     const r = pendingRef.r;
     if (!r) { setAnimating(false); return; }
-    if (r.multiplier > 0) changeGold(r.goldDelta + bet);
+    if (r.multiplier > 0) changeWealthCoin(r.goldDelta + bet);
     if (r.itemRewards.length > 0) addItems(r.itemRewards);
     setResult(r);
     onResult(r);
@@ -1701,16 +1701,16 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus =
       const winGold = Math.floor(bet * r.multiplier);
       const type = r.multiplier > 0 ? 'gamble_win' : 'gamble_lose';
       const msg = r.multiplier > 0
-        ? `が${game.name}で${(winGold - bet).toLocaleString()}G勝利しました！`
-        : `が${game.name}で${bet.toLocaleString()}G負けました`;
+        ? `が${game.name}で${(winGold - bet).toLocaleString()}WC勝利しました！`
+        : `が${game.name}で${bet.toLocaleString()}WC負けました`;
       postActivityFeed({ uid: player.uid, displayName: player.displayName, type, message: msg }).catch(() => {});
     }
     try {
       const { won, pool } = await checkJackpotWin();
       if (won && pool > 0) {
-        changeGold(pool);
-        addNotification('success', `🌟🌟🌟 JACKPOT!! ${pool.toLocaleString()}G獲得！！🌟🌟🌟`);
-        if (player) postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'gamble_win', message: `が🌟JACKPOTで${pool.toLocaleString()}G獲得！！` }).catch(() => {});
+        changeWealthCoin(pool);
+        addNotification('success', `🌟🌟🌟 JACKPOT!! ${pool.toLocaleString()}WC獲得！！🌟🌟🌟`);
+        if (player) postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'gamble_win', message: `が🌟JACKPOTで${pool.toLocaleString()}WC獲得！！` }).catch(() => {});
       }
     } catch { /* ignore */ }
     setAnimating(false);
@@ -1731,7 +1731,7 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus =
 }
 
 function ChohanPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
-  const { player, changeGold, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addNotification: s.addNotification }));
+  const { player, changeWealthCoin, addNotification } = useGameStore(s => ({ player: s.player, changeWealthCoin: s.changeWealthCoin, addNotification: s.addNotification }));
   const [choice, setChoice] = useState<'cho'|'han'>('cho');
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
@@ -1742,9 +1742,9 @@ function ChohanPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }:
   const DICE_EJ = ['⚀','⚁','⚂','⚃','⚄','⚅'];
 
   const play = async () => {
-    if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
+    if (animating || !player || (player.wealthCoin ?? 0) < bet) { addNotification('error', 'WCが足りません！'); return; }
     setAnimating(true); setResult(null); setFinalDice(null);
-    changeGold(-bet); onJackpotContrib(bet);
+    changeWealthCoin(-bet); onJackpotContrib(bet);
     const r = playChohan(bet, choice);
     const adjustedDelta = r.goldDelta > 0 ? Math.floor(r.goldDelta * multiplierBonus) : r.goldDelta;
     pendingRef.r = { ...r, goldDelta: adjustedDelta };
@@ -1761,9 +1761,9 @@ function ChohanPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }:
         setTimeout(async () => {
           const rr = pendingRef.r;
           if (!rr) { setAnimating(false); return; }
-          if (rr.goldDelta > 0) changeGold(rr.goldDelta + bet);
+          if (rr.goldDelta > 0) changeWealthCoin(rr.goldDelta + bet);
           setResult(rr); onResult(rr); setPhase('done');
-          try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /**/ }
+          try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeWealthCoin(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}WC！`); } } catch { /**/ }
           setAnimating(false);
         }, 1000);
       }
@@ -1814,7 +1814,7 @@ function ChohanPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }:
 }
 
 function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
-  const { player, changeGold, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addNotification: s.addNotification }));
+  const { player, changeWealthCoin, addNotification } = useGameStore(s => ({ player: s.player, changeWealthCoin: s.changeWealthCoin, addNotification: s.addNotification }));
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
   const [rollLogs, setRollLogs] = useState<{dice:number[];label:string;isRole:boolean}[]>([]);
@@ -1831,9 +1831,9 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
   }, [rolling]);
 
   const play = async () => {
-    if (animating || !player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
+    if (animating || !player || (player.wealthCoin ?? 0) < bet) { addNotification('error', 'WCが足りません！'); return; }
     setAnimating(true); setResult(null); setRollLogs([]); setCurrentDice(null);
-    changeGold(-bet); onJackpotContrib(bet);
+    changeWealthCoin(-bet); onJackpotContrib(bet);
     const r = playChinchiro(bet);
     const effectiveMult = r.multiplier > 0 ? r.multiplier * multiplierBonus : 0;
     pendingRef.r = { ...r, multiplier: effectiveMult, goldDelta: r.goldDelta > 0 ? Math.floor(bet * effectiveMult) - bet : r.goldDelta };
@@ -1865,9 +1865,9 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
           setTimeout(async () => {
             const rr = pendingRef.r;
             if (!rr) { setAnimating(false); return; }
-            if (rr.multiplier > 0) changeGold(rr.goldDelta + bet);
+            if (rr.multiplier > 0) changeWealthCoin(rr.goldDelta + bet);
             setResult(rr); onResult(rr);
-            try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /**/ }
+            try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeWealthCoin(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}WC！`); } } catch { /**/ }
             setAnimating(false);
           }, 1200);
         }
@@ -1916,7 +1916,7 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
 
 // 倍々チキンレース コインフリップ
 function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, onLockChange }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number; onLockChange?: (locked: boolean) => void }) {
-  const { player, changeGold, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addNotification: s.addNotification }));
+  const { player, changeWealthCoin, addNotification } = useGameStore(s => ({ player: s.player, changeWealthCoin: s.changeWealthCoin, addNotification: s.addNotification }));
   // phase: idle=未開始, choosing=表裏選択中, playing=進行中, busted=負け, cashed=利確
   const [phase, setPhase] = useState<'idle'|'choosing'|'playing'|'busted'|'cashed'>('idle');
   const [pick, setPick] = useState<'omote'|'ura'>('omote');  // 毎回選んだ面
@@ -1929,7 +1929,7 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0,
 
   // ゲーム開始ボタン押下 → 表裏選択フェーズへ
   const handleStart = () => {
-    if (!player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
+    if (!player || (player.wealthCoin ?? 0) < bet) { addNotification('error', 'WCが足りません！'); return; }
     setPhase('choosing');
     setScore(0);
     setFlips(0);
@@ -1942,7 +1942,7 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0,
     if (animating) return;
     if (phase === 'choosing') {
       // 初回：ここで掛け金を払う
-      changeGold(-bet);
+      changeWealthCoin(-bet);
       onJackpotContrib(bet);
       setScore(1);
       setPhase('playing');
@@ -1981,12 +1981,12 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0,
     if (phase !== 'playing' || animating) return;
     const multiplier = score * multiplierBonus;
     const winGold = Math.floor(bet * multiplier);
-    changeGold(winGold);
+    changeWealthCoin(winGold);
     setPhase('cashed');
     onLockChange?.(false);
     const r: GambleResult = { rewardLabel: `利確！×${score}倍！`, multiplier, goldDelta: winGold - bet, itemRewards: [], symbols: ['🌕','✨'] };
     onResult(r);
-    try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
+    try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeWealthCoin(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}WC！`); } } catch { /* ignore */ }
   };
 
   const reset = () => { setPhase('idle'); setScore(0); setFlips(0); setLastFlip(null); onLockChange?.(false); };
@@ -2055,8 +2055,8 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0,
 
       {/* ボタン群 */}
       {phase === 'idle' && (
-        <button onClick={handleStart} disabled={(player?.gold ?? 0) < bet}
-          style={{ width: '100%', padding: 12, background: (player?.gold ?? 0) >= bet ? 'linear-gradient(135deg,#f0c060,#c08020)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>
+        <button onClick={handleStart} disabled={(player?.wealthCoin ?? 0) < bet}
+          style={{ width: '100%', padding: 12, background: (player?.wealthCoin ?? 0) >= bet ? 'linear-gradient(135deg,#f0c060,#c08020)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>
           🪙 {bet.toLocaleString()}G でゲーム開始
         </button>
       )}
@@ -2090,7 +2090,7 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0,
 }
 
 function PokerPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, onBetLock }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number; onBetLock?: (locked: boolean) => void }) {
-  const { player, changeGold, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, addItems: s.addItems, addNotification: s.addNotification }));
+  const { player, changeWealthCoin, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeWealthCoin: s.changeWealthCoin, addItems: s.addItems, addNotification: s.addNotification }));
   const [pokerState, setPokerState] = useState<PokerState | null>(null);
   const [hold, setHold] = useState<boolean[]>([false,false,false,false,false]);
   const [phase, setPhase] = useState<'idle'|'dealing'|'deal'|'drawing'|'result'>('idle');
@@ -2106,8 +2106,8 @@ function PokerPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, on
   });
 
   const handleDeal = () => {
-    if (!player || player.gold < bet) { addNotification('error', 'ゴールドが足りません！'); return; }
-    changeGold(-bet); onJackpotContrib(bet);
+    if (!player || (player.wealthCoin ?? 0) < bet) { addNotification('error', 'WCが足りません！'); return; }
+    changeWealthCoin(-bet); onJackpotContrib(bet);
     const state = dealPoker();
     pendingRef.state = state;
     setHold([false,false,false,false,false]);
@@ -2136,10 +2136,10 @@ function PokerPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, on
     setPhase('result');
     const effectiveMult = r.multiplier > 0 ? r.multiplier * multiplierBonus : 0;
     const adjustedResult = { ...r, multiplier: effectiveMult, goldDelta: r.multiplier > 0 ? Math.floor(bet * effectiveMult) - bet : r.goldDelta };
-    if (effectiveMult > 0) changeGold(adjustedResult.goldDelta + bet);
+    if (effectiveMult > 0) changeWealthCoin(adjustedResult.goldDelta + bet);
     if (r.itemRewards.length > 0) addItems(r.itemRewards);
     setResult(adjustedResult); onResult(adjustedResult);
-    try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeGold(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}G！`); } } catch { /* ignore */ }
+    try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeWealthCoin(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}WC！`); } } catch { /* ignore */ }
   };
 
   return (
@@ -2195,10 +2195,77 @@ const GAME_TABS: { id: GameTab; label: string; icon: string }[] = [
   { id:'texas',        label:'TH対戦',   icon:'joker_card' },
 ];
 
+
+function ExchangePanel() {
+  const { player, changeGold, changeWealthCoin, addNotification } = useGameStore(s => ({
+    player: s.player, changeGold: s.changeGold, changeWealthCoin: s.changeWealthCoin, addNotification: s.addNotification
+  }));
+  const [gwcAmount, setGwcAmount] = useState(1000);
+  const [wcgAmount, setWcgAmount] = useState(1000);
+  if (!player) return null;
+  const wc = player.wealthCoin ?? 0;
+
+  const buyWC = () => {
+    if (gwcAmount <= 0) return;
+    if (!changeGold(-gwcAmount)) { addNotification('error', 'Gが足りません'); return; }
+    changeWealthCoin(gwcAmount * 1000);
+    addNotification('success', `${(gwcAmount * 1000).toLocaleString()}WC を取得しました！`);
+  };
+
+  const sellWC = () => {
+    if (wcgAmount <= 0) return;
+    if (wc < wcgAmount) { addNotification('error', 'WCが足りません'); return; }
+    changeWealthCoin(-wcgAmount);
+    const receive = Math.floor(wcgAmount / 1000 * 0.95);
+    changeGold(receive);
+    addNotification('success', `${receive.toLocaleString()}G を受け取りました！`);
+  };
+
+  return (
+    <div style={{ padding: '0 4px' }}>
+      <div style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 10, padding: 16, marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div style={{ fontSize: '0.9rem', color: '#8a92b2' }}>所持G: <span style={{ color: '#f0c060', fontWeight: 700 }}>{player.gold.toLocaleString()}G</span></div>
+          <div style={{ fontSize: '0.9rem', color: '#8a92b2' }}>所持WC: <span style={{ color: '#4caf87', fontWeight: 700 }}>{wc.toLocaleString()}WC</span></div>
+        </div>
+        <div style={{ marginBottom: 16, padding: 12, background: '#161b26', borderRadius: 8 }}>
+          <div style={{ fontWeight: 700, marginBottom: 8, color: '#e8e6ff' }}>G → WC（1G = 1,000WC）</div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input type="number" value={gwcAmount} min={1} onChange={e => setGwcAmount(Math.max(1, Number(e.target.value)))}
+              style={{ flex: 1, padding: '6px 8px', background: '#1c2235', border: '1px solid #2d3752', color: '#e8e6ff', borderRadius: 6, fontSize: '0.85rem' }} />
+            <span style={{ color: '#8a92b2', fontSize: '0.75rem' }}>G →</span>
+            <span style={{ color: '#4caf87', fontWeight: 700, fontSize: '0.85rem' }}>{(gwcAmount * 1000).toLocaleString()}WC</span>
+          </div>
+          <button onClick={buyWC} disabled={(player.gold ?? 0) < gwcAmount}
+            style={{ width: '100%', marginTop: 8, padding: '8px', background: (player.gold ?? 0) >= gwcAmount ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
+            {(player.gold ?? 0) >= gwcAmount ? '両替する' : 'Gが足りない'}
+          </button>
+        </div>
+        <div style={{ padding: 12, background: '#161b26', borderRadius: 8 }}>
+          <div style={{ fontWeight: 700, marginBottom: 8, color: '#e8e6ff' }}>WC → G（1,000WC = 0.95G / 手数料5%）</div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input type="number" value={wcgAmount} min={1000} step={1000} onChange={e => setWcgAmount(Math.max(1000, Number(e.target.value)))}
+              style={{ flex: 1, padding: '6px 8px', background: '#1c2235', border: '1px solid #2d3752', color: '#e8e6ff', borderRadius: 6, fontSize: '0.85rem' }} />
+            <span style={{ color: '#8a92b2', fontSize: '0.75rem' }}>WC →</span>
+            <span style={{ color: '#f0c060', fontWeight: 700, fontSize: '0.85rem' }}>{Math.floor(wcgAmount / 1000 * 0.95).toLocaleString()}G</span>
+          </div>
+          <button onClick={sellWC} disabled={wc < wcgAmount}
+            style={{ width: '100%', marginTop: 8, padding: '8px', background: wc >= wcgAmount ? 'linear-gradient(135deg,#f0c060,#c08020)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
+            {wc >= wcgAmount ? 'WC → G に両替' : 'WCが足りない'}
+          </button>
+        </div>
+      </div>
+      <div style={{ fontSize: '0.72rem', color: '#4a5070', textAlign: 'center' }}>※G→WC は手数料なし。WC→G は5%手数料あり。</div>
+    </div>
+  );
+}
+
+type MainTab = 'gamble' | 'exchange';
 export function GambleScreen() {
   const player = useGameStore(s => s.player);
   const setPlayer = useGameStore(s => s.setPlayer);
   const [activeGame, setActiveGame] = useState<GameTab>('chohan');
+  const [mainTab, setMainTab] = useState<MainTab>('gamble');
   const [bet, setBet] = useState(100);
   const [stats, setStats] = useState<SessionStats>(initStats());
   const [jackpotPool, setJackpotPool] = useState(0);
@@ -2268,6 +2335,26 @@ export function GambleScreen() {
   return (
     <div style={{ padding: '12px 8px' }}>
       <h2 style={{ fontFamily: 'Cinzel,serif', color: '#f0c060', marginBottom: 8, borderBottom: '1px solid #2d3752', paddingBottom: 8 }}>🎰 ギャンブル</h2>
+
+      {/* G/WC残高表示 */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10, background: '#1c2235', border: '1px solid #2d3752', borderRadius: 8, padding: '8px 12px' }}>
+        <span style={{ fontSize: '0.85rem', color: '#8a92b2' }}>💰 <span style={{ color: '#f0c060', fontWeight: 700 }}>{player.gold.toLocaleString()}G</span></span>
+        <span style={{ color: '#2d3752' }}>|</span>
+        <span style={{ fontSize: '0.85rem', color: '#8a92b2' }}>🪙 WC: <span style={{ color: '#4caf87', fontWeight: 700 }}>{(player.wealthCoin ?? 0).toLocaleString()}WC</span></span>
+      </div>
+
+      {/* メインタブ */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+        {([['gamble','🎲 ギャンブル'],['exchange','🔄 交換所']] as [MainTab, string][]).map(([id, label]) => (
+          <button key={id} onClick={() => setMainTab(id)}
+            style={{ flex: 1, padding: '7px 0', fontSize: '0.82rem', fontWeight: 700, background: mainTab === id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${mainTab === id ? '#5b8dee' : '#2d3752'}`, color: mainTab === id ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer' }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mainTab === 'exchange' && <ExchangePanel />}
+      {mainTab === 'gamble' && <>
 
       <JackpotBanner pool={jackpotPool} />
 
@@ -2380,6 +2467,7 @@ export function GambleScreen() {
           </div>
         </details>
       )}
+      </>}
     </div>
   );
 }

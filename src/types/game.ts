@@ -272,6 +272,8 @@ export interface PlayerData {
   hpUpgradeCount?: number;
   // ガチャコイン
   gachaCoins?: number;
+  // ウェルスコイン（ギャンブル専用通貨）
+  wealthCoin?: number;
   // 生涯統計
   lifetimeStats?: {
     totalDamageDealt: number;
