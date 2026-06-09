@@ -1638,24 +1638,35 @@ function KXBattlePanel({ player, runState, onVictory, onDefeat }: {
       )}
 
 
-      {/* ホットバー（回復アイテム使用） */}
-      <div style={{ display:'flex', gap: 4, marginBottom: 8, flexWrap:'wrap' }}>
+      {/* ホットバー（通常ダンジョンと同様の表示） */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
         {equipment.hotbar.map((itemId, i) => {
           const item = itemId ? ITEM_MASTER[itemId] : null;
           const qty = itemId ? (player.inventory[itemId] ?? 0) : 0;
-          if (!item || item.itemType === 'Weapon' || item.itemType === 'Armor') return null;
-          if (!item.useEffect || (!item.useEffect.hpRestore && !item.useEffect.satietyRestore)) return null;
+          const canUse = item && qty > 0 && turn === 'player' && item.itemType !== 'Weapon' && item.itemType !== 'Armor' && item.useEffect && (item.useEffect.hpRestore || item.useEffect.satietyRestore);
           return (
-            <button key={i} disabled={turn !== 'player' || qty <= 0}
+            <button key={i}
               onClick={() => {
-                if (!item.useEffect || turn !== 'player' || qty <= 0) return;
+                if (!canUse || !item?.useEffect) return;
                 consumeItem(itemId!, 1);
                 if (item.useEffect.hpRestore) changeHp(item.useEffect.hpRestore);
                 addLog(`🧪 ${item.name} 使用${item.useEffect.message ? '：' + item.useEffect.message : ''}`, '#4caf87');
               }}
-              style={{ padding: '6px 8px', background: qty > 0 && turn === 'player' ? '#1c2235' : '#161b26', border: `1px solid ${qty > 0 ? '#2d3752' : '#1c2235'}`, borderRadius: 6, cursor: qty > 0 && turn === 'player' ? 'pointer' : 'not-allowed', fontSize: '0.72rem', color: qty > 0 ? '#e8e6ff' : '#4a5070', minWidth: 48, textAlign: 'center' }}>
-              <div style={{ fontSize: '1rem' }}>{item.icon?.length <= 2 ? item.icon : '🧪'}</div>
-              <div style={{ fontSize: '0.65rem', color: '#8a92b2' }}>×{qty}</div>
+              disabled={!canUse}
+              title={item ? `${item.name} ×${qty}` : `スロット${i+1}（空）`}
+              style={{
+                width: 38, height: 38,
+                background: canUse ? 'rgba(155,109,240,0.2)' : '#161b26',
+                border: `1px solid ${canUse ? '#9b6df0' : '#2d3752'}`,
+                borderRadius: 6,
+                cursor: canUse ? 'pointer' : 'not-allowed',
+                position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+              {item
+                ? <><GameIcon id={item.icon} size={18} />
+                    <span style={{ position:'absolute', bottom:1, right:2, fontSize:'0.5rem', color:'#f0c060' }}>{qty}</span>
+                  </>
+                : <span style={{ fontSize: '0.6rem', color: '#4a5070' }}>{i+1}</span>}
             </button>
           );
         })}
@@ -1725,7 +1736,8 @@ export function DungeonScreen() {
   // 0=なし, 1=デビルアーマー戦, 2=デッドアーマー戦
   const [devilArmorPhase, setDevilArmorPhase] = useState(0);
 
-  const dungeons = Object.values(DUNGEON_MASTER);
+  const HIDDEN_DUNGEON_IDS = ['devil_armor_fight', 'dead_armor_fight', 'sky_castle_ex', 'dragons_lair'];
+  const dungeons = Object.values(DUNGEON_MASTER).filter(d => !HIDDEN_DUNGEON_IDS.includes(d.id));
   const lockedDungeons = dungeons.filter(d => !isDungeonUnlocked(d.id));
 
   const startDungeon = useCallback(() => {

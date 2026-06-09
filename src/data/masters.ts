@@ -922,13 +922,6 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
       { name:'KX-G21 決戦', description:'KX-G21との決戦。眷属を倒してダメージを与えよ！', monsters:[{monsterId:'kx_g21',count:1,isBoss:true},{monsterId:'roam_armor',count:3},{monsterId:'death_armor',count:3}], isHardArea:true },
     ],
   },
-  dragons_lair: {
-    id:'dragons_lair', name:'ドラゴンの塒', description:'伝説のダンジョン。最強の冒険者のみ。',
-    icon:'flame', tier:'extreme', requiredLevel:50, floors:10, expBonus:8.0, goldBonus:6.0,
-    monsterIds:['dragon'],
-    bossId:'dragon',
-    unlockCondition: { dungeonId:'sky_castle', clearedCount:1 },
-  },
   volcano: {
     id:'volcano', name:'火山', description:'総スポナー数999個。ステインポット対策必須。最難関クラスのダンジョン。',
     icon:'volcano', tier:'volcano', requiredLevel:15, floors:12, expBonus:5.0, goldBonus:4.5,
