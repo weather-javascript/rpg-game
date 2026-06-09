@@ -17,7 +17,7 @@ import {
   subscribeTreasureProbs,
 } from '../../services/multiplayer';
 import type { TreasureProbEntry } from '../../services/multiplayer';
-import type { GambleResult, GambleMaster, PokerTable } from '../../types/game';
+import type { GambleResult, GambleMaster, PokerTable, MissionDef, MissionProgress } from '../../types/game';
 import type { PokerState } from '../../systems/minigames';
 import type { GambleBattle } from '../../types/game';
 
@@ -2182,7 +2182,7 @@ function PokerPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, on
 // ============================================================
 // メイン画面
 // ============================================================
-type GameTab = 'chohan'|'chinchiro'|'coin_flip'|'slot'|'poker'|'treasure_box'|'pvp'|'texas';
+type GameTab = 'chohan'|'chinchiro'|'coin_flip'|'slot'|'poker'|'treasure_box'|'pvp'|'texas'|'highlow';
 const GAME_TABS: { id: GameTab; label: string; icon: string }[] = [
   { id:'chohan',       label:'丁半',     icon:'dice' },
   { id:'chinchiro',    label:'チンチロ', icon:'target' },
@@ -2190,10 +2190,356 @@ const GAME_TABS: { id: GameTab; label: string; icon: string }[] = [
   { id:'slot',         label:'スロット', icon:'slot_machine' },
   { id:'poker',        label:'ポーカー', icon:'joker_card' },
   { id:'treasure_box', label:'宝箱',     icon:'box' },
+  { id:'highlow',      label:'ハイロー', icon:'joker_card' },
   { id:'pvp',          label:'対戦',     icon:'swords' },
   { id:'texas',        label:'TH対戦',   icon:'joker_card' },
 ];
 
+// ============================================================
+// ギャンブルランク
+// ============================================================
+export type GambleRank = '見習い' | 'ギャンブラー' | '熟練ギャンブラー' | '賭博王' | 'レジェンド';
+const GAMBLE_RANKS: { name: GambleRank; threshold: number; multiplier: number; color: string }[] = [
+  { name: '見習い',       threshold: 0,              multiplier: 1.00, color: '#8a92b2' },
+  { name: 'ギャンブラー', threshold: 1_000_000,      multiplier: 1.02, color: '#4caf87' },
+  { name: '熟練ギャンブラー', threshold: 10_000_000, multiplier: 1.05, color: '#5b8dee' },
+  { name: '賭博王',       threshold: 1_000_000_000,  multiplier: 1.10, color: '#f0a040' },
+  { name: 'レジェンド',   threshold: 10_000_000_000, multiplier: 1.20, color: '#e060e0' },
+];
+export function getGambleRank(totalWagered: number) {
+  let rank = GAMBLE_RANKS[0];
+  for (const r of GAMBLE_RANKS) { if (totalWagered >= r.threshold) rank = r; }
+  return rank;
+}
+
+// ============================================================
+// ミッション定義
+// ============================================================
+const MISSIONS: MissionDef[] = [
+  // デイリー
+  { id:'daily_slot_5',       title:'スロット5回',       description:'スロットを5回プレイ',       type:'daily',   target:5,   rewardWC:5_000,    statKey:'dailySlotPlays' },
+  { id:'daily_slot_20',      title:'スロット20回',      description:'スロットを20回プレイ',      type:'daily',   target:20,  rewardWC:20_000,   statKey:'dailySlotPlays' },
+  { id:'daily_gamble_10',    title:'ギャンブル10回',    description:'任意ギャンブル10回',        type:'daily',   target:10,  rewardWC:10_000,   statKey:'dailyGamblePlays' },
+  { id:'daily_chohan_3wins', title:'丁半3勝',           description:'丁半で3勝',                 type:'daily',   target:3,   rewardWC:8_000,    statKey:'dailyChohanWins' },
+  { id:'daily_highlow_3wins',title:'ハイロー3勝',       description:'ハイローで3連勝以上',       type:'daily',   target:3,   rewardWC:15_000,   statKey:'dailyHighlowWins' },
+  { id:'daily_poker_1win',   title:'ポーカー1勝',       description:'ポーカーで1回勝つ',         type:'daily',   target:1,   rewardWC:10_000,   statKey:'dailyPokerWins' },
+  { id:'daily_coinflip_5wins',title:'コイン5勝',        description:'コインフリップで5勝',       type:'daily',   target:5,   rewardWC:8_000,    statKey:'dailyCoinFlipWins' },
+  // ウィークリー
+  { id:'weekly_slot_100',    title:'スロット100回',     description:'スロットを100回プレイ',     type:'weekly',  target:100, rewardWC:200_000,  statKey:'weeklySlotPlays' },
+  { id:'weekly_gamble_100',  title:'ギャンブル100回',   description:'任意ギャンブル100回',       type:'weekly',  target:100, rewardWC:100_000,  statKey:'weeklyGamblePlays' },
+  { id:'weekly_chohan_30',   title:'丁半30勝',          description:'丁半で30勝',                type:'weekly',  target:30,  rewardWC:150_000,  statKey:'weeklyChohanWins' },
+  { id:'weekly_chinchiro_20',title:'チンチロ20勝',      description:'チンチロで20勝',            type:'weekly',  target:20,  rewardWC:150_000,  statKey:'weeklyChinchiroWins' },
+  { id:'weekly_poker_10',    title:'ポーカー10勝',      description:'ポーカーで10勝',            type:'weekly',  target:10,  rewardWC:200_000,  statKey:'weeklyPokerWins' },
+  { id:'weekly_highlow5',    title:'ハイロー5連勝',     description:'ハイローで5連勝以上1回',    type:'weekly',  target:5,   rewardWC:300_000,  statKey:'weeklyHighlowMaxStreak' },
+  // 実績
+  { id:'ach_slot_10',        title:'スロット初挑戦',    description:'スロットを10回プレイ',      type:'achievement', target:10,  rewardWC:50_000,     statKey:'totalSlotPlays' },
+  { id:'ach_slot_100',       title:'スロット常連',      description:'スロットを100回プレイ',     type:'achievement', target:100, rewardWC:200_000,    statKey:'totalSlotPlays' },
+  { id:'ach_slot_1000',      title:'スロット廃人',      description:'スロットを1000回プレイ',    type:'achievement', target:1000,rewardWC:2_000_000,  statKey:'totalSlotPlays' },
+  { id:'ach_chohan_100',     title:'丁半百戦',          description:'丁半で100勝',               type:'achievement', target:100, rewardWC:300_000,    statKey:'totalChohanWins' },
+  { id:'ach_chohan_500',     title:'丁半の神',          description:'丁半で500勝',               type:'achievement', target:500, rewardWC:2_000_000,  statKey:'totalChohanWins' },
+  { id:'ach_chinchiro_100',  title:'チンチロ百戦',      description:'チンチロで100勝',           type:'achievement', target:100, rewardWC:300_000,    statKey:'totalChinchiroWins' },
+  { id:'ach_poker_100',      title:'ポーカー百勝',      description:'ポーカーで100勝',           type:'achievement', target:100, rewardWC:500_000,    statKey:'totalPokerWins' },
+  { id:'ach_poker_500',      title:'ポーカーの鬼',      description:'ポーカーで500勝',           type:'achievement', target:500, rewardWC:3_000_000,  statKey:'totalPokerWins' },
+  { id:'ach_highlow_5',      title:'ハイロー5連勝',     description:'ハイローで5連勝以上',       type:'achievement', target:5,   rewardWC:500_000,    statKey:'totalHighlowMaxStreak' },
+  { id:'ach_highlow_10',     title:'ハイロー10連勝',    description:'ハイローで10連勝以上',      type:'achievement', target:10,  rewardWC:5_000_000,  statKey:'totalHighlowMaxStreak' },
+  { id:'ach_highlow_wins50', title:'ハイロー50勝',      description:'ハイローで50勝',            type:'achievement', target:50,  rewardWC:200_000,    statKey:'totalHighlowWins' },
+  { id:'ach_highlow_wins200',title:'ハイロー200勝',     description:'ハイローで200勝',           type:'achievement', target:200, rewardWC:1_000_000,  statKey:'totalHighlowWins' },
+  { id:'ach_jackpot1',       title:'初ジャックポット',  description:'ジャックポットを当てる',    type:'achievement', target:1,   rewardWC:1_000_000,  statKey:'totalJackpotWins' },
+  { id:'ach_wager_1m',       title:'総賭け額100万WC',   description:'累計100万WCを賭ける',       type:'achievement', target:1_000_000,   rewardWC:100_000,    statKey:'totalWagered' },
+  { id:'ach_wager_10m',      title:'総賭け額1000万WC',  description:'累計1000万WCを賭ける',      type:'achievement', target:10_000_000,  rewardWC:500_000,    statKey:'totalWagered' },
+  { id:'ach_wager_100m',     title:'総賭け額1億WC',     description:'累計1億WCを賭ける',         type:'achievement', target:100_000_000, rewardWC:2_000_000,  statKey:'totalWagered' },
+  { id:'ach_wager_1b',       title:'総賭け額10億WC',    description:'累計10億WCを賭ける',        type:'achievement', target:1_000_000_000,rewardWC:10_000_000, statKey:'totalWagered' },
+  { id:'ach_wager_10b',      title:'総賭け額100億WC',   description:'累計100億WCを賭ける',       type:'achievement', target:10_000_000_000,rewardWC:50_000_000, statKey:'totalWagered' },
+  { id:'ach_coinflip_100',   title:'コイン百回',        description:'コインフリップで100勝',     type:'achievement', target:100, rewardWC:300_000,    statKey:'totalCoinFlipWins' },
+  { id:'ach_coinflip_500',   title:'コインの達人',      description:'コインフリップで500勝',     type:'achievement', target:500, rewardWC:2_000_000,  statKey:'totalCoinFlipWins' },
+  { id:'ach_gamble_rank2',   title:'ギャンブラー到達',  description:'ランク「ギャンブラー」に到達',type:'achievement',target:1_000_000,  rewardWC:500_000,    statKey:'totalWagered' },
+  { id:'ach_gamble_rank3',   title:'熟練者の証',        description:'ランク「熟練ギャンブラー」に到達',type:'achievement',target:10_000_000,rewardWC:2_000_000, statKey:'totalWagered' },
+  { id:'ach_gamble_rank4',   title:'賭博王の座',        description:'ランク「賭博王」に到達',    type:'achievement', target:1_000_000_000,rewardWC:20_000_000,statKey:'totalWagered' },
+  { id:'ach_gamble_rank5',   title:'レジェンド覚醒',    description:'ランク「レジェンド」に到達',type:'achievement', target:10_000_000_000,rewardWC:100_000_000,statKey:'totalWagered' },
+  // デイリー追加
+  { id:'daily_chinchiro_3',  title:'チンチロ3勝',       description:'チンチロで3勝',             type:'daily',   target:3,   rewardWC:8_000,    statKey:'dailyChinchiroWins' },
+  { id:'daily_gamble_30',    title:'ギャンブル30回',    description:'任意ギャンブル30回',        type:'daily',   target:30,  rewardWC:40_000,   statKey:'dailyGamblePlays' },
+  // ウィークリー追加
+  { id:'weekly_chinchiro_50',title:'チンチロ50勝',      description:'チンチロで50勝',            type:'weekly',  target:50,  rewardWC:400_000,  statKey:'weeklyChinchiroWins' },
+  { id:'weekly_slot_500',    title:'スロット500回',     description:'スロットを500回プレイ',     type:'weekly',  target:500, rewardWC:800_000,  statKey:'weeklySlotPlays' },
+  // 追加実績
+  { id:'ach_slot_5000',      title:'スロット伝説',      description:'スロットを5000回プレイ',    type:'achievement', target:5000,rewardWC:10_000_000,statKey:'totalSlotPlays' },
+  { id:'ach_chohan_1000',    title:'丁半の王',          description:'丁半で1000勝',              type:'achievement', target:1000,rewardWC:5_000_000,  statKey:'totalChohanWins' },
+  { id:'ach_highlow_20',     title:'ハイロー20連勝',    description:'ハイローで20連勝以上',      type:'achievement', target:20,  rewardWC:50_000_000, statKey:'totalHighlowMaxStreak' },
+  { id:'ach_jackpot5',       title:'ジャックポット5回', description:'ジャックポットを5回当てる', type:'achievement', target:5,   rewardWC:10_000_000, statKey:'totalJackpotWins' },
+];
+
+// ============================================================
+// HighLow Panel
+// ============================================================
+const HIGHLOW_MULTIPLIERS = [1.5, 2, 3, 5, 10];
+function HighLowPanel({ bet, onResult, onMissionUpdate }: {
+  bet: number;
+  onResult: (r: GambleResult) => void;
+  onMissionUpdate?: (won: boolean, streak: number) => void;
+}) {
+  const { player, changeWealthCoin, addNotification } = useGameStore(s => ({
+    player: s.player, changeWealthCoin: s.changeWealthCoin, addNotification: s.addNotification,
+  }));
+  const setPlayer = useGameStore(s => s.setPlayer);
+  const [currentCard, setCurrentCard] = useState<number | null>(null);
+  const [streak, setStreak] = useState(0);
+  const [gameActive, setGameActive] = useState(false);
+  const [animating, setAnimating] = useState(false);
+  const [lastResult, setLastResult] = useState<'win' | 'lose' | null>(null);
+  const [history, setHistory] = useState<number[]>([]);
+
+  if (!player) return null;
+  const totalWagered = player.totalWagered ?? 0;
+  const rankInfo = getGambleRank(totalWagered);
+
+  const drawCard = () => Math.floor(Math.random() * 13) + 1;
+  const cardLabel = (n: number) => {
+    if (n === 1) return 'A';
+    if (n === 11) return 'J';
+    if (n === 12) return 'Q';
+    if (n === 13) return 'K';
+    return String(n);
+  };
+
+  const startGame = () => {
+    if ((player.wealthCoin ?? 0) < bet) { addNotification('error', 'WCが足りません'); return; }
+    changeWealthCoin(-bet);
+    // update totalWagered
+    const newWagered = (player.totalWagered ?? 0) + bet;
+    setPlayer({ ...player, totalWagered: newWagered, wealthCoin: (player.wealthCoin ?? 0) - bet });
+    const card = drawCard();
+    setCurrentCard(card);
+    setStreak(0);
+    setGameActive(true);
+    setLastResult(null);
+    setHistory([card]);
+  };
+
+  const guess = (choice: 'high' | 'low') => {
+    if (!gameActive || currentCard === null || animating) return;
+    setAnimating(true);
+    setTimeout(() => {
+      const newCard = drawCard();
+      setHistory(prev => [...prev, newCard]);
+      const won = (choice === 'high' && newCard > currentCard) || (choice === 'low' && newCard < currentCard);
+      if (!won) {
+        // lose
+        setLastResult('lose');
+        setCurrentCard(newCard);
+        setStreak(0);
+        setGameActive(false);
+        setAnimating(false);
+        const goldDelta = -bet;
+        onResult({ rewardLabel: '敗北', multiplier: 0, goldDelta, itemRewards: [], symbols: ['💀'] });
+        onMissionUpdate?.(false, 0);
+      } else {
+        const newStreak = streak + 1;
+        setStreak(newStreak);
+        setCurrentCard(newCard);
+        setLastResult('win');
+        setAnimating(false);
+        if (onMissionUpdate) onMissionUpdate(true, newStreak);
+      }
+    }, 400);
+  };
+
+  const cashOut = () => {
+    if (!gameActive || streak === 0) return;
+    const mult = (HIGHLOW_MULTIPLIERS[streak - 1] ?? 1) * rankInfo.multiplier;
+    const winAmount = Math.floor(bet * mult);
+    changeWealthCoin(winAmount);
+    const goldDelta = winAmount - bet;
+    onResult({ rewardLabel: `${streak}連勝！`, multiplier: mult, goldDelta, itemRewards: [], symbols: ['🃏'] });
+    setGameActive(false);
+    setStreak(0);
+    setCurrentCard(null);
+    setHistory([]);
+    addNotification('success', `+${winAmount.toLocaleString()}WC 獲得！（×${mult.toFixed(2)}）`);
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: '0.8rem', color: '#8a92b2', marginBottom: 4 }}>倍率表</div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {HIGHLOW_MULTIPLIERS.map((m, i) => (
+            <span key={i} style={{ padding: '2px 6px', borderRadius: 4, fontSize: '0.72rem',
+              background: streak === i + 1 ? 'rgba(240,192,96,0.3)' : '#161b26',
+              border: `1px solid ${streak === i + 1 ? '#f0c060' : '#2d3752'}`,
+              color: streak === i + 1 ? '#f0c060' : '#8a92b2' }}>
+              {i + 1}連勝: ×{m}
+            </span>
+          ))}
+        </div>
+        <div style={{ fontSize: '0.72rem', color: '#4a5070', marginTop: 4 }}>ランクボーナス: ×{rankInfo.multiplier.toFixed(2)}（{rankInfo.name}）</div>
+      </div>
+
+      {currentCard !== null && (
+        <div style={{ textAlign: 'center', margin: '12px 0' }}>
+          <div style={{ fontSize: '0.8rem', color: '#8a92b2', marginBottom: 4 }}>現在のカード</div>
+          <div style={{ fontSize: '3.5rem', fontWeight: 700, color: '#f0c060', letterSpacing: 4 }}>
+            {animating ? '🃏' : cardLabel(currentCard)}
+          </div>
+          {streak > 0 && <div style={{ fontSize: '0.85rem', color: '#4caf87', marginTop: 4 }}>{streak}連勝中！ 確定倍率: ×{(HIGHLOW_MULTIPLIERS[streak-1] * rankInfo.multiplier).toFixed(2)}</div>}
+        </div>
+      )}
+
+      {history.length > 1 && (
+        <div style={{ display: 'flex', gap: 3, marginBottom: 8, flexWrap: 'wrap' }}>
+          {history.map((c, i) => <span key={i} style={{ padding: '2px 5px', background: '#161b26', border: '1px solid #2d3752', borderRadius: 4, fontSize: '0.72rem', color: '#8a92b2' }}>{cardLabel(c)}</span>)}
+        </div>
+      )}
+
+      {lastResult && (
+        <div style={{ textAlign: 'center', marginBottom: 8, fontWeight: 700, fontSize: '0.9rem',
+          color: lastResult === 'win' ? '#4caf87' : '#e05555' }}>
+          {lastResult === 'win' ? '✅ 正解！' : '❌ ハズレ…'}
+        </div>
+      )}
+
+      {!gameActive ? (
+        <button onClick={startGame} style={{ width: '100%', padding: '10px', background: 'linear-gradient(135deg,#5b8dee,#3a5bb0)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+          🃏 ゲーム開始（{bet.toLocaleString()}WC）
+        </button>
+      ) : (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={() => guess('high')} disabled={animating}
+            style={{ flex: 1, padding: '10px', background: 'linear-gradient(135deg,#4caf87,#2d8060)', color: '#fff', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '0.9rem', opacity: animating ? 0.5 : 1 }}>
+            ▲ HIGH
+          </button>
+          <button onClick={() => guess('low')} disabled={animating}
+            style={{ flex: 1, padding: '10px', background: 'linear-gradient(135deg,#e05555,#a02020)', color: '#fff', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '0.9rem', opacity: animating ? 0.5 : 1 }}>
+            ▼ LOW
+          </button>
+          {streak > 0 && (
+            <button onClick={cashOut} disabled={animating}
+              style={{ flex: 1, padding: '10px', background: 'linear-gradient(135deg,#f0c060,#c08020)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+              💰 確定
+            </button>
+          )}
+        </div>
+      )}
+      <div style={{ fontSize: '0.72rem', color: '#4a5070', marginTop: 8, textAlign: 'center' }}>同値は敗北。任意タイミングで確定可能。</div>
+    </div>
+  );
+}
+
+// ============================================================
+// ランクパネル
+// ============================================================
+function RankPanel() {
+  const player = useGameStore(s => s.player);
+  if (!player) return null;
+  const totalWagered = player.totalWagered ?? 0;
+  const rankInfo = getGambleRank(totalWagered);
+  const rankIdx = GAMBLE_RANKS.findIndex(r => r.name === rankInfo.name);
+  const nextRank = GAMBLE_RANKS[rankIdx + 1];
+  const progress = nextRank ? Math.min(1, (totalWagered - rankInfo.threshold) / (nextRank.threshold - rankInfo.threshold)) : 1;
+
+  return (
+    <div style={{ padding: '0 4px' }}>
+      <div style={{ background: '#1c2235', border: `1px solid ${rankInfo.color}`, borderRadius: 10, padding: 16, marginBottom: 12, textAlign: 'center' }}>
+        <div style={{ fontSize: '1.4rem', fontWeight: 700, color: rankInfo.color, marginBottom: 4 }}>{rankInfo.name}</div>
+        <div style={{ fontSize: '0.8rem', color: '#8a92b2', marginBottom: 8 }}>獲得WC ×{rankInfo.multiplier.toFixed(2)} ボーナス</div>
+        <div style={{ fontSize: '0.85rem', color: '#8a92b2' }}>累計賭け額: <span style={{ color: '#f0c060', fontWeight: 700 }}>{totalWagered.toLocaleString()}WC</span></div>
+        {nextRank && (
+          <>
+            <div style={{ background: '#161b26', borderRadius: 6, height: 8, margin: '10px 0 4px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${progress * 100}%`, background: `linear-gradient(90deg, ${rankInfo.color}, ${nextRank.color})`, borderRadius: 6, transition: 'width 0.5s' }} />
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#8a92b2' }}>次: {nextRank.name}（{nextRank.threshold.toLocaleString()}WC）</div>
+          </>
+        )}
+      </div>
+      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#e8e6ff', marginBottom: 8 }}>全ランク一覧</div>
+      {GAMBLE_RANKS.map((r) => (
+        <div key={r.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: r.name === rankInfo.name ? `rgba(${r.color === '#8a92b2' ? '138,146,178' : r.color === '#4caf87' ? '76,175,135' : r.color === '#5b8dee' ? '91,141,238' : r.color === '#f0a040' ? '240,160,64' : '224,96,224'},0.12)` : '#1c2235', border: `1px solid ${r.name === rankInfo.name ? r.color : '#2d3752'}`, borderRadius: 6, marginBottom: 4 }}>
+          <div>
+            <div style={{ fontWeight: 700, color: r.color, fontSize: '0.88rem' }}>{r.name}</div>
+            <div style={{ fontSize: '0.7rem', color: '#8a92b2' }}>{r.threshold === 0 ? '初期ランク' : `累計${r.threshold.toLocaleString()}WC以上`}</div>
+          </div>
+          <div style={{ fontSize: '0.85rem', color: '#f0c060', fontWeight: 700 }}>×{r.multiplier.toFixed(2)}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============================================================
+// ミッションパネル
+// ============================================================
+function MissionPanel() {
+  const { player, changeWealthCoin, setPlayer, addNotification } = useGameStore(s => ({
+    player: s.player, changeWealthCoin: s.changeWealthCoin, setPlayer: s.setPlayer, addNotification: s.addNotification,
+  }));
+  const [missionTab, setMissionTab] = useState<'daily' | 'weekly' | 'achievement'>('daily');
+  if (!player) return null;
+
+  const mp = player.missionProgress ?? ({} as MissionProgress);
+
+  const getStatValue = (key: string): number => {
+    return (mp as unknown as Record<string, number>)[key] ?? 0;
+  };
+
+  const claimMission = (m: MissionDef) => {
+    const val = getStatValue(m.statKey);
+    if (val < m.target) return;
+    const completed = mp.completedMissions ?? [];
+    if (completed.includes(m.id)) return;
+    changeWealthCoin(m.rewardWC);
+    const newMp = { ...mp, completedMissions: [...completed, m.id] };
+    setPlayer({ ...player, missionProgress: newMp });
+    addNotification('success', `✅ ${m.title} 達成！ +${m.rewardWC.toLocaleString()}WC`);
+  };
+
+  const filtered = MISSIONS.filter(m => m.type === missionTab);
+  const completed = mp.completedMissions ?? [];
+
+  return (
+    <div style={{ padding: '0 4px' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+        {(['daily','weekly','achievement'] as const).map(t => (
+          <button key={t} onClick={() => setMissionTab(t)}
+            style={{ flex: 1, padding: '6px 0', fontSize: '0.75rem', fontWeight: 700, background: missionTab === t ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${missionTab === t ? '#5b8dee' : '#2d3752'}`, color: missionTab === t ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer' }}>
+            {t === 'daily' ? '📅 デイリー' : t === 'weekly' ? '📆 ウィークリー' : '🏆 実績'}
+          </button>
+        ))}
+      </div>
+      {filtered.map(m => {
+        const val = Math.min(getStatValue(m.statKey), m.target);
+        const progress = val / m.target;
+        const isDone = completed.includes(m.id);
+        const canClaim = val >= m.target && !isDone;
+        return (
+          <div key={m.id} style={{ background: isDone ? 'rgba(76,175,135,0.08)' : '#1c2235', border: `1px solid ${isDone ? '#4caf87' : canClaim ? '#f0c060' : '#2d3752'}`, borderRadius: 8, padding: '10px 12px', marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: '0.85rem', color: isDone ? '#4caf87' : '#e8e6ff' }}>{isDone ? '✅ ' : ''}{m.title}</div>
+                <div style={{ fontSize: '0.72rem', color: '#8a92b2', marginTop: 2 }}>{m.description}</div>
+                <div style={{ marginTop: 6 }}>
+                  <div style={{ background: '#161b26', borderRadius: 4, height: 5, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${progress * 100}%`, background: isDone ? '#4caf87' : '#5b8dee', borderRadius: 4 }} />
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: '#4a5070', marginTop: 2 }}>{val.toLocaleString()} / {m.target.toLocaleString()}</div>
+                </div>
+              </div>
+              <div style={{ marginLeft: 10, textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: '0.75rem', color: '#f0c060', fontWeight: 700 }}>+{m.rewardWC.toLocaleString()}WC</div>
+                {canClaim && (
+                  <button onClick={() => claimMission(m)}
+                    style={{ marginTop: 4, padding: '4px 10px', background: 'linear-gradient(135deg,#f0c060,#c08020)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700 }}>
+                    受取
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function ExchangePanel() {
   const { player, changeGold, changeWealthCoin, addNotification } = useGameStore(s => ({
@@ -2259,7 +2605,7 @@ function ExchangePanel() {
   );
 }
 
-type MainTab = 'gamble' | 'exchange';
+type MainTab = 'gamble' | 'exchange' | 'mission' | 'rank';
 export function GambleScreen() {
   const player = useGameStore(s => s.player);
   const setPlayer = useGameStore(s => s.setPlayer);
@@ -2298,6 +2644,25 @@ export function GambleScreen() {
       }
       setTicketActive(false);
     }
+    // 累計賭け額・ミッション進捗更新
+    if (player && activeGame !== 'highlow') {
+      const isWin = r.goldDelta >= 0;
+      const mp = { ...(player.missionProgress ?? {}), completedMissions: player.missionProgress?.completedMissions ?? [] } as MissionProgress;
+      const inc = (k: keyof MissionProgress) => { (mp as unknown as Record<string,number>)[k as string] = ((mp as unknown as Record<string,number>)[k as string] ?? 0) + 1; };
+      mp.totalWagered = (mp.totalWagered ?? 0) + bet;
+      mp.dailyGamblePlays = (mp.dailyGamblePlays ?? 0) + 1;
+      mp.weeklyGamblePlays = (mp.weeklyGamblePlays ?? 0) + 1;
+      if (activeGame === 'slot') { inc('totalSlotPlays'); inc('dailySlotPlays'); inc('weeklySlotPlays'); }
+      if (isWin) {
+        if (activeGame === 'chohan') { inc('totalChohanWins'); inc('dailyChohanWins'); inc('weeklyChohanWins'); }
+        if (activeGame === 'chinchiro') { inc('totalChinchiroWins'); inc('dailyChinchiroWins'); inc('weeklyChinchiroWins'); }
+        if (activeGame === 'coin_flip') { inc('totalCoinFlipWins'); inc('dailyCoinFlipWins'); }
+        if (activeGame === 'poker') { inc('totalPokerWins'); inc('dailyPokerWins'); inc('weeklyPokerWins'); }
+      }
+      if (r.rewardLabel?.includes('JACKPOT') || r.rewardLabel?.includes('ジャックポット')) { inc('totalJackpotWins'); }
+      const newWagered = (player.totalWagered ?? 0) + bet;
+      setPlayer({ ...player, totalWagered: newWagered, missionProgress: mp });
+    }
     setStats(prev => {
       const isWin = r.goldDelta >= 0;
       return {
@@ -2311,6 +2676,19 @@ export function GambleScreen() {
     });
   };
 
+  const handleHighlowMissionUpdate = (won: boolean, streak: number) => {
+    if (!player) return;
+    const mp = { ...(player.missionProgress ?? {}), completedMissions: player.missionProgress?.completedMissions ?? [] } as MissionProgress;
+    mp.totalWagered = (mp.totalWagered ?? 0) + (won && streak === 1 ? 0 : 0); // already deducted on start
+    if (won) {
+      mp.totalHighlowWins = (mp.totalHighlowWins ?? 0) + 1;
+      mp.dailyHighlowWins = (mp.dailyHighlowWins ?? 0) + 1;
+      mp.totalHighlowMaxStreak = Math.max(mp.totalHighlowMaxStreak ?? 0, streak);
+      mp.weeklyHighlowMaxStreak = Math.max(mp.weeklyHighlowMaxStreak ?? 0, streak);
+    }
+    setPlayer({ ...player, missionProgress: mp });
+  };
+
   const handleJackpotContrib = async (betAmt: number) => {
     try { await contributeToJackpot(betAmt); } catch { /* ignore */ }
   };
@@ -2319,6 +2697,7 @@ export function GambleScreen() {
   const gameMasterKey = activeGame === 'slot' ? 'slot_machine' : activeGame;
   const game = GAMBLE_MASTER[gameMasterKey] ?? GAMBLE_MASTER['chohan'];
   const netProfit = stats.totalWon - stats.totalBet;
+  const gambleRankInfo = getGambleRank(player.totalWagered ?? 0);
 
   // 宝箱: 管理者オーバーライドがある場合はrewardTableの確率を上書き
   const treasureGame = treasureProbs
@@ -2336,23 +2715,27 @@ export function GambleScreen() {
       <h2 style={{ fontFamily: 'Cinzel,serif', color: '#f0c060', marginBottom: 8, borderBottom: '1px solid #2d3752', paddingBottom: 8 }}>🎰 ギャンブル</h2>
 
       {/* G/WC残高表示 */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10, background: '#1c2235', border: '1px solid #2d3752', borderRadius: 8, padding: '8px 12px' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10, background: '#1c2235', border: '1px solid #2d3752', borderRadius: 8, padding: '8px 12px', flexWrap: 'wrap', alignItems: 'center' }}>
         <span style={{ fontSize: '0.85rem', color: '#8a92b2' }}>💰 <span style={{ color: '#f0c060', fontWeight: 700 }}>{player.gold.toLocaleString()}G</span></span>
         <span style={{ color: '#2d3752' }}>|</span>
         <span style={{ fontSize: '0.85rem', color: '#8a92b2' }}>🪙 WC: <span style={{ color: '#4caf87', fontWeight: 700 }}>{(player.wealthCoin ?? 0).toLocaleString()}WC</span></span>
+        <span style={{ color: '#2d3752' }}>|</span>
+        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: gambleRankInfo.color }}>🏅 {gambleRankInfo.name}</span>
       </div>
 
       {/* メインタブ */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-        {([['gamble','🎲 ギャンブル'],['exchange','🔄 交換所']] as [MainTab, string][]).map(([id, label]) => (
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
+        {([['gamble','🎲 ギャンブル'],['exchange','🔄 交換所'],['mission','📋 ミッション'],['rank','🏅 ランク']] as [MainTab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setMainTab(id)}
-            style={{ flex: 1, padding: '7px 0', fontSize: '0.82rem', fontWeight: 700, background: mainTab === id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${mainTab === id ? '#5b8dee' : '#2d3752'}`, color: mainTab === id ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer' }}>
+            style={{ flex: 1, minWidth: 70, padding: '7px 4px', fontSize: '0.75rem', fontWeight: 700, background: mainTab === id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${mainTab === id ? '#5b8dee' : '#2d3752'}`, color: mainTab === id ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer' }}>
             {label}
           </button>
         ))}
       </div>
 
       {mainTab === 'exchange' && <ExchangePanel />}
+      {mainTab === 'mission' && <MissionPanel />}
+      {mainTab === 'rank' && <RankPanel />}
       {mainTab === 'gamble' && <>
 
       <JackpotBanner pool={jackpotPool} />
@@ -2404,7 +2787,8 @@ export function GambleScreen() {
             <div style={{ fontSize: '0.78rem', color: '#8a92b2', marginTop: 2 }}>{game.description}</div>
           </div>
         )}
-        {activeGame !== 'pvp' && activeGame !== 'treasure_box' && <BetInput game={game} bet={bet} setBet={setBet} disabled={(activeGame === 'poker' && pokerBetLocked) || (activeGame === 'coin_flip' && coinFlipBetLocked)} />}
+        {activeGame !== 'pvp' && activeGame !== 'treasure_box' && activeGame !== 'highlow' && <BetInput game={game} bet={bet} setBet={setBet} disabled={(activeGame === 'poker' && pokerBetLocked) || (activeGame === 'coin_flip' && coinFlipBetLocked)} />}
+        {activeGame === 'highlow' && <BetInput game={{ minBet: 100, maxBet: 1000000 } as GambleMaster} bet={bet} setBet={setBet} />}
 
         {activeGame === 'chohan'       && <ChohanPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chohan'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
         {activeGame === 'chinchiro'    && <ChinchiroPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chinchiro'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
@@ -2438,6 +2822,7 @@ export function GambleScreen() {
           </div>
         )}
         {activeGame === 'poker'        && <PokerPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['poker'] ?? 1.0} onBetLock={setPokerBetLocked} />}
+        {activeGame === 'highlow'      && <HighLowPanel  bet={bet} onResult={handleResult} onMissionUpdate={handleHighlowMissionUpdate} />}
         {activeGame === 'pvp'          && (
           <>
             <div style={{ fontWeight:700, fontSize:'1rem', marginBottom:8 }}>⚔️ PvP対戦</div>

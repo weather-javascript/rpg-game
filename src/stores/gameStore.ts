@@ -71,6 +71,17 @@ function ensureDefaults(player: PlayerData): PlayerData {
     settings: player.settings ?? {},
     lifetimeStats: player.lifetimeStats ?? { totalDamageDealt: 0, totalGoldEarned: 0, maxCombo: 0, monstersDefeated: 0 },
     unlockedAchievements: player.unlockedAchievements ?? [],
+    totalWagered: player.totalWagered ?? 0,
+    missionProgress: player.missionProgress ?? {
+      dailySlotPlays:0, dailyChohanWins:0, dailyChinchiroWins:0, dailyCoinFlipWins:0,
+      dailyHighlowWins:0, dailyPokerWins:0, dailyGamblePlays:0,
+      weeklySlotPlays:0, weeklyChohanWins:0, weeklyChinchiroWins:0, weeklyPokerWins:0,
+      weeklyGamblePlays:0, weeklyHighlowMaxStreak:0,
+      totalSlotPlays:0, totalChohanWins:0, totalChinchiroWins:0, totalPokerWins:0,
+      totalCoinFlipWins:0, totalHighlowWins:0, totalHighlowMaxStreak:0,
+      totalJackpotWins:0, totalWagered:0,
+      dailyResetAt:0, weeklyResetAt:0, completedMissions:[],
+    },
   };
 }
 

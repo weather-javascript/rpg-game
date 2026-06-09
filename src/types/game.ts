@@ -54,7 +54,50 @@ export interface WeaponUltimate {
   postBuffPoisonDmg?: number;
 }
 export type TabId = 'gathering' | 'market' | 'dungeon' | 'gamble' | 'status' | 'online' | 'fishing' | 'admin' | 'crafting';
-export type GambleType = 'slot' | 'treasure_box' | 'coin_flip' | 'chohan' | 'chinchiro' | 'jackpot' | 'poker';
+export type GambleType = 'slot' | 'treasure_box' | 'coin_flip' | 'chohan' | 'chinchiro' | 'jackpot' | 'poker' | 'highlow';
+export type GambleRank = '見習い' | 'ギャンブラー' | '熟練ギャンブラー' | '賭博王' | 'レジェンド';
+
+export interface MissionDef {
+  id: string;
+  title: string;
+  description: string;
+  type: 'daily' | 'weekly' | 'achievement';
+  target: number;
+  rewardWC: number;
+  statKey: string; // key in MissionProgress
+}
+
+export interface MissionProgress {
+  // counts reset daily/weekly
+  dailySlotPlays: number;
+  dailyChohanWins: number;
+  dailyChinchiroWins: number;
+  dailyCoinFlipWins: number;
+  dailyHighlowWins: number;
+  dailyPokerWins: number;
+  dailyGamblePlays: number;
+  weeklySlotPlays: number;
+  weeklyChohanWins: number;
+  weeklyChinchiroWins: number;
+  weeklyPokerWins: number;
+  weeklyGamblePlays: number;
+  weeklyHighlowMaxStreak: number;
+  // all-time
+  totalSlotPlays: number;
+  totalChohanWins: number;
+  totalChinchiroWins: number;
+  totalPokerWins: number;
+  totalCoinFlipWins: number;
+  totalHighlowWins: number;
+  totalHighlowMaxStreak: number;
+  totalJackpotWins: number;
+  totalWagered: number;
+  // timestamps for reset
+  dailyResetAt: number;
+  weeklyResetAt: number;
+  // completed mission ids
+  completedMissions: string[];
+}
 export type DungeonTier = 'beginner' | 'intermediate' | 'advanced' | 'super' | 'extreme' | 'volcano';
 
 // ============================================================
@@ -283,6 +326,10 @@ export interface PlayerData {
   };
   // 解放済み実績ID
   unlockedAchievements?: string[];
+  // ギャンブル累計賭け額（ランク判定用）
+  totalWagered?: number;
+  // ミッション進捗
+  missionProgress?: MissionProgress;
   // プロフィール
   profile?: {
     icon: string;          // 絵文字アイコン
