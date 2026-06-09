@@ -78,9 +78,9 @@ export function getChinchiroRole(dice: number[]): ChinchiroRole | null {
   if (s[0]===1 && s[1]===1 && s[2]===1) {
     return { name: 'ピンゾロ (1-1-1)', rank: 100, multiplier: 5, isInstantWin: true, isInstantLoss: false };
   }
-  // ヒフミ 1-2-3
+  // ヒフミ 1-2-3 → 目なしと同じハズレ（nullを返してplayChinchiroで負け扱い）
   if (s[0]===1 && s[1]===2 && s[2]===3) {
-    return { name: 'ヒフミ (1-2-3)', rank: -1, multiplier: 0, isInstantWin: false, isInstantLoss: true };
+    return null;
   }
   // シゴロ 4-5-6
   if (s[0]===4 && s[1]===5 && s[2]===6) {
@@ -97,7 +97,7 @@ export function getChinchiroRole(dice: number[]): ChinchiroRole | null {
   const singles = Object.entries(counts).filter(([, c]) => c === 1);
   if (pairs.length === 1 && singles.length === 1) {
     const pip = Number(singles[0][0]);
-    return { name: `通常目 ${pip}`, rank: pip, multiplier: 1, isInstantWin: false, isInstantLoss: false };
+    return { name: `通常目 ${pip}`, rank: pip, multiplier: 1.6, isInstantWin: false, isInstantLoss: false };
   }
   // 目なし（3つとも別々 & 役なし）
   return null;

@@ -89,7 +89,7 @@ function BetInput({ game, bet, setBet, disabled = false }: { game: GambleMaster;
         {presets.map(p => (
           <button key={p} onClick={() => !disabled && setBet(Math.min(p, player?.wealthCoin ?? 0))}
             style={{ padding: '3px 8px', background: bet === p ? '#5b8dee' : '#1c2235', color: bet === p ? '#fff' : '#8a92b2', border: `1px solid ${bet === p ? '#5b8dee' : '#2d3752'}`, borderRadius: 4, cursor: disabled ? 'not-allowed' : 'pointer', fontSize: '0.75rem', opacity: disabled ? 0.5 : 1 }}>
-            {p.toLocaleString()}G
+            {p.toLocaleString()}WC
           </button>
         ))}
         <button onClick={() => !disabled && setBet(Math.min(player?.wealthCoin ?? 0, game.maxBet))}
@@ -802,7 +802,7 @@ function BattleAnimation({ opponentName, gameName, result, battleData, iAmHost, 
             {result.won ? '勝利！！' : '敗北...'}
           </div>
           <div style={{ fontSize:'1.5rem', color: result.won ? '#4caf87' : '#e05555', fontWeight:700, animation:'pop 0.6s ease 0.2s both' }}>
-            {result.won ? `+${result.amount.toLocaleString()}G` : `-${result.amount.toLocaleString()}G`}
+            {result.won ? `+${result.amount.toLocaleString()}WC` : `-${result.amount.toLocaleString()}WC`}
           </div>
           <div style={{ fontSize:'0.82rem', color:'#8a92b2' }}>vs {opponentName} / {gameNameJp}</div>
           <button onClick={onDone} style={{
@@ -1009,7 +1009,7 @@ function TexasHoldemPanel() {
       const id = await createPokerTable(player.uid, player.displayName, player.stats.level, createForm.maxPlayers, createForm.buyIn);
       setMyTableId(id);
       setShowCreateForm(false);
-      addNotification('success', `♠ テーブルを作成しました！参加者を待っています (${createForm.buyIn.toLocaleString()}G)`);
+      addNotification('success', `♠ テーブルを作成しました！参加者を待っています (${createForm.buyIn.toLocaleString()}WC)`);
     } catch (e) {
       changeWealthCoin(createForm.buyIn);
       addNotification('error', '作成に失敗しました');
@@ -1147,7 +1147,7 @@ function TexasHoldemPanel() {
                 <span style={{ fontWeight:700, fontSize:'0.82rem', flex:1, color: p.folded ? '#4a5070' : '#e8e6ff' }}>
                   {p.displayName}{p.uid === player.uid ? ' (あなた)' : ''} Lv.{p.level}
                 </span>
-                <span style={{ fontSize:'0.75rem', color:'#f0c060' }}>{p.chips.toLocaleString()}G</span>
+                <span style={{ fontSize:'0.75rem', color:'#f0c060' }}>{p.chips.toLocaleString()}WC</span>
                 {p.bet > 0 && <span style={{ fontSize:'0.7rem', color:'#8a92b2' }}>bet:{p.bet.toLocaleString()}</span>}
                 {p.folded && <span style={{ fontSize:'0.65rem', color:'#e05555' }}>FOLD</span>}
                 {p.allIn && <span style={{ fontSize:'0.65rem', color:'#f0a830' }}>ALL IN</span>}
@@ -1168,7 +1168,7 @@ function TexasHoldemPanel() {
             <div style={{ fontWeight:700, color:'#4caf87', marginBottom:4 }}>🏆 勝者</div>
             {activeTable.winners.map((w,i) => (
               <div key={i} style={{ fontSize:'0.85rem', color:'#e8e6ff' }}>
-                {w.displayName}（{w.handName}）+{w.amount.toLocaleString()}G
+                {w.displayName}（{w.handName}）+{w.amount.toLocaleString()}WC
               </div>
             ))}
           </div>
@@ -1217,7 +1217,7 @@ function TexasHoldemPanel() {
               ) : (
                 <button onClick={() => handleAction('call')} disabled={loading}
                   style={{ flex:1, minWidth:60, padding:'8px 4px', background:'rgba(91,141,238,0.2)', color:'#5b8dee', border:'1px solid #5b8dee', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.82rem' }}>
-                  コール ({(activeTable.currentBet - (me?.bet ?? 0)).toLocaleString()}G)
+                  コール ({(activeTable.currentBet - (me?.bet ?? 0)).toLocaleString()}WC)
                 </button>
               )}
               <button onClick={() => setShowRaise(!showRaise)} disabled={loading}
@@ -1290,7 +1290,7 @@ function TexasHoldemPanel() {
                 {[500,1000,5000,10000].map(v => (
                   <button key={v} onClick={() => setCreateForm(f => ({...f, buyIn:v}))}
                     style={{ flex:1, padding:'4px 2px', background: createForm.buyIn === v ? 'rgba(240,192,96,0.2)' : '#1c2235', border:`1px solid ${createForm.buyIn === v ? '#f0c060' : '#2d3752'}`, color: createForm.buyIn === v ? '#f0c060' : '#8a92b2', borderRadius:4, cursor:'pointer', fontSize:'0.72rem' }}>
-                    {v.toLocaleString()}G
+                    {v.toLocaleString()}WC
                   </button>
                 ))}
               </div>
@@ -1300,7 +1300,7 @@ function TexasHoldemPanel() {
               />
             </div>
             <div style={{ fontSize:'0.72rem', color:'#4a5070', marginBottom:8 }}>
-              ブラインド: SB {Math.max(1,Math.floor(createForm.buyIn*0.01)).toLocaleString()}G / BB {Math.max(2,Math.floor(createForm.buyIn*0.02)).toLocaleString()}G<br/>
+              ブラインド: SB {Math.max(1,Math.floor(createForm.buyIn*0.01)).toLocaleString()}WC / BB {Math.max(2,Math.floor(createForm.buyIn*0.02)).toLocaleString()}WC<br/>
               ※ 参加費は先払い。キャンセルで全額返金。{createForm.maxPlayers}人全員が揃ったらホストがゲームを開始します。
             </div>
             <button onClick={handleCreate} disabled={loading || (player?.wealthCoin ?? 0) < createForm.buyIn}
@@ -1328,10 +1328,10 @@ function TexasHoldemPanel() {
                   <span style={{ fontWeight:700, fontSize:'0.9rem' }}>♠ {t.hostName}</span>
                   <span style={{ marginLeft:6, fontSize:'0.72rem', color:'#5b8dee' }}>Lv.{t.hostLevel}</span>
                 </div>
-                <span style={{ color:'#f0c060', fontWeight:700 }}>{t.buyIn.toLocaleString()}G</span>
+                <span style={{ color:'#f0c060', fontWeight:700 }}>{t.buyIn.toLocaleString()}WC</span>
               </div>
               <div style={{ fontSize:'0.75rem', color:'#8a92b2', marginBottom:8 }}>
-                参加: {t.players.length}/{t.maxPlayers}人 | ブラインド: {Math.max(1,Math.floor(t.buyIn*0.01)).toLocaleString()}G/{Math.max(2,Math.floor(t.buyIn*0.02)).toLocaleString()}G
+                参加: {t.players.length}/{t.maxPlayers}人 | ブラインド: {Math.max(1,Math.floor(t.buyIn*0.01)).toLocaleString()}WC/{Math.max(2,Math.floor(t.buyIn*0.02)).toLocaleString()}WC
               </div>
               {/* プレイヤーリスト */}
               <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:8 }}>
@@ -1422,7 +1422,7 @@ function PvPPanel({ bet }: { bet: number }) {
       changeWealthCoin(-bet);
       const id = await createGambleBattle(player.uid, player.displayName, player.stats.level, selectedGame, bet);
       setMyBattleId(id);
-      addNotification('success', `⚔️ 対戦を募集開始しました！ (${bet.toLocaleString()}G)`);
+      addNotification('success', `⚔️ 対戦を募集開始しました！ (${bet.toLocaleString()}WC)`);
     } catch (e) {
       // 失敗したら返金
       changeWealthCoin(bet);
@@ -1505,18 +1505,18 @@ function PvPPanel({ bet }: { bet: number }) {
           ))}
         </div>
         <div style={{ fontSize: '0.75rem', color: '#8a92b2', marginBottom: 8 }}>
-          掛け金: {bet.toLocaleString()}G | ゲーム: {GAME_NAMES[selectedGame]}<br />
+          掛け金: {bet.toLocaleString()}WC | ゲーム: {GAME_NAMES[selectedGame]}<br />
           <span style={{ color: '#4a5070' }}>※ 募集時に掛け金が引かれます。キャンセルで返金。</span>
         </div>
         {myBattleId && myBattle ? (
           <div style={{ background: 'rgba(91,141,238,0.1)', border: '1px solid #5b8dee', borderRadius: 6, padding: '8px 10px', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.82rem', color: '#5b8dee' }}>🔄 参加者募集中... ({bet.toLocaleString()}G エスクロー中)</span>
+            <span style={{ fontSize: '0.82rem', color: '#5b8dee' }}>🔄 参加者募集中... ({bet.toLocaleString()}WC エスクロー中)</span>
             <button onClick={handleCancelHost} disabled={loading} style={{ padding: '4px 10px', background: '#e05555', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.75rem' }}>取消</button>
           </div>
         ) : (
           <button onClick={handleHost} disabled={loading || (player?.wealthCoin ?? 0) < bet}
             style={{ width: '100%', padding: '8px', background: (player?.wealthCoin ?? 0) >= bet ? 'linear-gradient(135deg,#5b8dee,#3a6fd0)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
-            ⚔️ {bet.toLocaleString()}G で対戦を募集する
+            ⚔️ {bet.toLocaleString()}WC で対戦を募集する
           </button>
         )}
       </div>
@@ -1532,10 +1532,10 @@ function PvPPanel({ bet }: { bet: number }) {
                 <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>⚔️ {b.hostName}</span>
                 <span style={{ marginLeft: 6, fontSize: '0.72rem', color: '#5b8dee' }}>Lv.{b.hostLevel}</span>
               </div>
-              <span style={{ color: '#f0c060', fontWeight: 700 }}>{b.betAmount.toLocaleString()}G</span>
+              <span style={{ color: '#f0c060', fontWeight: 700 }}>{b.betAmount.toLocaleString()}WC</span>
             </div>
             <div style={{ fontSize: '0.78rem', color: '#8a92b2', marginBottom: 8 }}>
-              ゲーム: {GAME_NAMES[b.gambleType] ?? b.gambleType} | 勝者獲得: {(b.betAmount * 2).toLocaleString()}G
+              ゲーム: {GAME_NAMES[b.gambleType] ?? b.gambleType} | 勝者獲得: {(b.betAmount * 2).toLocaleString()}WC
             </div>
             <button onClick={() => handleJoin(b)} disabled={loading || (player?.wealthCoin ?? 0) < b.betAmount}
               style={{ width: '100%', padding: '6px', background: (player?.wealthCoin ?? 0) >= b.betAmount ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem' }}>
@@ -1662,7 +1662,7 @@ function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
       {result && <ResultDisplay result={result} bet={bet} />}
       <button onClick={play} disabled={animating}
         style={{ width:'100%', padding:12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#f0c060,#d0a040)', color: animating ? '#8a92b2' : '#000', border:'none', borderRadius:8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight:700, fontSize:'1rem' }}>
-        {animating ? '🎰 回転中...' : `🎰 ${bet.toLocaleString()}G でプレイ`}
+        {animating ? '🎰 回転中...' : `🎰 ${bet.toLocaleString()}WC でプレイ`}
       </button>
     </div>
   );
@@ -1723,7 +1723,7 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus =
       {result && !animating && <ResultDisplay result={result} bet={bet} />}
       <button onClick={play} disabled={animating}
         style={{ width: '100%', padding: 12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#5b8dee,#3a6fd0)', color: '#fff', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem' }}>
-        {animating ? '結果を出しています...' : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><GameIcon id={game.icon} size={18} /> {bet.toLocaleString()}G で挑戦</span>}
+        {animating ? '結果を出しています...' : <span style={{display:'inline-flex',alignItems:'center',gap:6}}><GameIcon id={game.icon} size={18} /> {bet.toLocaleString()}WC で挑戦</span>}
       </button>
     </div>
   );
@@ -1806,7 +1806,7 @@ function ChohanPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }:
       {phase === 'done' && result && <ResultDisplay result={result} bet={bet} />}
       <button onClick={play} disabled={animating}
         style={{ width: '100%', padding: 12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#e05555,#c03030)', color: '#fff', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem' }}>
-        🎲 {bet.toLocaleString()}G で投じる
+        🎲 {bet.toLocaleString()}WC で投じる
       </button>
     </div>
   );
@@ -1907,7 +1907,7 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
       )}
       <button onClick={play} disabled={animating}
         style={{ width: '100%', padding: 12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#f0a830,#c08020)', color: '#000', border: 'none', borderRadius: 8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '1rem' }}>
-        🎯 {bet.toLocaleString()}G でサイコロを振る
+        🎯 {bet.toLocaleString()}WC でサイコロを振る
       </button>
     </div>
   );
@@ -2020,7 +2020,7 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0,
         <div style={{ textAlign: 'center', padding: '10px 0', marginBottom: 10 }}>
           <div style={{ fontSize: '0.72rem', color: '#8a92b2', marginBottom: 2 }}>現在のスコア</div>
           <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#f0c060' }}>×{score}倍</div>
-          <div style={{ fontSize: '0.85rem', color: '#4caf87' }}>≈ {scoreGold.toLocaleString()}G</div>
+          <div style={{ fontSize: '0.85rem', color: '#4caf87' }}>≈ {scoreGold.toLocaleString()}WC</div>
           <div style={{ fontSize: '0.7rem', color: '#4a5070', marginTop: 2 }}>{flips}回当てた</div>
           {lastFlip && (
             <div style={{ fontSize: '1.2rem', marginTop: 4 }}>
@@ -2047,7 +2047,7 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0,
       {/* 利確成功表示 */}
       {phase === 'cashed' && !showAnim && (
         <div style={{ textAlign: 'center', background: 'rgba(76,175,135,0.1)', border: '1px solid #4caf87', borderRadius: 8, padding: 12, marginBottom: 12 }}>
-          <div style={{ fontSize: '1.1rem', color: '#4caf87', fontWeight: 700 }}>✅ 利確！×{score}倍 = {scoreGold.toLocaleString()}G 獲得！</div>
+          <div style={{ fontSize: '1.1rem', color: '#4caf87', fontWeight: 700 }}>✅ 利確！×{score}倍 = {scoreGold.toLocaleString()}WC 獲得！</div>
           <div style={{ color: '#8a92b2', fontSize: '0.78rem', marginTop: 4 }}>賢い判断だった！</div>
         </div>
       )}
@@ -2056,7 +2056,7 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0,
       {phase === 'idle' && (
         <button onClick={handleStart} disabled={(player?.wealthCoin ?? 0) < bet}
           style={{ width: '100%', padding: 12, background: (player?.wealthCoin ?? 0) >= bet ? 'linear-gradient(135deg,#f0c060,#c08020)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>
-          🪙 {bet.toLocaleString()}G でゲーム開始
+          🪙 {bet.toLocaleString()}WC でゲーム開始
         </button>
       )}
 
@@ -2073,7 +2073,7 @@ function CoinFlipPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0,
           <ChoiceButtons isFirst={false} />
           <button onClick={cashOut} disabled={animating}
             style={{ width: '100%', padding: 11, background: 'linear-gradient(135deg,#4caf87,#2d8060)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
-            💰 利確（{scoreGold.toLocaleString()}G）
+            💰 利確（{scoreGold.toLocaleString()}WC）
           </button>
         </div>
       )}
@@ -2161,7 +2161,7 @@ function PokerPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, on
       )}
       {phase==='idle' && (
         <button onClick={handleDeal} style={{ width:'100%', padding:12, background:'linear-gradient(135deg,#9b6df0,#7040c0)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'1rem' }}>
-          🃏 {bet.toLocaleString()}G でカードを引く
+          🃏 {bet.toLocaleString()}WC でカードを引く
         </button>
       )}
       {phase==='deal' && (
@@ -2545,23 +2545,23 @@ function ExchangePanel() {
   const { player, changeGold, changeWealthCoin, addNotification } = useGameStore(s => ({
     player: s.player, changeGold: s.changeGold, changeWealthCoin: s.changeWealthCoin, addNotification: s.addNotification
   }));
-  const [gwcAmount, setGwcAmount] = useState(1000);
-  const [wcgAmount, setWcgAmount] = useState(1000);
+  const [gwcAmount, setGwcAmount] = useState(10);
+  const [wcgAmount, setWcgAmount] = useState(300);
   if (!player) return null;
   const wc = player.wealthCoin ?? 0;
 
   const buyWC = () => {
     if (gwcAmount <= 0) return;
     if (!changeGold(-gwcAmount)) { addNotification('error', 'Gが足りません'); return; }
-    changeWealthCoin(gwcAmount * 1000);
-    addNotification('success', `${(gwcAmount * 1000).toLocaleString()}WC を取得しました！`);
+    changeWealthCoin(gwcAmount * 30);
+    addNotification('success', `${(gwcAmount * 30).toLocaleString()}WC を取得しました！`);
   };
 
   const sellWC = () => {
     if (wcgAmount <= 0) return;
     if (wc < wcgAmount) { addNotification('error', 'WCが足りません'); return; }
     changeWealthCoin(-wcgAmount);
-    const receive = Math.floor(wcgAmount / 1000 * 0.95);
+    const receive = Math.floor(wcgAmount / 300 * 7);
     changeGold(receive);
     addNotification('success', `${receive.toLocaleString()}G を受け取りました！`);
   };
@@ -2574,12 +2574,12 @@ function ExchangePanel() {
           <div style={{ fontSize: '0.9rem', color: '#8a92b2' }}>所持WC: <span style={{ color: '#4caf87', fontWeight: 700 }}>{wc.toLocaleString()}WC</span></div>
         </div>
         <div style={{ marginBottom: 16, padding: 12, background: '#161b26', borderRadius: 8 }}>
-          <div style={{ fontWeight: 700, marginBottom: 8, color: '#e8e6ff' }}>G → WC（1G = 1,000WC）</div>
+          <div style={{ fontWeight: 700, marginBottom: 8, color: '#e8e6ff' }}>G → WC（10G = 300WC）</div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <input type="number" value={gwcAmount} min={1} onChange={e => setGwcAmount(Math.max(1, Number(e.target.value)))}
               style={{ flex: 1, padding: '6px 8px', background: '#1c2235', border: '1px solid #2d3752', color: '#e8e6ff', borderRadius: 6, fontSize: '0.85rem' }} />
             <span style={{ color: '#8a92b2', fontSize: '0.75rem' }}>G →</span>
-            <span style={{ color: '#4caf87', fontWeight: 700, fontSize: '0.85rem' }}>{(gwcAmount * 1000).toLocaleString()}WC</span>
+            <span style={{ color: '#4caf87', fontWeight: 700, fontSize: '0.85rem' }}>{(gwcAmount * 30).toLocaleString()}WC</span>
           </div>
           <button onClick={buyWC} disabled={(player.gold ?? 0) < gwcAmount}
             style={{ width: '100%', marginTop: 8, padding: '8px', background: (player.gold ?? 0) >= gwcAmount ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
@@ -2587,12 +2587,12 @@ function ExchangePanel() {
           </button>
         </div>
         <div style={{ padding: 12, background: '#161b26', borderRadius: 8 }}>
-          <div style={{ fontWeight: 700, marginBottom: 8, color: '#e8e6ff' }}>WC → G（1,000WC = 0.95G / 手数料5%）</div>
+          <div style={{ fontWeight: 700, marginBottom: 8, color: '#e8e6ff' }}>WC → G（300WC = 7G）</div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <input type="number" value={wcgAmount} min={1000} step={1000} onChange={e => setWcgAmount(Math.max(1000, Number(e.target.value)))}
+            <input type="number" value={wcgAmount} min={300} step={300} onChange={e => setWcgAmount(Math.max(300, Number(e.target.value)))}
               style={{ flex: 1, padding: '6px 8px', background: '#1c2235', border: '1px solid #2d3752', color: '#e8e6ff', borderRadius: 6, fontSize: '0.85rem' }} />
             <span style={{ color: '#8a92b2', fontSize: '0.75rem' }}>WC →</span>
-            <span style={{ color: '#f0c060', fontWeight: 700, fontSize: '0.85rem' }}>{Math.floor(wcgAmount / 1000 * 0.95).toLocaleString()}G</span>
+            <span style={{ color: '#f0c060', fontWeight: 700, fontSize: '0.85rem' }}>{Math.floor(wcgAmount / 300 * 7).toLocaleString()}G</span>
           </div>
           <button onClick={sellWC} disabled={wc < wcgAmount}
             style={{ width: '100%', marginTop: 8, padding: '8px', background: wc >= wcgAmount ? 'linear-gradient(135deg,#f0c060,#c08020)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
@@ -2600,7 +2600,7 @@ function ExchangePanel() {
           </button>
         </div>
       </div>
-      <div style={{ fontSize: '0.72rem', color: '#4a5070', textAlign: 'center' }}>※G→WC は手数料なし。WC→G は5%手数料あり。</div>
+      <div style={{ fontSize: '0.72rem', color: '#4a5070', textAlign: 'center' }}>※10G → 300WC　/　300WC → 7G</div>
     </div>
   );
 }
@@ -2765,7 +2765,7 @@ export function GambleScreen() {
         <div style={{ display: 'flex', gap: 8, marginBottom: 8, fontSize: '0.75rem' }}>
           <span style={{ color: '#4a5070' }}>収支:</span>
           <span style={{ color: netProfit >= 0 ? '#4caf87' : '#e05555', fontWeight: 700 }}>
-            {netProfit >= 0 ? '+' : ''}{netProfit.toLocaleString()}G
+            {netProfit >= 0 ? '+' : ''}{netProfit.toLocaleString()}WC
           </span>
           <span style={{ color: '#8a92b2' }}>{stats.gamesPlayed}戦 {stats.wins}勝</span>
         </div>
@@ -2805,7 +2805,7 @@ export function GambleScreen() {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#e8e6ff' }}>{r.label}</div>
                     <div style={{ fontSize: '0.7rem', color: '#8a92b2', marginTop: 1 }}>
-                      {r.multiplier > 0 && <span>💰 41,000G賭け → {Math.floor(41000 * r.multiplier).toLocaleString()}G戻る（+{(Math.floor(41000 * r.multiplier) - 41000).toLocaleString()}G）</span>}
+                      {r.multiplier > 0 && <span>💰 41,000WC賭け → {Math.floor(41000 * r.multiplier).toLocaleString()}WC戻る（+{(Math.floor(41000 * r.multiplier) - 41000).toLocaleString()}WC）</span>}
                       {r.itemRewards && r.itemRewards.length > 0 && r.itemRewards.map(ir => (
                         <span key={ir.itemId} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, marginRight: 4 }}>
                           <GameIcon id={ITEM_MASTER[ir.itemId]?.icon ?? ''} size={12} />
@@ -2818,7 +2818,7 @@ export function GambleScreen() {
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: '0.72rem', color: '#4a5070', marginTop: 6, textAlign: 'center' }}>1回 41,000G固定</div>
+            <div style={{ fontSize: '0.72rem', color: '#4a5070', marginTop: 6, textAlign: 'center' }}>1回 41,000WC固定</div>
           </div>
         )}
         {activeGame === 'poker'        && <PokerPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['poker'] ?? 1.0} onBetLock={setPokerBetLocked} />}
@@ -2845,7 +2845,7 @@ export function GambleScreen() {
             {game.rewardTable.map((r, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', padding: '3px 0', borderBottom: '1px solid #2d3752', color: '#8a92b2' }}>
                 <span>{r.label}</span>
-                <span><span style={{ color: '#f0c060' }}>{activeGame === 'treasure_box' && r.multiplier > 0 ? `+${(Math.floor(41000 * r.multiplier) - 41000).toLocaleString()}G → 計${Math.floor(41000 * r.multiplier).toLocaleString()}G` : r.multiplier > 0 ? `×${r.multiplier}` : 'ハズレ'}</span><span style={{ color: '#4a5070', marginLeft: 8 }}>{(r.probability * 100).toFixed(2)}%</span></span>
+                <span><span style={{ color: '#f0c060' }}>{activeGame === 'treasure_box' && r.multiplier > 0 ? `+${(Math.floor(41000 * r.multiplier) - 41000).toLocaleString()}WC → 計${Math.floor(41000 * r.multiplier).toLocaleString()}WC` : r.multiplier > 0 ? `×${r.multiplier}` : 'ハズレ'}</span><span style={{ color: '#4a5070', marginLeft: 8 }}>{(r.probability * 100).toFixed(2)}%</span></span>
               </div>
             ))}
           </div>
