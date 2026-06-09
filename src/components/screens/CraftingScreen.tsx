@@ -103,12 +103,22 @@ export function CraftingScreen() {
   const [favorites, setFavorites] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem('craft_favorites') ?? '[]')); } catch { return new Set(); }
   });
+  const [recentCrafted, setRecentCrafted] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('craft_recent') ?? '[]'); } catch { return []; }
+  });
 
   const toggleFavorite = (itemId: string) => {
     setFavorites(prev => {
       const next = new Set(prev);
       if (next.has(itemId)) next.delete(itemId); else next.add(itemId);
       localStorage.setItem('craft_favorites', JSON.stringify([...next]));
+      return next;
+    });
+  };
+  const addRecentCrafted = (itemId: string) => {
+    setRecentCrafted(prev => {
+      const next = [itemId, ...prev.filter(x => x !== itemId)].slice(0, 10);
+      localStorage.setItem('craft_recent', JSON.stringify(next));
       return next;
     });
   };
@@ -195,10 +205,11 @@ export function CraftingScreen() {
     const totalOutput = matchedRecipe.outputAmount * craftTimes;
     addItems([{ itemId: matchedRecipe.outputItemId, amount: totalOutput }]);
     addSkillExp('crafting', matchedRecipe.craftingExpGain * craftTimes);
+    addRecentCrafted(matchedRecipe.outputItemId);
     const outItem = ITEM_MASTER[matchedRecipe.outputItemId];
     addNotification('success', `✨ ${outItem?.name ?? matchedRecipe.outputItemId} ×${totalOutput}${craftTimes > 1 ? ` (${craftTimes}回分)` : ''} を製作しました！`);
     clearGrid();
-  }, [matchedRecipe, craftTimes, player, craftingLevel, consumeItem, addItems, addSkillExp, addNotification]);
+  }, [matchedRecipe, craftTimes, player, craftingLevel, consumeItem, addItems, addSkillExp, addNotification, addRecentCrafted]);
 
   if (!player) return null;
 
@@ -337,6 +348,7 @@ export function CraftingScreen() {
               {[
                 { id: 'all',       label: '全て' },
                 { id: 'favorites', label: '⭐ お気に入り' },
+                { id: 'recent',    label: '🕐 最近使った' },
                 { id: 'gather',    label: '⛏️ 採取' },
                 { id: 'fishing',   label: '🎣 釣り' },
                 { id: 'material',  label: '🪨 素材' },
@@ -365,6 +377,7 @@ export function CraftingScreen() {
                     if (!item) return false;
                     if (searchText && !item.name.includes(searchText)) return false;
                     if (categoryFilter === 'favorites') return favorites.has(itemId);
+                    if (categoryFilter === 'recent') return recentCrafted.includes(itemId);
                     if (categoryFilter === 'gather') return gatherItems.has(itemId);
                     if (categoryFilter === 'fishing') return fishingItems.has(itemId);
                     if (categoryFilter === 'material') return item.category === 'material';

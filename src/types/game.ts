@@ -152,6 +152,7 @@ export interface MonsterMaster {
   isBoss?: boolean;
   isMidBoss?: boolean;
   specialAttack?: string;
+  defensePct?: number; // ダメージ軽減率 (0.0〜1.0)、貫通攻撃で無効化
 }
 
 export interface DungeonMaster {
@@ -271,6 +272,15 @@ export interface PlayerData {
   hpUpgradeCount?: number;
   // ガチャコイン
   gachaCoins?: number;
+  // 生涯統計
+  lifetimeStats?: {
+    totalDamageDealt: number;
+    totalGoldEarned: number;
+    maxCombo: number;
+    monstersDefeated: number;
+  };
+  // 解放済み実績ID
+  unlockedAchievements?: string[];
   // プロフィール
   profile?: {
     icon: string;          // 絵文字アイコン

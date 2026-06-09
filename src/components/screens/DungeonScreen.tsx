@@ -1720,6 +1720,8 @@ export function DungeonScreen() {
   const [showBossChoice, setShowBossChoice] = useState(false);
   const [kxBossMode, setKxBossMode] = useState(false);
   const [showDevilArmorChoice, setShowDevilArmorChoice] = useState(false);
+  const [showZeroChoice, setShowZeroChoice] = useState(false);
+  const [autoBattle, setAutoBattle] = useState(false);
   // 0=なし, 1=デビルアーマー戦, 2=デッドアーマー戦
   const [devilArmorPhase, setDevilArmorPhase] = useState(0);
 
@@ -1759,6 +1761,13 @@ export function DungeonScreen() {
     addSkillExp('combat', Math.floor(expGained / 2));
     changeGold(goldGained);
     addItems(drops);
+
+    // 生涯統計を更新
+    useGameStore.setState(state => {
+      if (!state.player) return state;
+      const ls = state.player.lifetimeStats ?? { totalDamageDealt: 0, totalGoldEarned: 0, maxCombo: 0, monstersDefeated: 0 };
+      return { player: { ...state.player, lifetimeStats: { ...ls, totalGoldEarned: ls.totalGoldEarned + goldGained, monstersDefeated: ls.monstersDefeated + 1 } } };
+    });
 
     const newDefeated = runState.monstersDefeated + 1;
     const newExp = runState.totalExp + expGained;
@@ -1815,8 +1824,28 @@ export function DungeonScreen() {
             totalDrops: allDrops, isComplete: false, currentFloor: Math.min(prev.currentFloor + 1, dungeon?.floors ?? 1),
           } : null);
           setShowBossChoice(true);
+        } else if (runState.dungeonId === 'frozen_cave') {
+          // 冷焦洞穴：極冷焦撃破後に零と戦うか帰還か選択
+          setRunState(prev => prev ? {
+            ...prev, currentAreaIdx: nextAreaIdx,
+            currentAreaName: areas?.[nextAreaIdx]?.name ?? prev.currentAreaName,
+            monstersDefeated: newDefeated, totalExp: newExp, totalGold: newGold,
+            totalDrops: allDrops, isComplete: false, currentFloor: Math.min(prev.currentFloor + 1, dungeon?.floors ?? 1),
+          } : null);
+          setShowZeroChoice(true);
         } else {
-          // 他のダンジョンはそのままクリア
+          // 他のダンジョンはそのままクリア（零討伐時はzerokiller実績付与）
+          if (runState.currentAreaIdx === 3 && runState.dungeonId === 'frozen_cave') {
+            useGameStore.setState(state => {
+              if (!state.player) return state;
+              const ua = state.player.unlockedAchievements ?? [];
+              if (!ua.includes('zerokiller')) {
+                addNotification('success', '⚡ 実績解除：「零の破壊者」！');
+                return { player: { ...state.player, unlockedAchievements: [...ua, 'zerokiller'] } };
+              }
+              return state;
+            });
+          }
           setRunState(prev => prev ? {
             ...prev, currentAreaIdx: nextAreaIdx,
             currentAreaName: areas?.[nextAreaIdx]?.name ?? prev.currentAreaName,
@@ -1838,8 +1867,20 @@ export function DungeonScreen() {
 
   const handleEscapeBattle = useCallback(() => {
     setInBattle(false);
+    setAutoBattle(false);
     setRunLog(prev => [...prev, '🏃 逃走した。']);
   }, []);
+
+  // オートバトル：戦闘終了後に自動で次の戦闘を開始
+  useEffect(() => {
+    if (!autoBattle || inBattle || !runState || runState.isComplete || runState.isFailed || showBossChoice || showZeroChoice || showDevilArmorChoice || kxBossMode) return;
+    if (player && player.stats.hp <= 0) return;
+    const timer = setTimeout(() => {
+      setBattleKey(k => k + 1);
+      setInBattle(true);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [autoBattle, inBattle, runState, player, showBossChoice, showZeroChoice, showDevilArmorChoice, kxBossMode]);
 
   // デビルアーマー戦終了ハンドラ
   const handleDevilArmorBattleEnd = useCallback((won: boolean, expGained: number, goldGained: number, drops: {itemId:string;amount:number}[], _hpDelta: number) => {
@@ -2066,6 +2107,32 @@ export function DungeonScreen() {
               initialMana={dungeonMana}
               onManaUpdate={setDungeonMana}
             />
+          ) : showZeroChoice ? (
+            <div style={{ background: '#161b26', border: '2px solid #00ccff', borderRadius: 12, padding: 18, textAlign: 'center' }}>
+              <div style={{ fontSize: '1.5rem', marginBottom: 6 }}>⚡</div>
+              <div style={{ color: '#00ccff', fontWeight: 700, fontSize: '1rem', marginBottom: 4 }}>極冷焦を撃破！</div>
+              <div style={{ color: '#8a92b2', fontSize: '0.8rem', marginBottom: 4 }}>深淵に「零」の気配を感じる...</div>
+              <div style={{ color: '#8a92b2', fontSize: '0.75rem', marginBottom: 16 }}>HP:100000 | 防御:99 | 洞窟そのもの。帰還しますか？それとも零と対峙しますか？</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => {
+                  setShowZeroChoice(false);
+                  setRunState(prev => prev ? { ...prev, isComplete: true } : null);
+                }} style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg,#4caf87,#2d8f6f)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+                  🏆 帰還する
+                </button>
+                <button onClick={() => {
+                  setShowZeroChoice(false);
+                  // monstersDefeated を (5の倍数-1) に合わせて次の1撃破でエリア進行
+                  const cur = runState.monstersDefeated;
+                  const aligned = Math.ceil((cur + 1) / 5) * 5 - 1;
+                  setRunState(prev => prev ? { ...prev, currentAreaIdx: 3, currentAreaName: '零の間', bossLoopMode: false, monstersDefeated: aligned } : null);
+                  setBattleKey(k => k + 1);
+                  setInBattle(true);
+                }} style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg,#0088ff,#0044aa)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+                  ⚡ 零と戦う
+                </button>
+              </div>
+            </div>
           ) : showBossChoice ? (
             <div style={{ background: '#161b26', border: '2px solid #f0c060', borderRadius: 12, padding: 18, textAlign: 'center' }}>
               <div style={{ fontSize: '1.3rem', marginBottom: 6 }}>👑</div>
@@ -2141,6 +2208,10 @@ export function DungeonScreen() {
                   disabled={player.stats.hp <= 0}
                   style={{ flex: 2, padding: '12px', fontWeight: 700, background: player.stats.hp > 0 ? 'linear-gradient(135deg,#e05555,#c03030)' : '#2d3752', color: '#fff', border: 'none', borderRadius: 8, cursor: player.stats.hp > 0 ? 'pointer' : 'not-allowed' }}>
                   {runState.bossLoopMode ? '👑 洞窟王に挑む' : '⚔️ 次の敵と戦う'}
+                </button>
+                <button onClick={() => setAutoBattle(v => !v)}
+                  style={{ flex: 1, padding: '12px', fontWeight: 700, background: autoBattle ? 'linear-gradient(135deg,#f0a040,#c07020)' : '#2d3752', color: autoBattle ? '#fff' : '#8a92b2', border: `1px solid ${autoBattle ? '#f0a040' : '#2d3752'}`, borderRadius: 8, cursor: 'pointer', fontSize: '0.8rem' }}>
+                  {autoBattle ? '🤖 AUTO ON' : '🤖 AUTO'}
                 </button>
                 <button onClick={escape} style={{ flex: 1, padding: '12px', background: '#2d3752', color: '#8a92b2', border: '1px solid #2d3752', borderRadius: 8, cursor: 'pointer' }}>
                   🏃 離脱

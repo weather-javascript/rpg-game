@@ -69,6 +69,8 @@ function ensureDefaults(player: PlayerData): PlayerData {
     emailNotifications: player.emailNotifications ?? { auction: true, events: true, updates: true },
     activityLog: player.activityLog ?? [],
     settings: player.settings ?? {},
+    lifetimeStats: player.lifetimeStats ?? { totalDamageDealt: 0, totalGoldEarned: 0, maxCombo: 0, monstersDefeated: 0 },
+    unlockedAchievements: player.unlockedAchievements ?? [],
   };
 }
 

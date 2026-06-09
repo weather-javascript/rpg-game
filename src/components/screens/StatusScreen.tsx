@@ -263,6 +263,11 @@ const TITLE_MASTER: { id: string; label: string; condition: (p: PlayerData) => b
   { id: 'rich',     label: '💰 大富豪',             condition: p => p.gold >= 1_000_000 },
   { id: 'fisher',   label: '🎣 釣り名人',           condition: p => (p.fishingScore ?? 0) >= 100 },
   { id: 'crafter',  label: '🔨 名工',               condition: p => (p.skillLevels?.crafting ?? 0) >= 10 },
+  { id: 'slayer100',label: '⚔️ 百獣狩り',          condition: p => (p.lifetimeStats?.monstersDefeated ?? 0) >= 100 },
+  { id: 'slayer500',label: '🩸 屠龍者',             condition: p => (p.lifetimeStats?.monstersDefeated ?? 0) >= 500 },
+  { id: 'goldear1m',label: '💸 金貨の化身',         condition: p => (p.lifetimeStats?.totalGoldEarned ?? 0) >= 1_000_000 },
+  { id: 'gokureich',label: '❄️🔥 極の征服者',      condition: p => (p.dungeonClearedCount?.['frozen_cave'] ?? 0) >= 1 },
+  { id: 'zerokiller',label:'⚡ 零の破壊者',         condition: p => (p.unlockedAchievements ?? []).includes('zerokiller') },
 ];
 
 const PROFILE_ICONS = ['⚔️','🛡️','🧙','🎣','💰','🏆','🌟','👑','🔥','💎','🐉','⚡','🌊','🌙','🎲','🗡️','🧪','🌱','💀','🦊'];
@@ -390,7 +395,7 @@ export function StatusScreen() {
   const isSaving = useGameStore(s => s.isSaving);
   const useItem = useGameStore(s => s.useItem);
   const setActiveTab = useGameStore(s => s.setActiveTab);
-  const [activeSection, setActiveSection] = useState<'stats'|'skills'|'inventory'|'equipment'>('stats');
+  const [activeSection, setActiveSection] = useState<'stats'|'skills'|'inventory'|'equipment'|'achievements'>('stats');
   const [profileIcon, setProfileIcon] = useState(() => player?.profile?.icon ?? '⚔️');
   const [profileComment, setProfileComment] = useState(() => player?.profile?.comment ?? '');
   const [profileTitleId, setProfileTitleId] = useState(() => player?.profile?.titleId ?? '');
@@ -415,6 +420,7 @@ export function StatusScreen() {
     { id:'skills', label:'スキル', icon:'lightning' },
     { id:'inventory', label:'所持', icon:'backpack' },
     { id:'equipment', label:'装備', icon:'swords' },
+    { id:'achievements', label:'実績', icon:'crown' },
   ] as const;
 
   return (
@@ -588,6 +594,43 @@ export function StatusScreen() {
         <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
           <h3 style={{fontSize:'0.9rem', color:'#f0c060', marginBottom:10}}>⚔️ 装備・ホットバー</h3>
           <EquipmentPanel />
+        </section>
+      )}
+
+      {/* 実績・統計 */}
+      {activeSection === 'achievements' && (
+        <section style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:10, padding:14, marginBottom:12}}>
+          <h3 style={{fontSize:'0.9rem', color:'#f0c060', marginBottom:10}}>🏆 実績・統計</h3>
+          {/* 生涯統計 */}
+          <div style={{background:'#161b26', borderRadius:8, padding:12, marginBottom:12}}>
+            <div style={{fontSize:'0.78rem', color:'#8a92b2', marginBottom:8, fontWeight:700}}>📊 生涯統計</div>
+            {[
+              { label:'討伐数', value: (player.lifetimeStats?.monstersDefeated ?? 0).toLocaleString() + ' 体' },
+              { label:'総獲得G', value: (player.lifetimeStats?.totalGoldEarned ?? 0).toLocaleString() + ' G' },
+              { label:'総ダンジョンクリア', value: Object.values(player.dungeonClearedCount ?? {}).reduce((a,b)=>a+b,0).toLocaleString() + ' 回' },
+              { label:'釣りスコア', value: (player.fishingScore ?? 0).toLocaleString() },
+            ].map(s => (
+              <div key={s.label} style={{display:'flex', justifyContent:'space-between', fontSize:'0.78rem', padding:'4px 0', borderBottom:'1px solid #2d3752'}}>
+                <span style={{color:'#8a92b2'}}>{s.label}</span>
+                <span style={{color:'#e8e6ff', fontWeight:700}}>{s.value}</span>
+              </div>
+            ))}
+          </div>
+          {/* 称号一覧 */}
+          <div style={{fontSize:'0.78rem', color:'#8a92b2', marginBottom:8, fontWeight:700}}>🎖️ 解放済み称号</div>
+          <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
+            {TITLE_MASTER.map(t => {
+              const unlocked = t.condition(player);
+              return (
+                <div key={t.id} style={{padding:'4px 10px', borderRadius:12, fontSize:'0.72rem', fontWeight:700,
+                  background: unlocked ? 'rgba(91,141,238,0.15)' : '#161b26',
+                  border: `1px solid ${unlocked ? '#5b8dee' : '#2d3752'}`,
+                  color: unlocked ? '#e8e6ff' : '#4a5070', opacity: unlocked ? 1 : 0.5 }}>
+                  {t.label}
+                </div>
+              );
+            })}
+          </div>
         </section>
       )}
 

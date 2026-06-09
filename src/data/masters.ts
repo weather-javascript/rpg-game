@@ -782,7 +782,8 @@ export const MONSTER_MASTER: Record<string, MonsterMaster> = {
   reicho:       { id:'reicho',    name:'冷焦',    description:'ボス（2体）。',        icon:'flame', maxHp:200,   attack:20, defense:10,  baseExp:150,  baseGold:80,   dungeonIds:['garden'], isBoss:true, specialAttack:'炎上+鈍足', drops:[{itemId:'spirit_ice',baseRate:0.5,minAmount:1,maxAmount:2},{itemId:'ancient_shard',baseRate:0.2,minAmount:1,maxAmount:1}] },
   extreme_cold: { id:'extreme_cold',name:'極冷',  description:'炎系攻撃で即死。',     icon:'blizzard', maxHp:2180,  attack:25, defense:20,  baseExp:400,  baseGold:200,  dungeonIds:['frozen_cave'], isMidBoss:true, specialAttack:'アイスビーム', drops:[{itemId:'spirit_ice',baseRate:0.5,minAmount:2,maxAmount:3},{itemId:'ancient_shard',baseRate:0.3,minAmount:1,maxAmount:2}] },
   extreme_fire: { id:'extreme_fire',name:'極焦',  description:'氷系攻撃で即死。',     icon:'volcano', maxHp:2180,  attack:25, defense:20,  baseExp:400,  baseGold:200,  dungeonIds:['frozen_cave'], isMidBoss:true, specialAttack:'ラバクロップ', drops:[{itemId:'ancient_shard',baseRate:0.5,minAmount:2,maxAmount:3}] },
-  zero_boss:    { id:'zero_boss', name:'零',      description:'洞窟そのもの。',       icon:'lightning', maxHp:100000,attack:1,  defense:99,  baseExp:5000, baseGold:3000, dungeonIds:['frozen_cave'], isBoss:true, drops:[{itemId:'stalactite',baseRate:1.0,minAmount:8,maxAmount:8}] },
+  gokureicho:   { id:'gokureicho',name:'極冷焦', description:'極の試練を超えた者が挑む冷焦洞穴の真のボス。防御力75%カット。貫通攻撃が必要。', icon:'blizzard', maxHp:800, attack:35, defense:0, baseExp:1000, baseGold:500, dungeonIds:['frozen_cave'], isBoss:true, specialAttack:'極氷炎撃', defensePct:0.75, drops:[{itemId:'spirit_ice',baseRate:1.0,minAmount:3,maxAmount:5},{itemId:'ancient_shard',baseRate:0.8,minAmount:2,maxAmount:3},{itemId:'stalactite',baseRate:0.5,minAmount:1,maxAmount:2}] },
+  zero_boss:    { id:'zero_boss', name:'零',      description:'洞窟そのもの。冷焦洞穴の裏ボス。',       icon:'lightning', maxHp:100000,attack:1,  defense:99,  baseExp:5000, baseGold:3000, dungeonIds:['frozen_cave'], isBoss:true, drops:[{itemId:'stalactite',baseRate:1.0,minAmount:8,maxAmount:8}] },
   roam_armor:   { id:'roam_armor', name:'ロウムアーマー',description:'打ち上げスキル。', icon:'robot', maxHp:60,  attack:20, defense:10,  baseExp:50,   baseGold:30,   dungeonIds:['sky_castle','sky_castle_ex'], drops:[{itemId:'mech_armor_oparts',baseRate:1.0,minAmount:1,maxAmount:1}] },
   death_armor:  { id:'death_armor',name:'デスアーマー',  description:'斬撃5回。',        icon:'skull', maxHp:75,  attack:30, defense:12,  baseExp:65,   baseGold:40,   dungeonIds:['sky_castle','sky_castle_ex'], drops:[{itemId:'rusty_mystery_obj',baseRate:1.0,minAmount:1,maxAmount:1}] },
   devil_armor:  { id:'devil_armor', name:'デビルアーマー', description:'天空城の中ボス。10ターンに1回貫通10000ダメージ。', icon:'skull', maxHp:750, attack:30, defense:0, baseExp:400, baseGold:250, dungeonIds:['sky_castle'], isMidBoss:true, drops:[] },
@@ -871,15 +872,16 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
     ],
   },
   frozen_cave: {
-    id:'frozen_cave', name:'冷焦洞穴', description:'属性攻撃システムあり。',
-    icon:'snowflake', tier:'advanced', requiredLevel:30, floors:3, expBonus:3.0, goldBonus:2.5,
-    monsterIds:['ice_spirit','extreme_cold','extreme_fire'],
-    bossId:'zero_boss',
+    id:'frozen_cave', name:'冷焦洞穴', description:'属性攻撃システムあり。極冷焦討伐後に零への挑戦が可能。',
+    icon:'snowflake', tier:'advanced', requiredLevel:30, floors:4, expBonus:3.0, goldBonus:2.5,
+    monsterIds:['ice_spirit','extreme_cold','extreme_fire','gokureicho'],
+    bossId:'gokureicho',
     unlockCondition: { dungeonId:'garden', clearedCount:1 },
     areas:[
       { name:'洞窟1層', monsters:[{monsterId:'ice_spirit',count:5}] },
       { name:'極の試練', description:'極冷・極焦が出現。属性攻撃が必須。', monsters:[{monsterId:'extreme_cold',count:1},{monsterId:'extreme_fire',count:1}], isHardArea:true },
-      { name:'零の間',  description:'零は洞窟そのもの。', monsters:[{monsterId:'zero_boss',count:1,isBoss:true}], isHardArea:true },
+      { name:'極冷焦の間', description:'冷焦洞穴の真のボス。防御力75%カット、貫通攻撃必須。', monsters:[{monsterId:'gokureicho',count:1,isBoss:true}], isHardArea:true },
+      { name:'零の間', description:'零は洞窟そのもの。裏ボス。', monsters:[{monsterId:'zero_boss',count:1,isBoss:true}], isHardArea:true },
     ],
   },
   sky_castle: {
@@ -1077,6 +1079,19 @@ export const DEFAULT_PLAYER_STATS = {
 // フォーマット: { version: 'x.x.x', date: 'YYYY-MM-DD', changes: ['変更内容...'] }
 // ============================================================
 export const VERSION_PATCHES = [
+  {
+    version: '2.5.2',
+    date: '2026-06-09',
+    changes: [
+      '🤖 オートバトル機能追加：「AUTO」ボタンで通常フロアを自動進行（戦闘終了後0.8秒で次戦開始）',
+      '⭐ クラフト「最近使った」タブ追加：直近10件のクラフトアイテムにワンタップでアクセス',
+      '🏆 実績・統計システム実装：StatusScreenに「実績」タブ追加（討伐数・総獲得G等の生涯統計＋称号一覧）',
+      '🎖️ 称号5種追加：百獣狩り・屠龍者・金貨の化身・極の征服者・零の破壊者',
+      '❄️🔥 極冷焦（HP800・防御75%軽減）を冷焦洞穴の正規ボスとして追加',
+      '⚡ 極冷焦撃破後に「帰還」または「零と戦う」を選択可能に（零撃破で「零の破壊者」実績解除）',
+      '👑 初級の洞窟王を除くボスは1回のみ出現し撃破でクリア扱いに統一',
+    ],
+  },
   {
     version: '2.5.1',
     date: '2026-06-09',
