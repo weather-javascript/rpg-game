@@ -113,21 +113,34 @@ export interface MissionProgress {
   weeklyPokerWins: number;
   weeklyGamblePlays: number;
   weeklyHighlowMaxStreak: number;
-  // all-time
+  // all-time stats
   totalSlotPlays: number;
+  totalChohanPlays: number;
   totalChohanWins: number;
+  totalChinchiroPlays: number;
   totalChinchiroWins: number;
+  totalPokerPlays: number;
   totalPokerWins: number;
+  totalCoinFlipPlays: number;
   totalCoinFlipWins: number;
+  totalHighlowPlays: number;
   totalHighlowWins: number;
   totalHighlowMaxStreak: number;
   totalJackpotWins: number;
   totalWagered: number;
+  totalWinAmount: number;
+  totalLoseCount: number;
+  totalWinCount: number;
+  maxSingleWin: number;
+  maxSingleBet: number;
+  maxHighlowStreak: number;
   // timestamps for reset
   dailyResetAt: number;
   weeklyResetAt: number;
   // completed mission ids
   completedMissions: string[];
+  // claimed mission reward ids (separate from completed)
+  claimedMissions: string[];
 }
 export type DungeonTier = 'beginner' | 'intermediate' | 'advanced' | 'super' | 'extreme' | 'volcano';
 
@@ -367,6 +380,8 @@ export interface PlayerData {
   monthlyGambleWonResetAt?: number;
   // ミッション進捗
   missionProgress?: MissionProgress;
+  // 冒険ナビ報酬受け取り済み
+  naviClaimed?: Record<string, boolean>;
   // プロフィール
   profile?: {
     icon: string;          // 絵文字アイコン

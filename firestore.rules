@@ -185,7 +185,8 @@ service cloud.firestore {
             && isAuthed()
             && request.resource.data.pool is int
             && request.resource.data.pool >= resource.data.get('pool', 0))
-        || (docId == 'activity_feed' && isAuthed());
+        || (docId == 'activity_feed' && isAuthed())
+        || (docId == 'gamble_feed' && isAuthed());
     }
 
     // ============================================================
@@ -245,6 +246,26 @@ service cloud.firestore {
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
+
+    // ============================================================
+    // gamble_ranking/{uid} — ギャンブルランキング
+    // ============================================================
+    match /gamble_ranking/{uid} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+
+    // ============================================================
+    // slot_jackpot/{tier} — スロットジャックポット
+    // ============================================================
+    match /slot_jackpot/{tier} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+
+    // ============================================================
+    // shared/{docId} の追加ドキュメント許可
+    // ============================================================
 
     // ============================================================
     // それ以外は全拒否

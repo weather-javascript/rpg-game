@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { GAMBLE_MASTER, ITEM_MASTER } from '../../data/masters';
 import { playChohan, playChinchiro, dealPoker, drawPoker } from '../../systems/minigames';
+import { MISSION_DEFS, GAMBLE_RANK_DEFS, getMissionRewardBonus, ensureMissionProgress } from '../../data/missions';
 import {
   contributeToJackpot, checkJackpotWin, subscribeJackpotPool,
   createGambleBattle, subscribeGambleBattles, joinGambleBattle, cancelGambleBattle,
@@ -21,7 +22,7 @@ import {
   subscribeActiveBattles, spectateGambleBattle, joinSpectate, leaveSpectate,
 } from '../../services/multiplayer';
 import type { TreasureProbEntry, GambleRankingEntry } from '../../services/multiplayer';
-import type { GambleResult, GambleMaster, PokerTable, MissionProgress, BattleHistoryEntry as _BH } from '../../types/game';
+import type { GambleResult, GambleMaster, PokerTable, BattleHistoryEntry as _BH } from '../../types/game';
 import type { PokerState } from '../../systems/minigames';
 import type { GambleBattle } from '../../types/game';
 
@@ -997,6 +998,9 @@ function TexasHoldemPanel() {
         const me = t.players.find(p => p.uid === player.uid);
         if (me && me.chips > 0) {
           changeWealthCoin(me.chips);
+          const net = me.chips - t.buyIn;
+          postGambleFeed({ uid: player.uid, displayName: player.displayName, gameType: 'texas', amount: net }).catch(() => {});
+          if (net > 0) updateGambleRanking(player.uid, player.displayName, net).catch(() => {});
         }
       }
     });
@@ -1399,6 +1403,9 @@ function PvPPanel({ bet }: { bet: number }) {
           changeWealthCoin(battle.betAmount * 2); // 自分の掛け金 + 相手の掛け金
         }
         // 負けの場合は handleHost で既に -betAmount してあるので追加処理なし
+        const pvpNet = iWon ? battle.betAmount : -battle.betAmount;
+        postGambleFeed({ uid: player.uid, displayName: player.displayName, gameType: battle.gambleType ?? 'pvp', amount: pvpNet }).catch(() => {});
+        if (iWon) updateGambleRanking(player.uid, player.displayName, battle.betAmount).catch(() => {});
         setBattleAnim({
           opponentName: battle.guestName ?? '相手',
           gameName: battle.gambleType,
@@ -1464,6 +1471,9 @@ function PvPPanel({ bet }: { bet: number }) {
           changeWealthCoin(battle.betAmount * 2);
         }
         // 負けの場合は既に -betAmount 済みなので追加処理なし
+        const pvpNet = iWon ? battle.betAmount : -battle.betAmount;
+        postGambleFeed({ uid: player.uid, displayName: player.displayName, gameType: battle.gambleType ?? 'pvp', amount: pvpNet }).catch(() => {});
+        if (iWon) updateGambleRanking(player.uid, player.displayName, battle.betAmount).catch(() => {});
         setBattleAnim({
           opponentName: battle.hostName,
           gameName: battle.gambleType,
@@ -2325,11 +2335,11 @@ function TreasureBoxPanel({ onResult, onJackpotContrib, multiplierBonus = 1.0 }:
 // ============================================================
 export type GambleRank = '見習い' | 'ギャンブラー' | '熟練ギャンブラー' | '賭博王' | 'レジェンド';
 const GAMBLE_RANKS: { name: GambleRank; threshold: number; multiplier: number; color: string }[] = [
-  { name: '見習い',       threshold: 0,              multiplier: 1.00, color: '#8a92b2' },
-  { name: 'ギャンブラー', threshold: 1_000_000,      multiplier: 1.02, color: '#4caf87' },
-  { name: '熟練ギャンブラー', threshold: 10_000_000, multiplier: 1.05, color: '#5b8dee' },
-  { name: '賭博王',       threshold: 1_000_000_000,  multiplier: 1.10, color: '#f0a040' },
-  { name: 'レジェンド',   threshold: 10_000_000_000, multiplier: 1.20, color: '#e060e0' },
+  { name: '見習い',           threshold: 0,                multiplier: 1.00, color: '#8a92b2' },
+  { name: 'ギャンブラー',     threshold: 10_000_000,       multiplier: 1.00, color: '#4caf87' },
+  { name: '熟練ギャンブラー', threshold: 100_000_000,      multiplier: 1.00, color: '#5b8dee' },
+  { name: '賭博王',           threshold: 10_000_000_000,   multiplier: 1.00, color: '#f0a040' },
+  { name: 'レジェンド',       threshold: 100_000_000_000,  multiplier: 1.00, color: '#e060e0' },
 ];
 export function getGambleRank(totalWagered: number) {
   let rank = GAMBLE_RANKS[0];
@@ -2659,6 +2669,211 @@ function SpectatePanel() {
 }
 
 
+// ============================================================
+// ランクパネル
+// ============================================================
+function RankPanel() {
+  const player = useGameStore(s => s.player);
+  if (!player) return null;
+  const totalWagered = player.totalWagered ?? 0;
+  const rankInfo = getGambleRank(totalWagered);
+  const currentRankDef = GAMBLE_RANK_DEFS.find(r => r.name === rankInfo.name) ?? GAMBLE_RANK_DEFS[0];
+  const nextRankDef = GAMBLE_RANK_DEFS[GAMBLE_RANK_DEFS.indexOf(currentRankDef) + 1];
+
+  const progressPct = nextRankDef
+    ? Math.min(100, ((totalWagered - currentRankDef.threshold) / (nextRankDef.threshold - currentRankDef.threshold)) * 100)
+    : 100;
+
+  return (
+    <div style={{ padding: '0 4px' }}>
+      {/* 現在のランク */}
+      <div style={{ background: `linear-gradient(135deg,rgba(${rankInfo.color === '#e060e0' ? '224,96,224' : rankInfo.color === '#f0a040' ? '240,160,64' : rankInfo.color === '#5b8dee' ? '91,141,238' : rankInfo.color === '#4caf87' ? '76,175,135' : '138,146,178'},0.15),transparent)`, border: `2px solid ${rankInfo.color}`, borderRadius: 12, padding: 16, marginBottom: 14, textAlign: 'center' }}>
+        <div style={{ fontSize: '3rem' }}>{currentRankDef.badge}</div>
+        <div style={{ fontSize: '1.4rem', fontWeight: 700, color: rankInfo.color, marginBottom: 4 }}>{rankInfo.name}</div>
+        <div style={{ fontSize: '0.78rem', color: '#8a92b2', marginBottom: 10 }}>累計賭け額: <span style={{ color: '#f0c060', fontWeight: 700 }}>{totalWagered.toLocaleString()}WC</span></div>
+        {/* 進捗バー */}
+        {nextRankDef ? (
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#4a5070', marginBottom: 4 }}>
+              <span>{totalWagered.toLocaleString()}WC</span>
+              <span>{nextRankDef.threshold.toLocaleString()}WC</span>
+            </div>
+            <div style={{ background: '#161b26', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+              <div style={{ width: `${progressPct}%`, height: '100%', background: `linear-gradient(90deg,${rankInfo.color},${nextRankDef.color})`, borderRadius: 4, transition: 'width 0.5s' }} />
+            </div>
+            <div style={{ fontSize: '0.7rem', color: '#8a92b2', marginTop: 4 }}>
+              次のランク「{nextRankDef.name}」まで {(nextRankDef.threshold - totalWagered).toLocaleString()}WC
+            </div>
+          </div>
+        ) : (
+          <div style={{ fontSize: '0.82rem', color: '#e060e0', fontWeight: 700 }}>🌟 最高ランク到達！</div>
+        )}
+      </div>
+
+      {/* 特典一覧 */}
+      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f0c060', marginBottom: 8 }}>🎁 現在のランク特典</div>
+      <div style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 10, padding: 12, marginBottom: 14 }}>
+        {currentRankDef.perks.map((p, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: i < currentRankDef.perks.length - 1 ? '1px solid #2d3752' : 'none' }}>
+            <span style={{ color: rankInfo.color }}>✦</span>
+            <span style={{ fontSize: '0.82rem', color: '#e8e6ff' }}>{p}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* 全ランク表 */}
+      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#8a92b2', marginBottom: 8 }}>📊 ランク一覧</div>
+      {GAMBLE_RANK_DEFS.map((r, i) => {
+        const isCurrentRank = r.name === rankInfo.name;
+        const isUnlocked = totalWagered >= r.threshold;
+        return (
+          <div key={r.name} style={{ background: isCurrentRank ? 'rgba(91,141,238,0.08)' : '#1c2235', border: `1px solid ${isCurrentRank ? '#5b8dee' : '#2d3752'}`, borderRadius: 8, padding: '10px 12px', marginBottom: 6, opacity: isUnlocked ? 1 : 0.5 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: '1.4rem' }}>{r.badge}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: r.color }}>{r.name}</div>
+                <div style={{ fontSize: '0.7rem', color: '#4a5070' }}>{r.threshold === 0 ? '初期ランク' : `累計${r.threshold.toLocaleString()}WC〜`}</div>
+              </div>
+              {isCurrentRank && <span style={{ fontSize: '0.7rem', background: '#5b8dee', color: '#fff', padding: '2px 6px', borderRadius: 4 }}>現在</span>}
+              {!isCurrentRank && isUnlocked && i < GAMBLE_RANK_DEFS.indexOf(GAMBLE_RANK_DEFS.find(x => x.name === rankInfo.name)!) && <span style={{ fontSize: '0.7rem', color: '#4caf87' }}>✓</span>}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {r.perks.map((p, pi) => <div key={pi} style={{ fontSize: '0.72rem', color: '#8a92b2', paddingLeft: 8 }}>• {p}</div>)}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ============================================================
+// ミッションパネル
+// ============================================================
+function MissionPanel() {
+  const { player, changeWealthCoin, addNotification } = useGameStore(s => ({
+    player: s.player, changeWealthCoin: s.changeWealthCoin, addNotification: s.addNotification,
+  }));
+  const setPlayer = useGameStore(s => s.setPlayer);
+  const [missionTab, setMissionTab] = useState<'daily' | 'weekly' | 'achievement'>('daily');
+
+  if (!player) return null;
+
+  const mp = ensureMissionProgress(player.missionProgress);
+  const totalWagered = player.totalWagered ?? 0;
+  const rewardBonus = getMissionRewardBonus(totalWagered);
+  const rankInfo = getGambleRank(totalWagered);
+
+  // デイリー/ウィークリーリセット確認
+  const now = Date.now();
+  const DAY_MS = 86_400_000;
+  const _WEEK_MS = 604_800_000; void _WEEK_MS;
+
+  const missionsForTab = MISSION_DEFS.filter(m => m.type === missionTab);
+
+  const getProgress = (m: typeof MISSION_DEFS[0]) => {
+    const val = (mp as unknown as Record<string, number>)[m.statKey] ?? 0;
+    return Math.min(val, m.target);
+  };
+
+  const isMissionCompleted = (m: typeof MISSION_DEFS[0]) => {
+    if (m.type === 'achievement') return mp.completedMissions.includes(m.id);
+    // daily/weekly: check progress
+    return getProgress(m) >= m.target;
+  };
+
+  const isRewarded = (m: typeof MISSION_DEFS[0]) => mp.claimedMissions.includes(m.id);
+
+  const claimReward = (m: typeof MISSION_DEFS[0]) => {
+    if (!isMissionCompleted(m) || isRewarded(m)) return;
+    const reward = Math.floor(m.rewardWC * rewardBonus);
+    changeWealthCoin(reward);
+    const latest = useGameStore.getState().player ?? player;
+    const latestMp = ensureMissionProgress(latest.missionProgress);
+    const newMp = {
+      ...latestMp,
+      claimedMissions: [...latestMp.claimedMissions, m.id],
+      completedMissions: m.type === 'achievement' ? [...latestMp.completedMissions, m.id] : latestMp.completedMissions,
+    };
+    setPlayer({ ...latest, missionProgress: newMp });
+    addNotification('success', `🎁 ${m.title} クリア！ +${reward.toLocaleString()}WC`);
+  };
+
+  const completedCount = missionsForTab.filter(m => isRewarded(m)).length;
+
+  return (
+    <div style={{ padding: '0 4px' }}>
+      {/* ランクボーナス表示 */}
+      {rewardBonus > 1 && (
+        <div style={{ background: 'rgba(240,192,96,0.08)', border: '1px solid #f0c060', borderRadius: 8, padding: '6px 12px', marginBottom: 10, fontSize: '0.78rem', color: '#f0c060' }}>
+          🏅 {rankInfo.name}ボーナス: ミッション報酬×{rewardBonus.toFixed(2)}
+        </div>
+      )}
+
+      {/* サブタブ */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+        {(['daily', 'weekly', 'achievement'] as const).map(t => (
+          <button key={t} onClick={() => setMissionTab(t)}
+            style={{ flex: 1, padding: '7px 0', fontSize: '0.75rem', fontWeight: 700,
+              background: missionTab === t ? 'rgba(91,141,238,0.2)' : '#1c2235',
+              border: `1px solid ${missionTab === t ? '#5b8dee' : '#2d3752'}`,
+              color: missionTab === t ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer' }}>
+            {t === 'daily' ? '📅 デイリー' : t === 'weekly' ? '📆 ウィークリー' : '🏆 実績'}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ fontSize: '0.72rem', color: '#4a5070', marginBottom: 8 }}>
+        {completedCount}/{missionsForTab.length} クリア済み
+        {missionTab === 'daily' && now - mp.dailyResetAt > DAY_MS && <span style={{ color: '#e05555', marginLeft: 8 }}>（明日リセット）</span>}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {missionsForTab.map(m => {
+          const prog = getProgress(m);
+          const completed = isMissionCompleted(m);
+          const rewarded = isRewarded(m);
+          const pct = Math.min(100, (prog / m.target) * 100);
+          const rewardWCDisplay = Math.floor(m.rewardWC * rewardBonus);
+
+          return (
+            <div key={m.id} style={{
+              background: rewarded ? 'rgba(76,175,135,0.06)' : '#1c2235',
+              border: `1px solid ${rewarded ? '#2d5240' : completed ? '#4caf87' : '#2d3752'}`,
+              borderRadius: 8, padding: '10px 12px', opacity: rewarded ? 0.65 : 1,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: rewarded ? '#4caf87' : '#e8e6ff' }}>
+                    {rewarded ? '✅ ' : completed ? '🎁 ' : ''}{m.title}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#8a92b2', marginTop: 2 }}>{m.description}</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, marginLeft: 8 }}>
+                  <span style={{ fontSize: '0.78rem', color: '#f0c060', fontWeight: 700 }}>+{rewardWCDisplay.toLocaleString()}WC</span>
+                  {completed && !rewarded && (
+                    <button onClick={() => claimReward(m)}
+                      style={{ padding: '4px 10px', background: 'linear-gradient(135deg,#4caf87,#2d8060)', color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700 }}>
+                      受取
+                    </button>
+                  )}
+                </div>
+              </div>
+              {/* 進捗バー */}
+              <div style={{ background: '#161b26', borderRadius: 3, height: 5, overflow: 'hidden', marginTop: 4 }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: completed ? '#4caf87' : '#5b8dee', borderRadius: 3, transition: 'width 0.3s' }} />
+              </div>
+              <div style={{ fontSize: '0.68rem', color: '#4a5070', marginTop: 3, textAlign: 'right' }}>
+                {prog.toLocaleString()} / {m.target.toLocaleString()}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ExchangePanel() {
   const { player, changeGold, changeWealthCoin, addNotification } = useGameStore(s => ({
     player: s.player, changeGold: s.changeGold, changeWealthCoin: s.changeWealthCoin, addNotification: s.addNotification
@@ -2723,7 +2938,7 @@ function ExchangePanel() {
   );
 }
 
-type MainTab = 'home' | 'gamble' | 'ranking' | 'exchange' | 'spectate';
+type MainTab = 'home' | 'gamble' | 'rank' | 'mission' | 'ranking' | 'exchange' | 'spectate';
 
 // ============================================================
 // デイリーカジノ設定
@@ -2929,19 +3144,33 @@ export function GambleScreen() {
     if (player && activeGame !== 'highlow') {
       const latest = useGameStore.getState().player ?? player;
       const isWin = r.goldDelta >= 0;
-      const mp = { ...(latest.missionProgress ?? {}), completedMissions: latest.missionProgress?.completedMissions ?? [] } as MissionProgress;
-      const inc = (k: keyof MissionProgress) => { (mp as unknown as Record<string,number>)[k as string] = ((mp as unknown as Record<string,number>)[k as string] ?? 0) + 1; };
+      const mp = ensureMissionProgress(latest.missionProgress);
+      const inc = (k: keyof typeof mp) => { (mp as unknown as Record<string,number>)[k as string] = ((mp as unknown as Record<string,number>)[k as string] ?? 0) + 1; };
       mp.totalWagered = (mp.totalWagered ?? 0) + bet;
       mp.dailyGamblePlays = (mp.dailyGamblePlays ?? 0) + 1;
       mp.weeklyGamblePlays = (mp.weeklyGamblePlays ?? 0) + 1;
-      if (activeGame === 'slot') { inc('totalSlotPlays'); inc('dailySlotPlays'); inc('weeklySlotPlays'); }
+      mp.maxSingleBet = Math.max(mp.maxSingleBet ?? 0, bet);
       if (isWin) {
-        if (activeGame === 'chohan') { inc('totalChohanWins'); inc('dailyChohanWins'); inc('weeklyChohanWins'); }
-        if (activeGame === 'chinchiro') { inc('totalChinchiroWins'); inc('dailyChinchiroWins'); inc('weeklyChinchiroWins'); }
-        if (activeGame === 'coin_flip') { inc('totalCoinFlipWins'); inc('dailyCoinFlipWins'); }
-        if (activeGame === 'poker') { inc('totalPokerWins'); inc('dailyPokerWins'); inc('weeklyPokerWins'); }
+        mp.totalWinCount = (mp.totalWinCount ?? 0) + 1;
+        mp.totalWinAmount = (mp.totalWinAmount ?? 0) + r.goldDelta;
+        mp.maxSingleWin = Math.max(mp.maxSingleWin ?? 0, r.goldDelta);
+      } else {
+        mp.totalLoseCount = (mp.totalLoseCount ?? 0) + 1;
       }
+      if (activeGame === 'slot') { inc('totalSlotPlays'); inc('dailySlotPlays'); inc('weeklySlotPlays'); }
+      if (activeGame === 'chohan') { inc('totalChohanPlays'); if (isWin) { inc('totalChohanWins'); inc('dailyChohanWins'); inc('weeklyChohanWins'); } }
+      if (activeGame === 'chinchiro') { inc('totalChinchiroPlays'); if (isWin) { inc('totalChinchiroWins'); inc('dailyChinchiroWins'); inc('weeklyChinchiroWins'); } }
+      if (activeGame === 'coin_flip') { inc('totalCoinFlipPlays'); if (isWin) { inc('totalCoinFlipWins'); inc('dailyCoinFlipWins'); } }
+      if (activeGame === 'poker') { inc('totalPokerPlays'); if (isWin) { inc('totalPokerWins'); inc('dailyPokerWins'); inc('weeklyPokerWins'); } }
       if (r.rewardLabel?.includes('JACKPOT') || r.rewardLabel?.includes('ジャックポット')) { inc('totalJackpotWins'); }
+      // achievement auto-complete check
+      const newCompleted = [...mp.completedMissions];
+      for (const m of MISSION_DEFS.filter(x => x.type === 'achievement')) {
+        if (newCompleted.includes(m.id)) continue;
+        const val = (mp as unknown as Record<string,number>)[m.statKey] ?? 0;
+        if (val >= m.target) newCompleted.push(m.id);
+      }
+      mp.completedMissions = newCompleted;
       const newWagered = (latest.totalWagered ?? 0) + bet;
       setPlayer({ ...latest, totalWagered: newWagered, missionProgress: mp });
     }
@@ -2961,16 +3190,34 @@ export function GambleScreen() {
   const handleHighlowMissionUpdate = (won: boolean, streak: number) => {
     if (!player) return;
     const latest = useGameStore.getState().player ?? player;
-    const mp = { ...(latest.missionProgress ?? {}), completedMissions: latest.missionProgress?.completedMissions ?? [] } as MissionProgress;
-    mp.totalWagered = (mp.totalWagered ?? 0) + (won && streak === 1 ? 0 : 0); // already deducted on start
+    const mp = ensureMissionProgress(latest.missionProgress);
+    inc('totalHighlowPlays')(mp);
     if (won) {
       mp.totalHighlowWins = (mp.totalHighlowWins ?? 0) + 1;
       mp.dailyHighlowWins = (mp.dailyHighlowWins ?? 0) + 1;
       mp.totalHighlowMaxStreak = Math.max(mp.totalHighlowMaxStreak ?? 0, streak);
       mp.weeklyHighlowMaxStreak = Math.max(mp.weeklyHighlowMaxStreak ?? 0, streak);
+      mp.maxHighlowStreak = Math.max(mp.maxHighlowStreak ?? 0, streak);
+      mp.totalWinCount = (mp.totalWinCount ?? 0) + 1;
+    } else {
+      mp.totalLoseCount = (mp.totalLoseCount ?? 0) + 1;
     }
+    // achievement check
+    const newCompleted = [...mp.completedMissions];
+    for (const m of MISSION_DEFS.filter(x => x.type === 'achievement')) {
+      if (newCompleted.includes(m.id)) continue;
+      const val = (mp as unknown as Record<string,number>)[m.statKey] ?? 0;
+      if (val >= m.target) newCompleted.push(m.id);
+    }
+    mp.completedMissions = newCompleted;
     setPlayer({ ...latest, missionProgress: mp });
   };
+
+  function inc(k: string) {
+    return (mp: ReturnType<typeof ensureMissionProgress>) => {
+      (mp as unknown as Record<string,number>)[k] = ((mp as unknown as Record<string,number>)[k] ?? 0) + 1;
+    };
+  }
 
   const handleJackpotContrib = async (betAmt: number) => {
     try { await contributeToJackpot(betAmt); } catch { /* ignore */ }
@@ -2996,10 +3243,10 @@ export function GambleScreen() {
       </div>
 
       {/* メインタブ */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-        {([['home','🏠 ホーム'],['gamble','🎲 ギャンブル'],['ranking','🏆 ランキング'],['exchange','🔄 交換所'],['spectate','📺 観戦']] as [MainTab, string][]).map(([id, label]) => (
+      <div style={{ display: 'flex', gap: 3, marginBottom: 12, overflowX: 'auto', paddingBottom: 2 }}>
+        {([['home','🏠'],['gamble','🎲'],['rank','🏅'],['mission','📋'],['ranking','🏆'],['exchange','🔄'],['spectate','📺']] as [MainTab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setMainTab(id)}
-            style={{ flex: 1, padding: '7px 4px', fontSize: '0.75rem', fontWeight: 700, background: mainTab === id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${mainTab === id ? '#5b8dee' : '#2d3752'}`, color: mainTab === id ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer' }}>
+            style={{ flexShrink: 0, padding: '7px 8px', fontSize: '0.75rem', fontWeight: 700, background: mainTab === id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${mainTab === id ? '#5b8dee' : '#2d3752'}`, color: mainTab === id ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer' }}>
             {label}
           </button>
         ))}
@@ -3008,6 +3255,8 @@ export function GambleScreen() {
       {mainTab === 'exchange' && <ExchangePanel />}
       {mainTab === 'ranking' && <GambleRankingPanel />}
       {mainTab === 'spectate' && <SpectatePanel />}
+      {mainTab === 'rank' && <RankPanel />}
+      {mainTab === 'mission' && <MissionPanel />}
       {mainTab === 'home' && (
         <div>
           {/* デイリーカジノ */}

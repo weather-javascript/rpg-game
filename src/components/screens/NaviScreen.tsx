@@ -176,9 +176,18 @@ export function NaviScreen() {
 
   const handleClaim = () => {
     if (!allMet) return;
+    // 既に受け取り済みかチェック（goalのハッシュをキーに使用）
+    const claimedKey = `navi_claimed_${goal.title}`;
+    const alreadyClaimed = player.naviClaimed?.[claimedKey];
+    if (alreadyClaimed) { addNotification('info', '既にこの報酬は受け取り済みです'); return; }
     // 小額報酬付与
     changeGold(500);
     changeWealthCoin(100);
+    // 受け取り済みフラグ保存
+    const updatedPlayer = useGameStore.getState().player;
+    if (updatedPlayer) {
+      useGameStore.getState().setPlayer({ ...updatedPlayer, naviClaimed: { ...(updatedPlayer.naviClaimed ?? {}), [claimedKey]: true } });
+    }
     addNotification('success', '🎉 目標達成！ 500G + 100WC 獲得！');
   };
 

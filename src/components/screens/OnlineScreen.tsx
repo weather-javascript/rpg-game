@@ -22,7 +22,7 @@ import {
 import type { OnlineUser, BoardMessage, AuctionListing } from '../../types/game';
 
 type SubTab = 'online' | 'board' | 'auction' | 'activity' | 'ranking' | 'proposal';
-type ActivitySubTab = 'world_news' | 'player_status' | 'world_status' | 'gamble_flash';
+type ActivitySubTab = 'world_news' | 'player_status' | 'world_status' | 'gamble_flash' | 'natural_news';
 
 // ============================================================
 // 活動タブ内 サブタブ
@@ -293,6 +293,65 @@ function WorldStatusPanel({ users }: { users: OnlineUser[] }) {
   );
 }
 
+// ─── ナチュラルニュース ───────────────────────────────────────
+const NATURAL_TYPE_LABELS: Record<string, string> = {
+  mining: '⛏️',
+  fishing: '🎣',
+  auction: '🏷️',
+  crafting: '🔨',
+  dungeon: '⚔️',
+  level_up: '⬆️',
+};
+
+function NaturalNewsPanel() {
+  const [entries, setEntries] = useState<ActivityFeedEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = subscribeActivityFeed(es => {
+      setEntries(es);
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  const natural = entries.filter(e =>
+    ['mining','fishing','auction','crafting','level_up'].includes(e.type)
+  );
+
+  return (
+    <div>
+      <h3 style={{color:'#4caf87', marginBottom:4, fontSize:'0.95rem'}}>🌿 ナチュラルニュース</h3>
+      <p style={{fontSize:'0.72rem', color:'#4a5070', marginBottom:10}}>採掘・釣り・オークション・クラフト等の記録</p>
+      <div style={{display:'flex', flexDirection:'column', background:'#161b26', border:'1px solid #2d3752', borderRadius:10, overflow:'hidden', maxHeight:520, overflowY:'auto'}}>
+        {loading && <div style={{color:'#8a92b2', textAlign:'center', padding:24, fontSize:'0.85rem'}}>読み込み中...</div>}
+        {!loading && natural.length === 0 && <div style={{color:'#4a5070', textAlign:'center', padding:24, fontSize:'0.85rem'}}>まだ記録がありません</div>}
+        {natural.map((e, i) => {
+          const icon = NATURAL_TYPE_LABELS[e.type] ?? '📌';
+          const now = Date.now();
+          const diff = now - e.timestamp;
+          const timeLabel = diff < 60_000 ? 'たった今'
+            : diff < 3_600_000 ? `${Math.floor(diff/60_000)}分前`
+            : `${Math.floor(diff/3_600_000)}時間前`;
+          return (
+            <div key={i} style={{
+              display:'flex', alignItems:'center', gap:8, padding:'8px 12px',
+              borderBottom: i < natural.length-1 ? '1px solid #1c2235' : 'none',
+            }}>
+              <span style={{fontSize:'1rem', minWidth:20, textAlign:'center'}}>{icon}</span>
+              <div style={{flex:1, minWidth:0}}>
+                <span style={{fontSize:'0.8rem', color:'#c0bcd8', fontWeight:600}}>{e.displayName}</span>
+                <span style={{fontSize:'0.78rem', color:'#8a92b2'}}>{e.message.replace(e.displayName,'')}</span>
+              </div>
+              <span style={{fontSize:'0.62rem', color:'#4a5070', whiteSpace:'nowrap'}}>{timeLabel}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── ギャンブル速報 ──────────────────────────────────────────
 const GAME_TYPE_LABELS: Record<string, string> = {
   slot: 'スロット',
@@ -379,6 +438,7 @@ function ActivityTabPanel({ users }: { users: OnlineUser[] }) {
     { id: 'player_status', label: 'プレイヤー状況',   emoji: '👥' },
     { id: 'world_status',  label: 'ワールド状況',     emoji: '🌐' },
     { id: 'gamble_flash',  label: 'ギャンブル速報',   emoji: '🎰' },
+    { id: 'natural_news',  label: 'ナチュラルニュース', emoji: '🌿' },
   ];
 
   return (
@@ -399,6 +459,7 @@ function ActivityTabPanel({ users }: { users: OnlineUser[] }) {
       {actSubTab === 'player_status' && <PlayerStatusPanel users={users} />}
       {actSubTab === 'world_status'  && <WorldStatusPanel users={users} />}
       {actSubTab === 'gamble_flash'  && <GambleFlashPanel />}
+      {actSubTab === 'natural_news'  && <NaturalNewsPanel />}
     </div>
   );
 }
