@@ -1370,7 +1370,6 @@ export function subscribeGambleRanking(cb: (entries: GambleRankingEntry[]) => vo
 // ============================================================
 // スロット台別ジャックポットプール
 // ============================================================
-const SLOT_MACHINE_TIERS = [100, 1000, 10000, 100000, 1000000] as const;
 const _slotLocalPools: Record<number, number> = {};
 const _slotPendingContribs: Record<number, number> = {};
 const _slotFlushTimers: Record<number, ReturnType<typeof setTimeout> | null> = {};
