@@ -22,7 +22,10 @@ import {
 import { fetchLoginBonus, claimLoginBonus, LOGIN_BONUS_REWARDS, LoginBonusState } from '../../services/database';
 import type { OnlineUser, BoardMessage, AuctionListing } from '../../types/game';
 
-type SubTab = 'online' | 'board' | 'auction' | 'activity' | 'ranking' | 'proposal' | 'transfer';
+import { GuildScreen } from './GuildScreen';
+import { FriendScreen } from './FriendScreen';
+
+type SubTab = 'online' | 'board' | 'auction' | 'activity' | 'ranking' | 'proposal' | 'transfer' | 'guild' | 'friend';
 type ActivitySubTab = 'world_news' | 'player_status' | 'world_status' | 'gamble_flash' | 'natural_news';
 
 // ============================================================
@@ -1308,6 +1311,8 @@ export function OnlineScreen() {
     { id:'ranking'  as SubTab, label:'ランキング', icon:'trophy' },
     { id:'transfer' as SubTab, label:'送金',       icon:'coin' },
     { id:'proposal' as SubTab, label:'提案',       icon:'ballot_box' },
+    { id:'guild'    as SubTab, label:'ギルド',     icon:'castle' },
+    { id:'friend'   as SubTab, label:'フレンド',   icon:'heart' },
   ];
 
   return (
@@ -1331,6 +1336,8 @@ export function OnlineScreen() {
       {subTab === 'ranking'  && <RankingPanel />}
       {subTab === 'transfer' && <TransferPanel />}
       {subTab === 'proposal' && <ProposalPanel />}
+      {subTab === 'guild'    && <GuildScreen />}
+      {subTab === 'friend'   && <FriendScreen />}
     </div>
   );
 }

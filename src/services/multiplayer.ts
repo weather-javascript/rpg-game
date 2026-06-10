@@ -1883,3 +1883,273 @@ export function subscribeStockRanking(cb: (entries: StockRankingEntry[]) => void
     cb(entries);
   }, () => cb([]));
 }
+
+// ============================================================
+// ギルドシステム
+// ============================================================
+import type { GuildData, GuildMember, GuildChatMessage, FriendRequest, FriendEntry, DirectMessage } from '../types/game';
+
+const GUILD_LEVEL_TABLE = [
+  { level: 1, donateRequired: 0,       maxMembers: 10, warehouseSlots: 20 },
+  { level: 2, donateRequired: 100000,  maxMembers: 15, warehouseSlots: 30 },
+  { level: 3, donateRequired: 300000,  maxMembers: 20, warehouseSlots: 40 },
+  { level: 4, donateRequired: 600000,  maxMembers: 25, warehouseSlots: 50 },
+  { level: 5, donateRequired: 1000000, maxMembers: 30, warehouseSlots: 60 },
+  { level: 6, donateRequired: 2000000, maxMembers: 35, warehouseSlots: 70 },
+  { level: 7, donateRequired: 4000000, maxMembers: 40, warehouseSlots: 80 },
+  { level: 8, donateRequired: 7000000, maxMembers: 50, warehouseSlots: 90 },
+  { level: 9, donateRequired: 12000000, maxMembers: 60, warehouseSlots: 100 },
+  { level: 10, donateRequired: 20000000, maxMembers: 100, warehouseSlots: 200 },
+];
+
+function calcGuildLevel(totalDonated: number): { level: number; maxMembers: number; warehouseSlots: number } {
+  let result = GUILD_LEVEL_TABLE[0];
+  for (const row of GUILD_LEVEL_TABLE) {
+    if (totalDonated >= row.donateRequired) result = row;
+  }
+  return { level: result.level, maxMembers: result.maxMembers, warehouseSlots: result.warehouseSlots };
+}
+
+export { calcGuildLevel, GUILD_LEVEL_TABLE };
+
+export async function createGuild(leaderUid: string, leaderName: string, name: string, description: string): Promise<{ success: boolean; error?: string }> {
+  const existing = await getDocs(query(collection(db, 'guilds'), where('name', '==', name.trim())));
+  if (!existing.empty) return { success: false, error: 'そのギルド名は既に使用されています' };
+  const playerSnap = await getDoc(doc(db, 'players', leaderUid));
+  if (playerSnap.exists()) {
+    const pd = playerSnap.data() as any;
+    if (pd.guildId) return { success: false, error: '既にギルドに所属しています' };
+  }
+  const now = Date.now();
+  const guildRef = doc(collection(db, 'guilds'));
+  const guildData: Omit<GuildData, 'id'> = {
+    name: name.trim(), description: description.trim(),
+    leaderUid, leaderName,
+    memberUids: [leaderUid], memberCount: 1,
+    level: 1, totalDonated: 0, bankGold: 0,
+    warehouseItems: {}, warehouseCapacity: 20, maxMembers: 10,
+    totalAssets: 0, totalKills: 0, totalLevels: 0,
+    createdAt: now, updatedAt: now,
+  };
+  await setDoc(guildRef, { id: guildRef.id, ...guildData });
+  const memberRef = doc(db, 'guilds', guildRef.id, 'members', leaderUid);
+  await setDoc(memberRef, { uid: leaderUid, displayName: leaderName, level: playerSnap.exists() ? (playerSnap.data() as any).stats?.level ?? 1 : 1, role: 'leader', joinedAt: now, totalDonated: 0 } as GuildMember);
+  await updateDoc(doc(db, 'players', leaderUid), { guildId: guildRef.id, guildName: name.trim() });
+  return { success: true };
+}
+
+export async function joinGuild(uid: string, displayName: string, level: number, guildId: string): Promise<{ success: boolean; error?: string }> {
+  const playerSnap = await getDoc(doc(db, 'players', uid));
+  if (playerSnap.exists() && (playerSnap.data() as any).guildId) return { success: false, error: '既にギルドに所属しています' };
+  const guildSnap = await getDoc(doc(db, 'guilds', guildId));
+  if (!guildSnap.exists()) return { success: false, error: 'ギルドが見つかりません' };
+  const guild = guildSnap.data() as GuildData;
+  if (guild.memberCount >= guild.maxMembers) return { success: false, error: 'ギルドの人数上限に達しています' };
+  const now = Date.now();
+  await updateDoc(doc(db, 'guilds', guildId), { memberUids: arrayUnion(uid), memberCount: increment(1), updatedAt: now });
+  await setDoc(doc(db, 'guilds', guildId, 'members', uid), { uid, displayName, level, role: 'member', joinedAt: now, totalDonated: 0 } as GuildMember);
+  await updateDoc(doc(db, 'players', uid), { guildId, guildName: guild.name });
+  return { success: true };
+}
+
+export async function leaveGuild(uid: string, guildId: string): Promise<{ success: boolean; error?: string }> {
+  const guildSnap = await getDoc(doc(db, 'guilds', guildId));
+  if (!guildSnap.exists()) return { success: false, error: 'ギルドが見つかりません' };
+  const guild = guildSnap.data() as GuildData;
+  if (guild.leaderUid === uid) return { success: false, error: 'リーダーは脱退できません（ギルドを解散してください）' };
+  await updateDoc(doc(db, 'guilds', guildId), { memberUids: arrayRemove(uid), memberCount: increment(-1), updatedAt: Date.now() });
+  await deleteDoc(doc(db, 'guilds', guildId, 'members', uid));
+  await updateDoc(doc(db, 'players', uid), { guildId: null, guildName: null });
+  return { success: true };
+}
+
+export async function disbandGuild(uid: string, guildId: string): Promise<{ success: boolean; error?: string }> {
+  const guildSnap = await getDoc(doc(db, 'guilds', guildId));
+  if (!guildSnap.exists()) return { success: false, error: 'ギルドが見つかりません' };
+  const guild = guildSnap.data() as GuildData;
+  if (guild.leaderUid !== uid) return { success: false, error: 'リーダーのみ解散できます' };
+  // メンバー全員のguildIdをクリア
+  for (const memberUid of guild.memberUids) {
+    await updateDoc(doc(db, 'players', memberUid), { guildId: null, guildName: null }).catch(() => {});
+  }
+  await deleteDoc(doc(db, 'guilds', guildId));
+  return { success: true };
+}
+
+export async function searchGuilds(nameQuery: string): Promise<GuildData[]> {
+  const snap = await getDocs(query(collection(db, 'guilds'), orderBy('memberCount', 'desc'), limit(20)));
+  const all = snap.docs.map(d => d.data() as GuildData);
+  if (!nameQuery.trim()) return all;
+  return all.filter(g => g.name.includes(nameQuery.trim()));
+}
+
+export async function donateToGuild(uid: string, guildId: string, gold: number): Promise<{ success: boolean; error?: string }> {
+  if (gold <= 0) return { success: false, error: '無効な金額' };
+  const now = Date.now();
+  const guildSnap = await getDoc(doc(db, 'guilds', guildId));
+  if (!guildSnap.exists()) return { success: false, error: 'ギルドが見つかりません' };
+  const guild = guildSnap.data() as GuildData;
+  const newDonated = guild.totalDonated + gold;
+  const newLevel = calcGuildLevel(newDonated);
+  await updateDoc(doc(db, 'guilds', guildId), {
+    bankGold: increment(gold),
+    totalDonated: increment(gold),
+    level: newLevel.level,
+    maxMembers: newLevel.maxMembers,
+    warehouseCapacity: newLevel.warehouseSlots,
+    updatedAt: now,
+  });
+  const memberRef = doc(db, 'guilds', guildId, 'members', uid);
+  await updateDoc(memberRef, { totalDonated: increment(gold) }).catch(() => {});
+  return { success: true };
+}
+
+export async function depositToGuildWarehouse(guildId: string, _uid: string, itemId: string, amount: number): Promise<{ success: boolean; error?: string }> {
+  const guildSnap = await getDoc(doc(db, 'guilds', guildId));
+  if (!guildSnap.exists()) return { success: false, error: 'ギルドが見つかりません' };
+  const guild = guildSnap.data() as GuildData;
+  const currentItems = guild.warehouseItems ?? {};
+  const slotCount = Object.keys(currentItems).filter(k => (currentItems[k] ?? 0) > 0).length;
+  if (!currentItems[itemId] && slotCount >= guild.warehouseCapacity) return { success: false, error: '倉庫がいっぱいです' };
+  await updateDoc(doc(db, 'guilds', guildId), { [`warehouseItems.${itemId}`]: increment(amount), updatedAt: Date.now() });
+  return { success: true };
+}
+
+export async function withdrawFromGuildWarehouse(guildId: string, _uid: string, itemId: string, amount: number): Promise<{ success: boolean; error?: string }> {
+  const guildSnap = await getDoc(doc(db, 'guilds', guildId));
+  if (!guildSnap.exists()) return { success: false, error: 'ギルドが見つかりません' };
+  const guild = guildSnap.data() as GuildData;
+  const current = (guild.warehouseItems ?? {})[itemId] ?? 0;
+  if (current < amount) return { success: false, error: '在庫が不足しています' };
+  await updateDoc(doc(db, 'guilds', guildId), { [`warehouseItems.${itemId}`]: increment(-amount), updatedAt: Date.now() });
+  return { success: true };
+}
+
+export async function getGuildById(guildId: string): Promise<GuildData | null> {
+  const snap = await getDoc(doc(db, 'guilds', guildId));
+  return snap.exists() ? (snap.data() as GuildData) : null;
+}
+
+export function subscribeGuild(guildId: string, cb: (g: GuildData | null) => void): Unsubscribe {
+  return onSnapshot(doc(db, 'guilds', guildId), snap => {
+    cb(snap.exists() ? (snap.data() as GuildData) : null);
+  });
+}
+
+export function subscribeGuildMembers(guildId: string, cb: (members: GuildMember[]) => void): Unsubscribe {
+  return onSnapshot(collection(db, 'guilds', guildId, 'members'), snap => {
+    cb(snap.docs.map(d => d.data() as GuildMember).sort((a,b) => a.role === 'leader' ? -1 : b.role === 'leader' ? 1 : b.totalDonated - a.totalDonated));
+  });
+}
+
+export async function postGuildChat(guildId: string, uid: string, displayName: string, level: number, text: string): Promise<void> {
+  await addDoc(collection(db, 'guilds', guildId, 'chat'), { uid, displayName, level, text: text.slice(0, 200), createdAt: Date.now() } as Omit<GuildChatMessage, 'id'>);
+}
+
+export function subscribeGuildChat(guildId: string, cb: (msgs: GuildChatMessage[]) => void): Unsubscribe {
+  const q = query(collection(db, 'guilds', guildId, 'chat'), orderBy('createdAt', 'desc'), limit(50));
+  return onSnapshot(q, snap => {
+    cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as GuildChatMessage)));
+  });
+}
+
+export async function getGuildRanking(type: 'totalAssets' | 'totalKills' | 'totalLevels'): Promise<GuildData[]> {
+  const snap = await getDocs(query(collection(db, 'guilds'), orderBy(type, 'desc'), limit(20)));
+  return snap.docs.map(d => d.data() as GuildData);
+}
+
+export async function updateGuildStats(guildId: string, stats: { totalAssets?: number; totalKills?: number; totalLevels?: number }): Promise<void> {
+  await updateDoc(doc(db, 'guilds', guildId), { ...stats, updatedAt: Date.now() }).catch(() => {});
+}
+
+// ============================================================
+// フレンドシステム
+// ============================================================
+
+export async function sendFriendRequest(fromUid: string, fromName: string, fromLevel: number, toUid: string): Promise<{ success: boolean; error?: string }> {
+  if (fromUid === toUid) return { success: false, error: '自分にフレンド申請はできません' };
+  // 既存確認
+  const existing = await getDocs(query(collection(db, 'friend_requests'), where('fromUid', '==', fromUid), where('toUid', '==', toUid)));
+  if (!existing.empty) return { success: false, error: '既に申請済みです' };
+  // 既にフレンドか確認
+  const friendSnap = await getDoc(doc(db, 'friends', fromUid, 'list', toUid));
+  if (friendSnap.exists()) return { success: false, error: '既にフレンドです' };
+  await addDoc(collection(db, 'friend_requests'), { fromUid, fromName, fromLevel, toUid, status: 'pending', createdAt: Date.now() } as Omit<FriendRequest, 'id'>);
+  return { success: true };
+}
+
+export async function respondFriendRequest(requestId: string, accept: boolean, currentUid: string): Promise<{ success: boolean }> {
+  const reqSnap = await getDoc(doc(db, 'friend_requests', requestId));
+  if (!reqSnap.exists()) return { success: false };
+  const req = reqSnap.data() as FriendRequest;
+  if (req.toUid !== currentUid) return { success: false };
+  if (accept) {
+    const now = Date.now();
+    const toSnap = await getDoc(doc(db, 'players', req.toUid));
+    const toName = toSnap.exists() ? (toSnap.data() as any).displayName ?? '' : '';
+    const toLevel = toSnap.exists() ? (toSnap.data() as any).stats?.level ?? 1 : 1;
+    await setDoc(doc(db, 'friends', req.fromUid, 'list', req.toUid), { uid: req.toUid, displayName: toName, level: toLevel, favorite: false, addedAt: now } as FriendEntry);
+    await setDoc(doc(db, 'friends', req.toUid, 'list', req.fromUid), { uid: req.fromUid, displayName: req.fromName, level: req.fromLevel, favorite: false, addedAt: now } as FriendEntry);
+  }
+  await deleteDoc(doc(db, 'friend_requests', requestId));
+  return { success: true };
+}
+
+export async function removeFriend(myUid: string, friendUid: string): Promise<void> {
+  await deleteDoc(doc(db, 'friends', myUid, 'list', friendUid)).catch(() => {});
+  await deleteDoc(doc(db, 'friends', friendUid, 'list', myUid)).catch(() => {});
+}
+
+export async function toggleFavoriteFriend(myUid: string, friendUid: string, favorite: boolean): Promise<void> {
+  await updateDoc(doc(db, 'friends', myUid, 'list', friendUid), { favorite });
+}
+
+export function subscribeFriends(myUid: string, cb: (friends: FriendEntry[]) => void): Unsubscribe {
+  return onSnapshot(collection(db, 'friends', myUid, 'list'), snap => {
+    cb(snap.docs.map(d => d.data() as FriendEntry).sort((a,b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0)));
+  });
+}
+
+export function subscribeFriendRequests(myUid: string, cb: (reqs: FriendRequest[]) => void): Unsubscribe {
+  const q = query(collection(db, 'friend_requests'), where('toUid', '==', myUid), where('status', '==', 'pending'));
+  return onSnapshot(q, snap => {
+    cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as FriendRequest)));
+  });
+}
+
+export async function sendDirectMessage(fromUid: string, fromName: string, toUid: string, text: string, gift?: { itemId: string; amount: number }, goldAmount?: number): Promise<{ success: boolean; error?: string }> {
+  const friendSnap = await getDoc(doc(db, 'friends', fromUid, 'list', toUid));
+  if (!friendSnap.exists()) return { success: false, error: 'フレンドのみDMを送れます' };
+  const msg: Omit<DirectMessage, 'id'> = { fromUid, fromName, toUid, text: text.slice(0, 300), read: false, createdAt: Date.now() };
+  if (gift) msg.gift = gift;
+  if (goldAmount && goldAmount > 0) msg.goldAmount = goldAmount;
+  await addDoc(collection(db, 'direct_messages'), msg);
+  return { success: true };
+}
+
+export function subscribeDirectMessages(myUid: string, cb: (msgs: DirectMessage[]) => void): Unsubscribe {
+  const q = query(collection(db, 'direct_messages'), where('toUid', '==', myUid), orderBy('createdAt', 'desc'), limit(50));
+  return onSnapshot(q, snap => {
+    cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as DirectMessage)));
+  });
+}
+
+export async function markDmRead(dmId: string): Promise<void> {
+  await updateDoc(doc(db, 'direct_messages', dmId), { read: true }).catch(() => {});
+}
+
+export async function getFriendCount(uid: string): Promise<number> {
+  const snap = await getDocs(collection(db, 'friends', uid, 'list'));
+  return snap.size;
+}
+
+export async function fetchFriendCountRanking(): Promise<{ uid: string; displayName: string; friendCount: number }[]> {
+  // players全員のfriendカウントを集計 (簡易実装: friend_count_rankingコレクション利用)
+  const snap = await getDocs(query(collection(db, 'friend_count_ranking'), orderBy('friendCount', 'desc'), limit(20)));
+  return snap.docs.map(d => d.data() as { uid: string; displayName: string; friendCount: number });
+}
+
+export async function updateFriendCountRanking(uid: string, displayName: string): Promise<void> {
+  const count = await getFriendCount(uid);
+  await setDoc(doc(db, 'friend_count_ranking', uid), { uid, displayName, friendCount: count });
+}

@@ -392,6 +392,9 @@ export interface PlayerData {
   totalStockProfit?: number;
   // ナビ報酬受取済み
   naviClaimed?: Record<string, boolean>;
+  // ギルド
+  guildId?: string | null;
+  guildName?: string | null;
   // プロフィール
   profile?: {
     icon: string;          // 絵文字アイコン
@@ -694,4 +697,79 @@ export interface VersionPatch {
   version: string;
   date: string;
   changes: string[];
+}
+
+// ============================================================
+// ギルド型
+// ============================================================
+export interface GuildData {
+  id: string;
+  name: string;
+  description: string;
+  leaderUid: string;
+  leaderName: string;
+  memberUids: string[];
+  memberCount: number;
+  level: number;               // ギルドレベル (1〜10)
+  totalDonated: number;        // 累計寄付額 (ギルドEXP)
+  bankGold: number;            // ギルド銀行残高
+  warehouseItems: IdMap<number>; // ギルド倉庫
+  warehouseCapacity: number;   // 倉庫スロット数
+  maxMembers: number;          // 人数上限
+  totalAssets: number;         // 総資産（ランキング用）
+  totalKills: number;          // 総討伐数（ランキング用）
+  totalLevels: number;         // 総レベル（ランキング用）
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface GuildMember {
+  uid: string;
+  displayName: string;
+  level: number;
+  role: 'leader' | 'member';
+  joinedAt: number;
+  totalDonated: number;
+}
+
+export interface GuildChatMessage {
+  id: string;
+  uid: string;
+  displayName: string;
+  level: number;
+  text: string;
+  createdAt: number;
+}
+
+// ============================================================
+// フレンド型
+// ============================================================
+export interface FriendRequest {
+  id: string;
+  fromUid: string;
+  fromName: string;
+  fromLevel: number;
+  toUid: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: number;
+}
+
+export interface FriendEntry {
+  uid: string;
+  displayName: string;
+  level: number;
+  favorite: boolean;
+  addedAt: number;
+}
+
+export interface DirectMessage {
+  id: string;
+  fromUid: string;
+  fromName: string;
+  toUid: string;
+  text: string;
+  gift?: { itemId: string; amount: number };
+  goldAmount?: number;
+  read: boolean;
+  createdAt: number;
 }

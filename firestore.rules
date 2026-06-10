@@ -275,6 +275,143 @@ service cloud.firestore {
     // ============================================================
 
     // ============================================================
+    // gold_transfers/{transferId} — 送金履歴
+    // ============================================================
+    match /gold_transfers/{transferId} {
+      allow read: if isAuthed()
+        && (resource.data.senderUid == request.auth.uid
+          || resource.data.receiverUid == request.auth.uid
+          || isAdmin());
+      allow create: if isAuthed()
+        && request.resource.data.senderUid == request.auth.uid
+        && request.resource.data.amount is int
+        && request.resource.data.amount > 0;
+      allow update, delete: if isAdmin();
+    }
+
+    // ============================================================
+    // transfer_ranking/{uid} — 送金ランキング
+    // ============================================================
+    match /transfer_ranking/{uid} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+
+    // ============================================================
+    // login_bonus/{uid} — ログインボーナス
+    // ============================================================
+    match /login_bonus/{uid} {
+      allow read: if isAuthed() && isOwner(uid);
+      allow write: if isAuthed() && isOwner(uid);
+    }
+
+    // ============================================================
+    // npc_quests/{questId} — NPC依頼
+    // ============================================================
+    match /npc_quests/{questId} {
+      allow read: if isAuthed();
+      allow create: if isAuthed();
+      allow delete: if isAuthed();
+      allow update: if isAdmin();
+    }
+
+    // ============================================================
+    // quest_ranking/{uid} — 依頼ランキング
+    // ============================================================
+    match /quest_ranking/{uid} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+
+    // ============================================================
+    // stock_market/{docId} — 株式市場価格・履歴
+    // ============================================================
+    match /stock_market/{docId} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+
+    // ============================================================
+    // stock_ranking/{uid} — 株式ランキング
+    // ============================================================
+    match /stock_ranking/{uid} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+
+    // ============================================================
+    // guilds/{guildId} — ギルド
+    // ============================================================
+    match /guilds/{guildId} {
+      allow read: if isAuthed();
+      allow create: if isAuthed()
+        && request.resource.data.leaderUid == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 20;
+      allow update: if isAuthed()
+        && (resource.data.leaderUid == request.auth.uid
+          || resource.data.memberUids.hasAny([request.auth.uid])
+          || isAdmin());
+      allow delete: if isAuthed()
+        && resource.data.leaderUid == request.auth.uid;
+      match /members/{uid} {
+        allow read: if isAuthed();
+        allow write: if isAuthed();
+      }
+      match /chat/{msgId} {
+        allow read: if isAuthed();
+        allow create: if isAuthed();
+        allow delete: if isAdmin();
+      }
+    }
+
+    // ============================================================
+    // friends/{uid}/list/{friendUid} — フレンドリスト
+    // ============================================================
+    match /friends/{uid}/list/{friendUid} {
+      allow read: if isAuthed() && isOwner(uid);
+      allow write: if isAuthed();
+    }
+
+    // ============================================================
+    // friend_requests/{reqId} — フレンド申請
+    // ============================================================
+    match /friend_requests/{reqId} {
+      allow read: if isAuthed()
+        && (resource.data.fromUid == request.auth.uid
+          || resource.data.toUid == request.auth.uid);
+      allow create: if isAuthed()
+        && request.resource.data.fromUid == request.auth.uid;
+      allow delete: if isAuthed()
+        && (resource.data.fromUid == request.auth.uid
+          || resource.data.toUid == request.auth.uid);
+      allow update: if isAdmin();
+    }
+
+    // ============================================================
+    // direct_messages/{msgId} — DM
+    // ============================================================
+    match /direct_messages/{msgId} {
+      allow read: if isAuthed()
+        && (resource.data.fromUid == request.auth.uid
+          || resource.data.toUid == request.auth.uid);
+      allow create: if isAuthed()
+        && request.resource.data.fromUid == request.auth.uid;
+      allow update: if isAuthed()
+        && resource.data.toUid == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
+    // friend_count_ranking/{uid} — フレンド数ランキング
+    // ============================================================
+    match /friend_count_ranking/{uid} {
+      allow read: if isAuthed();
+      allow write: if isAuthed() && isOwner(uid);
+    }
+
+    // ============================================================
     // それ以外は全拒否
     // ============================================================
     match /{document=**} {
