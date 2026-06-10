@@ -2356,9 +2356,10 @@ function HighLowPanel({ bet, onResult, onMissionUpdate }: {
   const startGame = () => {
     if ((player.wealthCoin ?? 0) < bet) { addNotification('error', 'WCが足りません'); return; }
     changeWealthCoin(-bet);
-    // update totalWagered
-    const newWagered = (player.totalWagered ?? 0) + bet;
-    setPlayer({ ...player, totalWagered: newWagered, wealthCoin: (player.wealthCoin ?? 0) - bet });
+    // update totalWagered using latest store state to preserve wealthCoin updated by changeWealthCoin
+    const latest = useGameStore.getState().player ?? player;
+    const newWagered = (latest.totalWagered ?? 0) + bet;
+    setPlayer({ ...latest, totalWagered: newWagered });
     const card = drawCard();
     setCurrentCard(card);
     setStreak(0);
@@ -2874,9 +2875,10 @@ export function GambleScreen() {
   const handleResult = (r: GambleResult) => {
     // チケット消費（1ゲーム後）
     if (ticketActive && player) {
-      const cur = player.inventory?.['gacha_multiplier_ticket'] ?? 0;
+      const latestForTicket = useGameStore.getState().player ?? player;
+      const cur = latestForTicket.inventory?.['gacha_multiplier_ticket'] ?? 0;
       if (cur > 0) {
-        setPlayer({ ...player, inventory: { ...player.inventory, gacha_multiplier_ticket: cur - 1 } });
+        setPlayer({ ...latestForTicket, inventory: { ...latestForTicket.inventory, gacha_multiplier_ticket: cur - 1 } });
       }
       setTicketActive(false);
     }
@@ -2886,8 +2888,9 @@ export function GambleScreen() {
     }
     // 累計賭け額・ミッション進捗更新
     if (player && activeGame !== 'highlow') {
+      const latest = useGameStore.getState().player ?? player;
       const isWin = r.goldDelta >= 0;
-      const mp = { ...(player.missionProgress ?? {}), completedMissions: player.missionProgress?.completedMissions ?? [] } as MissionProgress;
+      const mp = { ...(latest.missionProgress ?? {}), completedMissions: latest.missionProgress?.completedMissions ?? [] } as MissionProgress;
       const inc = (k: keyof MissionProgress) => { (mp as unknown as Record<string,number>)[k as string] = ((mp as unknown as Record<string,number>)[k as string] ?? 0) + 1; };
       mp.totalWagered = (mp.totalWagered ?? 0) + bet;
       mp.dailyGamblePlays = (mp.dailyGamblePlays ?? 0) + 1;
@@ -2900,8 +2903,8 @@ export function GambleScreen() {
         if (activeGame === 'poker') { inc('totalPokerWins'); inc('dailyPokerWins'); inc('weeklyPokerWins'); }
       }
       if (r.rewardLabel?.includes('JACKPOT') || r.rewardLabel?.includes('ジャックポット')) { inc('totalJackpotWins'); }
-      const newWagered = (player.totalWagered ?? 0) + bet;
-      setPlayer({ ...player, totalWagered: newWagered, missionProgress: mp });
+      const newWagered = (latest.totalWagered ?? 0) + bet;
+      setPlayer({ ...latest, totalWagered: newWagered, missionProgress: mp });
     }
     setStats(prev => {
       const isWin = r.goldDelta >= 0;
@@ -2918,7 +2921,8 @@ export function GambleScreen() {
 
   const handleHighlowMissionUpdate = (won: boolean, streak: number) => {
     if (!player) return;
-    const mp = { ...(player.missionProgress ?? {}), completedMissions: player.missionProgress?.completedMissions ?? [] } as MissionProgress;
+    const latest = useGameStore.getState().player ?? player;
+    const mp = { ...(latest.missionProgress ?? {}), completedMissions: latest.missionProgress?.completedMissions ?? [] } as MissionProgress;
     mp.totalWagered = (mp.totalWagered ?? 0) + (won && streak === 1 ? 0 : 0); // already deducted on start
     if (won) {
       mp.totalHighlowWins = (mp.totalHighlowWins ?? 0) + 1;
@@ -2926,7 +2930,7 @@ export function GambleScreen() {
       mp.totalHighlowMaxStreak = Math.max(mp.totalHighlowMaxStreak ?? 0, streak);
       mp.weeklyHighlowMaxStreak = Math.max(mp.weeklyHighlowMaxStreak ?? 0, streak);
     }
-    setPlayer({ ...player, missionProgress: mp });
+    setPlayer({ ...latest, missionProgress: mp });
   };
 
   const handleJackpotContrib = async (betAmt: number) => {
