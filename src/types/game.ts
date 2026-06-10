@@ -328,6 +328,12 @@ export interface PlayerData {
   unlockedAchievements?: string[];
   // ギャンブル累計賭け額（ランク判定用）
   totalWagered?: number;
+  // ギャンブルWC獲得集計（ランキング用）
+  weeklyGambleWon?: number;
+  monthlyGambleWon?: number;
+  totalGambleWon?: number;
+  weeklyGambleWonResetAt?: number;
+  monthlyGambleWonResetAt?: number;
   // ミッション進捗
   missionProgress?: MissionProgress;
   // プロフィール

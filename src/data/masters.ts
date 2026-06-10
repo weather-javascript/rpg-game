@@ -990,8 +990,8 @@ export const GAMBLE_MASTER: Record<string, GambleMaster> = {
     ],
   },
   slot_machine: {
-    id:'slot_machine', name:'スロットマシン', description:'3つのシンボルが揃えばジャックポット！',
-    icon:'slot_machine', type:'slot', minBet:10, maxBet:10000, returnRate:0.95,
+    id:'slot_machine', name:'スロットマシン', description:'3つのシンボルが揃えばジャックポット！台ごとに独立したジャックポットプール。',
+    icon:'slot_machine', type:'slot', minBet:100, maxBet:1000000, returnRate:0.95,
     rewardTable:[
       { label:'💰💰💰 JACKPOT!',  probability:0.003, multiplier:50,  symbols:['💰','💰','💰'] },
       { label:'🌟🌟🌟 BIG WIN!', probability:0.015, multiplier:10,  symbols:['🌟','🌟','🌟'] },
@@ -1002,8 +1002,74 @@ export const GAMBLE_MASTER: Record<string, GambleMaster> = {
       { label:'ハズレ',           probability:0.602, multiplier:0,   symbols:['💨','💨','💨'] },
     ],
   },
+  treasure_box_wood: {
+    id:'treasure_box_wood', name:'木箱', description:'1,000WCで開ける木製の宝箱。',
+    icon:'box', type:'treasure_box', minBet:1000, maxBet:1000, returnRate:0.85,
+    rewardTable:[
+      { label:'ドラゴンの鱗（激レア！）', probability:0.001, multiplier:0,   itemRewards:[{itemId:'dragon_scale',amount:1}], symbols:['🐉'] },
+      { label:'3,000WC大当り！',         probability:0.020, multiplier:3.0,  symbols:['💰'] },
+      { label:'古代の欠片（レア）',       probability:0.030, multiplier:0,   itemRewards:[{itemId:'ancient_shard',amount:1}], symbols:['💎'] },
+      { label:'2,000WC当り！',           probability:0.100, multiplier:2.0,  symbols:['🤑'] },
+      { label:'回復セット（小）',         probability:0.150, multiplier:0,   itemRewards:[{itemId:'roast_meat',amount:5}], symbols:['🧪'] },
+      { label:'1,200WC',                probability:0.200, multiplier:1.2,  symbols:['🪙'] },
+      { label:'ハズレ（空の木箱）',       probability:0.499, multiplier:0,   symbols:['📭'] },
+    ],
+  },
+  treasure_box_iron: {
+    id:'treasure_box_iron', name:'鉄箱', description:'10,000WCで開ける鉄製の宝箱。',
+    icon:'box', type:'treasure_box', minBet:10000, maxBet:10000, returnRate:0.87,
+    rewardTable:[
+      { label:'ドラゴンの鱗（激レア！）', probability:0.003, multiplier:0,   itemRewards:[{itemId:'dragon_scale',amount:1}], symbols:['🐉'] },
+      { label:'50,000WC大当り！',        probability:0.015, multiplier:5.0,  symbols:['💰'] },
+      { label:'古代の欠片×2（レア）',    probability:0.040, multiplier:0,   itemRewards:[{itemId:'ancient_shard',amount:2}], symbols:['💎'] },
+      { label:'20,000WC当り！',          probability:0.100, multiplier:2.0,  symbols:['🤑'] },
+      { label:'回復セット（中）',         probability:0.150, multiplier:0,   itemRewards:[{itemId:'mega_potion',amount:1},{itemId:'roast_meat',amount:20}], symbols:['🧪'] },
+      { label:'12,000WC',               probability:0.200, multiplier:1.2,  symbols:['🪙'] },
+      { label:'ハズレ（空の鉄箱）',       probability:0.492, multiplier:0,   symbols:['📭'] },
+    ],
+  },
+  treasure_box_silver: {
+    id:'treasure_box_silver', name:'銀箱', description:'41,000WCで開ける銀製の宝箱。',
+    icon:'box', type:'treasure_box', minBet:41000, maxBet:41000, returnRate:0.92,
+    rewardTable:[
+      { label:'ドラゴンの鱗（超激レア！）', probability:0.008, multiplier:0,   itemRewards:[{itemId:'dragon_scale',amount:1}], symbols:['🐉'] },
+      { label:'300,000WC大当り！',          probability:0.010, multiplier:10,   symbols:['💰'] },
+      { label:'古代の欠片×3（激レア）',     probability:0.020, multiplier:0,   itemRewards:[{itemId:'ancient_shard',amount:3}], symbols:['💎'] },
+      { label:'100,000WC当り！',            probability:0.070, multiplier:3.333,symbols:['🤑'] },
+      { label:'回復セット（メガポ2・焼肉50）', probability:0.170, multiplier:0, itemRewards:[{itemId:'mega_potion',amount:2},{itemId:'roast_meat',amount:50}], symbols:['🧪'] },
+      { label:'50,000WC',                  probability:0.239, multiplier:1.667, symbols:['🪙'] },
+      { label:'ハズレ（空の銀箱）',          probability:0.483, multiplier:0,   symbols:['📭'] },
+    ],
+  },
+  treasure_box_gold: {
+    id:'treasure_box_gold', name:'金箱', description:'400,000WCで開ける黄金の宝箱。レア報酬率高め！',
+    icon:'box', type:'treasure_box', minBet:400000, maxBet:400000, returnRate:0.93,
+    rewardTable:[
+      { label:'ドラゴンの鱗×3（超激レア！）', probability:0.030, multiplier:0,   itemRewards:[{itemId:'dragon_scale',amount:3}], symbols:['🐉'] },
+      { label:'5,000,000WC大当り！',          probability:0.010, multiplier:12.5, symbols:['💰'] },
+      { label:'古代の欠片×10（激レア）',       probability:0.060, multiplier:0,   itemRewards:[{itemId:'ancient_shard',amount:10}], symbols:['💎'] },
+      { label:'1,200,000WC当り！',            probability:0.100, multiplier:3.0,  symbols:['🤑'] },
+      { label:'回復セット（超）',              probability:0.200, multiplier:0,   itemRewards:[{itemId:'mega_potion',amount:5},{itemId:'roast_meat',amount:100}], symbols:['🧪'] },
+      { label:'500,000WC',                   probability:0.200, multiplier:1.25, symbols:['🪙'] },
+      { label:'ハズレ（空の金箱）',            probability:0.400, multiplier:0,   symbols:['📭'] },
+    ],
+  },
+  treasure_box_mystic: {
+    id:'treasure_box_mystic', name:'神秘箱', description:'4,000,000WCで開ける神秘の宝箱。最高レア報酬率！',
+    icon:'box', type:'treasure_box', minBet:4000000, maxBet:4000000, returnRate:0.94,
+    rewardTable:[
+      { label:'ドラゴンの鱗×10（神話級！）',   probability:0.100, multiplier:0,   itemRewards:[{itemId:'dragon_scale',amount:10}], symbols:['🐉'] },
+      { label:'100,000,000WC MEGA JACKPOT！', probability:0.005, multiplier:25.0, symbols:['💰'] },
+      { label:'古代の欠片×30（神話）',         probability:0.100, multiplier:0,   itemRewards:[{itemId:'ancient_shard',amount:30}], symbols:['💎'] },
+      { label:'20,000,000WC大当り！',         probability:0.050, multiplier:5.0,  symbols:['🤑'] },
+      { label:'回復セット（神秘）',            probability:0.200, multiplier:0,   itemRewards:[{itemId:'mega_potion',amount:10},{itemId:'roast_meat',amount:200}], symbols:['🧪'] },
+      { label:'5,000,000WC',                 probability:0.200, multiplier:1.25, symbols:['🪙'] },
+      { label:'ハズレ（空の神秘箱）',          probability:0.345, multiplier:0,   symbols:['📭'] },
+    ],
+  },
+  // 旧treasure_box互換（管理者オーバーライド用）
   treasure_box: {
-    id:'treasure_box', name:'宝箱くじ', description:'宝箱を開けてみよう。1回41,000G',
+    id:'treasure_box', name:'銀箱（旧）', description:'41,000WCで開ける銀製の宝箱。',
     icon:'box', type:'treasure_box', minBet:41000, maxBet:41000, returnRate:0.92,
     rewardTable:[
       { label:'ドラゴンの鱗（超激レア！）', probability:0.008, multiplier:0,   itemRewards:[{itemId:'dragon_scale',amount:1}], symbols:['🐉'] },

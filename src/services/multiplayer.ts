@@ -1310,3 +1310,118 @@ export function subscribeDungeonOverrides(cb: (o: Record<string, DungeonOverride
     cb(snap.exists() ? (snap.data().overrides as Record<string, DungeonOverride>) : null);
   });
 }
+
+// ============================================================
+// ギャンブルランキング
+// ============================================================
+export interface GambleRankingEntry {
+  uid: string;
+  displayName: string;
+  weeklyWon: number;
+  monthlyWon: number;
+  totalWon: number;
+  updatedAt: number;
+}
+
+export async function updateGambleRanking(uid: string, displayName: string, wonAmount: number): Promise<void> {
+  if (wonAmount <= 0) return;
+  try {
+    const ref = doc(db, 'gamble_ranking', uid);
+    const snap = await getDoc(ref);
+    const now = Date.now();
+    const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
+    const ONE_MONTH = 30 * 24 * 60 * 60 * 1000;
+    if (snap.exists()) {
+      const d = snap.data() as GambleRankingEntry & { weeklyResetAt?: number; monthlyResetAt?: number };
+      const weeklyReset = d.weeklyResetAt ?? 0;
+      const monthlyReset = d.monthlyResetAt ?? 0;
+      const newWeekly = now - weeklyReset > ONE_WEEK ? wonAmount : (d.weeklyWon ?? 0) + wonAmount;
+      const newMonthly = now - monthlyReset > ONE_MONTH ? wonAmount : (d.monthlyWon ?? 0) + wonAmount;
+      await setDoc(ref, {
+        uid, displayName,
+        weeklyWon: newWeekly,
+        monthlyWon: newMonthly,
+        totalWon: (d.totalWon ?? 0) + wonAmount,
+        weeklyResetAt: now - weeklyReset > ONE_WEEK ? now : weeklyReset,
+        monthlyResetAt: now - monthlyReset > ONE_MONTH ? now : monthlyReset,
+        updatedAt: now,
+      });
+    } else {
+      await setDoc(ref, {
+        uid, displayName,
+        weeklyWon: wonAmount,
+        monthlyWon: wonAmount,
+        totalWon: wonAmount,
+        weeklyResetAt: now,
+        monthlyResetAt: now,
+        updatedAt: now,
+      });
+    }
+  } catch { /* ignore */ }
+}
+
+export function subscribeGambleRanking(cb: (entries: GambleRankingEntry[]) => void): () => void {
+  const q = query(collection(db, 'gamble_ranking'), orderBy('totalWon', 'desc'), limit(50));
+  return onSnapshot(q, snap => {
+    cb(snap.docs.map(d => d.data() as GambleRankingEntry));
+  }, () => cb([]));
+}
+
+// ============================================================
+// スロット台別ジャックポットプール
+// ============================================================
+const SLOT_MACHINE_TIERS = [100, 1000, 10000, 100000, 1000000] as const;
+const _slotLocalPools: Record<number, number> = {};
+const _slotPendingContribs: Record<number, number> = {};
+const _slotFlushTimers: Record<number, ReturnType<typeof setTimeout> | null> = {};
+
+function slotJackpotRef(tier: number) { return doc(db, 'slot_jackpot', `tier_${tier}`); }
+
+function _scheduleSlotFlush(tier: number) {
+  if (_slotFlushTimers[tier]) return;
+  _slotFlushTimers[tier] = setTimeout(async () => {
+    _slotFlushTimers[tier] = null;
+    const contrib = _slotPendingContribs[tier] ?? 0;
+    if (contrib <= 0) return;
+    _slotPendingContribs[tier] = 0;
+    try {
+      await updateDoc(slotJackpotRef(tier), { pool: increment(contrib) });
+    } catch {
+      try { await setDoc(slotJackpotRef(tier), { pool: _slotLocalPools[tier] ?? 0 }); } catch { /* ignore */ }
+    }
+  }, 15_000);
+}
+
+export async function contributeToSlotJackpot(tier: number, bet: number): Promise<number> {
+  const contrib = Math.floor(bet * 0.01);
+  _slotPendingContribs[tier] = (_slotPendingContribs[tier] ?? 0) + contrib;
+  _slotLocalPools[tier] = (_slotLocalPools[tier] ?? 0) + contrib;
+  _scheduleSlotFlush(tier);
+  return _slotLocalPools[tier];
+}
+
+export function subscribeSlotJackpotPool(tier: number, cb: (pool: number) => void): () => void {
+  let stopped = false;
+  const fetch = () => getDoc(slotJackpotRef(tier)).then(snap => {
+    if (stopped) return;
+    const base = snap.exists() ? (snap.data()['pool'] as number ?? 0) : 0;
+    _slotLocalPools[tier] = base;
+    cb(base);
+  }).catch(() => {});
+  fetch();
+  const timer = setInterval(fetch, 15_000);
+  return () => { stopped = true; clearInterval(timer); };
+}
+
+export async function checkSlotJackpotWin(tier: number): Promise<{ won: boolean; pool: number }> {
+  const won = rollJackpot();
+  if (!won) return { won: false, pool: 0 };
+  const pool = _slotLocalPools[tier] ?? 0;
+  if (pool > 0) {
+    _slotLocalPools[tier] = 0;
+    _slotPendingContribs[tier] = 0;
+    if (_slotFlushTimers[tier]) { clearTimeout(_slotFlushTimers[tier]!); _slotFlushTimers[tier] = null; }
+    try { await setDoc(slotJackpotRef(tier), { pool: 0 }); } catch { /* ignore */ }
+  }
+  return { won, pool };
+}

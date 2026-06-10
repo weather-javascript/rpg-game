@@ -15,8 +15,10 @@ import {
   createPokerTable, subscribePokerTables, subscribePokerTable,
   joinPokerTable, cancelPokerTable, leavePokerTable, startPokerGame, pokerAction,
   subscribeTreasureProbs,
+  contributeToSlotJackpot, subscribeSlotJackpotPool, checkSlotJackpotWin,
+  subscribeGambleRanking, updateGambleRanking,
 } from '../../services/multiplayer';
-import type { TreasureProbEntry } from '../../services/multiplayer';
+import type { TreasureProbEntry, GambleRankingEntry } from '../../services/multiplayer';
 import type { GambleResult, GambleMaster, PokerTable, MissionDef, MissionProgress } from '../../types/game';
 import type { PokerState } from '../../systems/minigames';
 import type { GambleBattle } from '../../types/game';
@@ -1553,24 +1555,48 @@ function PvPPanel({ bet }: { bet: number }) {
 // ============================================================
 
 // スロット専用パネル（リール本格演出）
-function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
-  const { player, changeGold: _cg1, changeWealthCoin, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, changeWealthCoin: s.changeWealthCoin, addItems: s.addItems, addNotification: s.addNotification }));
+// スロット台定義
+const SLOT_TIERS = [
+  { bet: 100,     label: '100WC台',       color: '#8a92b2' },
+  { bet: 1000,    label: '1,000WC台',     color: '#4caf87' },
+  { bet: 10000,   label: '10,000WC台',    color: '#5b8dee' },
+  { bet: 100000,  label: '100,000WC台',   color: '#f0a830' },
+  { bet: 1000000, label: '1,000,000WC台', color: '#e060e0' },
+] as const;
+
+// スロット専用パネル（固定台制・台別ジャックポット）
+function SlotPanel({ onResult, onJackpotContrib, multiplierBonus = 1.0 }: { onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
+  const { player, changeWealthCoin, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeWealthCoin: s.changeWealthCoin, addItems: s.addItems, addNotification: s.addNotification }));
+  const [selectedTier, setSelectedTier] = useState(0); // index into SLOT_TIERS
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
   const [spinning, setSpinning] = useState(false);
   const [finalSyms, setFinalSyms] = useState<string[]|null>(null);
   const [reelFrames, setReelFrames] = useState([0,0,0]);
+  const [tierPools, setTierPools] = useState<number[]>([0,0,0,0,0]);
   const SLOT_SYM = ['🍒','💰','🌟','🍋','🔄','👑','🔔','⭐'];
   const game = GAMBLE_MASTER['slot_machine'];
+  const tier = SLOT_TIERS[selectedTier];
+  const bet = tier.bet;
+
+  useEffect(() => {
+    const unsubs = SLOT_TIERS.map((t, i) =>
+      subscribeSlotJackpotPool(t.bet, (pool) => {
+        setTierPools(prev => { const n = [...prev]; n[i] = pool; return n; });
+      })
+    );
+    return () => unsubs.forEach(u => u());
+  }, []);
 
   const play = async () => {
     if (animating || !player || (player.wealthCoin ?? 0) < bet) { addNotification('error', 'WCが足りません！'); return; }
     setAnimating(true); setResult(null); setFinalSyms(null);
-    changeWealthCoin(-bet); onJackpotContrib(bet);
+    changeWealthCoin(-bet);
+    onJackpotContrib(bet);
+    await contributeToSlotJackpot(bet, bet);
     const r = resolveGenericGamble(game, bet, multiplierBonus);
 
     setSpinning(true);
-    // リール高速回転
     let cnt = 0;
     const t = setInterval(() => {
       setReelFrames([
@@ -1581,7 +1607,6 @@ function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
       cnt++;
     }, 80);
 
-    // 各リールを時差停止
     const syms = r.symbols ?? [SLOT_SYM[0], SLOT_SYM[1], SLOT_SYM[2]];
     const stopReel = (idx: number, delay: number) => {
       setTimeout(() => {
@@ -1589,9 +1614,7 @@ function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
         setFinalSyms(prev => { const n = prev ? [...prev] : [null,null,null] as any; n[idx] = syms[idx]; return n; });
       }, delay);
     };
-    stopReel(0, 900);
-    stopReel(1, 1400);
-    stopReel(2, 1900);
+    stopReel(0, 900); stopReel(1, 1400); stopReel(2, 1900);
 
     setTimeout(async () => {
       clearInterval(t);
@@ -1599,10 +1622,7 @@ function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
       setFinalSyms(syms as string[]);
       if (r.multiplier > 0) changeWealthCoin(r.goldDelta + bet);
       if (r.itemRewards.length > 0) addItems(r.itemRewards);
-      // REPLAY役（×1.0）は「掛け金返還」として通知
-      if (r.rewardLabel.includes('REPLAY')) {
-        addNotification('success', '🔄 REPLAY！掛け金返還！');
-      }
+      if (r.rewardLabel.includes('REPLAY')) addNotification('success', '🔄 REPLAY！掛け金返還！');
       setResult(r); onResult(r);
       if (player) {
         const winGold = Math.floor(bet * r.multiplier);
@@ -1610,7 +1630,13 @@ function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
         const msg = r.multiplier > 0 ? `が${game.name}で${(winGold-bet).toLocaleString()}WC勝利しました！` : `が${game.name}で${bet.toLocaleString()}WC負けました`;
         postActivityFeed({ uid: player.uid, displayName: player.displayName, type, message: msg }).catch(() => {});
       }
-      try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeWealthCoin(pool); addNotification('success', `🌟🌟🌟 JACKPOT!! ${pool.toLocaleString()}WC！`); } } catch { /**/ }
+      try {
+        const { won, pool } = await checkSlotJackpotWin(bet);
+        if (won && pool > 0) {
+          changeWealthCoin(pool);
+          addNotification('success', `🌟🌟🌟 ${tier.label} JACKPOT!! ${pool.toLocaleString()}WC！`);
+        }
+      } catch { /**/ }
       setAnimating(false);
     }, 2300);
   };
@@ -1624,49 +1650,60 @@ function SlotPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
         @keyframes reelStop{0%{transform:translateY(-20px)}100%{transform:translateY(0)}}
         @keyframes jackpotGlow{0%,100%{box-shadow:0 0 10px rgba(240,192,96,0.5)}50%{box-shadow:0 0 40px rgba(240,192,96,1),0 0 80px rgba(240,192,96,0.5)}}
       `}</style>
+      {/* 台選択 */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: '0.75rem', color: '#8a92b2', marginBottom: 6 }}>🎰 台を選択</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {SLOT_TIERS.map((t, i) => (
+            <button key={i} onClick={() => { setSelectedTier(i); setResult(null); setFinalSyms(null); }}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px',
+                background: selectedTier === i ? `rgba(${t.color === '#8a92b2' ? '138,146,178' : t.color === '#4caf87' ? '76,175,135' : t.color === '#5b8dee' ? '91,141,238' : t.color === '#f0a830' ? '240,168,48' : '224,96,224'},0.2)` : '#161b26',
+                border: `1px solid ${selectedTier === i ? t.color : '#2d3752'}`, borderRadius: 8, cursor: 'pointer' }}>
+              <div>
+                <span style={{ fontWeight: 700, color: t.color, fontSize: '0.85rem' }}>{t.label}</span>
+                <span style={{ fontSize: '0.7rem', color: '#4a5070', marginLeft: 8 }}>賭け金: {t.bet.toLocaleString()}WC</span>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '0.7rem', color: '#f0c060' }}>JP: {tierPools[i].toLocaleString()}WC</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* JP表示（選択中台） */}
+      {tierPools[selectedTier] > 0 && (
+        <div style={{ background: 'linear-gradient(135deg,rgba(240,192,96,0.12),rgba(240,168,48,0.12))', border: `2px solid ${tier.color}`, borderRadius: 10, padding: '8px 14px', marginBottom: 10, textAlign: 'center' }}>
+          <div style={{ fontSize: '0.72rem', color: '#8a92b2' }}>🌟 {tier.label} ジャックポット</div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#f0c060' }}>{tierPools[selectedTier].toLocaleString()}WC</div>
+        </div>
+      )}
       {/* スロットマシン本体 */}
-      <div style={{ background:'linear-gradient(135deg,#1a1f30,#0f1220)', border:'3px solid #f0c060', borderRadius:16, padding:'16px', marginBottom:10, textAlign:'center', boxShadow: result && isWin ? '0 0 30px rgba(240,192,96,0.4)' : 'none', animation: result && isWin ? 'jackpotGlow 1s infinite' : 'none' }}>
-        <div style={{ fontSize:'0.7rem', color:'#4a5070', marginBottom:8, letterSpacing:2 }}>🎰 SLOT MACHINE 🎰</div>
+      <div style={{ background:'linear-gradient(135deg,#1a1f30,#0f1220)', border:`3px solid ${tier.color}`, borderRadius:16, padding:'16px', marginBottom:10, textAlign:'center', boxShadow: result && isWin ? '0 0 30px rgba(240,192,96,0.4)' : 'none', animation: result && isWin ? 'jackpotGlow 1s infinite' : 'none' }}>
+        <div style={{ fontSize:'0.7rem', color:'#4a5070', marginBottom:8, letterSpacing:2 }}>🎰 {tier.label} 🎰</div>
         <div style={{ display:'flex', gap:8, justifyContent:'center', alignItems:'center', marginBottom:10 }}>
           {[0,1,2].map(i => {
             const sym = finalSyms?.[i] ?? null;
             const stopped = sym !== null;
             return (
-              <div key={i} style={{
-                width:72, height:88, background:'#0a0d18', border:`3px solid ${stopped ? '#f0c060' : '#2d3752'}`,
-                borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden',
-                boxShadow: stopped && isWin ? '0 0 20px rgba(240,192,96,0.5)' : 'none',
-                transition:'border-color 0.3s, box-shadow 0.3s',
-              }}>
-                <span style={{
-                  fontSize:'2.5rem', display:'block',
-                  animation: spinning && !stopped ? 'reelSpin 0.2s linear infinite' : stopped ? 'reelStop 0.3s ease' : 'none',
-                }}>
+              <div key={i} style={{ width:72, height:88, background:'#0a0d18', border:`3px solid ${stopped ? tier.color : '#2d3752'}`, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', boxShadow: stopped && isWin ? `0 0 20px rgba(240,192,96,0.5)` : 'none', transition:'border-color 0.3s, box-shadow 0.3s' }}>
+                <span style={{ fontSize:'2.5rem', display:'block', animation: spinning && !stopped ? 'reelSpin 0.2s linear infinite' : stopped ? 'reelStop 0.3s ease' : 'none' }}>
                   {stopped ? sym : SLOT_SYM[reelFrames[i] % SLOT_SYM.length]}
                 </span>
               </div>
             );
           })}
         </div>
-        {/* ペイライン */}
         <div style={{ width:'100%', height:2, background: isWin ? '#f0c060' : '#2d3752', borderRadius:1, marginBottom:8, transition:'background 0.5s' }} />
-        {result && (
-          <div style={{ fontSize:'1rem', fontWeight:900, color: isWin ? '#f0c060' : '#4a5070' }}>
-            {result.symbols?.join(' ') ?? ''} {result.rewardLabel}
-          </div>
-        )}
-        {spinning && !finalSyms && (
-          <div style={{ fontSize:'0.8rem', color:'#8a92b2', animation:'glow 0.5s infinite' }}>リール回転中...</div>
-        )}
+        {result && <div style={{ fontSize:'1rem', fontWeight:900, color: isWin ? '#f0c060' : '#4a5070' }}>{result.symbols?.join(' ') ?? ''} {result.rewardLabel}</div>}
+        {spinning && !finalSyms && <div style={{ fontSize:'0.8rem', color:'#8a92b2' }}>リール回転中...</div>}
       </div>
       {result && <ResultDisplay result={result} bet={bet} />}
       <button onClick={play} disabled={animating}
-        style={{ width:'100%', padding:12, background: animating ? '#2d3752' : 'linear-gradient(135deg,#f0c060,#d0a040)', color: animating ? '#8a92b2' : '#000', border:'none', borderRadius:8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight:700, fontSize:'1rem' }}>
+        style={{ width:'100%', padding:12, background: animating ? '#2d3752' : `linear-gradient(135deg,${tier.color},${tier.color}cc)`, color: animating ? '#8a92b2' : '#fff', border:'none', borderRadius:8, cursor: animating ? 'not-allowed' : 'pointer', fontWeight:700, fontSize:'1rem' }}>
         {animating ? '🎰 回転中...' : `🎰 ${bet.toLocaleString()}WC でプレイ`}
       </button>
     </div>
   );
-}
 
 function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { game: GambleMaster; bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
   const { player, changeGold: _cg2, changeWealthCoin, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, changeWealthCoin: s.changeWealthCoin, addItems: s.addItems, addNotification: s.addNotification }));
@@ -2196,6 +2233,74 @@ const GAME_TABS: { id: GameTab; label: string; icon: string }[] = [
 ];
 
 // ============================================================
+// 宝箱セレクターパネル
+// ============================================================
+const TREASURE_BOX_DEFS = [
+  { id: 'treasure_box_wood',   label: '木箱',   emoji: '📦', color: '#8B4513', bet: 1000 },
+  { id: 'treasure_box_iron',   label: '鉄箱',   emoji: '🔒', color: '#8a92b2', bet: 10000 },
+  { id: 'treasure_box_silver', label: '銀箱',   emoji: '🪙', color: '#c0c0c0', bet: 41000 },
+  { id: 'treasure_box_gold',   label: '金箱',   emoji: '💛', color: '#f0c060', bet: 400000 },
+  { id: 'treasure_box_mystic', label: '神秘箱', emoji: '✨', color: '#e060e0', bet: 4000000 },
+] as const;
+
+function TreasureBoxPanel({ onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
+  onResult: (r: GambleResult) => void;
+  onJackpotContrib: (bet: number) => void;
+  multiplierBonus?: number;
+}) {
+  const [selectedBox, setSelectedBox] = useState(0);
+  const boxDef = TREASURE_BOX_DEFS[selectedBox];
+  const game = GAMBLE_MASTER[boxDef.id] ?? GAMBLE_MASTER['treasure_box_silver'];
+  const bet = boxDef.bet;
+
+  return (
+    <div>
+      {/* 箱選択 */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: '0.75rem', color: '#8a92b2', marginBottom: 6 }}>📦 宝箱を選択</div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {TREASURE_BOX_DEFS.map((b, i) => (
+            <button key={i} onClick={() => setSelectedBox(i)}
+              style={{ flex: 1, minWidth: 60, padding: '8px 4px', textAlign: 'center',
+                background: selectedBox === i ? `rgba(${b.color === '#f0c060' ? '240,192,96' : b.color === '#e060e0' ? '224,96,224' : b.color === '#c0c0c0' ? '192,192,192' : b.color === '#8a92b2' ? '138,146,178' : '139,69,19'},0.2)` : '#161b26',
+                border: `2px solid ${selectedBox === i ? b.color : '#2d3752'}`,
+                borderRadius: 8, cursor: 'pointer' }}>
+              <div style={{ fontSize: '1.4rem' }}>{b.emoji}</div>
+              <div style={{ fontSize: '0.65rem', color: selectedBox === i ? b.color : '#8a92b2', fontWeight: 700 }}>{b.label}</div>
+              <div style={{ fontSize: '0.62rem', color: '#4a5070' }}>{b.bet.toLocaleString()}WC</div>
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* 選択した宝箱の中身一覧 */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontWeight: 700, fontSize: '0.82rem', color: boxDef.color, marginBottom: 6 }}>
+          {boxDef.emoji} {boxDef.label}の中身一覧
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {game.rewardTable.map((r, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#161b26', border: '1px solid #2d3752', borderRadius: 6, padding: '6px 10px' }}>
+              <span style={{ fontSize: '1rem', minWidth: 22, textAlign: 'center' }}>{r.symbols?.[0] ?? '?'}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#e8e6ff' }}>{r.label}</div>
+                {r.multiplier > 0 && <div style={{ fontSize: '0.68rem', color: '#8a92b2' }}>→ {Math.floor(bet * r.multiplier).toLocaleString()}WC</div>}
+                {r.itemRewards && r.itemRewards.map(ir => (
+                  <span key={ir.itemId} style={{ fontSize: '0.68rem', color: '#8a92b2', marginRight: 4 }}>
+                    {ITEM_MASTER[ir.itemId]?.name ?? ir.itemId} ×{ir.amount}
+                  </span>
+                ))}
+              </div>
+              <span style={{ fontSize: '0.7rem', color: '#4a5070' }}>{(r.probability * 100).toFixed(1)}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <GenericPanel game={game} bet={bet} onResult={onResult} onJackpotContrib={onJackpotContrib} multiplierBonus={multiplierBonus} />
+    </div>
+  );
+}
+
+// ============================================================
 // ギャンブルランク
 // ============================================================
 export type GambleRank = '見習い' | 'ギャンブラー' | '熟練ギャンブラー' | '賭博王' | 'レジェンド';
@@ -2605,20 +2710,157 @@ function ExchangePanel() {
   );
 }
 
-type MainTab = 'gamble' | 'exchange' | 'mission' | 'rank';
+type MainTab = 'home' | 'gamble' | 'ranking' | 'exchange';
+
+// ============================================================
+// デイリーカジノ設定
+// ============================================================
+const DAILY_CASINO_GAMES = [
+  { id: 'chohan',    label: '丁半',     icon: '🎲', bonus: 1.3 },
+  { id: 'chinchiro', label: 'チンチロ', icon: '🎲', bonus: 1.3 },
+  { id: 'coin_flip', label: 'コイン',   icon: '🪙', bonus: 1.3 },
+  { id: 'slot',      label: 'スロット', icon: '🎰', bonus: 1.3 },
+  { id: 'poker',     label: 'ポーカー', icon: '🃏', bonus: 1.3 },
+];
+
+function getDailyCasino(): { id: string; label: string; icon: string; bonus: number } {
+  const now = new Date();
+  const seed = now.getFullYear() * 10000 + (now.getMonth()+1) * 100 + now.getDate();
+  return DAILY_CASINO_GAMES[seed % DAILY_CASINO_GAMES.length];
+}
+
+// ============================================================
+// イベント設定（偶数日 12:00〜13:00 のみ）
+// ============================================================
+interface DailyEvent {
+  name: string;
+  emoji: string;
+  effect: string;
+  gameId: string;
+  bonusType: 'multiplier' | 'rare' | 'jackpot';
+  bonusValue: number;
+}
+
+const DAILY_EVENTS: DailyEvent[] = [
+  { name: 'スロットフェス',  emoji: '🎰', effect: '配当+10%',        gameId: 'slot',      bonusType: 'multiplier', bonusValue: 1.1 },
+  { name: '丁半祭',          emoji: '🎲', effect: '配当+10%',        gameId: 'chohan',    bonusType: 'multiplier', bonusValue: 1.1 },
+  { name: 'ジャックポット祭', emoji: '🌟', effect: 'JP率1.5倍',       gameId: 'all',       bonusType: 'jackpot',    bonusValue: 1.5 },
+  { name: 'チンチロ祭',       emoji: '🎯', effect: '配当+10%',        gameId: 'chinchiro', bonusType: 'multiplier', bonusValue: 1.1 },
+  { name: 'ポーカー祭',       emoji: '🃏', effect: '配当+10%',        gameId: 'poker',     bonusType: 'multiplier', bonusValue: 1.1 },
+  { name: 'レア率フェス',     emoji: '💎', effect: 'レア率1.3倍',     gameId: 'treasure_box_silver', bonusType: 'rare', bonusValue: 1.3 },
+];
+
+function getActiveEvent(): DailyEvent | null {
+  const now = new Date();
+  const day = now.getDate();
+  const hour = now.getHours();
+  // 偶数日 12:00〜13:00 のみ
+  if (day % 2 !== 0) return null;
+  if (hour !== 12) return null;
+  const seed = now.getFullYear() * 10000 + (now.getMonth()+1) * 100 + day;
+  return DAILY_EVENTS[seed % DAILY_EVENTS.length];
+}
+
+// ============================================================
+// ランキングパネル
+// ============================================================
+function GambleRankingPanel() {
+  const [entries, setEntries] = useState<GambleRankingEntry[]>([]);
+  const [rankTab, setRankTab] = useState<'weekly' | 'monthly' | 'total'>('weekly');
+  const player = useGameStore(s => s.player);
+
+  useEffect(() => {
+    const unsub = subscribeGambleRanking(setEntries);
+    return unsub;
+  }, []);
+
+  const sorted = [...entries].sort((a, b) => {
+    if (rankTab === 'weekly') return (b.weeklyWon ?? 0) - (a.weeklyWon ?? 0);
+    if (rankTab === 'monthly') return (b.monthlyWon ?? 0) - (a.monthlyWon ?? 0);
+    return (b.totalWon ?? 0) - (a.totalWon ?? 0);
+  });
+
+  const getValue = (e: GambleRankingEntry) => {
+    if (rankTab === 'weekly') return e.weeklyWon ?? 0;
+    if (rankTab === 'monthly') return e.monthlyWon ?? 0;
+    return e.totalWon ?? 0;
+  };
+
+  const titleByRank: Record<number, string> = { 0: '👑 今週の賭博王', 1: '🥈 ギャンブルキング', 2: '🥉 3位' };
+  const monthTitles: Record<number, string> = { 0: '👑 月間ギャンブルキング', 1: '🥈 月間2位', 2: '🥉 月間3位' };
+
+  return (
+    <div style={{ padding: '0 4px' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+        {(['weekly','monthly','total'] as const).map(t => (
+          <button key={t} onClick={() => setRankTab(t)}
+            style={{ flex: 1, padding: '7px 0', fontSize: '0.75rem', fontWeight: 700,
+              background: rankTab === t ? 'rgba(240,192,96,0.2)' : '#1c2235',
+              border: `1px solid ${rankTab === t ? '#f0c060' : '#2d3752'}`,
+              color: rankTab === t ? '#f0c060' : '#8a92b2', borderRadius: 6, cursor: 'pointer' }}>
+            {t === 'weekly' ? '📅 週間' : t === 'monthly' ? '📆 月間' : '🏆 総合'}
+          </button>
+        ))}
+      </div>
+
+      {/* 称号表示 */}
+      {sorted.slice(0, 3).map((e, i) => {
+        const title = rankTab === 'weekly' ? titleByRank[i] : rankTab === 'monthly' ? monthTitles[i] : `🏆 総合${i+1}位`;
+        return (
+          <div key={e.uid} style={{ background: i === 0 ? 'rgba(240,192,96,0.12)' : '#1c2235', border: `2px solid ${i === 0 ? '#f0c060' : i === 1 ? '#8a92b2' : '#cd7f32'}`, borderRadius: 10, padding: '12px', marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#e8e6ff' }}>{e.displayName}</div>
+                <div style={{ fontSize: '0.7rem', color: '#f0c060', marginTop: 2 }}>{title}</div>
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: '#f0c060' }}>{getValue(e).toLocaleString()}WC</div>
+            </div>
+          </div>
+        );
+      })}
+
+      {sorted.length > 3 && (
+        <div style={{ marginTop: 4 }}>
+          {sorted.slice(3).map((e, i) => (
+            <div key={e.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px', background: e.uid === player?.uid ? 'rgba(91,141,238,0.1)' : '#161b26', border: `1px solid ${e.uid === player?.uid ? '#5b8dee' : '#2d3752'}`, borderRadius: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: '0.75rem', color: '#8a92b2' }}>{i+4}位 {e.displayName}{e.uid === player?.uid ? ' (あなた)' : ''}</span>
+              <span style={{ fontSize: '0.78rem', color: '#f0c060', fontWeight: 700 }}>{getValue(e).toLocaleString()}WC</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {sorted.length === 0 && (
+        <div style={{ textAlign: 'center', color: '#4a5070', fontSize: '0.82rem', padding: '20px 0' }}>
+          ランキングデータがありません<br/>
+          <span style={{ fontSize: '0.72rem' }}>ギャンブルで勝利するとランキングに載ります！</span>
+        </div>
+      )}
+    </div>
+  );
+}
 export function GambleScreen() {
   const player = useGameStore(s => s.player);
   const setPlayer = useGameStore(s => s.setPlayer);
   const [activeGame, setActiveGame] = useState<GameTab>('chohan');
-  const [mainTab, setMainTab] = useState<MainTab>('gamble');
+  const [mainTab, setMainTab] = useState<MainTab>('home');
   const [bet, setBet] = useState(100);
   const [stats, setStats] = useState<SessionStats>(initStats());
   const [jackpotPool, setJackpotPool] = useState(0);
   const [gambleMultipliers, setGambleMultipliers] = useState<Record<string, number>>({});
   const [pokerBetLocked, setPokerBetLocked] = useState(false);
   const [coinFlipBetLocked, setCoinFlipBetLocked] = useState(false);
-  const [ticketActive, setTicketActive] = useState(false); // チケット1枚使用中
+  const [ticketActive, setTicketActive] = useState(false);
   const [treasureProbs, setTreasureProbs] = useState<TreasureProbEntry[] | null>(null);
+  const [activeEvent, setActiveEvent] = useState<ReturnType<typeof getActiveEvent>>(null);
+  const [dailyCasino] = useState(getDailyCasino);
+
+  // イベント判定（毎分更新）
+  useEffect(() => {
+    setActiveEvent(getActiveEvent());
+    const t = setInterval(() => setActiveEvent(getActiveEvent()), 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     const unsub = subscribeTreasureProbs(setTreasureProbs);
@@ -2643,6 +2885,10 @@ export function GambleScreen() {
         setPlayer({ ...player, inventory: { ...player.inventory, gacha_multiplier_ticket: cur - 1 } });
       }
       setTicketActive(false);
+    }
+    // ランキング用WC集計
+    if (player && r.goldDelta > 0) {
+      updateGambleRanking(player.uid, player.displayName, r.goldDelta).catch(() => {});
     }
     // 累計賭け額・ミッション進捗更新
     if (player && activeGame !== 'highlow') {
@@ -2694,21 +2940,10 @@ export function GambleScreen() {
   };
 
   if (!player) return null;
-  const gameMasterKey = activeGame === 'slot' ? 'slot_machine' : activeGame;
+  const gameMasterKey = activeGame === 'slot' ? 'slot_machine' : activeGame === 'treasure_box' ? 'treasure_box_silver' : activeGame;
   const game = GAMBLE_MASTER[gameMasterKey] ?? GAMBLE_MASTER['chohan'];
   const netProfit = stats.totalWon - stats.totalBet;
   const gambleRankInfo = getGambleRank(player.totalWagered ?? 0);
-
-  // 宝箱: 管理者オーバーライドがある場合はrewardTableの確率を上書き
-  const treasureGame = treasureProbs
-    ? {
-        ...GAMBLE_MASTER['treasure_box'],
-        rewardTable: GAMBLE_MASTER['treasure_box'].rewardTable.map((r, i) => ({
-          ...r,
-          probability: treasureProbs[i]?.probability ?? r.probability,
-        })),
-      }
-    : GAMBLE_MASTER['treasure_box'];
 
   return (
     <div style={{ padding: '12px 8px' }}>
@@ -2724,18 +2959,78 @@ export function GambleScreen() {
       </div>
 
       {/* メインタブ */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
-        {([['gamble','🎲 ギャンブル'],['exchange','🔄 交換所'],['mission','📋 ミッション'],['rank','🏅 ランク']] as [MainTab, string][]).map(([id, label]) => (
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+        {([['home','🏠 ホーム'],['gamble','🎲 ギャンブル'],['ranking','🏆 ランキング'],['exchange','🔄 交換所']] as [MainTab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setMainTab(id)}
-            style={{ flex: 1, minWidth: 70, padding: '7px 4px', fontSize: '0.75rem', fontWeight: 700, background: mainTab === id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${mainTab === id ? '#5b8dee' : '#2d3752'}`, color: mainTab === id ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer' }}>
+            style={{ flex: 1, padding: '7px 4px', fontSize: '0.75rem', fontWeight: 700, background: mainTab === id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${mainTab === id ? '#5b8dee' : '#2d3752'}`, color: mainTab === id ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer' }}>
             {label}
           </button>
         ))}
       </div>
 
       {mainTab === 'exchange' && <ExchangePanel />}
-      {mainTab === 'mission' && <MissionPanel />}
-      {mainTab === 'rank' && <RankPanel />}
+      {mainTab === 'ranking' && <GambleRankingPanel />}
+      {mainTab === 'home' && (
+        <div>
+          {/* デイリーカジノ */}
+          <div style={{ background: 'linear-gradient(135deg,rgba(240,192,96,0.12),rgba(240,168,48,0.08))', border: '2px solid #f0c060', borderRadius: 12, padding: '14px', marginBottom: 14 }}>
+            <div style={{ fontSize: '0.75rem', color: '#f0c060', fontWeight: 700, marginBottom: 6 }}>🎰 本日のラッキーギャンブル</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: '2.5rem' }}>{dailyCasino.icon}</span>
+              <div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#e8e6ff' }}>{dailyCasino.label}</div>
+                <div style={{ fontSize: '0.82rem', color: '#4caf87', fontWeight: 700 }}>配当{dailyCasino.bonus}倍</div>
+              </div>
+              <button onClick={() => { setActiveGame(dailyCasino.id as GameTab); setMainTab('gamble'); }}
+                style={{ marginLeft: 'auto', padding: '8px 16px', background: 'linear-gradient(135deg,#f0c060,#c08020)', color: '#000', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem' }}>
+                プレイ →
+              </button>
+            </div>
+            <div style={{ fontSize: '0.7rem', color: '#4a5070', marginTop: 6 }}>毎日0時に更新</div>
+          </div>
+
+          {/* イベント */}
+          {activeEvent ? (
+            <div style={{ background: 'linear-gradient(135deg,rgba(224,96,224,0.12),rgba(91,141,238,0.08))', border: '2px solid #e060e0', borderRadius: 12, padding: '14px', marginBottom: 14 }}>
+              <div style={{ fontSize: '0.72rem', color: '#e060e0', fontWeight: 700, marginBottom: 6 }}>🎉 開催中イベント（偶数日 12:00〜13:00）</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: '2rem' }}>{activeEvent.emoji}</span>
+                <div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#e8e6ff' }}>{activeEvent.name}</div>
+                  <div style={{ fontSize: '0.82rem', color: '#e060e0', fontWeight: 700 }}>{activeEvent.effect}</div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 10, padding: '12px', marginBottom: 14 }}>
+              <div style={{ fontSize: '0.75rem', color: '#4a5070', marginBottom: 4 }}>🎉 イベント</div>
+              <div style={{ fontSize: '0.82rem', color: '#8a92b2' }}>次のイベントは偶数日の 12:00〜13:00 に開催</div>
+              <div style={{ fontSize: '0.7rem', color: '#4a5070', marginTop: 4 }}>スロットフェス・丁半祭・ジャックポット祭など</div>
+            </div>
+          )}
+
+          {/* ジャックポットプール表示 */}
+          <JackpotBanner pool={jackpotPool} />
+
+          {/* ランキングTop3 */}
+          <div style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 10, padding: '12px', marginBottom: 12 }}>
+            <div style={{ fontWeight: 700, fontSize: '0.82rem', color: '#f0c060', marginBottom: 8 }}>🏆 今週のランキング（プレビュー）</div>
+            <button onClick={() => setMainTab('ranking')} style={{ width: '100%', padding: '6px', background: 'rgba(240,192,96,0.1)', border: '1px solid #f0c060', borderRadius: 6, color: '#f0c060', cursor: 'pointer', fontSize: '0.78rem' }}>
+              ランキング全体を見る →
+            </button>
+          </div>
+
+          {/* ミッション・ランクへのナビ */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setMainTab('gamble')} style={{ flex: 1, padding: '10px', background: 'linear-gradient(135deg,#5b8dee,#3a6fd0)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
+              🎲 ギャンブルへ
+            </button>
+            <button onClick={() => setMainTab('exchange')} style={{ flex: 1, padding: '10px', background: 'rgba(76,175,135,0.2)', color: '#4caf87', border: '1px solid #4caf87', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem' }}>
+              🔄 交換所
+            </button>
+          </div>
+        </div>
+      )}
       {mainTab === 'gamble' && <>
 
       <JackpotBanner pool={jackpotPool} />
@@ -2787,41 +3082,15 @@ export function GambleScreen() {
             <div style={{ fontSize: '0.78rem', color: '#8a92b2', marginTop: 2 }}>{game.description}</div>
           </div>
         )}
-        {activeGame !== 'pvp' && activeGame !== 'treasure_box' && activeGame !== 'highlow' && <BetInput game={game} bet={bet} setBet={setBet} disabled={(activeGame === 'poker' && pokerBetLocked) || (activeGame === 'coin_flip' && coinFlipBetLocked)} />}
+        {activeGame !== 'pvp' && activeGame !== 'treasure_box' && activeGame !== 'highlow' && activeGame !== 'slot' && <BetInput game={game} bet={bet} setBet={setBet} disabled={(activeGame === 'poker' && pokerBetLocked) || (activeGame === 'coin_flip' && coinFlipBetLocked)} />}
         {activeGame === 'highlow' && <BetInput game={{ minBet: 100, maxBet: 1000000 } as GambleMaster} bet={bet} setBet={setBet} />}
 
-        {activeGame === 'chohan'       && <ChohanPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chohan'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
-        {activeGame === 'chinchiro'    && <ChinchiroPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chinchiro'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
-        {activeGame === 'coin_flip'    && <CoinFlipPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['coin_flip'] ?? 1.0) * (ticketActive ? 2 : 1)} onLockChange={setCoinFlipBetLocked} />}
-        {activeGame === 'slot'         && <SlotPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['slot_machine'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
-        {activeGame === 'treasure_box' && <GenericPanel game={treasureGame}  bet={41000} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['treasure_box'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
-        {activeGame === 'treasure_box' && (
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#f0c060', marginBottom: 8 }}>📦 宝箱の中身一覧</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {treasureGame.rewardTable.map((r, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#161b26', border: '1px solid #2d3752', borderRadius: 6, padding: '7px 10px' }}>
-                  <span style={{ fontSize: '1.1rem', minWidth: 24, textAlign: 'center' }}>{r.symbols?.[0] ?? '?'}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#e8e6ff' }}>{r.label}</div>
-                    <div style={{ fontSize: '0.7rem', color: '#8a92b2', marginTop: 1 }}>
-                      {r.multiplier > 0 && <span>💰 41,000WC賭け → {Math.floor(41000 * r.multiplier).toLocaleString()}WC戻る（+{(Math.floor(41000 * r.multiplier) - 41000).toLocaleString()}WC）</span>}
-                      {r.itemRewards && r.itemRewards.length > 0 && r.itemRewards.map(ir => (
-                        <span key={ir.itemId} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, marginRight: 4 }}>
-                          <GameIcon id={ITEM_MASTER[ir.itemId]?.icon ?? ''} size={12} />
-                          {ITEM_MASTER[ir.itemId]?.name ?? ir.itemId} ×{ir.amount}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <span style={{ fontSize: '0.72rem', color: '#4a5070', flexShrink: 0 }}>{(r.probability * 100).toFixed(0)}%</span>
-                </div>
-              ))}
-            </div>
-            <div style={{ fontSize: '0.72rem', color: '#4a5070', marginTop: 6, textAlign: 'center' }}>1回 41,000WC固定</div>
-          </div>
-        )}
-        {activeGame === 'poker'        && <PokerPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={gambleMultipliers['poker'] ?? 1.0} onBetLock={setPokerBetLocked} />}
+        {activeGame === 'chohan'       && <ChohanPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chohan'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'chohan' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'chohan' ? activeEvent.bonusValue : 1)} />}
+        {activeGame === 'chinchiro'    && <ChinchiroPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chinchiro'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'chinchiro' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'chinchiro' ? activeEvent.bonusValue : 1)} />}
+        {activeGame === 'coin_flip'    && <CoinFlipPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['coin_flip'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'coin_flip' ? dailyCasino.bonus : 1)} onLockChange={setCoinFlipBetLocked} />}
+        {activeGame === 'slot'         && <SlotPanel onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['slot_machine'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'slot' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'slot' ? activeEvent.bonusValue : 1)} />}
+        {activeGame === 'treasure_box' && <TreasureBoxPanel onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['treasure_box'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
+        {activeGame === 'poker'        && <PokerPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['poker'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'poker' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'poker' ? activeEvent.bonusValue : 1)} onBetLock={setPokerBetLocked} />}
         {activeGame === 'highlow'      && <HighLowPanel  bet={bet} onResult={handleResult} onMissionUpdate={handleHighlowMissionUpdate} />}
         {activeGame === 'pvp'          && (
           <>
@@ -2838,14 +3107,14 @@ export function GambleScreen() {
         )}
       </div>
 
-      {activeGame !== 'pvp' && (
+      {activeGame !== 'pvp' && activeGame !== 'treasure_box' && activeGame !== 'slot' && (
         <details style={{ marginTop: 10 }}>
           <summary style={{ cursor: 'pointer', color: '#8a92b2', fontSize: '0.8rem', padding: '6px 0' }}>📋 配当表</summary>
           <div style={{ background: '#161b26', border: '1px solid #2d3752', borderRadius: 8, padding: 10, marginTop: 6 }}>
             {game.rewardTable.map((r, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', padding: '3px 0', borderBottom: '1px solid #2d3752', color: '#8a92b2' }}>
                 <span>{r.label}</span>
-                <span><span style={{ color: '#f0c060' }}>{activeGame === 'treasure_box' && r.multiplier > 0 ? `+${(Math.floor(41000 * r.multiplier) - 41000).toLocaleString()}WC → 計${Math.floor(41000 * r.multiplier).toLocaleString()}WC` : r.multiplier > 0 ? `×${r.multiplier}` : 'ハズレ'}</span><span style={{ color: '#4a5070', marginLeft: 8 }}>{(r.probability * 100).toFixed(2)}%</span></span>
+                <span><span style={{ color: '#f0c060' }}>{r.multiplier > 0 ? `×${r.multiplier}` : 'ハズレ'}</span><span style={{ color: '#4a5070', marginLeft: 8 }}>{(r.probability * 100).toFixed(2)}%</span></span>
               </div>
             ))}
           </div>
