@@ -5,7 +5,7 @@ import {
   arrayUnion, arrayRemove, runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, BattleHistoryEntry, PokerTable, PokerCard, PokerPlayer, PokerPhase } from '../types/game';
+import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, BattleHistoryEntry, PokerTable, PokerCard, PokerPlayer, PokerPhase, NpcQuest, StockPricePoint, StockId } from '../types/game';
 import { calcJackpotContrib, rollJackpot } from '../systems/minigames';
 
 const COLLECTIONS = {
@@ -1575,4 +1575,311 @@ export function subscribeGambleFeed(cb: (entries: GambleFeedEntry[]) => void): U
   fetch();
   const timer = setInterval(fetch, 20_000);
   return () => { stopped = true; clearInterval(timer); };
+}
+
+// ============================================================
+// プレイヤー送金システム
+// ============================================================
+export interface TransferRecord {
+  id?: string;
+  senderUid: string;
+  senderName: string;
+  receiverUid: string;
+  receiverName: string;
+  amount: number;      // 送金額（手数料込み）
+  received: number;    // 受取額（手数料5%引き後）
+  fee: number;
+  createdAt: number;
+}
+
+export async function sendGold(
+  sender: { uid: string; displayName: string; gold: number },
+  receiverUid: string,
+  amount: number,
+): Promise<{ success: boolean; error?: string }> {
+  if (amount <= 0) return { success: false, error: '金額が不正です' };
+  if (amount > sender.gold) return { success: false, error: '所持金が不足しています' };
+  const fee = Math.floor(amount * 0.05);
+  const received = amount - fee;
+
+  try {
+    // Fetch receiver
+    const receiverRef = doc(db, 'players', receiverUid);
+    const receiverSnap = await getDoc(receiverRef);
+    if (!receiverSnap.exists()) return { success: false, error: '受取人が見つかりません' };
+    const receiverData = receiverSnap.data() as { displayName: string; gold: number };
+
+    // Deduct from sender (save handled by caller)
+    // Add to receiver
+    await updateDoc(receiverRef, { gold: (receiverData.gold ?? 0) + received });
+
+    // Record transfer
+    const record: Omit<TransferRecord, 'id'> = {
+      senderUid: sender.uid,
+      senderName: sender.displayName,
+      receiverUid,
+      receiverName: receiverData.displayName ?? '名無し',
+      amount,
+      received,
+      fee,
+      createdAt: Date.now(),
+    };
+    await addDoc(collection(db, 'gold_transfers'), record);
+
+    // Update transfer rankings
+    const senderRankRef = doc(db, 'transfer_ranking', sender.uid);
+    const receiverRankRef = doc(db, 'transfer_ranking', receiverUid);
+    const [sr, rr] = await Promise.all([getDoc(senderRankRef), getDoc(receiverRankRef)]);
+    await setDoc(senderRankRef, {
+      uid: sender.uid,
+      displayName: sender.displayName,
+      totalSent: ((sr.exists() ? sr.data()['totalSent'] : 0) ?? 0) + amount,
+      totalReceived: (sr.exists() ? sr.data()['totalReceived'] : 0) ?? 0,
+      updatedAt: Date.now(),
+    });
+    await setDoc(receiverRankRef, {
+      uid: receiverUid,
+      displayName: receiverData.displayName ?? '名無し',
+      totalSent: (rr.exists() ? rr.data()['totalSent'] : 0) ?? 0,
+      totalReceived: ((rr.exists() ? rr.data()['totalReceived'] : 0) ?? 0) + received,
+      updatedAt: Date.now(),
+    });
+
+    return { success: true };
+  } catch (e: unknown) {
+    return { success: false, error: String(e) };
+  }
+}
+
+export async function fetchMyTransfers(uid: string): Promise<TransferRecord[]> {
+  try {
+    const q1 = query(collection(db, 'gold_transfers'), where('senderUid', '==', uid), orderBy('createdAt', 'desc'), limit(30));
+    const q2 = query(collection(db, 'gold_transfers'), where('receiverUid', '==', uid), orderBy('createdAt', 'desc'), limit(30));
+    const [s1, s2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+    const all: TransferRecord[] = [];
+    s1.forEach(d => all.push({ id: d.id, ...d.data() } as TransferRecord));
+    s2.forEach(d => { if (!all.find(x => x.id === d.id)) all.push({ id: d.id, ...d.data() } as TransferRecord); });
+    return all.sort((a, b) => b.createdAt - a.createdAt).slice(0, 50);
+  } catch { return []; }
+}
+
+export async function fetchTransferRanking(): Promise<{ uid: string; displayName: string; totalSent: number; totalReceived: number }[]> {
+  try {
+    const snap = await getDocs(collection(db, 'transfer_ranking'));
+    const list: { uid: string; displayName: string; totalSent: number; totalReceived: number }[] = [];
+    snap.forEach(d => list.push(d.data() as { uid: string; displayName: string; totalSent: number; totalReceived: number }));
+    return list;
+  } catch { return []; }
+}
+
+export async function fetchOnlinePlayerList(): Promise<{ uid: string; displayName: string; level: number }[]> {
+  try {
+    const snap = await getDocs(query(collection(db, 'players'), orderBy('stats.level', 'desc'), limit(100)));
+    const list: { uid: string; displayName: string; level: number }[] = [];
+    snap.forEach(d => {
+      const data = d.data();
+      if (!data['banned']) list.push({ uid: d.id, displayName: data['displayName'] ?? '名無し', level: data['stats']?.['level'] ?? 1 });
+    });
+    return list;
+  } catch { return []; }
+}
+
+// ============================================================
+// NPC依頼システム
+// ============================================================
+export async function subscribeNpcQuests(cb: (quests: NpcQuest[]) => void): () => void {
+  const ref = collection(db, 'npc_quests');
+  const unsub = onSnapshot(query(ref, orderBy('rank', 'asc'), limit(50)), snap => {
+    const quests: NpcQuest[] = [];
+    snap.forEach(d => quests.push({ id: d.id, ...d.data() } as NpcQuest));
+    cb(quests);
+  }, () => cb([]));
+  return unsub;
+}
+
+export async function generateNpcQuests(): Promise<void> {
+  // クライアント側でランダム依頼を生成してFirestoreに保存
+  const QUEST_TEMPLATES: Omit<NpcQuest, 'id' | 'createdAt' | 'expiresAt'>[] = [
+    { npcName: '村人', npcIcon: '👨‍🌾', rank: 'C', title: '鉄鉱石の調達', description: '鉄鉱石30個を届けてほしい', requiredItemId: 'iron_ore', requiredAmount: 30, rewardGold: 10000 },
+    { npcName: '村人', npcIcon: '👨‍🌾', rank: 'C', title: '木材の調達', description: '木材20個を届けてほしい', requiredItemId: 'wood', requiredAmount: 20, rewardGold: 8000 },
+    { npcName: '鍛冶屋', npcIcon: '⚒️', rank: 'B', title: '鋼鉄インゴット', description: '鋼鉄インゴット10個が必要だ', requiredItemId: 'steel_ingot', requiredAmount: 10, rewardGold: 50000 },
+    { npcName: '鍛冶屋', npcIcon: '⚒️', rank: 'B', title: '鉄インゴット', description: '鉄インゴット20個を持ってきてくれ', requiredItemId: 'iron_ingot', requiredAmount: 20, rewardGold: 30000 },
+    { npcName: '漁師', npcIcon: '🎣', rank: 'B', title: 'サケの調達', description: 'サケ50匹を届けてほしい', requiredItemId: 'salmon', requiredAmount: 50, rewardGold: 30000 },
+    { npcName: '商人', npcIcon: '🧑‍💼', rank: 'A', title: '宝石の調達', description: '宝石5個を持ってきてほしい', requiredItemId: 'gem', requiredAmount: 5, rewardGold: 200000 },
+    { npcName: '商人', npcIcon: '🧑‍💼', rank: 'A', title: '洞窟王の宝石', description: '洞窟王の宝石32個が必要だ', requiredItemId: 'cave_gem', requiredAmount: 32, rewardGold: 300000 },
+    { npcName: '貴族', npcIcon: '👑', rank: 'A', title: '黄金の塊', description: '金塊を10個持ってきなさい', requiredItemId: 'gold_bar', requiredAmount: 10, rewardGold: 500000 },
+    { npcName: '王様', npcIcon: '🤴', rank: 'S', title: 'ドラゴンの心臓', description: '勇者よ、ドラゴンの心臓を持ってきてくれ！', requiredItemId: 'dragon_heart', requiredAmount: 1, rewardGold: 5000000 },
+    { npcName: 'S級冒険者', npcIcon: '🗡️', rank: 'SS', title: '伝説の素材', description: '伝説の宝珠を届けてほしい。必ず報いよう。', requiredItemId: 'legendary_gem', requiredAmount: 1, rewardGold: 10000000 },
+    { npcName: '錬金術師', npcIcon: '⚗️', rank: 'A', title: '魔法の粉', description: 'モグラの爪8個が必要だ', requiredItemId: 'mole_claw', requiredAmount: 8, rewardGold: 180000 },
+    { npcName: '村人', npcIcon: '👩‍🌾', rank: 'C', title: '石炭の調達', description: '石炭50個を届けてほしい', requiredItemId: 'coal', requiredAmount: 50, rewardGold: 12000 },
+  ];
+  const now = Date.now();
+  const expiresAt = now + 6 * 60 * 60 * 1000; // 6時間後
+  // ランダムに6件選ぶ
+  const shuffled = [...QUEST_TEMPLATES].sort(() => Math.random() - 0.5).slice(0, 6);
+  for (const tmpl of shuffled) {
+    await addDoc(collection(db, 'npc_quests'), { ...tmpl, createdAt: now, expiresAt });
+  }
+}
+
+export async function deleteExpiredNpcQuests(): Promise<void> {
+  try {
+    const snap = await getDocs(query(collection(db, 'npc_quests'), where('expiresAt', '<', Date.now())));
+    for (const d of snap.docs) await deleteDoc(d.ref);
+  } catch { /* ignore */ }
+}
+
+export async function completeNpcQuest(questId: string): Promise<boolean> {
+  try {
+    await deleteDoc(doc(db, 'npc_quests', questId));
+    return true;
+  } catch { return false; }
+}
+
+// 依頼ランキング
+export interface QuestRankingEntry {
+  uid: string;
+  displayName: string;
+  totalCompleted: number;
+  totalRewardGold: number;
+}
+
+export async function updateQuestRanking(uid: string, displayName: string, rewardGold: number): Promise<void> {
+  try {
+    const ref = doc(db, 'quest_ranking', uid);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      await updateDoc(ref, { totalCompleted: increment(1), totalRewardGold: increment(rewardGold), displayName });
+    } else {
+      await setDoc(ref, { uid, displayName, totalCompleted: 1, totalRewardGold: rewardGold });
+    }
+  } catch { /* ignore */ }
+}
+
+export function subscribeQuestRanking(cb: (entries: QuestRankingEntry[]) => void): () => void {
+  return onSnapshot(query(collection(db, 'quest_ranking'), orderBy('totalCompleted', 'desc'), limit(20)), snap => {
+    const entries: QuestRankingEntry[] = [];
+    snap.forEach(d => entries.push(d.data() as QuestRankingEntry));
+    cb(entries);
+  }, () => cb([]));
+}
+
+// ============================================================
+// 株式市場（Wealth Exchange）
+// ============================================================
+export const STOCK_MASTERS: Record<StockId, { id: StockId; name: string; icon: string; basePrice: number }> = {
+  wealth_mining:    { id: 'wealth_mining',    name: 'Wealth Mining',    icon: '⛏️', basePrice: 1000 },
+  wealth_fishery:   { id: 'wealth_fishery',   name: 'Wealth Fishery',   icon: '🎣', basePrice: 800 },
+  wealth_casino:    { id: 'wealth_casino',    name: 'Wealth Casino',    icon: '🎰', basePrice: 1200 },
+  wealth_tech:      { id: 'wealth_tech',      name: 'Wealth Tech',      icon: '💻', basePrice: 2000 },
+  wealth_energy:    { id: 'wealth_energy',    name: 'Wealth Energy',    icon: '⚡', basePrice: 900 },
+  wealth_logistics: { id: 'wealth_logistics', name: 'Wealth Logistics', icon: '🚚', basePrice: 700 },
+  wealth_foods:     { id: 'wealth_foods',     name: 'Wealth Foods',     icon: '🍖', basePrice: 600 },
+  wealth_finance:   { id: 'wealth_finance',   name: 'Wealth Finance',   icon: '💰', basePrice: 1500 },
+};
+
+const STOCK_IDS: StockId[] = ['wealth_mining','wealth_fishery','wealth_casino','wealth_tech','wealth_energy','wealth_logistics','wealth_foods','wealth_finance'];
+
+export function subscribeStockPrices(cb: (prices: Record<StockId, number>, history: Record<StockId, StockPricePoint[]>) => void): () => void {
+  return onSnapshot(doc(db, 'stock_market', 'prices'), snap => {
+    if (!snap.exists()) { cb({} as Record<StockId, number>, {} as Record<StockId, StockPricePoint[]>); return; }
+    const data = snap.data();
+    const prices: Record<string, number> = {};
+    const history: Record<string, StockPricePoint[]> = {};
+    for (const id of STOCK_IDS) {
+      prices[id] = data[id] ?? STOCK_MASTERS[id].basePrice;
+      history[id] = data[`history_${id}`] ?? [];
+    }
+    cb(prices as Record<StockId, number>, history as Record<StockId, StockPricePoint[]>);
+  }, () => {});
+}
+
+export async function tickStockPrices(): Promise<{ prices: Record<StockId, number>; news: string[] }> {
+  // 誰かがログインした時に価格を更新（15分インターバル）
+  const ref = doc(db, 'stock_market', 'prices');
+  const NEWS_TEMPLATES = [
+    { text: '{name}が新技術を発表！', type: 'good' as const },
+    { text: '{name}の業績が悪化', type: 'bad' as const },
+    { text: '{name}が大型契約を締結', type: 'good' as const },
+    { text: '{name}の経営不振が明らかに', type: 'bad' as const },
+    { text: '市場全体に追い風！{name}も上昇', type: 'good' as const },
+    { text: '規制強化で{name}に逆風', type: 'bad' as const },
+    { text: '{name}が記録的な利益を達成！', type: 'super_good' as const },
+    { text: '{name}の不祥事が発覚', type: 'super_bad' as const },
+  ];
+  try {
+    const snap = await getDoc(ref);
+    const now = Date.now();
+    const INTERVAL = 15 * 60 * 1000;
+    const data = snap.exists() ? snap.data() : {};
+    const lastTick: number = data['lastTickAt'] ?? 0;
+    if (now - lastTick < INTERVAL) {
+      // まだ更新時刻でない
+      const prices: Record<string, number> = {};
+      for (const id of STOCK_IDS) prices[id] = data[id] ?? STOCK_MASTERS[id].basePrice;
+      return { prices: prices as Record<StockId, number>, news: [] };
+    }
+    const newData: Record<string, unknown> = { lastTickAt: now };
+    const prices: Record<string, number> = {};
+    const newsItems: string[] = [];
+    for (const id of STOCK_IDS) {
+      const current: number = (data[id] as number) ?? STOCK_MASTERS[id].basePrice;
+      const roll = Math.random();
+      let changePct = 0;
+      let newsText: string | undefined;
+      if (roll < 0.005) {
+        changePct = 0.5; // ストップ高
+        newsText = `🚀 【ストップ高】${STOCK_MASTERS[id].name} +50%！`;
+      } else if (roll < 0.01) {
+        changePct = -0.5; // ストップ安
+        newsText = `📉 【ストップ安】${STOCK_MASTERS[id].name} -50%！`;
+      } else if (roll < 0.06) {
+        const pct = 0.1 + Math.random() * 0.1;
+        changePct = Math.random() < 0.5 ? pct : -pct; // ±10~20%
+        const tmpl = NEWS_TEMPLATES[Math.floor(Math.random() * NEWS_TEMPLATES.length)];
+        newsText = `📰 ${tmpl.text.replace('{name}', STOCK_MASTERS[id].name)}（${changePct > 0 ? '+' : ''}${(changePct * 100).toFixed(0)}%）`;
+      } else {
+        const pct = 0.01 + Math.random() * 0.04;
+        changePct = Math.random() < 0.5 ? pct : -pct; // ±1~5%
+      }
+      const newPrice = Math.max(1, Math.round(current * (1 + changePct)));
+      prices[id] = newPrice;
+      newData[id] = newPrice;
+      if (newsText) newsItems.push(newsText);
+      // 履歴更新（最大96件 = 24h分）
+      const histKey = `history_${id}`;
+      const hist: StockPricePoint[] = (data[histKey] as StockPricePoint[]) ?? [];
+      hist.push({ timestamp: now, price: newPrice, news: newsText });
+      if (hist.length > 96) hist.splice(0, hist.length - 96);
+      newData[histKey] = hist;
+    }
+    await setDoc(ref, newData, { merge: true });
+    return { prices: prices as Record<StockId, number>, news: newsItems };
+  } catch { 
+    const prices: Record<string, number> = {};
+    for (const id of STOCK_IDS) prices[id] = STOCK_MASTERS[id].basePrice;
+    return { prices: prices as Record<StockId, number>, news: [] };
+  }
+}
+
+export interface StockRankingEntry {
+  uid: string;
+  displayName: string;
+  totalProfit: number;
+  totalAssets: number;
+}
+
+export async function updateStockRanking(uid: string, displayName: string, profit: number, assets: number): Promise<void> {
+  try {
+    const ref = doc(db, 'stock_ranking', uid);
+    await setDoc(ref, { uid, displayName, totalProfit: increment(profit), totalAssets: assets }, { merge: true });
+  } catch { /* ignore */ }
+}
+
+export function subscribeStockRanking(cb: (entries: StockRankingEntry[]) => void): () => void {
+  return onSnapshot(query(collection(db, 'stock_ranking'), orderBy('totalProfit', 'desc'), limit(20)), snap => {
+    const entries: StockRankingEntry[] = [];
+    snap.forEach(d => entries.push(d.data() as StockRankingEntry));
+    cb(entries);
+  }, () => cb([]));
 }

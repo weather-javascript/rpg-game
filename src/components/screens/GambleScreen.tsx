@@ -20,9 +20,10 @@ import {
   contributeToSlotJackpot, subscribeSlotJackpotPool, checkSlotJackpotWin,
   subscribeGambleRanking, updateGambleRanking,
   subscribeActiveBattles, spectateGambleBattle, joinSpectate, leaveSpectate,
+  subscribeStockPrices, tickStockPrices, STOCK_MASTERS, updateStockRanking, subscribeStockRanking,
 } from '../../services/multiplayer';
-import type { TreasureProbEntry, GambleRankingEntry } from '../../services/multiplayer';
-import type { GambleResult, GambleMaster, PokerTable, BattleHistoryEntry as _BH } from '../../types/game';
+import type { TreasureProbEntry, GambleRankingEntry, StockRankingEntry } from '../../services/multiplayer';
+import type { GambleResult, GambleMaster, PokerTable, BattleHistoryEntry as _BH, StockId, StockHolding, StockPricePoint } from '../../types/game';
 import type { PokerState } from '../../systems/minigames';
 import type { GambleBattle } from '../../types/game';
 
@@ -2942,7 +2943,271 @@ function ExchangePanel() {
   );
 }
 
-type MainTab = 'home' | 'gamble' | 'rank' | 'mission' | 'ranking' | 'exchange' | 'spectate';
+// ============================================================
+// 株式市場パネル（Wealth Exchange）
+// ============================================================
+const STOCK_ID_LIST: StockId[] = ['wealth_mining','wealth_fishery','wealth_casino','wealth_tech','wealth_energy','wealth_logistics','wealth_foods','wealth_finance'];
+
+function StockMarketPanel() {
+  const player = useGameStore(s => s.player);
+  const changeWealthCoin = useGameStore(s => s.changeWealthCoin);
+  const addNotification = useGameStore(s => s.addNotification);
+  const [prices, setPrices] = useState<Record<StockId, number>>({} as Record<StockId, number>);
+  const [history, setHistory] = useState<Record<StockId, StockPricePoint[]>>({} as Record<StockId, StockPricePoint[]>);
+  const [news, setNews] = useState<string[]>([]);
+  const [selectedStock, setSelectedStock] = useState<StockId>('wealth_mining');
+  const [buyAmt, setBuyAmt] = useState(1);
+  const [stockRanking, setStockRanking] = useState<StockRankingEntry[]>([]);
+  const [rankTab, setRankTab] = useState<'profit' | 'assets'>('profit');
+  const [stockView, setStockView] = useState<'market' | 'portfolio' | 'ranking'>('market');
+
+  useEffect(() => {
+    const unsub = subscribeStockPrices((p, h) => { setPrices(p); setHistory(h); });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeStockRanking(entries => setStockRanking(entries));
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    // 起動時に株価更新を試みる
+    tickStockPrices().then(res => {
+      if (res.news.length > 0) setNews(prev => [...res.news, ...prev].slice(0, 20));
+    }).catch(() => {});
+  }, []);
+
+  const holdings: Record<string, StockHolding> = (player?.stockHoldings ?? {}) as Record<string, StockHolding>;
+
+  const getPrice = (id: StockId) => prices[id] ?? STOCK_MASTERS[id].basePrice;
+
+  const handleBuy = () => {
+    if (!player) return;
+    const price = getPrice(selectedStock);
+    const total = price * buyAmt;
+    if ((player.wealthCoin ?? 0) < total) { addNotification('error', 'WCが足りません'); return; }
+    changeWealthCoin(-total);
+    const prev = holdings[selectedStock];
+    const newAvg = prev ? Math.round((prev.avgBuyPrice * prev.amount + price * buyAmt) / (prev.amount + buyAmt)) : price;
+    const newHolding: StockHolding = {
+      stockId: selectedStock,
+      amount: (prev?.amount ?? 0) + buyAmt,
+      avgBuyPrice: newAvg,
+      purchasedAt: Date.now(),
+    };
+    const latest = useGameStore.getState().player;
+    if (latest) {
+      useGameStore.setState({ player: { ...latest, stockHoldings: { ...latest.stockHoldings, [selectedStock]: newHolding } } });
+    }
+    addNotification('success', `📈 ${STOCK_MASTERS[selectedStock].name} ×${buyAmt} 購入（${total.toLocaleString()}WC）`);
+  };
+
+  const handleSell = (id: StockId) => {
+    if (!player) return;
+    const h = holdings[id];
+    if (!h || h.amount <= 0) return;
+    const now = Date.now();
+    if (now - h.purchasedAt < 24 * 60 * 60 * 1000) {
+      const remain = Math.ceil((h.purchasedAt + 24 * 60 * 60 * 1000 - now) / 60000);
+      addNotification('error', `購入後24時間は売却できません（あと${remain}分）`);
+      return;
+    }
+    const price = getPrice(id);
+    const total = price * h.amount;
+    const profit = (price - h.avgBuyPrice) * h.amount;
+    changeWealthCoin(total);
+    const latest = useGameStore.getState().player;
+    if (latest) {
+      const newHoldings = { ...(latest.stockHoldings ?? {}) };
+      delete newHoldings[id];
+      const newProfit = (latest.totalStockProfit ?? 0) + profit;
+      useGameStore.setState({ player: { ...latest, stockHoldings: newHoldings, totalStockProfit: newProfit } });
+      // ランキング更新
+      const totalAssets = STOCK_ID_LIST.reduce((sum, sid) => {
+        const sh = newHoldings[sid] as StockHolding | undefined;
+        return sum + (sh ? getPrice(sid) * sh.amount : 0);
+      }, 0);
+      updateStockRanking(latest.uid, latest.displayName, profit, totalAssets).catch(() => {});
+    }
+    addNotification(profit >= 0 ? 'success' : 'info', `📉 ${STOCK_MASTERS[id].name} 全売却: ${total.toLocaleString()}WC（${profit >= 0 ? '+' : ''}${profit.toLocaleString()}WC）`);
+  };
+
+  const selectedHistory = history[selectedStock] ?? [];
+  const selectedPrice = getPrice(selectedStock);
+  const selectedMaster = STOCK_MASTERS[selectedStock];
+
+  return (
+    <div>
+      <div style={{display:'flex', gap:6, marginBottom:12}}>
+        {(['market','portfolio','ranking'] as const).map(v => (
+          <button key={v} onClick={() => setStockView(v)}
+            style={{flex:1, padding:'7px 4px', fontSize:'0.72rem', fontWeight:700,
+              background: stockView===v ? 'rgba(91,141,238,0.2)' : '#1c2235',
+              border:`1px solid ${stockView===v ? '#5b8dee' : '#2d3752'}`,
+              color: stockView===v ? '#e8e6ff' : '#8a92b2', borderRadius:6, cursor:'pointer'}}>
+            {v==='market' ? '📈 市場' : v==='portfolio' ? '💼 保有' : '🏆 ランク'}
+          </button>
+        ))}
+      </div>
+
+      {stockView === 'market' && (
+        <>
+          {/* ニュース */}
+          {news.length > 0 && (
+            <div style={{background:'rgba(240,192,96,0.08)', border:'1px solid rgba(240,192,96,0.25)', borderRadius:8, padding:'8px 12px', marginBottom:10, maxHeight:80, overflowY:'auto'}}>
+              <div style={{fontSize:'0.68rem', color:'#f0c060', fontWeight:700, marginBottom:4}}>📰 マーケットニュース</div>
+              {news.slice(0,5).map((n,i) => <div key={i} style={{fontSize:'0.72rem', color:'#8a92b2', padding:'1px 0'}}>{n}</div>)}
+            </div>
+          )}
+
+          {/* 銘柄一覧 */}
+          <div style={{marginBottom:10}}>
+            {STOCK_ID_LIST.map(id => {
+              const m = STOCK_MASTERS[id];
+              const p = getPrice(id);
+              const hist = history[id] ?? [];
+              const prevPrice = hist.length > 1 ? hist[hist.length-2].price : m.basePrice;
+              const change = prevPrice > 0 ? (p - prevPrice) / prevPrice * 100 : 0;
+              const isSelected = selectedStock === id;
+              return (
+                <div key={id} onClick={() => setSelectedStock(id)}
+                  style={{display:'flex', alignItems:'center', gap:8, padding:'8px 10px', marginBottom:4, borderRadius:6, cursor:'pointer',
+                    background: isSelected ? 'rgba(91,141,238,0.15)' : '#1c2235',
+                    border:`1px solid ${isSelected ? '#5b8dee' : '#2d3752'}`}}>
+                  <span style={{fontSize:'1.2rem'}}>{m.icon}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'0.82rem', fontWeight:600}}>{m.name}</div>
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontSize:'0.88rem', fontWeight:700, color:'#e8e6ff'}}>{p.toLocaleString()}WC</div>
+                    <div style={{fontSize:'0.7rem', color: change >= 0 ? '#4caf87' : '#e05555'}}>
+                      {change >= 0 ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* チャートと購入 */}
+          <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'12px 14px'}}>
+            <div style={{fontWeight:700, fontSize:'0.9rem', marginBottom:8}}>{selectedMaster.icon} {selectedMaster.name}</div>
+            {/* 簡易チャート */}
+            <div style={{height:80, position:'relative', marginBottom:12, background:'#161b26', borderRadius:6, overflow:'hidden'}}>
+              {selectedHistory.length === 0 ? (
+                <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'#4a5070', fontSize:'0.75rem'}}>
+                  ━━━━━ 価格履歴なし（誰かがログインすると動き始めます）
+                </div>
+              ) : (() => {
+                const pts = selectedHistory.slice(-48);
+                const maxP = Math.max(...pts.map(p => p.price));
+                const minP = Math.min(...pts.map(p => p.price));
+                const range = maxP - minP || 1;
+                const w = 100 / Math.max(pts.length - 1, 1);
+                const points = pts.map((p, i) => `${i * w},${((maxP - p.price) / range * 70 + 5).toFixed(1)}`).join(' ');
+                return (
+                  <svg viewBox={`0 0 100 80`} preserveAspectRatio="none" style={{width:'100%', height:'100%'}}>
+                    <polyline points={points} fill="none" stroke="#5b8dee" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                    <line x1="0" y1={((maxP - selectedPrice) / range * 70 + 5).toFixed(1)} x2="100" y2={((maxP - selectedPrice) / range * 70 + 5).toFixed(1)} stroke="#f0c060" strokeWidth="0.5" strokeDasharray="2,2" vectorEffect="non-scaling-stroke" />
+                  </svg>
+                );
+              })()}
+            </div>
+            <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.78rem', color:'#8a92b2', marginBottom:10}}>
+              <span>現在値: <strong style={{color:'#e8e6ff'}}>{selectedPrice.toLocaleString()}WC</strong></span>
+              <span>保有: {holdings[selectedStock]?.amount ?? 0}株</span>
+            </div>
+            {/* 購入UI */}
+            <div style={{display:'flex', gap:6, alignItems:'center'}}>
+              <input type="number" min={1} value={buyAmt} onChange={e => setBuyAmt(Math.max(1, parseInt(e.target.value)||1))}
+                style={{width:70, padding:'5px 8px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:5, fontSize:'0.8rem'}} />
+              <span style={{fontSize:'0.75rem', color:'#8a92b2'}}>株</span>
+              <span style={{fontSize:'0.8rem', color:'#4caf87', flex:1}}>{(selectedPrice * buyAmt).toLocaleString()}WC</span>
+              <button onClick={handleBuy} disabled={(player?.wealthCoin ?? 0) < selectedPrice * buyAmt}
+                style={{padding:'6px 14px', background:'linear-gradient(135deg,#4caf87,#2d8060)', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.8rem',
+                  opacity:(player?.wealthCoin ?? 0) >= selectedPrice * buyAmt ? 1 : 0.5}}>
+                📈 購入
+              </button>
+            </div>
+            <div style={{fontSize:'0.68rem', color:'#4a5070', marginTop:4}}>※購入後24時間は売却禁止</div>
+          </div>
+        </>
+      )}
+
+      {stockView === 'portfolio' && (
+        <div>
+          <div style={{fontSize:'0.82rem', color:'#8a92b2', marginBottom:10}}>保有株式の一覧です</div>
+          {STOCK_ID_LIST.filter(id => (holdings[id]?.amount ?? 0) > 0).length === 0 && (
+            <p style={{color:'#4a5070', textAlign:'center', padding:20}}>保有株式がありません</p>
+          )}
+          {STOCK_ID_LIST.filter(id => (holdings[id]?.amount ?? 0) > 0).map(id => {
+            const h = holdings[id];
+            const m = STOCK_MASTERS[id];
+            const currentPrice = getPrice(id);
+            const totalVal = currentPrice * h.amount;
+            const profit = (currentPrice - h.avgBuyPrice) * h.amount;
+            const now = Date.now();
+            const canSell = now - h.purchasedAt >= 24 * 60 * 60 * 1000;
+            const remainMin = canSell ? 0 : Math.ceil((h.purchasedAt + 24 * 60 * 60 * 1000 - now) / 60000);
+            return (
+              <div key={id} style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'12px 14px', marginBottom:8}}>
+                <div style={{display:'flex', alignItems:'center', gap:6, marginBottom:6}}>
+                  <span>{m.icon}</span>
+                  <span style={{fontWeight:700, fontSize:'0.88rem'}}>{m.name}</span>
+                  <span style={{marginLeft:'auto', fontSize:'0.78rem', color:'#8a92b2'}}>{h.amount}株</span>
+                </div>
+                <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.78rem', marginBottom:4}}>
+                  <span style={{color:'#8a92b2'}}>取得均価: {h.avgBuyPrice.toLocaleString()}WC</span>
+                  <span style={{color:'#e8e6ff'}}>評価額: {totalVal.toLocaleString()}WC</span>
+                </div>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                  <span style={{fontSize:'0.82rem', fontWeight:700, color: profit >= 0 ? '#4caf87' : '#e05555'}}>
+                    {profit >= 0 ? '+' : ''}{profit.toLocaleString()}WC
+                  </span>
+                  <button onClick={() => handleSell(id)} disabled={!canSell}
+                    style={{padding:'5px 12px', background: canSell ? 'linear-gradient(135deg,#e05555,#c03030)' : '#2d3752',
+                      color: canSell ? '#fff' : '#4a5070', border:'none', borderRadius:5, cursor: canSell ? 'pointer' : 'not-allowed', fontSize:'0.78rem', fontWeight:700}}>
+                    {canSell ? '📉 全売却' : `🔒 ${remainMin}分後`}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{marginTop:12, padding:'10px 14px', background:'rgba(91,141,238,0.07)', border:'1px solid #2d3752', borderRadius:8}}>
+            <div style={{fontSize:'0.78rem', color:'#8a92b2'}}>累計投資利益: <strong style={{color:'#f0c060'}}>{(player?.totalStockProfit ?? 0).toLocaleString()}WC</strong></div>
+          </div>
+        </div>
+      )}
+
+      {stockView === 'ranking' && (
+        <div>
+          <div style={{display:'flex', gap:6, marginBottom:10}}>
+            {[{id:'profit' as const, label:'投資利益'},{id:'assets' as const, label:'株資産'}].map(t => (
+              <button key={t.id} onClick={() => setRankTab(t.id)}
+                style={{flex:1, padding:'6px', fontSize:'0.75rem', background: rankTab===t.id ? 'rgba(91,141,238,0.2)' : '#1c2235',
+                  border:`1px solid ${rankTab===t.id ? '#5b8dee' : '#2d3752'}`, color: rankTab===t.id ? '#e8e6ff' : '#8a92b2', borderRadius:6, cursor:'pointer'}}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {stockRanking.length === 0 && <p style={{color:'#4a5070', textAlign:'center', padding:20}}>データなし</p>}
+          {[...stockRanking].sort((a,b) => rankTab==='profit' ? b.totalProfit-a.totalProfit : b.totalAssets-a.totalAssets).slice(0,10).map((e,i) => (
+            <div key={e.uid} style={{display:'flex', alignItems:'center', gap:8, padding:'6px 10px', background:'#1c2235', border:'1px solid #2d3752', borderRadius:6, marginBottom:4}}>
+              <span style={{color: i===0?'#f0c060':i===1?'#8a92b2':i===2?'#cd7f32':'#4a5070', width:20, fontSize:'0.8rem'}}>{i+1}.</span>
+              <span style={{flex:1, fontSize:'0.85rem'}}>{e.displayName}</span>
+              <span style={{fontSize:'0.78rem', color:'#4caf87'}}>
+                {rankTab==='profit' ? `${e.totalProfit.toLocaleString()}WC` : `${e.totalAssets.toLocaleString()}WC`}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type MainTab = 'home' | 'gamble' | 'rank' | 'mission' | 'ranking' | 'exchange' | 'spectate' | 'stock';
 
 // ============================================================
 // デイリーカジノ設定
@@ -3256,6 +3521,7 @@ export function GambleScreen() {
           ['ranking','🏆','順位'],
           ['exchange','🔄','両替'],
           ['spectate','📺','観戦'],
+          ['stock','📈','株式'],
         ] as [MainTab, string, string][]).map(([id, icon, name]) => (
           <button key={id} onClick={() => setMainTab(id)}
             style={{ flexShrink: 0, padding: '6px 7px', fontSize: '0.68rem', fontWeight: 700, background: mainTab === id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${mainTab === id ? '#5b8dee' : '#2d3752'}`, color: mainTab === id ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
@@ -3266,6 +3532,7 @@ export function GambleScreen() {
       </div>
 
       {mainTab === 'exchange' && <ExchangePanel />}
+      {mainTab === 'stock' && <StockMarketPanel />}
       {mainTab === 'ranking' && <GambleRankingPanel />}
       {mainTab === 'spectate' && <SpectatePanel />}
       {mainTab === 'rank' && <RankPanel />}

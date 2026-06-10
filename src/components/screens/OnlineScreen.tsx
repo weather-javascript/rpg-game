@@ -17,10 +17,12 @@ import {
   subscribeActivityFeed, ActivityFeedEntry, postActivityFeed,
   submitProposal,
   deleteBoardMessage, addBoardReaction, removeBoardReaction, addBoardReply, voteBoardPoll,
+  sendGold, fetchMyTransfers, fetchTransferRanking, fetchOnlinePlayerList, TransferRecord,
 } from '../../services/multiplayer';
+import { fetchLoginBonus, claimLoginBonus, LOGIN_BONUS_REWARDS, LoginBonusState } from '../../services/database';
 import type { OnlineUser, BoardMessage, AuctionListing } from '../../types/game';
 
-type SubTab = 'online' | 'board' | 'auction' | 'activity' | 'ranking' | 'proposal';
+type SubTab = 'online' | 'board' | 'auction' | 'activity' | 'ranking' | 'proposal' | 'transfer';
 type ActivitySubTab = 'world_news' | 'player_status' | 'world_status' | 'gamble_flash' | 'natural_news';
 
 // ============================================================
@@ -1034,6 +1036,259 @@ function ProposalPanel() {
 }
 
 // ============================================================
+// 送金パネル
+// ============================================================
+function TransferPanel() {
+  const player = useGameStore(s => s.player);
+  const setPlayer = useGameStore(s => s.setPlayer);
+  const saveGame = useGameStore(s => s.saveGame);
+  const addNotification = useGameStore(s => s.addNotification);
+  const [tab, setTab] = useState<'send' | 'history' | 'ranking'>('send');
+  const [playerList, setPlayerList] = useState<{ uid: string; displayName: string; level: number }[]>([]);
+  const [selectedUid, setSelectedUid] = useState('');
+  const [amount, setAmount] = useState('');
+  const [sending, setSending] = useState(false);
+  const [history, setHistory] = useState<TransferRecord[]>([]);
+  const [ranking, setRanking] = useState<{ uid: string; displayName: string; totalSent: number; totalReceived: number }[]>([]);
+  const [rankMode, setRankMode] = useState<'sent' | 'received'>('sent');
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  useEffect(() => { fetchOnlinePlayerList().then(setPlayerList); }, []);
+
+  useEffect(() => {
+    if (tab === 'history' && player) {
+      setLoadingHistory(true);
+      fetchMyTransfers(player.uid).then(h => { setHistory(h); setLoadingHistory(false); });
+    }
+    if (tab === 'ranking') {
+      fetchTransferRanking().then(setRanking);
+    }
+  }, [tab, player]);
+
+  if (!player) return null;
+  const locked = player.stats.level < 10;
+
+  if (locked) return (
+    <div style={{textAlign:'center', padding:40, color:'#8a92b2'}}>
+      <div style={{fontSize:'2rem', marginBottom:8}}>🔒</div>
+      <div>レベル10以上で解放されます</div>
+      <div style={{fontSize:'0.78rem', marginTop:4, color:'#4a5070'}}>現在 Lv.{player.stats.level}</div>
+    </div>
+  );
+
+  const fee = Math.floor((parseInt(amount) || 0) * 0.05);
+  const received = (parseInt(amount) || 0) - fee;
+  const others = playerList.filter(p => p.uid !== player.uid);
+
+  return (
+    <div>
+      <div style={{display:'flex', gap:6, marginBottom:12}}>
+        {(['send','history','ranking'] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            style={{padding:'6px 12px', fontSize:'0.78rem', background: tab===t ? 'rgba(240,192,96,0.15)' : '#1c2235', border:`1px solid ${tab===t ? '#f0c060' : '#2d3752'}`, color: tab===t ? '#f0c060' : '#8a92b2', borderRadius:6, cursor:'pointer'}}>
+            {t === 'send' ? '💸 送金' : t === 'history' ? '📜 履歴' : '🏆 ランキング'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'send' && (
+        <div style={{display:'flex', flexDirection:'column', gap:10}}>
+          <div style={{background:'rgba(240,192,96,0.07)', border:'1px solid #2d3752', borderRadius:8, padding:12, fontSize:'0.8rem', color:'#8a92b2'}}>
+            💡 手数料5%が差し引かれます（差額はゲームから消滅）
+          </div>
+          <div>
+            <div style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:4}}>送金先プレイヤー</div>
+            <select value={selectedUid} onChange={e => setSelectedUid(e.target.value)}
+              style={{width:'100%', padding:'8px', background:'#1c2235', border:'1px solid #2d3752', borderRadius:6, color:'#e8e6ff', fontSize:'0.85rem'}}>
+              <option value=''>選択してください</option>
+              {others.map(p => <option key={p.uid} value={p.uid}>{p.displayName} (Lv.{p.level})</option>)}
+            </select>
+          </div>
+          <div>
+            <div style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:4}}>金額 (所持: {player.gold.toLocaleString()}G)</div>
+            <input type='number' value={amount} onChange={e => setAmount(e.target.value)}
+              style={{width:'100%', padding:'8px', background:'#1c2235', border:'1px solid #2d3752', borderRadius:6, color:'#e8e6ff', fontSize:'0.85rem', boxSizing:'border-box'}}
+              placeholder='0' min={1} max={player.gold} />
+          </div>
+          {parseInt(amount) > 0 && (
+            <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:6, padding:10, fontSize:'0.8rem'}}>
+              <div style={{display:'flex', justifyContent:'space-between'}}><span style={{color:'#8a92b2'}}>送金額</span><span>{parseInt(amount).toLocaleString()}G</span></div>
+              <div style={{display:'flex', justifyContent:'space-between'}}><span style={{color:'#8a92b2'}}>手数料(5%)</span><span style={{color:'#e05555'}}>-{fee.toLocaleString()}G</span></div>
+              <div style={{display:'flex', justifyContent:'space-between', marginTop:4, paddingTop:4, borderTop:'1px solid #2d3752'}}><span style={{color:'#f0c060', fontWeight:700}}>相手受取額</span><span style={{color:'#f0c060', fontWeight:700}}>{received.toLocaleString()}G</span></div>
+            </div>
+          )}
+          <button onClick={async () => {
+            if (!selectedUid || !parseInt(amount)) { addNotification('error', '送金先と金額を入力してください'); return; }
+            setSending(true);
+            const result = await sendGold({ uid: player.uid, displayName: player.displayName, gold: player.gold }, selectedUid, parseInt(amount));
+            if (result.success) {
+              setPlayer({ ...player, gold: player.gold - parseInt(amount) });
+              await saveGame();
+              addNotification('success', `${received.toLocaleString()}Gを送金しました`);
+              setAmount('');
+              setSelectedUid('');
+            } else {
+              addNotification('error', result.error ?? '送金失敗');
+            }
+            setSending(false);
+          }} disabled={sending || !selectedUid || !parseInt(amount)}
+            style={{padding:'10px', background:'#f0c060', color:'#0d1117', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'0.9rem', opacity: (sending || !selectedUid || !parseInt(amount)) ? 0.5 : 1}}>
+            {sending ? '送金中...' : '💸 送金する'}
+          </button>
+        </div>
+      )}
+
+      {tab === 'history' && (
+        <div>
+          {loadingHistory ? <div style={{color:'#8a92b2', textAlign:'center', padding:24}}>読み込み中...</div>
+          : history.length === 0 ? <div style={{color:'#4a5070', textAlign:'center', padding:24}}>履歴がありません</div>
+          : history.map(h => {
+            const isSent = h.senderUid === player.uid;
+            return (
+              <div key={h.id} style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:6, padding:'10px 12px', marginBottom:6}}>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                  <span style={{fontSize:'0.85rem', fontWeight:700, color: isSent ? '#e05555' : '#4caf87'}}>
+                    {isSent ? `↑ ${h.receiverName}へ送金` : `↓ ${h.senderName}から受取`}
+                  </span>
+                  <span style={{fontWeight:700, color: isSent ? '#e05555' : '#4caf87', fontSize:'0.9rem'}}>
+                    {isSent ? `-${h.amount.toLocaleString()}G` : `+${h.received.toLocaleString()}G`}
+                  </span>
+                </div>
+                {isSent && <div style={{fontSize:'0.72rem', color:'#4a5070', marginTop:2}}>手数料: {h.fee.toLocaleString()}G消滅</div>}
+                <div style={{fontSize:'0.7rem', color:'#4a5070', marginTop:2}}>{new Date(h.createdAt).toLocaleString('ja-JP')}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tab === 'ranking' && (
+        <div>
+          <div style={{display:'flex', gap:6, marginBottom:10}}>
+            {(['sent','received'] as const).map(m => (
+              <button key={m} onClick={() => setRankMode(m)}
+                style={{padding:'5px 10px', fontSize:'0.78rem', background: rankMode===m ? 'rgba(240,192,96,0.15)' : '#1c2235', border:`1px solid ${rankMode===m ? '#f0c060' : '#2d3752'}`, color: rankMode===m ? '#f0c060' : '#8a92b2', borderRadius:6, cursor:'pointer'}}>
+                {m === 'sent' ? '💸 総送金額' : '💰 総受取額'}
+              </button>
+            ))}
+          </div>
+          {[...ranking].sort((a,b) => rankMode === 'sent' ? b.totalSent - a.totalSent : b.totalReceived - a.totalReceived).slice(0,20).map((r, i) => (
+            <div key={r.uid} style={{display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background:'#1c2235', border:'1px solid #2d3752', borderRadius:6, marginBottom:4}}>
+              <span style={{fontSize:'1.1rem', width:24, textAlign:'center'}}>{['🥇','🥈','🥉'][i] ?? `${i+1}.`}</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:'0.85rem', fontWeight:700}}>{r.displayName}</div>
+              </div>
+              <span style={{color:'#f0c060', fontSize:'0.85rem', fontWeight:700}}>
+                {rankMode === 'sent' ? `${r.totalSent.toLocaleString()}G送金` : `${r.totalReceived.toLocaleString()}G受取`}
+              </span>
+            </div>
+          ))}
+          {ranking.length === 0 && <div style={{color:'#4a5070', textAlign:'center', padding:24}}>データなし</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+// ログインボーナスモーダル (OnlineScreenに統合)
+// ============================================================
+export function LoginBonusButton() {
+  const player = useGameStore(s => s.player);
+  const setPlayer = useGameStore(s => s.setPlayer);
+  const saveGame = useGameStore(s => s.saveGame);
+  const addNotification = useGameStore(s => s.addNotification);
+  const [open, setOpen] = useState(false);
+  const [state, setState] = useState<LoginBonusState | null>(null);
+  const [claiming, setClaiming] = useState(false);
+
+  const LOGIN_TITLE_MILESTONES = [
+    { count: 1,  id: 'login_regular' },
+    { count: 7,  id: 'login_adventurer' },
+    { count: 14, id: 'login_challenger' },
+    { count: 21, id: 'login_resilient' },
+    { count: 30, id: 'login_master' },
+  ];
+
+  const load = async () => {
+    if (!player) return;
+    const s = await fetchLoginBonus(player.uid);
+    setState(s);
+  };
+
+  useEffect(() => { if (open) load(); }, [open, player]);
+
+  const handleClaim = async (day: number) => {
+    if (!player || claiming) return;
+    setClaiming(true);
+    const result = await claimLoginBonus(player.uid, day);
+    if (result.success) {
+      const updates: Partial<typeof player> = {};
+      if (result.gold > 0) updates.gold = player.gold + result.gold;
+      // ログインボーナス称号チェック
+      const totalClaimed = (state?.claimed.length ?? 0) + 1;
+      const newAch = [...(player.unlockedAchievements ?? [])];
+      LOGIN_TITLE_MILESTONES.forEach(m => {
+        if (totalClaimed >= m.count && !newAch.includes(m.id)) newAch.push(m.id);
+      });
+      updates.unlockedAchievements = newAch;
+      setPlayer({ ...player, ...updates });
+      await saveGame();
+      const label = result.special === 'treasure_box' ? '宝箱' : `${result.gold.toLocaleString()}G`;
+      addNotification('success', `${day}日目ボーナス受取: ${label}！`);
+      await load();
+    } else {
+      addNotification('error', result.error ?? 'エラー');
+    }
+    setClaiming(false);
+  };
+
+  if (!player) return null;
+  const DAY_LABELS = ['','1000G','3000G','5000G','10000G','30000G','50000G','🎁宝箱'];
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)}
+        style={{padding:'8px 14px', background:'rgba(240,192,96,0.15)', border:'1px solid #f0c060', borderRadius:8, color:'#f0c060', cursor:'pointer', fontSize:'0.85rem', fontWeight:700}}>
+        🎁 ログインボーナス
+      </button>
+      {open && (
+        <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center'}} onClick={() => setOpen(false)}>
+          <div style={{background:'#161a2e', border:'1px solid #2d3752', borderRadius:12, padding:20, width:'min(400px,92vw)', maxHeight:'80vh', overflowY:'auto'}} onClick={e => e.stopPropagation()}>
+            <h3 style={{color:'#f0c060', marginBottom:4}}>🎁 ログインボーナス</h3>
+            <p style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:16}}>毎週リセット。順番に受け取ってください。</p>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8, marginBottom:16}}>
+              {LOGIN_BONUS_REWARDS.map(r => {
+                const claimed = state?.claimed.includes(r.day) ?? false;
+                const canClaim = !claimed && (r.day === 1 || (state?.claimed.includes(r.day - 1) ?? false));
+                return (
+                  <div key={r.day} style={{background: claimed ? 'rgba(76,175,87,0.1)' : canClaim ? 'rgba(240,192,96,0.1)' : '#1c2235', border:`1px solid ${claimed ? '#4caf57' : canClaim ? '#f0c060' : '#2d3752'}`, borderRadius:8, padding:12, textAlign:'center'}}>
+                    <div style={{fontSize:'0.7rem', color:'#8a92b2', marginBottom:4}}>{r.day}日目</div>
+                    <div style={{fontSize:'1.2rem', marginBottom:6}}>{r.special === 'treasure_box' ? '🎁' : '💰'}</div>
+                    <div style={{fontSize:'0.8rem', fontWeight:700, color: claimed ? '#4caf87' : '#f0c060', marginBottom:6}}>{DAY_LABELS[r.day]}</div>
+                    {claimed
+                      ? <div style={{fontSize:'0.72rem', color:'#4caf87'}}>✅ 受取済み</div>
+                      : canClaim
+                        ? <button onClick={() => handleClaim(r.day)} disabled={claiming}
+                            style={{padding:'5px 12px', background:'#f0c060', color:'#0d1117', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.78rem'}}>
+                            受け取る
+                          </button>
+                        : <div style={{fontSize:'0.72rem', color:'#4a5070'}}>🔒 未解放</div>
+                    }
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:4}}>
+              今週: {state?.claimed.length ?? 0}/7日受取済み
+            </div>
+            <button onClick={() => setOpen(false)} style={{width:'100%', padding:'8px', background:'#2d3752', border:'none', borderRadius:8, color:'#e8e6ff', cursor:'pointer'}}>閉じる</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ============================================================
 // メイン OnlineScreen
 // ============================================================
 export function OnlineScreen() {
@@ -1051,12 +1306,16 @@ export function OnlineScreen() {
     { id:'board'    as SubTab, label:'掲示板',     icon:'chat' },
     { id:'auction'  as SubTab, label:'オークション', icon:'tag' },
     { id:'ranking'  as SubTab, label:'ランキング', icon:'trophy' },
+    { id:'transfer' as SubTab, label:'送金',       icon:'coin' },
     { id:'proposal' as SubTab, label:'提案',       icon:'ballot_box' },
   ];
 
   return (
     <div style={{padding:'12px 8px'}}>
-      <h2 style={{fontFamily:'Cinzel,serif', color:'#f0c060', marginBottom:12, borderBottom:'1px solid #2d3752', paddingBottom:8}}>🌐 オンライン</h2>
+      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, borderBottom:'1px solid #2d3752', paddingBottom:8}}>
+        <h2 style={{fontFamily:'Cinzel,serif', color:'#f0c060', margin:0}}>🌐 オンライン</h2>
+        <LoginBonusButton />
+      </div>
       <div style={{display:'flex', gap:4, marginBottom:12, overflowX:'auto'}}>
         {SUB_TABS.map(t => (
           <button key={t.id} onClick={() => setSubTab(t.id)}
@@ -1070,6 +1329,7 @@ export function OnlineScreen() {
       {subTab === 'board'    && <BoardPanel />}
       {subTab === 'auction'  && <AuctionPanel />}
       {subTab === 'ranking'  && <RankingPanel />}
+      {subTab === 'transfer' && <TransferPanel />}
       {subTab === 'proposal' && <ProposalPanel />}
     </div>
   );

@@ -268,6 +268,12 @@ const TITLE_MASTER: { id: string; label: string; condition: (p: PlayerData) => b
   { id: 'goldear1m',label: '💸 金貨の化身',         condition: p => (p.lifetimeStats?.totalGoldEarned ?? 0) >= 1_000_000 },
   { id: 'gokureich',label: '❄️🔥 極の征服者',      condition: p => (p.dungeonClearedCount?.['frozen_cave'] ?? 0) >= 1 },
   { id: 'zerokiller',label:'⚡ 零の破壊者',         condition: p => (p.unlockedAchievements ?? []).includes('zerokiller') },
+  // ログインボーナス称号
+  { id: 'login_regular',    label: '🏠 常連客',         condition: p => (p.unlockedAchievements ?? []).includes('login_regular') },
+  { id: 'login_adventurer', label: '🗺️ 冒険好き',       condition: p => (p.unlockedAchievements ?? []).includes('login_adventurer') },
+  { id: 'login_challenger', label: '🔥 毎日挑戦者',      condition: p => (p.unlockedAchievements ?? []).includes('login_challenger') },
+  { id: 'login_resilient',  label: '💪 不屈の旅人',      condition: p => (p.unlockedAchievements ?? []).includes('login_resilient') },
+  { id: 'login_master',     label: '⭐ ログインマスター', condition: p => (p.unlockedAchievements ?? []).includes('login_master') },
 ];
 
 const PROFILE_ICONS = ['⚔️','🛡️','🧙','🎣','💰','🏆','🌟','👑','🔥','💎','🐉','⚡','🌊','🌙','🎲','🗡️','🧪','🌱','💀','🦊'];

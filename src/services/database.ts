@@ -262,3 +262,64 @@ export function subscribeToAuctions(
     callback(listings);
   });
 }
+
+// ============================================================
+// ログインボーナス
+// ============================================================
+export interface LoginBonusState {
+  uid: string;
+  weekStart: number;   // 今週のサイクル開始Timestamp(ms)
+  claimed: number[];   // 受取済み日数(1-7)
+  updatedAt: number;
+}
+
+const LOGIN_BONUS_REWARDS: { day: number; gold: number; special?: string }[] = [
+  { day: 1, gold: 1000 },
+  { day: 2, gold: 3000 },
+  { day: 3, gold: 5000 },
+  { day: 4, gold: 10000 },
+  { day: 5, gold: 30000 },
+  { day: 6, gold: 50000 },
+  { day: 7, gold: 0, special: 'treasure_box' },
+];
+
+export { LOGIN_BONUS_REWARDS };
+
+function getWeekStart(): number {
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun
+  const diff = now.getDate() - day;
+  const weekStart = new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0);
+  return weekStart.getTime();
+}
+
+export async function fetchLoginBonus(uid: string): Promise<LoginBonusState> {
+  const ref = doc(db, 'login_bonus', uid);
+  const snap = await getDoc(ref);
+  const weekStart = getWeekStart();
+  if (!snap.exists()) {
+    return { uid, weekStart, claimed: [], updatedAt: Date.now() };
+  }
+  const data = snap.data() as LoginBonusState;
+  // 週が変わっていたらリセット
+  if (data.weekStart < weekStart) {
+    return { uid, weekStart, claimed: [], updatedAt: Date.now() };
+  }
+  return data;
+}
+
+export async function claimLoginBonus(uid: string, day: number): Promise<{ success: boolean; gold: number; special?: string; error?: string }> {
+  const state = await fetchLoginBonus(uid);
+  if (state.claimed.includes(day)) return { success: false, gold: 0, error: '受取済みです' };
+  // 前の日を全部受け取っていないとNG (day-1 まで全部claimed)
+  for (let d = 1; d < day; d++) {
+    if (!state.claimed.includes(d)) return { success: false, gold: 0, error: `${d}日目を先に受け取ってください` };
+  }
+  const reward = LOGIN_BONUS_REWARDS.find(r => r.day === day);
+  if (!reward) return { success: false, gold: 0, error: '無効な日数です' };
+
+  const newClaimed = [...state.claimed, day];
+  const ref = doc(db, 'login_bonus', uid);
+  await setDoc(ref, { uid, weekStart: state.weekStart, claimed: newClaimed, updatedAt: Date.now() });
+  return { success: true, gold: reward.gold, special: reward.special };
+}

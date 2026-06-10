@@ -380,8 +380,16 @@ export interface PlayerData {
   monthlyGambleWonResetAt?: number;
   // ミッション進捗
   missionProgress?: MissionProgress;
-  // 冒険ナビ報酬受け取り済み
-  naviClaimed?: Record<string, boolean>;
+  // 送金統計
+  totalGoldSent?: number;
+  totalGoldReceived?: number;
+  // NPC依頼
+  npcQuestAcceptances?: QuestAcceptance[];
+  totalQuestCompleted?: number;
+  totalQuestRewardGold?: number;
+  // 株式保有
+  stockHoldings?: Record<string, StockHolding>; // key: StockId
+  totalStockProfit?: number;
   // プロフィール
   profile?: {
     icon: string;          // 絵文字アイコン
@@ -607,6 +615,65 @@ export interface PokerTable {
   createdAt: number;
   expiresAt: number;
   lastActionAt: number;
+}
+
+// ============================================================
+// NPC依頼システム型
+// ============================================================
+export type QuestRank = 'C' | 'B' | 'A' | 'S' | 'SS';
+
+export interface NpcQuest {
+  id: string;
+  npcName: string;
+  npcIcon: string;
+  rank: QuestRank;
+  title: string;
+  description: string;
+  requiredItemId: string;
+  requiredAmount: number;
+  rewardGold: number;
+  expiresAt: number;   // タイムスタンプ（定期更新）
+  createdAt: number;
+}
+
+export interface QuestAcceptance {
+  questId: string;
+  acceptedAt: number;
+  completedAt?: number;
+  rewardGold: number;
+}
+
+// ============================================================
+// 株式市場型
+// ============================================================
+export type StockId =
+  | 'wealth_mining'
+  | 'wealth_fishery'
+  | 'wealth_casino'
+  | 'wealth_tech'
+  | 'wealth_energy'
+  | 'wealth_logistics'
+  | 'wealth_foods'
+  | 'wealth_finance';
+
+export interface StockMaster {
+  id: StockId;
+  name: string;
+  icon: string;
+  basePrice: number;
+}
+
+export interface StockPricePoint {
+  timestamp: number;
+  price: number;
+  news?: string;   // イベント発生時のニュース文
+}
+
+export interface StockHolding {
+  stockId: StockId;
+  amount: number;
+  avgBuyPrice: number;   // 平均購入価格
+  purchasedAt: number;   // 最後の購入時刻（24h売却禁止用）
 }
 
 // ============================================================
