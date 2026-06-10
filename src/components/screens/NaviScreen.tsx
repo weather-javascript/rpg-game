@@ -317,10 +317,9 @@ function DungeonProgress({ player }: { player: PlayerData }) {
           const canTry = player.stats.level >= reqLevel;
           const prevDone = idx === 0 || (cleared[MAIN_DUNGEON_ORDER[idx - 1]] ?? 0) > 0;
 
-          let _statusColor = '#2d3752';
           let statusText = '🔒';
-          if (done) { _statusColor = '#4caf87'; statusText = '✅'; }
-          else if (canTry && prevDone) { statusColor = '#f0c060'; statusText = '👉'; }
+          if (done) { statusText = '✅'; }
+          else if (canTry && prevDone) { statusText = '👉'; }
 
           return (
             <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
