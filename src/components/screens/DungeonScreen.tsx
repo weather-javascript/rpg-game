@@ -45,15 +45,23 @@ interface TurnBattleState {
   goldGained: number;
   drops: { itemId: string; amount: number }[];
   isDefending: boolean;
-  // 武器スキル用
+  // ===== 共通Manaシステム =====
+  // 武器固有ではなく戦闘全体で共有する単一のManaリソース
+  // 獲得方法・消費量は武器スキル定義で管理する
   weaponMana: number;
   weaponManaMax: number;
   ultimateReady: boolean;
+  // ===== 共通バフ・デバフシステム =====
+  // 個別変数の代わりにバフ配列で統一管理
+  // { type, value, turns } 形式で毒/シールド/攻撃上昇等を一括管理
+  buffs: import('../../types/game').CombatBuff[];
+  // 後方互換：poisonBuff/poisonDmgはbuffsから派生（削除は段階的に）
   poisonBuff: number;
   poisonDmg: number;
   equippedWeaponId: string | null;
   skillTurn: number;
   // アイテムクールダウン管理 { itemId: 残りターン数 }
+  // tickCooldowns()で一括デクリメント
   itemCooldowns: Record<string, number>;
   // 単発攻撃の一時保存（ターゲット選択後に使う）
   pendingAction: null | { type: 'attack' | 'weapon' | 'ultimate'; itemId?: string };
@@ -352,6 +360,8 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       weaponMana: initialMana ?? 0,
       weaponManaMax: manaSkill?.manaMax ?? 1200,
       ultimateReady: false,
+      // 共通バフ配列（毒などは{ type:'poison', value:5, turns:10 }形式）
+      buffs: [],
       poisonBuff: 0,
       poisonDmg: 5,
       equippedWeaponId: hotbarWeaponId,
@@ -427,16 +437,18 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     let newLog = [...prevBattle.log];
     let newBattle = { ...prevBattle, enemies: prevBattle.enemies.map(e => ({ ...e })) };
 
-    // 武器パッシブスキル処理
-    const weaponItem = prevBattle.equippedWeaponId ? ITEM_MASTER[prevBattle.equippedWeaponId] : null;
+    // ===== 共通ターン処理：クールダウンデクリメント =====
     const newSkillTurn = prevBattle.skillTurn + 1;
     newBattle = { ...newBattle, skillTurn: newSkillTurn };
-    // クールダウンをデクリメント
+    // tickCooldowns()で一括管理
     const newCooldowns: Record<string, number> = {};
     for (const [id, cd] of Object.entries(prevBattle.itemCooldowns)) {
       if (cd > 1) newCooldowns[id] = cd - 1;
     }
     newBattle = { ...newBattle, itemCooldowns: newCooldowns };
+
+    // ===== 共通ターン処理：武器スキル（onTurnEnd相当） =====
+    const weaponItem = prevBattle.equippedWeaponId ? ITEM_MASTER[prevBattle.equippedWeaponId] : null;
     if (weaponItem?.weaponSkills) {
       for (const skill of weaponItem.weaponSkills) {
         if (skill.type === 'penetrate_per_turn') {
@@ -453,6 +465,8 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           if (regen.hpRestore) { changeHp(regen.hpRestore); newLog.push({ text: `💚 ${weaponItem.name}の回復！ HP+${regen.hpRestore}`, color: '#4caf87' }); }
           if (regen.satietyRestore) { changeSatiety(regen.satietyRestore); }
         }
+        // ===== 共通Manaシステム：mana_charge（変幻など） =====
+        // 毎ターン固定量獲得。武器固有のmanaPerTurn/manaMaxだがMana変数は共通。
         if (skill.type === 'mana_charge') {
           const ms = skill as WeaponManaSkill;
           const newMana = Math.min(prevBattle.weaponMana + ms.manaPerTurn, ms.manaMax);
@@ -461,6 +475,8 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
             newLog.push({ text: `⭐ 必殺技「${weaponItem.weaponUltimate?.name}」が使えるようになった！`, color: '#f0c060' });
           }
         }
+        // ===== 共通Manaシステム：mana_per_turn_random（Diamond Staffなど） =====
+        // 毎ターンランダム量獲得。獲得方法は武器固有だがMana変数は共通。
         if (skill.type === 'mana_per_turn_random') {
           const s = skill as import('../../types/game').WeaponManaPerTurnRandomSkill;
           const steps = Math.floor((s.manaMax - s.manaMin) / s.manaStep) + 1;
@@ -471,7 +487,9 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         }
       }
     }
-    // オフハンド装備のスキル処理（hotbarの全アイテムをチェック）
+
+    // ===== 共通オフハンド処理：hotbarの全スロットをチェック =====
+    // offhand_mana_on_heal は回復使用時に処理するため、ここではmana_per_turn_randomのみ
     for (const slotId of localEquip.hotbar) {
       if (!slotId || slotId === prevBattle.equippedWeaponId) continue;
       const offItem = ITEM_MASTER[slotId];
@@ -487,7 +505,23 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         }
       }
     }
-    // 毒バフ
+
+    // ===== 共通バフ・デバフ処理（onTurnEnd）=====
+    // buffs配列を走査して毒ダメージなどを適用し、ターン数をデクリメント
+    let newBuffs = newBattle.buffs ? [...newBattle.buffs] : [];
+    const remainBuffs: typeof newBuffs = [];
+    for (const buff of newBuffs) {
+      if (buff.type === 'poison') {
+        newBattle.enemies = newBattle.enemies.map(e =>
+          e.hp > 0 ? { ...e, hp: Math.max(0, e.hp - buff.value) } : e
+        );
+        newLog.push({ text: `☠️ 毒！ 全体${buff.value}ダメージ (残${buff.turns - 1}ターン)`, color: '#9b6df0' });
+      }
+      if (buff.turns - 1 > 0) remainBuffs.push({ ...buff, turns: buff.turns - 1 });
+    }
+    newBattle = { ...newBattle, buffs: remainBuffs };
+
+    // 後方互換：poisonBuff（旧来の直接変数も処理）
     if (newBattle.poisonBuff > 0) {
       newBattle.enemies = newBattle.enemies.map(e =>
         e.hp > 0 ? { ...e, hp: Math.max(0, e.hp - newBattle.poisonDmg) } : e
@@ -821,6 +855,18 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     const newPoisonDmg = ult.postBuffPoisonDmg ?? 0;
     if (newPoisonBuff > 0) logEntries.push({ text: `☠️ ${newPoisonBuff}ターン毒付与！（毎ターン${newPoisonDmg}ダメージ）`, color: '#9b6df0' });
 
+    // 毒を共通バフ配列に追加
+    let newBuffsAfterUlt = battle.buffs ? [...battle.buffs] : [];
+    if (newPoisonBuff > 0) {
+      const existingPoison = newBuffsAfterUlt.findIndex(b => b.type === 'poison');
+      const poisonBuff = { type: 'poison', value: newPoisonDmg, turns: newPoisonBuff };
+      if (existingPoison >= 0) {
+        newBuffsAfterUlt[existingPoison] = poisonBuff;
+      } else {
+        newBuffsAfterUlt = [...newBuffsAfterUlt, poisonBuff];
+      }
+    }
+
     // 必殺技は全体攻撃
     const newEnemies = battle.enemies.map(e =>
       e.hp > 0 ? { ...e, hp: Math.max(0, e.hp - dmgTotal) } : e
@@ -866,7 +912,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         logEntries.push({ text: 'KX-G21が眷属を再召喚した！', color: '#e05555' });
         finalEnemies = spawnKxMinions(np);
       }
-      const afterUlt: TurnBattleState = { ...battle, enemies: finalEnemies, log: [...battle.log, ...logEntries], turn: 'monster', isDefending: false, weaponMana: 0, ultimateReady: false, poisonBuff: newPoisonBuff, poisonDmg: newPoisonDmg, kx: { ...battle.kx, hp: newKxHp, phase: np } };
+      const afterUlt: TurnBattleState = { ...battle, enemies: finalEnemies, log: [...battle.log, ...logEntries], turn: 'monster', isDefending: false, weaponMana: 0, ultimateReady: false, poisonBuff: newPoisonBuff, poisonDmg: newPoisonDmg, buffs: newBuffsAfterUlt, kx: { ...battle.kx, hp: newKxHp, phase: np } };
       setBattle(afterUlt);
       setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
       return;
@@ -882,7 +928,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         setBattle(b => ({ ...b, log: [...b.log, ...logEntries], turn: 'result', result: 'win', kx: { ...battle.kx!, awakeHp: 0 }, weaponMana: 0, ultimateReady: false }));
         return;
       }
-      const afterUlt: TurnBattleState = { ...battle, log: [...battle.log, ...logEntries], turn: 'monster', isDefending: false, weaponMana: 0, ultimateReady: false, poisonBuff: newPoisonBuff, poisonDmg: newPoisonDmg, kx: { ...battle.kx, awakeHp: newAwakeHp } };
+      const afterUlt: TurnBattleState = { ...battle, log: [...battle.log, ...logEntries], turn: 'monster', isDefending: false, weaponMana: 0, ultimateReady: false, poisonBuff: newPoisonBuff, poisonDmg: newPoisonDmg, buffs: newBuffsAfterUlt, kx: { ...battle.kx, awakeHp: newAwakeHp } };
       setBattle(afterUlt);
       setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
       return;
@@ -895,7 +941,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       setBattle(b => ({ ...b, enemies: newEnemies, log: [...b.log, ...logEntries], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, weaponMana: 0, ultimateReady: false }));
       return;
     }
-    const afterUlt: TurnBattleState = { ...battle, enemies: newEnemies, log: [...battle.log, ...logEntries], turn: 'monster', isDefending: false, weaponMana: 0, ultimateReady: false, poisonBuff: newPoisonBuff, poisonDmg: newPoisonDmg };
+    const afterUlt: TurnBattleState = { ...battle, enemies: newEnemies, log: [...battle.log, ...logEntries], turn: 'monster', isDefending: false, weaponMana: 0, ultimateReady: false, poisonBuff: newPoisonBuff, poisonDmg: newPoisonDmg, buffs: newBuffsAfterUlt };
     setBattle(afterUlt);
     setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
   };
@@ -1027,7 +1073,8 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       // クールダウン設定
       const newCooldownsAfterHeal = { ...battle.itemCooldowns };
       if (item.cooldownTurns && item.cooldownTurns > 0) newCooldownsAfterHeal[itemId] = item.cooldownTurns;
-      // offhand_mana_on_heal: 装備中の全アイテムのスキルをチェック
+      // ===== 共通Manaシステム：offhand_mana_on_heal処理 =====
+      // 回復アイテム使用時に共通Manaを獲得する。Diamond Staffなどのオフハンド武器が対象。
       let manaAfterHeal = battle.weaponMana;
       for (const slotId of localEquip.hotbar) {
         if (!slotId) continue;

@@ -7,6 +7,25 @@ export type ItemType = 'Weapon' | 'Armor' | 'Item' | 'Heal';
 export type SkillId = 'mining' | 'woodcutting' | 'combat' | 'fishing' | 'crafting';
 
 // ============================================================
+// 共通バフ・デバフ型
+// ============================================================
+export interface CombatBuff {
+  type: string;   // 'poison' | 'atk_up' | 'shield' | 'burn' | 'freeze' | 'curse' | ...
+  value: number;  // ダメージ量 / 上昇量 / カット率など
+  turns: number;  // 残ターン数
+}
+
+// ============================================================
+// 共通オフハンド効果型
+// ============================================================
+export interface OffhandEffect {
+  type: 'offhand_mana_regen' | 'offhand_hp_regen' | 'offhand_crit_up' | 'offhand_mana_on_heal';
+  value: number;
+  chance?: number;
+  requiredOffhandItemId?: string;
+}
+
+// ============================================================
 // 武器スキル型
 // ============================================================
 export interface WeaponPassiveSkill {
@@ -22,19 +41,31 @@ export interface WeaponShieldSkill {
   type: 'hotbar_shield';        // ホットバー装備中に敵攻撃カット
   cutPercent: number;
 }
+/**
+ * mana_charge: 毎ターン固定Mana獲得型（変幻など）
+ * 共通Manaシステムを使用。manaMaxは武器固有。
+ */
 export interface WeaponManaSkill {
   type: 'mana_charge';          // MANAチャージ型必殺技
   manaPerTurn: number;
   manaMax: number;
 }
+/**
+ * offhand_mana_on_heal: 回復アイテム使用時に確率でMana獲得（Memory of Flowerなど）
+ * 共通Manaシステムを使用。
+ */
 export interface WeaponOffhandManaOnHealSkill {
-  type: 'offhand_mana_on_heal';  // オフハンド装備時に回復使用で一定確率でMana蓄積
+  type: 'offhand_mana_on_heal';
   offhandItemId: string;
   chance: number;
   manaGain: number;
 }
+/**
+ * mana_per_turn_random: 毎ターンランダムMana付与（Diamond Staffなど）
+ * 共通Manaシステムを使用。manaMaxは武器固有。
+ */
 export interface WeaponManaPerTurnRandomSkill {
-  type: 'mana_per_turn_random';  // 毎ターンランダムにMana付与（サポート武器）
+  type: 'mana_per_turn_random';
   manaMin: number;
   manaMax: number;
   manaStep: number;
