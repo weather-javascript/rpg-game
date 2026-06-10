@@ -7,7 +7,7 @@ import { DUNGEON_MASTER, MONSTER_MASTER, ITEM_MASTER } from '../../data/masters'
 import type { MonsterMaster, DungeonRunState, DungeonMaster, WeaponPassiveSkill, WeaponRegenSkill, WeaponShieldSkill, WeaponManaSkill, PlayerData } from '../../types/game';
 import type { EquipmentSlots } from '../../types/game';
 import { defaultEquipmentSlots } from '../../types/game';
-import { postActivityFeed, subscribeMonsterOverrides, subscribeDungeonOverrides } from '../../services/multiplayer';
+import { postActivityFeed, subscribeMonsterOverrides, subscribeDungeonOverrides, setPlayerActivity } from '../../services/multiplayer';
 import type { MonsterOverride, DungeonOverride } from '../../services/multiplayer';
 
 // ============================================================
@@ -1863,6 +1863,20 @@ export function DungeonScreen() {
     setRunLog([`⚔️ ${dungeon.name} に突入！`]);
     setInBattle(false);
     setDungeonMana(0);
+    // プレイヤー状態更新（画面遷移時のみ）
+    const actCode = selectedId === 'sky_castle' ? 'dungeon_sky'
+      : selectedId === 'sky_castle_ex' ? 'dungeon_sky_ex'
+      : selectedId === 'volcano' ? 'dungeon_volcano'
+      : selectedId === 'beginner_cave' ? 'dungeon_cave'
+      : selectedId === 'goblin_nest' ? 'dungeon_goblin'
+      : selectedId === 'fortress' ? 'dungeon_fortress'
+      : selectedId === 'underground_fortress' ? 'dungeon_underground'
+      : selectedId === 'garden' ? 'dungeon_garden'
+      : selectedId === 'frozen_cave' ? 'dungeon_ice'
+      : selectedId === 'kx_fight' || selectedId === 'kx_ex_fight' ? 'boss_kx'
+      : selectedId === 'rei_fight' ? 'boss_rei'
+      : 'other';
+    setPlayerActivity(player.uid, actCode as import('../../services/multiplayer').PlayerActivityCode).catch(() => {});
   }, [player, selectedId, isDungeonUnlocked, addNotification]);
 
   const handleBattleEnd = useCallback((won: boolean, expGained: number, goldGained: number, drops: {itemId:string;amount:number}[], _hpDelta: number) => {

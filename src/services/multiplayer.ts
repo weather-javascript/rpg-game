@@ -1494,3 +1494,99 @@ export async function checkSlotJackpotWin(tier: number): Promise<{ won: boolean;
   }
   return { won, pool };
 }
+
+// ============================================================
+// プレイヤー状態管理（画面遷移時のみ更新）
+// ============================================================
+export type PlayerActivityCode =
+  | 'home' | 'dungeon_cave' | 'dungeon_goblin' | 'dungeon_fortress'
+  | 'dungeon_underground' | 'dungeon_garden' | 'dungeon_ice'
+  | 'dungeon_sky' | 'dungeon_sky_ex' | 'dungeon_volcano'
+  | 'boss_kx' | 'boss_rei' | 'mining' | 'fishing' | 'gambling'
+  | 'pvp_waiting' | 'pvp_battle' | 'market' | 'crafting' | 'other';
+
+export const ACTIVITY_LABELS: Record<PlayerActivityCode, string> = {
+  home: 'ホーム画面',
+  dungeon_cave: '始まりの洞窟攻略中',
+  dungeon_goblin: 'ゴブリンの巣窟攻略中',
+  dungeon_fortress: '要塞攻略中',
+  dungeon_underground: '地下要塞攻略中',
+  dungeon_garden: '箱庭庭園攻略中',
+  dungeon_ice: '冷焦洞穴攻略中',
+  dungeon_sky: '天空城攻略中',
+  dungeon_sky_ex: '天空城EX攻略中',
+  dungeon_volcano: '火山攻略中',
+  boss_kx: 'KX戦闘中',
+  boss_rei: '零戦闘中',
+  mining: '採掘中',
+  fishing: '釣り中',
+  gambling: 'ギャンブル中',
+  pvp_waiting: 'PvP待機中',
+  pvp_battle: 'PvP対戦中',
+  market: 'マーケット閲覧中',
+  crafting: 'クラフト中',
+  other: 'その他',
+};
+
+/** 画面遷移時のみ呼ぶ（Firebase節約: 状態変更時のみ） */
+export async function setPlayerActivity(uid: string, activity: PlayerActivityCode): Promise<void> {
+  try {
+    await updateDoc(doc(db, COLLECTIONS.ONLINE, uid), {
+      currentActivityCode: activity,
+      currentActivity: ACTIVITY_LABELS[activity],
+      updatedAt: Date.now(),
+    });
+  } catch { /* ignore — online doc may not exist yet */ }
+}
+
+// ============================================================
+// ギャンブル速報フィード（最新100件、バッファ+10秒flush）
+// ============================================================
+export interface GambleFeedEntry {
+  uid: string;
+  displayName: string;
+  gameType: string;   // 'slot'|'highlow'|'blackjack'|'roulette'|'treasure'|'jackpot'|'super_jackpot'
+  amount: number;     // 正=勝ち 負=負け 0=neutral
+  timestamp: number;
+  isJackpot?: boolean;
+  isSuperJackpot?: boolean;
+}
+
+const GAMBLE_FEED_REF = () => doc(db, 'shared', 'gamble_feed');
+
+let _gambleFeedBuffer: Omit<GambleFeedEntry, 'timestamp'>[] = [];
+let _gambleFeedFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function _flushGambleFeed() {
+  _gambleFeedFlushTimer = null;
+  if (_gambleFeedBuffer.length === 0) return;
+  const toWrite = _gambleFeedBuffer.map(e => ({ ...e, timestamp: Date.now() }));
+  _gambleFeedBuffer = [];
+  try {
+    const snap = await getDoc(GAMBLE_FEED_REF());
+    const prev: GambleFeedEntry[] = snap.exists() ? ((snap.data()['entries'] ?? []) as GambleFeedEntry[]) : [];
+    const next = [...toWrite, ...prev].slice(0, 100); // 最新100件のみ保持
+    await setDoc(GAMBLE_FEED_REF(), { entries: next, updatedAt: Date.now() });
+  } catch { /* ignore */ }
+}
+
+/** ギャンブル結果をフィードに追記（バッファして10秒に1回まとめてWrite） */
+export async function postGambleFeed(entry: Omit<GambleFeedEntry, 'timestamp'>): Promise<void> {
+  _gambleFeedBuffer.unshift(entry);
+  if (_gambleFeedBuffer.length > 20) _gambleFeedBuffer = _gambleFeedBuffer.slice(0, 20);
+  if (!_gambleFeedFlushTimer) {
+    _gambleFeedFlushTimer = setTimeout(_flushGambleFeed, 10_000);
+  }
+}
+
+/** ギャンブル速報をポーリング購読（30秒間隔） */
+export function subscribeGambleFeed(cb: (entries: GambleFeedEntry[]) => void): Unsubscribe {
+  let stopped = false;
+  const fetch = () => getDoc(GAMBLE_FEED_REF()).then(snap => {
+    if (stopped) return;
+    cb(snap.exists() ? ((snap.data()['entries'] ?? []) as GambleFeedEntry[]) : []);
+  }).catch(() => {});
+  fetch();
+  const timer = setInterval(fetch, 30_000);
+  return () => { stopped = true; clearInterval(timer); };
+}

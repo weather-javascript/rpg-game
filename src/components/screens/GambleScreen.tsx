@@ -12,6 +12,7 @@ import {
   createGambleBattle, subscribeGambleBattles, joinGambleBattle, cancelGambleBattle,
   subscribeGambleMultipliers, subscribeGambleBattle,
   postActivityFeed,
+  postGambleFeed,
   createPokerTable, subscribePokerTables, subscribePokerTable,
   joinPokerTable, cancelPokerTable, leavePokerTable, startPokerGame, pokerAction,
   subscribeTreasureProbs,
@@ -1630,12 +1631,15 @@ function SlotPanel({ onResult, onJackpotContrib, multiplierBonus = 1.0 }: { onRe
         const type = r.multiplier > 0 ? 'gamble_win' : 'gamble_lose';
         const msg = r.multiplier > 0 ? `が${game.name}で${(winGold-bet).toLocaleString()}WC勝利しました！` : `が${game.name}で${bet.toLocaleString()}WC負けました`;
         postActivityFeed({ uid: player.uid, displayName: player.displayName, type, message: msg }).catch(() => {});
+        const netAmount = r.multiplier > 0 ? Math.floor(bet * (r.multiplier - 1)) : -bet;
+        postGambleFeed({ uid: player.uid, displayName: player.displayName, gameType: 'slot', amount: netAmount }).catch(() => {});
       }
       try {
         const { won, pool } = await checkSlotJackpotWin(bet);
         if (won && pool > 0) {
           changeWealthCoin(pool);
           addNotification('success', `🌟🌟🌟 ${tier.label} JACKPOT!! ${pool.toLocaleString()}WC！`);
+          if (player) postGambleFeed({ uid: player.uid, displayName: player.displayName, gameType: 'jackpot', amount: pool, isJackpot: true }).catch(() => {});
         }
       } catch { /**/ }
       setAnimating(false);
@@ -1742,13 +1746,27 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus =
         ? `が${game.name}で${(winGold - bet).toLocaleString()}WC勝利しました！`
         : `が${game.name}で${bet.toLocaleString()}WC負けました`;
       postActivityFeed({ uid: player.uid, displayName: player.displayName, type, message: msg }).catch(() => {});
+      // ギャンブル速報
+      const gameTypeCode = game.type === 'slot' ? 'slot'
+        : game.type === 'highlow' ? 'highlow'
+        : game.type === 'chohan' ? 'chohan'
+        : game.type === 'chinchiro' ? 'chinchiro'
+        : game.type === 'coin_flip' ? 'coin_flip'
+        : game.type === 'treasure_box' ? 'treasure'
+        : game.type === 'poker' ? 'poker'
+        : 'slot';
+      const netAmt2 = r.multiplier > 0 ? Math.floor(bet * (r.multiplier - 1)) : -bet;
+      postGambleFeed({ uid: player.uid, displayName: player.displayName, gameType: gameTypeCode, amount: netAmt2 }).catch(() => {});
     }
     try {
       const { won, pool } = await checkJackpotWin();
       if (won && pool > 0) {
         changeWealthCoin(pool);
         addNotification('success', `🌟🌟🌟 JACKPOT!! ${pool.toLocaleString()}WC獲得！！🌟🌟🌟`);
-        if (player) postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'gamble_win', message: `が🌟JACKPOTで${pool.toLocaleString()}WC獲得！！` }).catch(() => {});
+        if (player) {
+          postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'gamble_win', message: `が🌟JACKPOTで${pool.toLocaleString()}WC獲得！！` }).catch(() => {});
+          postGambleFeed({ uid: player.uid, displayName: player.displayName, gameType: 'jackpot', amount: pool, isJackpot: true }).catch(() => {});
+        }
       }
     } catch { /* ignore */ }
     setAnimating(false);

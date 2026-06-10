@@ -15,7 +15,20 @@ import { FishingScreen }   from './components/screens/FishingScreen';
 import { AdminScreen }     from './components/screens/AdminScreen';
 import { CraftingScreen }   from './components/screens/CraftingScreen';
 import { NaviScreen }       from './components/screens/NaviScreen';
-import { subscribeSoldNotifications, markSoldNotificationRead, subscribeMaintenanceStatus } from './services/multiplayer';
+import { subscribeSoldNotifications, markSoldNotificationRead, subscribeMaintenanceStatus, setPlayerActivity } from './services/multiplayer';
+import type { PlayerActivityCode } from './services/multiplayer';
+
+const TAB_TO_ACTIVITY: Partial<Record<string, PlayerActivityCode>> = {
+  gathering: 'mining',
+  fishing:   'fishing',
+  crafting:  'crafting',
+  market:    'market',
+  gamble:    'gambling',
+  online:    'home',
+  status:    'home',
+  navi:      'home',
+  dungeon:   'other',
+};
 import { onSnapshot, doc } from 'firebase/firestore';
 import { db } from './services/firebase';
 import { ITEM_MASTER, VERSION_PATCHES } from './data/masters';
@@ -646,7 +659,13 @@ export default function App() {
         <ActiveScreen tab={activeTab} />
       </main>
       <ReliefPanel />
-      <TabNav activeTab={activeTab} setTab={(t) => setActiveTab(t as TabId)} />
+      <TabNav activeTab={activeTab} setTab={(t) => {
+        setActiveTab(t as TabId);
+        if (player) {
+          const code = TAB_TO_ACTIVITY[t] ?? 'home';
+          setPlayerActivity(player.uid, code).catch(() => {});
+        }
+      }} />
       <NotificationToast />
     </div>
   );

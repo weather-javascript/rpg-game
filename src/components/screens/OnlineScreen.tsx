@@ -1,14 +1,14 @@
 // src/components/screens/OnlineScreen.tsx
-// オンライン画面：アクティビティフィード追加
+// オンライン画面：活動タブを4サブタブ構成にリニューアル
 // 【変更履歴を更新する際の注意】
 // このファイルを変更したら必ず src/data/masters.ts の VERSION_PATCHES[0] に変更内容を追記すること。
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type CSSProperties } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { GameIcon } from '../icons';
 import { useGameStore } from '../../stores/gameStore';
-import { ITEM_MASTER, DUNGEON_MASTER } from '../../data/masters';
+import { ITEM_MASTER } from '../../data/masters';
 import type { PlayerData } from '../../types/game';
 import {
   subscribeOnlineUsers, subscribeBoardMessages, postBoardMessage,
@@ -17,54 +17,395 @@ import {
   subscribeActivityFeed, ActivityFeedEntry, postActivityFeed,
   submitProposal,
   deleteBoardMessage, addBoardReaction, removeBoardReaction, addBoardReply, voteBoardPoll,
+  subscribeGambleFeed, GambleFeedEntry,
 } from '../../services/multiplayer';
 import type { OnlineUser, BoardMessage, AuctionListing } from '../../types/game';
 
 type SubTab = 'online' | 'board' | 'auction' | 'activity' | 'ranking' | 'proposal';
+type ActivitySubTab = 'world_news' | 'player_status' | 'world_status' | 'gamble_flash';
 
-function ProposalPanel() {
-  const player = useGameStore(s => s.player);
-  const addNotification = useGameStore(s => s.addNotification);
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [sending, setSending] = useState(false);
+// ============================================================
+// 活動タブ内 サブタブ
+// ============================================================
 
-  const handleSubmit = async () => {
-    if (!player || !title.trim() || !body.trim()) return;
-    setSending(true);
-    try {
-      await submitProposal({ uid: player.uid, displayName: player.displayName, title: title.trim(), body: body.trim() });
-      addNotification('success', '📨 提案を送信しました！承認されると提案チケットが付与されます。');
-      setTitle(''); setBody('');
-    } catch { addNotification('error', '送信に失敗しました'); }
-    setSending(false);
+// ─── ワールドニュース ────────────────────────────────────────
+const WORLD_NEWS_TYPES = new Set([
+  'dungeon_clear','sky_castle_clear','sky_castle_ex_clear','volcano_clear',
+  'boss_kx','boss_rei','boss_ragnarok','boss_hard',
+  'super_jackpot','jackpot','gamble_rank_up',
+  'level_50','level_100','level_200',
+  'event_clear','admin_event',
+]);
+
+const NEWS_STYLE: Record<string, { emoji: string; color: string }> = {
+  dungeon_clear:        { emoji: '🏰', color: '#f0c060' },
+  sky_castle_clear:     { emoji: '🏯', color: '#f0c060' },
+  sky_castle_ex_clear:  { emoji: '✨', color: '#ff9933' },
+  volcano_clear:        { emoji: '🌋', color: '#ff6644' },
+  boss_kx:              { emoji: '🤖', color: '#e05555' },
+  boss_rei:             { emoji: '💀', color: '#cc44cc' },
+  boss_ragnarok:        { emoji: '🌪️', color: '#ff4444' },
+  boss_hard:            { emoji: '⚔️', color: '#e05555' },
+  super_jackpot:        { emoji: '🌟', color: '#ffd700' },
+  jackpot:              { emoji: '💰', color: '#f0c060' },
+  gamble_rank_up:       { emoji: '🎖️', color: '#9b6df0' },
+  level_50:             { emoji: '💎', color: '#5b8dee' },
+  level_100:            { emoji: '👑', color: '#f0c060' },
+  level_200:            { emoji: '🔮', color: '#ff66cc' },
+  event_clear:          { emoji: '🎉', color: '#4caf87' },
+  admin_event:          { emoji: '📢', color: '#5b8dee' },
+};
+
+function WorldNewsPanel() {
+  const [entries, setEntries] = useState<ActivityFeedEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = subscribeActivityFeed(es => {
+      setEntries(es.filter(e => WORLD_NEWS_TYPES.has(e.type)));
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  return (
+    <div>
+      <h3 style={{color:'#f0c060', marginBottom:4, fontSize:'0.95rem'}}>🌍 ワールドニュース</h3>
+      <p style={{fontSize:'0.72rem', color:'#4a5070', marginBottom:10}}>世界で起きた重要イベント</p>
+      <div style={{display:'flex', flexDirection:'column', background:'#161b26', border:'1px solid #2d3752', borderRadius:10, overflow:'hidden', maxHeight:480, overflowY:'auto'}}>
+        {loading && <div style={{color:'#8a92b2', textAlign:'center', padding:24, fontSize:'0.85rem'}}>読み込み中...</div>}
+        {!loading && entries.length === 0 && <div style={{color:'#4a5070', textAlign:'center', padding:24, fontSize:'0.85rem'}}>まだニュースがありません</div>}
+        {entries.map((e, i) => {
+          const style = NEWS_STYLE[e.type] ?? { emoji: '📌', color: '#8a92b2' };
+          const now = Date.now();
+          const diff = now - e.timestamp;
+          const timeLabel = diff < 60_000 ? 'たった今'
+            : diff < 3_600_000 ? `${Math.floor(diff/60_000)}分前`
+            : diff < 86_400_000 ? `${Math.floor(diff/3_600_000)}時間前`
+            : new Date(e.timestamp).toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' });
+          const isSpecial = e.type === 'super_jackpot' || e.type === 'sky_castle_ex_clear' || e.type === 'level_200';
+          return (
+            <div key={i} style={{display:'flex', alignItems:'flex-start', gap:10, padding:'10px 12px',
+              borderBottom: i < entries.length-1 ? '1px solid #1c2235' : 'none',
+              background: isSpecial ? 'rgba(255,215,0,0.06)' : (i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)'),
+              boxShadow: isSpecial ? 'inset 0 0 0 1px rgba(255,215,0,0.15)' : 'none',
+            }}>
+              <span style={{fontSize:'1.2rem', minWidth:24, textAlign:'center', marginTop:1}}>{style.emoji}</span>
+              <div style={{flex:1, minWidth:0}}>
+                <span style={{fontSize:'0.82rem', color: style.color, fontWeight:700}}>{e.displayName} </span>
+                <span style={{fontSize:'0.82rem', color:'#c0bcd8'}}>{e.message}</span>
+              </div>
+              <span style={{fontSize:'0.65rem', color:'#4a5070', whiteSpace:'nowrap', marginTop:3}}>{timeLabel}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── プレイヤー状況 ─────────────────────────────────────────
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return 'たった今';
+  if (diff < 3_600_000) return `${Math.floor(diff/60_000)}分前`;
+  if (diff < 86_400_000) return `${Math.floor(diff/3_600_000)}時間前`;
+  return '1日以上前';
+}
+
+const TITLE_LABELS: Record<string, string> = {
+  beginner:'🌱 見習い冒険者', lv10:'⚔️ 一人前', lv30:'🗡️ 熟練冒険者', lv50:'💎 エキスパート',
+  lv100:'👑 レジェンド', dungeon10:'🏰 ダンジョンマスター', dungeon50:'🌟 ダンジョン王',
+  rich:'💰 大富豪', fisher:'🎣 釣り名人', crafter:'🔨 名工',
+};
+
+function ProfilePopup({ uid, onClose }: { uid: string; onClose: () => void }) {
+  const [pdata, setPdata] = useState<PlayerData | null>(null);
+  const [actLog, setActLog] = useState<ActivityFeedEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'players', uid));
+        if (snap.exists()) setPdata(snap.data() as PlayerData);
+      } catch { /* ignore */ }
+      setLoading(false);
+    })();
+    // 活動履歴: activityFeedから該当uidの重要イベント最新10件
+    const unsub = subscribeActivityFeed(es => {
+      setActLog(es.filter(e => e.uid === uid && WORLD_NEWS_TYPES.has(e.type)).slice(0, 10));
+    });
+    return unsub;
+  }, [uid]);
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:9000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={onClose}>
+      <div style={{background:'#1c2235',border:'1px solid #2d3752',borderRadius:12,padding:20,width:'100%',maxWidth:340,position:'relative',maxHeight:'80vh',overflowY:'auto'}} onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} style={{position:'absolute',top:10,right:10,background:'none',border:'none',color:'#4a5070',fontSize:'1.2rem',cursor:'pointer'}}>✕</button>
+        {loading ? (
+          <div style={{textAlign:'center',color:'#4a5070',padding:'20px 0'}}>読み込み中...</div>
+        ) : !pdata ? (
+          <div style={{textAlign:'center',color:'#4a5070',padding:'20px 0'}}>プロフィールが見つかりません</div>
+        ) : (
+          <>
+            <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:14}}>
+              <span style={{fontSize:'2.5rem'}}>{pdata.profile?.icon ?? '⚔️'}</span>
+              <div>
+                <div style={{fontSize:'1rem',fontWeight:700,color:'#f0c060'}}>{pdata.displayName}</div>
+                <div style={{fontSize:'0.78rem',color:'#5b8dee'}}>Lv.{pdata.stats.level}</div>
+                {pdata.profile?.titleId && <div style={{fontSize:'0.75rem',color:'#8a92b2',marginTop:2}}>{TITLE_LABELS[pdata.profile.titleId] ?? ''}</div>}
+              </div>
+            </div>
+            {pdata.profile?.comment && (
+              <div style={{background:'#161b26',borderRadius:6,padding:'8px 10px',fontSize:'0.82rem',color:'#e8e6ff',marginBottom:10,fontStyle:'italic'}}>
+                「{pdata.profile.comment}」
+              </div>
+            )}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:10}}>
+              {[
+                ['攻撃力', `⚔️ ${pdata.stats.attack}`],
+                ['防御力', `🛡️ ${pdata.stats.defense}`],
+                ['所持金', `💰 ${pdata.gold.toLocaleString()}G`],
+                ['釣りスコア', `🎣 ${pdata.fishingScore ?? 0}`],
+              ].map(([label, value]) => (
+                <div key={label} style={{background:'#161b26',borderRadius:6,padding:'6px 8px'}}>
+                  <div style={{fontSize:'0.65rem',color:'#4a5070'}}>{label}</div>
+                  <div style={{fontSize:'0.82rem',color:'#e8e6ff',fontWeight:700}}>{value}</div>
+                </div>
+              ))}
+            </div>
+            {actLog.length > 0 && (
+              <div>
+                <div style={{fontSize:'0.75rem',color:'#8a92b2',marginBottom:6}}>📋 活動履歴（重要イベント）</div>
+                <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                  {actLog.map((e, i) => {
+                    const style = NEWS_STYLE[e.type] ?? { emoji: '📌', color: '#8a92b2' };
+                    return (
+                      <div key={i} style={{fontSize:'0.75rem',background:'#161b26',borderRadius:4,padding:'4px 8px',display:'flex',gap:6,alignItems:'center'}}>
+                        <span>{style.emoji}</span>
+                        <span style={{color: style.color,flex:1}}>{e.message}</span>
+                        <span style={{color:'#4a5070',fontSize:'0.65rem'}}>{timeAgo(e.timestamp)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PlayerStatusPanel({ users }: { users: OnlineUser[] }) {
+  const [selectedUid, setSelectedUid] = useState<string | null>(null);
+
+  if (users.length === 0) {
+    return <p style={{color:'#4a5070', fontSize:'0.85rem', textAlign:'center', padding:20}}>現在オンラインのプレイヤーはいません</p>;
+  }
+
+  return (
+    <div>
+      <h3 style={{color:'#4caf87', marginBottom:8, fontSize:'0.95rem'}}>👥 プレイヤー状況 ({users.length}人)</h3>
+      <p style={{fontSize:'0.72rem', color:'#4a5070', marginBottom:10}}>名前をタップでプロフィール表示</p>
+      <div style={{display:'flex', flexDirection:'column', gap:6}}>
+        {users.map(u => {
+          const actLabel = u.currentActivity ?? 'ホーム画面';
+          const isGambling = actLabel.includes('ギャンブル');
+          const isDungeon = actLabel.includes('攻略') || actLabel.includes('戦闘');
+          const accentColor = isGambling ? '#f0c060' : isDungeon ? '#e05555' : '#4caf87';
+          const updatedAt = (u as { updatedAt?: number }).updatedAt;
+          return (
+            <div key={u.uid} style={{background:'#1c2235', border:`1px solid #2d3752`, borderRadius:8, padding:'10px 12px', borderLeft:`3px solid ${accentColor}`}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                <div>
+                  <span style={{fontSize:'0.88rem', fontWeight:700, color:'#e8e6ff', cursor:'pointer', textDecoration:'underline dotted'}}
+                    onClick={() => setSelectedUid(u.uid)}>
+                    ⚔️ {u.displayName}
+                  </span>
+                  <span style={{fontSize:'0.72rem', color:'#5b8dee', marginLeft:8}}>Lv.{u.level}</span>
+                </div>
+                <span style={{fontSize:'0.65rem', color:'#4a5070'}}>{updatedAt ? timeAgo(updatedAt) : ''}</span>
+              </div>
+              <div style={{fontSize:'0.78rem', color: accentColor, marginTop:5}}>
+                📍 現在：{actLabel}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {selectedUid && <ProfilePopup uid={selectedUid} onClose={() => setSelectedUid(null)} />}
+    </div>
+  );
+}
+
+// ─── ワールド状況 ────────────────────────────────────────────
+function WorldStatusPanel({ users }: { users: OnlineUser[] }) {
+  const counts: Record<string, number> = {};
+  for (const u of users) {
+    const label = u.currentActivity ?? 'ホーム画面';
+    // カテゴリに集約
+    let cat = 'ホーム画面';
+    if (label.includes('攻略') || label.includes('戦闘')) cat = 'ダンジョン攻略中';
+    else if (label === 'ギャンブル中') cat = 'ギャンブル中';
+    else if (label === '採掘中') cat = '採掘中';
+    else if (label === '釣り中') cat = '釣り中';
+    else if (label.includes('PvP')) cat = 'PvP中';
+    else if (label === 'マーケット閲覧中') cat = 'マーケット閲覧中';
+    else if (label === 'クラフト中') cat = 'クラフト中';
+    counts[cat] = (counts[cat] ?? 0) + 1;
+  }
+
+  const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+  const catEmoji: Record<string,string> = {
+    'ダンジョン攻略中':'⚔️','ギャンブル中':'🎰','採掘中':'⛏️',
+    '釣り中':'🎣','PvP中':'🥊','マーケット閲覧中':'🛒',
+    'クラフト中':'🔨','ホーム画面':'🏠',
   };
 
   return (
     <div>
-      <h3 style={{color:'#5b8dee', marginBottom:6, fontSize:'0.95rem'}}>💡 運営への機能提案</h3>
-      <p style={{color:'#8a92b2', fontSize:'0.78rem', marginBottom:12, lineHeight:1.6}}>
-        ゲームへの要望・改善案を送信できます。承認された場合、<strong style={{color:'#f0c060'}}>提案チケット</strong>が付与されます。
-      </p>
-      <div style={{marginBottom:8}}>
-        <div style={{fontSize:'0.72rem', color:'#8a92b2', marginBottom:3}}>タイトル</div>
-        <input value={title} onChange={e => setTitle(e.target.value)} maxLength={50}
-          placeholder="例：採掘スキルに新しい鉱石を追加してほしい"
-          style={{width:'100%', padding:'7px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', boxSizing:'border-box'}} />
+      <h3 style={{color:'#9b6df0', marginBottom:8, fontSize:'0.95rem'}}>🌐 ワールド状況</h3>
+      <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'12px 14px', marginBottom:12}}>
+        <div style={{fontSize:'0.78rem', color:'#8a92b2', marginBottom:2}}>オンライン人数</div>
+        <div style={{fontSize:'1.8rem', fontWeight:700, color:'#4caf87'}}>{users.length}人</div>
       </div>
-      <div style={{marginBottom:10}}>
-        <div style={{fontSize:'0.72rem', color:'#8a92b2', marginBottom:3}}>詳細・理由</div>
-        <textarea value={body} onChange={e => setBody(e.target.value)} maxLength={500} rows={4}
-          placeholder="提案の詳細を書いてください..."
-          style={{width:'100%', padding:'7px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', boxSizing:'border-box', resize:'vertical'}} />
+      {sorted.length === 0 && <p style={{color:'#4a5070', fontSize:'0.85rem', textAlign:'center', padding:10}}>データなし</p>}
+      <div style={{display:'flex', flexDirection:'column', gap:6}}>
+        {sorted.map(([cat, cnt]) => {
+          const pct = users.length > 0 ? Math.round(cnt / users.length * 100) : 0;
+          return (
+            <div key={cat} style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:6, padding:'8px 12px'}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4}}>
+                <span style={{fontSize:'0.85rem'}}>{catEmoji[cat] ?? '📍'} {cat}</span>
+                <span style={{fontSize:'0.85rem', fontWeight:700, color:'#f0c060'}}>{cnt}人</span>
+              </div>
+              <div style={{height:5, background:'#2d3752', borderRadius:3, overflow:'hidden'}}>
+                <div style={{height:'100%', background:'linear-gradient(90deg,#5b8dee,#9b6df0)', width:`${pct}%`, transition:'width 0.3s'}} />
+              </div>
+            </div>
+          );
+        })}
       </div>
-      <button onClick={handleSubmit} disabled={sending || !title.trim() || !body.trim()}
-        style={{width:'100%', padding:'9px', background: (!title.trim() || !body.trim()) ? '#2d3752' : 'linear-gradient(135deg,#5b8dee,#3d6fd0)', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.85rem'}}>
-        {sending ? '送信中...' : '📨 提案を送信する'}
-      </button>
     </div>
   );
 }
+
+// ─── ギャンブル速報 ──────────────────────────────────────────
+const GAME_TYPE_LABELS: Record<string, string> = {
+  slot: 'スロット',
+  highlow: 'ハイロー',
+  blackjack: 'ブラックジャック',
+  roulette: 'ルーレット',
+  treasure: '宝箱開封',
+  jackpot: 'ジャックポット',
+  super_jackpot: '超ジャックポット',
+  chohan: '丁半',
+  chinchiro: 'チンチロリン',
+  coin_flip: 'コイントス',
+  slot_machine: 'スロットPvP',
+};
+
+function GambleFlashPanel() {
+  const [entries, setEntries] = useState<GambleFeedEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = subscribeGambleFeed(es => {
+      setEntries(es);
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  return (
+    <div>
+      <h3 style={{color:'#f0c060', marginBottom:4, fontSize:'0.95rem'}}>🎰 ギャンブル速報</h3>
+      <p style={{fontSize:'0.72rem', color:'#4a5070', marginBottom:10}}>全ギャンブル結果リアルタイム</p>
+      <div style={{display:'flex', flexDirection:'column', background:'#161b26', border:'1px solid #2d3752', borderRadius:10, overflow:'hidden', maxHeight:520, overflowY:'auto'}}>
+        {loading && <div style={{color:'#8a92b2', textAlign:'center', padding:24, fontSize:'0.85rem'}}>読み込み中...</div>}
+        {!loading && entries.length === 0 && <div style={{color:'#4a5070', textAlign:'center', padding:24, fontSize:'0.85rem'}}>まだ記録がありません</div>}
+        {entries.map((e, i) => {
+          const isSuperJP = e.isSuperJackpot;
+          const isJP = e.isJackpot;
+          const isWin = e.amount > 0;
+          const isNeutral = e.amount === 0;
+          const gameName = GAME_TYPE_LABELS[e.gameType] ?? e.gameType;
+          const amountStr = isNeutral ? '' : (isWin ? `+${e.amount.toLocaleString()}WC` : `${e.amount.toLocaleString()}WC`);
+          const amountColor = isSuperJP ? '#ffd700' : isJP ? '#f0c060' : isWin ? '#4caf87' : isNeutral ? '#8a92b2' : '#e05555';
+          const rowBg = isSuperJP ? 'rgba(255,215,0,0.1)' : isJP ? 'rgba(240,192,96,0.06)' : 'transparent';
+          const now = Date.now();
+          const diff = now - e.timestamp;
+          const timeLabel = diff < 60_000 ? 'たった今'
+            : diff < 3_600_000 ? `${Math.floor(diff/60_000)}分前`
+            : `${Math.floor(diff/3_600_000)}時間前`;
+
+          return (
+            <div key={i} style={{
+              display:'flex', alignItems:'center', gap:8, padding:'8px 12px',
+              borderBottom: i < entries.length-1 ? '1px solid #1c2235' : 'none',
+              background: rowBg,
+              boxShadow: isSuperJP ? 'inset 0 0 0 1px rgba(255,215,0,0.2)' : 'none',
+            }}>
+              <span style={{fontSize:'1rem', minWidth:20, textAlign:'center'}}>
+                {isSuperJP ? '🌟' : isJP ? '💰' : isWin ? '🎲' : isNeutral ? '🎁' : '🃏'}
+              </span>
+              <div style={{flex:1, minWidth:0}}>
+                <span style={{fontSize:'0.8rem', color:'#c0bcd8', fontWeight:600}}>{e.displayName}</span>
+                <span style={{fontSize:'0.78rem', color:'#8a92b2'}}> が {gameName}で </span>
+                <span style={{fontSize:'0.82rem', color: amountColor, fontWeight:700}}>
+                  {isSuperJP ? `超ジャックポット獲得！（${e.amount.toLocaleString()}WC）`
+                    : isJP ? `ジャックポット！（${e.amount.toLocaleString()}WC）`
+                    : isNeutral ? '開封' : amountStr}
+                </span>
+              </div>
+              <span style={{fontSize:'0.62rem', color:'#4a5070', whiteSpace:'nowrap'}}>{timeLabel}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── 活動タブ（4サブタブ）────────────────────────────────────
+function ActivityTabPanel({ users }: { users: OnlineUser[] }) {
+  const [actSubTab, setActSubTab] = useState<ActivitySubTab>('world_news');
+
+  const ACT_TABS: { id: ActivitySubTab; label: string; emoji: string }[] = [
+    { id: 'world_news',    label: 'ワールドニュース', emoji: '🌍' },
+    { id: 'player_status', label: 'プレイヤー状況',   emoji: '👥' },
+    { id: 'world_status',  label: 'ワールド状況',     emoji: '🌐' },
+    { id: 'gamble_flash',  label: 'ギャンブル速報',   emoji: '🎰' },
+  ];
+
+  return (
+    <div>
+      <div style={{display:'flex', gap:4, marginBottom:12, overflowX:'auto'}}>
+        {ACT_TABS.map(t => (
+          <button key={t.id} onClick={() => setActSubTab(t.id)}
+            style={{flexShrink:0, padding:'5px 9px', fontSize:'0.72rem',
+              background: actSubTab===t.id ? 'rgba(240,192,96,0.15)' : '#1c2235',
+              border:`1px solid ${actSubTab===t.id ? '#f0c060' : '#2d3752'}`,
+              color: actSubTab===t.id ? '#f0c060' : '#8a92b2',
+              borderRadius:6, cursor:'pointer'}}>
+            {t.emoji} {t.label}
+          </button>
+        ))}
+      </div>
+      {actSubTab === 'world_news'    && <WorldNewsPanel />}
+      {actSubTab === 'player_status' && <PlayerStatusPanel users={users} />}
+      {actSubTab === 'world_status'  && <WorldStatusPanel users={users} />}
+      {actSubTab === 'gamble_flash'  && <GambleFlashPanel />}
+    </div>
+  );
+}
+
+// ============================================================
+// 既存パネル（変更なし）
+// ============================================================
 
 function OnlinePanel({ users }: { users: OnlineUser[] }) {
   return (
@@ -87,135 +428,6 @@ function OnlinePanel({ users }: { users: OnlineUser[] }) {
           </div>
         ))
       }
-    </div>
-  );
-}
-
-const ACTIVITY_STYLE: Record<string, { emoji: string; color: string }> = {
-  dungeon_clear: { emoji: '🏰', color: '#f0c060' },
-  dungeon_enter: { emoji: '⚔️', color: '#e05555' },
-  level_up:      { emoji: '⬆️', color: '#5b8dee' },
-  crafting:      { emoji: '🔨', color: '#9b6df0' },
-  gamble_win:    { emoji: '🎰', color: '#4caf87' },
-  gamble_lose:   { emoji: '🎰', color: '#e05555' },
-  gamble_battle: { emoji: '⚔️', color: '#f0c060' },
-  fishing:       { emoji: '🎣', color: '#5b8dee' },
-  mining:        { emoji: '⛏️', color: '#f0a830' },
-  auction:       { emoji: '🏷️', color: '#f0c060' },
-  online:        { emoji: '🌐', color: '#4caf87' },
-};
-
-function ActivityPanel() {
-  const [entries, setEntries] = useState<ActivityFeedEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const unsub = subscribeActivityFeed(es => {
-      setEntries(es);
-      setLoading(false);
-    });
-    return unsub;
-  }, []);
-
-  return (
-    <div>
-      <h3 style={{color:'#9b6df0', marginBottom:4, fontSize:'0.95rem'}}>📡 プレイヤーアクティビティ</h3>
-      <p style={{fontSize:'0.72rem', color:'#4a5070', marginBottom:10}}>全プレイヤーの行動がリアルタイムで流れます</p>
-      <div style={{display:'flex', flexDirection:'column', gap:0, background:'#161b26', border:'1px solid #2d3752', borderRadius:10, overflow:'hidden', maxHeight:480, overflowY:'auto'}}>
-        {loading && (
-          <div style={{color:'#8a92b2', textAlign:'center', padding:24, fontSize:'0.85rem'}}>読み込み中...</div>
-        )}
-        {!loading && entries.length === 0 && (
-          <div style={{color:'#4a5070', textAlign:'center', padding:24, fontSize:'0.85rem'}}>まだ記録がありません</div>
-        )}
-        {entries.map((e, i) => {
-          const style = ACTIVITY_STYLE[e.type] ?? { emoji: '📌', color: '#8a92b2' };
-          const now = Date.now();
-          const diff = now - e.timestamp;
-          const timeLabel = diff < 60_000 ? 'たった今'
-            : diff < 3_600_000 ? `${Math.floor(diff/60_000)}分前`
-            : diff < 86_400_000 ? `${Math.floor(diff/3_600_000)}時間前`
-            : new Date(e.timestamp).toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' });
-          return (
-            <div key={i} style={{display:'flex', alignItems:'flex-start', gap:10, padding:'9px 12px', borderBottom: i < entries.length-1 ? '1px solid #1c2235' : 'none', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)'}}>
-              <span style={{fontSize:'1.1rem', minWidth:22, textAlign:'center', marginTop:1}}>{style.emoji}</span>
-              <div style={{flex:1, minWidth:0}}>
-                <span style={{fontSize:'0.8rem', color: style.color, fontWeight:600}}>{e.displayName} </span>
-                <span style={{fontSize:'0.8rem', color:'#c0bcd8'}}>{e.message}</span>
-              </div>
-              <span style={{fontSize:'0.65rem', color:'#4a5070', whiteSpace:'nowrap', marginTop:3}}>{timeLabel}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-
-const TITLE_LABELS: Record<string, string> = {
-  beginner:'🌱 見習い冒険者', lv10:'⚔️ 一人前', lv30:'🗡️ 熟練冒険者', lv50:'💎 エキスパート',
-  lv100:'👑 レジェンド', dungeon10:'🏰 ダンジョンマスター', dungeon50:'🌟 ダンジョン王',
-  rich:'💰 大富豪', fisher:'🎣 釣り名人', crafter:'🔨 名工',
-};
-
-function ProfilePopup({ uid, onClose }: { uid: string; onClose: () => void }) {
-  const [pdata, setPdata] = useState<PlayerData | null>(null);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    (async () => {
-      try {
-        const snap = await getDoc(doc(db, 'players', uid));
-        if (snap.exists()) setPdata(snap.data() as PlayerData);
-      } catch { /* ignore */ }
-      setLoading(false);
-    })();
-  }, [uid]);
-
-  return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:9000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={onClose}>
-      <div style={{background:'#1c2235',border:'1px solid #2d3752',borderRadius:12,padding:20,width:'100%',maxWidth:320,position:'relative'}} onClick={e => e.stopPropagation()}>
-        <button onClick={onClose} style={{position:'absolute',top:10,right:10,background:'none',border:'none',color:'#4a5070',fontSize:'1.2rem',cursor:'pointer'}}>✕</button>
-        {loading ? (
-          <div style={{textAlign:'center',color:'#4a5070',padding:'20px 0'}}>読み込み中...</div>
-        ) : !pdata ? (
-          <div style={{textAlign:'center',color:'#4a5070',padding:'20px 0'}}>プロフィールが見つかりません</div>
-        ) : (
-          <>
-            <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:14}}>
-              <span style={{fontSize:'2.5rem'}}>{pdata.profile?.icon ?? '⚔️'}</span>
-              <div>
-                <div style={{fontSize:'1rem',fontWeight:700,color:'#f0c060'}}>{pdata.displayName}</div>
-                <div style={{fontSize:'0.78rem',color:'#5b8dee'}}>Lv.{pdata.stats.level}</div>
-                {pdata.profile?.titleId && <div style={{fontSize:'0.75rem',color:'#8a92b2',marginTop:2}}>{TITLE_LABELS[pdata.profile.titleId] ?? ''}</div>}
-              </div>
-            </div>
-            {pdata.profile?.comment && (
-              <div style={{background:'#161b26',borderRadius:6,padding:'8px 10px',fontSize:'0.82rem',color:'#e8e6ff',marginBottom:10,fontStyle:'italic'}}>
-                「{pdata.profile.comment}」
-              </div>
-            )}
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-              {[
-                ['攻撃力', `⚔️ ${pdata.stats.attack}`],
-                ['防御力', `🛡️ ${pdata.stats.defense}`],
-                ['所持金', `💰 ${pdata.gold.toLocaleString()}G`],
-                ['釣りスコア', `🎣 ${pdata.fishingScore ?? 0}`],
-              ].map(([label, value]) => (
-                <div key={label} style={{background:'#161b26',borderRadius:6,padding:'6px 8px'}}>
-                  <div style={{fontSize:'0.65rem',color:'#4a5070'}}>{label}</div>
-                  <div style={{fontSize:'0.82rem',color:'#e8e6ff',fontWeight:700}}>{value}</div>
-                </div>
-              ))}
-            </div>
-            {pdata.profile?.favDungeonId && (
-              <div style={{marginTop:10,fontSize:'0.78rem',color:'#8a92b2'}}>
-                好きなダンジョン：<span style={{color:'#f0c060'}}>{DUNGEON_MASTER[pdata.profile.favDungeonId]?.name ?? pdata.profile.favDungeonId}</span>
-              </div>
-            )}
-          </>
-        )}
-      </div>
     </div>
   );
 }
@@ -284,7 +496,7 @@ function BoardPanel() {
 
   const toggleReplies = (id: string) => setExpandedReplies(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
-  const msgStyle: React.CSSProperties = {background:'#1c2235', borderRadius:8, padding:'8px 10px', fontSize:'0.82rem', border:'1px solid #2d3752'};
+  const msgStyle: CSSProperties = {background:'#1c2235', borderRadius:8, padding:'8px 10px', fontSize:'0.82rem', border:'1px solid #2d3752'};
 
   return (
     <div>
@@ -296,7 +508,6 @@ function BoardPanel() {
           const showReplies = expandedReplies.has(m.id);
           return (
             <div key={m.id} style={msgStyle}>
-              {/* ヘッダー */}
               <div style={{display:'flex', gap:6, marginBottom:4, alignItems:'center'}}>
                 <span style={{color:'#f0c060', fontWeight:700, fontSize:'0.85rem', cursor:'pointer', textDecoration:'underline dotted'}} onClick={() => setProfileTarget({uid:m.uid})}>{m.displayName}</span>
                 <span style={{color:'#4a5070', fontSize:'0.68rem'}}>Lv.{m.level}</span>
@@ -306,9 +517,7 @@ function BoardPanel() {
                     style={{background:'none', border:'none', color:'#e05555', cursor:'pointer', fontSize:'0.75rem', padding:'0 2px'}}>🗑️</button>
                 )}
               </div>
-              {/* 本文 */}
               <div style={{color:'#e8e6ff', marginBottom:6, wordBreak:'break-all'}}>{m.text}</div>
-              {/* 投票 */}
               {m.poll && (() => {
                 const votes = m.poll.votes ?? {};
                 const myVote = player ? votes[player.uid as keyof typeof votes] as number | undefined : undefined;
@@ -335,7 +544,6 @@ function BoardPanel() {
                   </div>
                 );
               })()}
-              {/* リアクション */}
               <div style={{display:'flex', gap:4, flexWrap:'wrap', marginBottom:4}}>
                 {REACTION_EMOJIS.map(emoji => {
                   const uids = m.reactions?.[emoji] ?? [];
@@ -358,7 +566,6 @@ function BoardPanel() {
                   </button>
                 )}
               </div>
-              {/* 返信一覧 */}
               {showReplies && replies.length > 0 && (
                 <div style={{borderLeft:'2px solid #2d3752', paddingLeft:8, marginBottom:4, display:'flex', flexDirection:'column', gap:4}}>
                   {replies.map((r, i) => (
@@ -371,7 +578,6 @@ function BoardPanel() {
                   ))}
                 </div>
               )}
-              {/* 返信入力 */}
               {replyTarget === m.id && (
                 <div style={{display:'flex', gap:4, marginTop:4}}>
                   <input value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={e => e.key==='Enter' && handleReply(m.id)}
@@ -386,9 +592,7 @@ function BoardPanel() {
         })}
       </div>
       {profileTarget && <ProfilePopup uid={profileTarget.uid} onClose={() => setProfileTarget(null)} />}
-      {/* 投稿フォーム */}
       <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'8px 10px'}}>
-        {/* 絵文字ピッカー */}
         {showEmojiPicker && (
           <div style={{display:'flex', flexWrap:'wrap', gap:4, marginBottom:8, background:'#161b26', borderRadius:6, padding:8}}>
             {EMOJI_LIST.map(e => (
@@ -397,7 +601,6 @@ function BoardPanel() {
             ))}
           </div>
         )}
-        {/* 投票フォーム */}
         {showPollForm && (
           <div style={{marginBottom:8, background:'#161b26', borderRadius:6, padding:8}}>
             <input value={pollQuestion} onChange={e => setPollQuestion(e.target.value)} placeholder="投票の質問..." maxLength={60}
@@ -453,8 +656,8 @@ function AuctionPanel() {
   }, []);
 
   const inventoryItems = Object.entries(player?.inventory ?? {})
-    .filter(([,qty]) => qty > 0)
-    .map(([id, qty]) => ({ id, qty, item: ITEM_MASTER[id] }))
+    .filter(([,qty]) => (qty as number) > 0)
+    .map(([id, qty]) => ({ id, qty: qty as number, item: ITEM_MASTER[id] }))
     .filter(e => e.item);
 
   const handleBuy = async (listing: AuctionListing) => {
@@ -497,7 +700,6 @@ function AuctionPanel() {
           </button>
         ))}
       </div>
-
       {tab === 'browse' && (
         listings.length === 0
           ? <p style={{color:'#4a5070', fontSize:'0.85rem', textAlign:'center', padding:20}}>出品中のアイテムがありません</p>
@@ -537,7 +739,6 @@ function AuctionPanel() {
             );
           })
       )}
-
       {tab === 'sell' && (
         <div>
           <div style={{marginBottom:8}}>
@@ -572,9 +773,6 @@ function AuctionPanel() {
   );
 }
 
-// ============================================================
-// ランキングパネル
-// ============================================================
 function RankingPanel() {
   const [players, setPlayers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -649,6 +847,53 @@ function RankingPanel() {
   );
 }
 
+function ProposalPanel() {
+  const player = useGameStore(s => s.player);
+  const addNotification = useGameStore(s => s.addNotification);
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!player || !title.trim() || !body.trim()) return;
+    setSending(true);
+    try {
+      await submitProposal({ uid: player.uid, displayName: player.displayName, title: title.trim(), body: body.trim() });
+      addNotification('success', '📨 提案を送信しました！承認されると提案チケットが付与されます。');
+      setTitle(''); setBody('');
+    } catch { addNotification('error', '送信に失敗しました'); }
+    setSending(false);
+  };
+
+  return (
+    <div>
+      <h3 style={{color:'#5b8dee', marginBottom:6, fontSize:'0.95rem'}}>💡 運営への機能提案</h3>
+      <p style={{color:'#8a92b2', fontSize:'0.78rem', marginBottom:12, lineHeight:1.6}}>
+        ゲームへの要望・改善案を送信できます。承認された場合、<strong style={{color:'#f0c060'}}>提案チケット</strong>が付与されます。
+      </p>
+      <div style={{marginBottom:8}}>
+        <div style={{fontSize:'0.72rem', color:'#8a92b2', marginBottom:3}}>タイトル</div>
+        <input value={title} onChange={e => setTitle(e.target.value)} maxLength={50}
+          placeholder="例：採掘スキルに新しい鉱石を追加してほしい"
+          style={{width:'100%', padding:'7px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', boxSizing:'border-box'}} />
+      </div>
+      <div style={{marginBottom:10}}>
+        <div style={{fontSize:'0.72rem', color:'#8a92b2', marginBottom:3}}>詳細・理由</div>
+        <textarea value={body} onChange={e => setBody(e.target.value)} maxLength={500} rows={4}
+          placeholder="提案の詳細を書いてください..."
+          style={{width:'100%', padding:'7px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', boxSizing:'border-box', resize:'vertical'}} />
+      </div>
+      <button onClick={handleSubmit} disabled={sending || !title.trim() || !body.trim()}
+        style={{width:'100%', padding:'9px', background: (!title.trim() || !body.trim()) ? '#2d3752' : 'linear-gradient(135deg,#5b8dee,#3d6fd0)', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.85rem'}}>
+        {sending ? '送信中...' : '📨 提案を送信する'}
+      </button>
+    </div>
+  );
+}
+
+// ============================================================
+// メイン OnlineScreen
+// ============================================================
 export function OnlineScreen() {
   const [subTab, setSubTab] = useState<SubTab>('online');
   const [users, setUsers] = useState<OnlineUser[]>([]);
@@ -679,7 +924,7 @@ export function OnlineScreen() {
         ))}
       </div>
       {subTab === 'online'   && <OnlinePanel users={users} />}
-      {subTab === 'activity' && <ActivityPanel />}
+      {subTab === 'activity' && <ActivityTabPanel users={users} />}
       {subTab === 'board'    && <BoardPanel />}
       {subTab === 'auction'  && <AuctionPanel />}
       {subTab === 'ranking'  && <RankingPanel />}
@@ -687,3 +932,4 @@ export function OnlineScreen() {
     </div>
   );
 }
+
