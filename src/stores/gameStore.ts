@@ -77,10 +77,13 @@ function ensureDefaults(player: PlayerData): PlayerData {
       dailyHighlowWins:0, dailyPokerWins:0, dailyGamblePlays:0,
       weeklySlotPlays:0, weeklyChohanWins:0, weeklyChinchiroWins:0, weeklyPokerWins:0,
       weeklyGamblePlays:0, weeklyHighlowMaxStreak:0,
-      totalSlotPlays:0, totalChohanWins:0, totalChinchiroWins:0, totalPokerWins:0,
-      totalCoinFlipWins:0, totalHighlowWins:0, totalHighlowMaxStreak:0,
-      totalJackpotWins:0, totalWagered:0,
-      dailyResetAt:0, weeklyResetAt:0, completedMissions:[],
+      totalSlotPlays:0, totalChohanPlays:0, totalChohanWins:0,
+      totalChinchiroPlays:0, totalChinchiroWins:0, totalPokerPlays:0, totalPokerWins:0,
+      totalCoinFlipPlays:0, totalCoinFlipWins:0, totalHighlowPlays:0,
+      totalHighlowWins:0, totalHighlowMaxStreak:0,
+      totalJackpotWins:0, totalWagered:0, totalWinAmount:0,
+      totalLoseCount:0, totalWinCount:0, maxSingleWin:0, maxSingleBet:0, maxHighlowStreak:0,
+      dailyResetAt:0, weeklyResetAt:0, completedMissions:[], claimedMissions:[],
     },
   };
 }
