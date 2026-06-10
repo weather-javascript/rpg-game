@@ -17,7 +17,6 @@ import {
   subscribeActivityFeed, ActivityFeedEntry, postActivityFeed,
   submitProposal,
   deleteBoardMessage, addBoardReaction, removeBoardReaction, addBoardReply, voteBoardPoll,
-  subscribeGambleFeed, GambleFeedEntry,
 } from '../../services/multiplayer';
 import type { OnlineUser, BoardMessage, AuctionListing } from '../../types/game';
 
@@ -353,27 +352,15 @@ function NaturalNewsPanel() {
 }
 
 // ─── ギャンブル速報 ──────────────────────────────────────────
-const GAME_TYPE_LABELS: Record<string, string> = {
-  slot: 'スロット',
-  highlow: 'ハイロー',
-  blackjack: 'ブラックジャック',
-  roulette: 'ルーレット',
-  treasure: '宝箱開封',
-  jackpot: 'ジャックポット',
-  super_jackpot: '超ジャックポット',
-  chohan: '丁半',
-  chinchiro: 'チンチロリン',
-  coin_flip: 'コイントス',
-  slot_machine: 'スロットPvP',
-};
+const GAMBLE_TYPES = new Set(['gamble_win','gamble_lose','jackpot','super_jackpot','gamble_rank_up','treasure']);
 
 function GambleFlashPanel() {
-  const [entries, setEntries] = useState<GambleFeedEntry[]>([]);
+  const [entries, setEntries] = useState<ActivityFeedEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = subscribeGambleFeed(es => {
-      setEntries(es);
+    const unsub = subscribeActivityFeed(es => {
+      setEntries(es.filter(e => GAMBLE_TYPES.has(e.type)));
       setLoading(false);
     });
     return unsub;
@@ -387,14 +374,11 @@ function GambleFlashPanel() {
         {loading && <div style={{color:'#8a92b2', textAlign:'center', padding:24, fontSize:'0.85rem'}}>読み込み中...</div>}
         {!loading && entries.length === 0 && <div style={{color:'#4a5070', textAlign:'center', padding:24, fontSize:'0.85rem'}}>まだ記録がありません</div>}
         {entries.map((e, i) => {
-          const isSuperJP = e.isSuperJackpot;
-          const isJP = e.isJackpot;
-          const isWin = e.amount > 0;
-          const isNeutral = e.amount === 0;
-          const gameName = GAME_TYPE_LABELS[e.gameType] ?? e.gameType;
-          const amountStr = isNeutral ? '' : (isWin ? `+${e.amount.toLocaleString()}WC` : `${e.amount.toLocaleString()}WC`);
-          const amountColor = isSuperJP ? '#ffd700' : isJP ? '#f0c060' : isWin ? '#4caf87' : isNeutral ? '#8a92b2' : '#e05555';
+          const isSuperJP = e.type === 'super_jackpot';
+          const isJP = e.type === 'jackpot';
+          const isWin = e.type === 'gamble_win';
           const rowBg = isSuperJP ? 'rgba(255,215,0,0.1)' : isJP ? 'rgba(240,192,96,0.06)' : 'transparent';
+          const msgColor = isSuperJP ? '#ffd700' : isJP ? '#f0c060' : isWin ? '#4caf87' : '#e05555';
           const now = Date.now();
           const diff = now - e.timestamp;
           const timeLabel = diff < 60_000 ? 'たった今'
@@ -409,16 +393,11 @@ function GambleFlashPanel() {
               boxShadow: isSuperJP ? 'inset 0 0 0 1px rgba(255,215,0,0.2)' : 'none',
             }}>
               <span style={{fontSize:'1rem', minWidth:20, textAlign:'center'}}>
-                {isSuperJP ? '🌟' : isJP ? '💰' : isWin ? '🎲' : isNeutral ? '🎁' : '🃏'}
+                {isSuperJP ? '🌟' : isJP ? '💰' : isWin ? '🎲' : '🃏'}
               </span>
               <div style={{flex:1, minWidth:0}}>
                 <span style={{fontSize:'0.8rem', color:'#c0bcd8', fontWeight:600}}>{e.displayName}</span>
-                <span style={{fontSize:'0.78rem', color:'#8a92b2'}}> が {gameName}で </span>
-                <span style={{fontSize:'0.82rem', color: amountColor, fontWeight:700}}>
-                  {isSuperJP ? `超ジャックポット獲得！（${e.amount.toLocaleString()}WC）`
-                    : isJP ? `ジャックポット！（${e.amount.toLocaleString()}WC）`
-                    : isNeutral ? '開封' : amountStr}
-                </span>
+                <span style={{fontSize:'0.82rem', color: msgColor, fontWeight:600}}>{e.message}</span>
               </div>
               <span style={{fontSize:'0.62rem', color:'#4a5070', whiteSpace:'nowrap'}}>{timeLabel}</span>
             </div>
