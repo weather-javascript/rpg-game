@@ -1949,7 +1949,7 @@ export function DungeonScreen() {
         recordDungeonClear(runState.dungeonId);
         const gachaCoinReward = ({ beginner:1, intermediate:2, advanced:3, super:4, extreme:5, volcano:4 } as Record<string,number>)[dungeon?.tier ?? 'beginner'] ?? 1;
         addNotification('success', `🏆 ${dungeon?.name} ボス撃破！🪙 ガチャコイン+${gachaCoinReward}枚！`);
-        if (player) postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'dungeon_clear', message: `が「${dungeon?.name}」をクリアしました！` }).catch(() => {});
+        if (player) { const dId = runState.dungeonId; const clearType = dId === 'sky_castle' ? 'sky_castle_clear' : dId === 'sky_castle_ex' ? 'sky_castle_ex_clear' : dId === 'volcano' ? 'volcano_clear' : dId === 'kx_fight' || dId === 'kx_ex_fight' ? 'boss_kx' : dId === 'rei_fight' ? 'boss_rei' : 'dungeon_clear'; postActivityFeed({ uid: player.uid, displayName: player.displayName, type: clearType, message: `が「${dungeon?.name}」をクリアしました！` }).catch(() => {}); }
         if (runState.dungeonId === 'beginner_cave') {
           // 初級のみ：帰還or継続の選択を表示
           setRunState(prev => prev ? {

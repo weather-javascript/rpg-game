@@ -36,6 +36,9 @@ const WORLD_NEWS_TYPES = new Set([
   'event_clear','admin_event',
 ]);
 
+// ワールドニュースに表示するギャンブルの大勝ち閾値（WC）
+const GAMBLE_BIG_WIN_THRESHOLD = 50000;
+
 const NEWS_STYLE: Record<string, { emoji: string; color: string }> = {
   dungeon_clear:        { emoji: '🏰', color: '#f0c060' },
   sky_castle_clear:     { emoji: '🏯', color: '#f0c060' },
@@ -300,6 +303,12 @@ const NATURAL_TYPE_LABELS: Record<string, string> = {
   crafting: '🔨',
   dungeon: '⚔️',
   level_up: '⬆️',
+  dungeon_clear: '🏰',
+  gamble_win: '🎲',
+  gamble_lose: '🃏',
+  pvp_win: '⚔️',
+  pvp_lose: '💀',
+  treasure: '🎁',
 };
 
 function NaturalNewsPanel() {
@@ -315,7 +324,7 @@ function NaturalNewsPanel() {
   }, []);
 
   const natural = entries.filter(e =>
-    ['mining','fishing','auction','crafting','level_up'].includes(e.type)
+    ['mining','fishing','auction','crafting','level_up','dungeon_clear','gamble_win','gamble_lose','pvp_win','pvp_lose','treasure'].includes(e.type) && !WORLD_NEWS_TYPES.has(e.type)
   );
 
   return (
@@ -352,7 +361,7 @@ function NaturalNewsPanel() {
 }
 
 // ─── ギャンブル速報 ──────────────────────────────────────────
-const GAMBLE_TYPES = new Set(['gamble_win','gamble_lose','jackpot','super_jackpot','gamble_rank_up','treasure']);
+const GAMBLE_TYPES = new Set(['gamble_win','gamble_lose','jackpot','super_jackpot','gamble_rank_up','treasure','pvp_win','pvp_lose']);
 
 function GambleFlashPanel() {
   const [entries, setEntries] = useState<ActivityFeedEntry[]>([]);

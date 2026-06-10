@@ -41,6 +41,7 @@ import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER, CRAFT_RECIPES, DUNGEON_MASTER, GATHER_NODE_MASTER } from '../../data/masters';
 import type { CraftRecipe } from '../../types/game';
 import { doc, onSnapshot } from 'firebase/firestore';
+import { postActivityFeed } from '../../services/multiplayer';
 import { db } from '../../services/firebase';
 
 // ============================================================
@@ -208,6 +209,7 @@ export function CraftingScreen() {
     addRecentCrafted(matchedRecipe.outputItemId);
     const outItem = ITEM_MASTER[matchedRecipe.outputItemId];
     addNotification('success', `✨ ${outItem?.name ?? matchedRecipe.outputItemId} ×${totalOutput}${craftTimes > 1 ? ` (${craftTimes}回分)` : ''} を製作しました！`);
+    if (player) postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'crafting', message: `が${outItem?.name ?? matchedRecipe.outputItemId}×${totalOutput}を製作しました！` }).catch(() => {});
     clearGrid();
   }, [matchedRecipe, craftTimes, player, craftingLevel, consumeItem, addItems, addSkillExp, addNotification, addRecentCrafted]);
 

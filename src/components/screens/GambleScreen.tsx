@@ -999,7 +999,7 @@ function TexasHoldemPanel() {
         if (me && me.chips > 0) {
           changeWealthCoin(me.chips);
           const net = me.chips - t.buyIn;
-          postGambleFeed({ uid: player.uid, displayName: player.displayName, gameType: 'texas', amount: net }).catch(() => {});
+          postGambleFeed({ uid: player.uid, displayName: player.displayName, gameType: 'texas', amount: net }).catch(() => {}); if (net !== 0) postActivityFeed({ uid: player.uid, displayName: player.displayName, type: net > 0 ? 'gamble_win' : 'gamble_lose', message: net > 0 ? `がテキサスホールデムで${net.toLocaleString()}WC勝利しました！` : `がテキサスホールデムで${Math.abs(net).toLocaleString()}WC負けました` }).catch(() => {});
           if (net > 0) updateGambleRanking(player.uid, player.displayName, net).catch(() => {});
         }
       }
@@ -1405,6 +1405,7 @@ function PvPPanel({ bet }: { bet: number }) {
         // 負けの場合は handleHost で既に -betAmount してあるので追加処理なし
         const pvpNet = iWon ? battle.betAmount : -battle.betAmount;
         postGambleFeed({ uid: player.uid, displayName: player.displayName, gameType: battle.gambleType ?? 'pvp', amount: pvpNet }).catch(() => {});
+        postActivityFeed({ uid: player.uid, displayName: player.displayName, type: iWon ? 'gamble_win' : 'gamble_lose', message: iWon ? `がPvPで${battle.betAmount.toLocaleString()}WC勝利しました！` : `がPvPで${battle.betAmount.toLocaleString()}WC負けました` }).catch(() => {});
         if (iWon) updateGambleRanking(player.uid, player.displayName, battle.betAmount).catch(() => {});
         setBattleAnim({
           opponentName: battle.guestName ?? '相手',
@@ -1473,6 +1474,7 @@ function PvPPanel({ bet }: { bet: number }) {
         // 負けの場合は既に -betAmount 済みなので追加処理なし
         const pvpNet = iWon ? battle.betAmount : -battle.betAmount;
         postGambleFeed({ uid: player.uid, displayName: player.displayName, gameType: battle.gambleType ?? 'pvp', amount: pvpNet }).catch(() => {});
+        postActivityFeed({ uid: player.uid, displayName: player.displayName, type: iWon ? 'gamble_win' : 'gamble_lose', message: iWon ? `がPvPで${battle.betAmount.toLocaleString()}WC勝利しました！` : `がPvPで${battle.betAmount.toLocaleString()}WC負けました` }).catch(() => {});
         if (iWon) updateGambleRanking(player.uid, player.displayName, battle.betAmount).catch(() => {});
         setBattleAnim({
           opponentName: battle.hostName,
@@ -1638,8 +1640,9 @@ function SlotPanel({ onResult, onJackpotContrib, multiplierBonus = 1.0 }: { onRe
       setResult(r); onResult(r);
       if (player) {
         const winGold = Math.floor(bet * r.multiplier);
-        const type = r.multiplier > 0 ? 'gamble_win' : 'gamble_lose';
-        const msg = r.multiplier > 0 ? `が${game.name}で${(winGold-bet).toLocaleString()}WC勝利しました！` : `が${game.name}で${bet.toLocaleString()}WC負けました`;
+        const netWinSlot = winGold - bet;
+        const type = r.multiplier > 0 ? (netWinSlot >= 50000 ? 'super_jackpot' : 'gamble_win') : 'gamble_lose';
+        const msg = r.multiplier > 0 ? `が${game.name}で${netWinSlot.toLocaleString()}WC勝利しました！` : `が${game.name}で${bet.toLocaleString()}WC負けました`;
         postActivityFeed({ uid: player.uid, displayName: player.displayName, type, message: msg }).catch(() => {});
         const netAmount = r.multiplier > 0 ? Math.floor(bet * (r.multiplier - 1)) : -bet;
         postGambleFeed({ uid: player.uid, displayName: player.displayName, gameType: 'slot', amount: netAmount }).catch(() => {});
@@ -1751,9 +1754,10 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus =
     // アクティビティフィードに投稿
     if (player) {
       const winGold = Math.floor(bet * r.multiplier);
-      const type = r.multiplier > 0 ? 'gamble_win' : 'gamble_lose';
+      const netWin = winGold - bet;
+      const type = r.multiplier > 0 ? (netWin >= 50000 ? 'super_jackpot' : 'gamble_win') : 'gamble_lose';
       const msg = r.multiplier > 0
-        ? `が${game.name}で${(winGold - bet).toLocaleString()}WC勝利しました！`
+        ? `が${game.name}で${netWin.toLocaleString()}WC勝利しました！`
         : `が${game.name}で${bet.toLocaleString()}WC負けました`;
       postActivityFeed({ uid: player.uid, displayName: player.displayName, type, message: msg }).catch(() => {});
       // ギャンブル速報
