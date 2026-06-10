@@ -37,6 +37,7 @@ const WORLD_NEWS_TYPES = new Set([
 ]);
 
 // ワールドニュースに表示するギャンブルの大勝ち閾値（WC）
+
 const NEWS_STYLE: Record<string, { emoji: string; color: string }> = {
   dungeon_clear:        { emoji: '🏰', color: '#f0c060' },
   sky_castle_clear:     { emoji: '🏯', color: '#f0c060' },
@@ -56,9 +57,19 @@ const NEWS_STYLE: Record<string, { emoji: string; color: string }> = {
   admin_event:          { emoji: '📢', color: '#5b8dee' },
 };
 
+// ─── ワールドニュース ランクテーブル ────────────────────────
+const NEWS_RANK: Record<string, number> = {
+  super_jackpot: 5, sky_castle_ex_clear: 5, level_200: 5,
+  volcano_clear: 4, boss_kx: 4, boss_rei: 4, boss_ragnarok: 4,
+  jackpot: 3, sky_castle_clear: 3, boss_hard: 3, level_100: 3,
+  dungeon_clear: 2, gamble_rank_up: 2, level_50: 2, event_clear: 2,
+  admin_event: 1,
+};
+
 function WorldNewsPanel() {
   const [entries, setEntries] = useState<ActivityFeedEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     const unsub = subscribeActivityFeed(es => {
@@ -68,34 +79,118 @@ function WorldNewsPanel() {
     return unsub;
   }, []);
 
+  // shimmer animation tick
+  useEffect(() => {
+    const t = setInterval(() => setTick(p => p + 1), 1200);
+    return () => clearInterval(t);
+  }, []);
+
   return (
     <div>
-      <h3 style={{color:'#f0c060', marginBottom:4, fontSize:'0.95rem'}}>🌍 ワールドニュース</h3>
+      <h3 style={{color:'#f0c060', marginBottom:2, fontSize:'0.95rem', display:'flex', alignItems:'center', gap:6}}>
+        <span style={{animation:`spin ${tick}s linear`}}>🌍</span> ワールドニュース
+      </h3>
       <p style={{fontSize:'0.72rem', color:'#4a5070', marginBottom:10}}>世界で起きた重要イベント</p>
-      <div style={{display:'flex', flexDirection:'column', background:'#161b26', border:'1px solid #2d3752', borderRadius:10, overflow:'hidden', maxHeight:480, overflowY:'auto'}}>
+      <div style={{display:'flex', flexDirection:'column', gap:6, maxHeight:520, overflowY:'auto', paddingBottom:4}}>
         {loading && <div style={{color:'#8a92b2', textAlign:'center', padding:24, fontSize:'0.85rem'}}>読み込み中...</div>}
         {!loading && entries.length === 0 && <div style={{color:'#4a5070', textAlign:'center', padding:24, fontSize:'0.85rem'}}>まだニュースがありません</div>}
         {entries.map((e, i) => {
-          const style = NEWS_STYLE[e.type] ?? { emoji: '📌', color: '#8a92b2' };
+          const s = NEWS_STYLE[e.type] ?? { emoji: '📌', color: '#8a92b2' };
+          const rank = NEWS_RANK[e.type] ?? 1;
           const now = Date.now();
           const diff = now - e.timestamp;
           const timeLabel = diff < 60_000 ? 'たった今'
             : diff < 3_600_000 ? `${Math.floor(diff/60_000)}分前`
             : diff < 86_400_000 ? `${Math.floor(diff/3_600_000)}時間前`
             : new Date(e.timestamp).toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' });
-          const isSpecial = e.type === 'super_jackpot' || e.type === 'sky_castle_ex_clear' || e.type === 'level_200';
-          return (
-            <div key={i} style={{display:'flex', alignItems:'flex-start', gap:10, padding:'10px 12px',
-              borderBottom: i < entries.length-1 ? '1px solid #1c2235' : 'none',
-              background: isSpecial ? 'rgba(255,215,0,0.06)' : (i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)'),
-              boxShadow: isSpecial ? 'inset 0 0 0 1px rgba(255,215,0,0.15)' : 'none',
+
+          // rank5: super jackpot / sky_castle_ex / lv200
+          if (rank >= 5) return (
+            <div key={i} style={{
+              position:'relative', borderRadius:12, overflow:'hidden',
+              background:'linear-gradient(135deg, #1a1200 0%, #2a1800 40%, #1a0a00 100%)',
+              border:'2px solid #ffd700',
+              boxShadow:'0 0 18px rgba(255,215,0,0.45), 0 0 4px rgba(255,165,0,0.3)',
+              padding:'12px 14px',
             }}>
-              <span style={{fontSize:'1.2rem', minWidth:24, textAlign:'center', marginTop:1}}>{style.emoji}</span>
-              <div style={{flex:1, minWidth:0}}>
-                <span style={{fontSize:'0.82rem', color: style.color, fontWeight:700}}>{e.displayName} </span>
-                <span style={{fontSize:'0.82rem', color:'#c0bcd8'}}>{e.message}</span>
+              {/* shimmer strip */}
+              <div style={{position:'absolute',top:0,left:`${(tick*30)%160-40}%`,width:'40%',height:'100%',
+                background:'linear-gradient(90deg,transparent,rgba(255,215,0,0.12),transparent)',
+                pointerEvents:'none'}} />
+              <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:6}}>
+                <span style={{fontSize:'1.6rem'}}>{s.emoji}</span>
+                <div style={{
+                  fontSize:'0.65rem', fontWeight:800, letterSpacing:'0.12em',
+                  color:'#ffd700', textTransform:'uppercase',
+                  textShadow:'0 0 8px rgba(255,215,0,0.8)',
+                  background:'rgba(255,215,0,0.12)', borderRadius:4, padding:'2px 6px',
+                }}>⭐ LEGENDARY EVENT ⭐</div>
+                <span style={{marginLeft:'auto', fontSize:'0.62rem', color:'#7a6a30'}}>{timeLabel}</span>
               </div>
-              <span style={{fontSize:'0.65rem', color:'#4a5070', whiteSpace:'nowrap', marginTop:3}}>{timeLabel}</span>
+              <div style={{fontSize:'0.92rem', fontWeight:800, color:'#ffd700',
+                textShadow:'0 0 12px rgba(255,215,0,0.7)'}}>
+                {e.displayName}
+                <span style={{fontSize:'0.85rem', fontWeight:500, color:'#f0d880'}}>{e.message.replace(e.displayName,'')}</span>
+              </div>
+            </div>
+          );
+
+          // rank4: volcano/boss_kx/boss_rei/boss_ragnarok
+          if (rank === 4) return (
+            <div key={i} style={{
+              borderRadius:10, overflow:'hidden',
+              background:'linear-gradient(135deg, #1a0808 0%, #220e0e 100%)',
+              border:'1.5px solid', borderColor: s.color,
+              boxShadow:`0 0 10px ${s.color}55`,
+              padding:'10px 12px',
+            }}>
+              <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:4}}>
+                <span style={{fontSize:'1.3rem'}}>{s.emoji}</span>
+                <span style={{fontSize:'0.62rem', fontWeight:700, color: s.color, letterSpacing:'0.08em',
+                  background:`${s.color}22`, borderRadius:4, padding:'1px 5px'}}>★ EPIC</span>
+                <span style={{marginLeft:'auto', fontSize:'0.62rem', color:'#4a5070'}}>{timeLabel}</span>
+              </div>
+              <div style={{fontSize:'0.88rem', fontWeight:700, color: s.color, textShadow:`0 0 8px ${s.color}66`}}>
+                {e.displayName}
+                <span style={{color:'#c0bcd8', fontWeight:400}}>{e.message.replace(e.displayName,'')}</span>
+              </div>
+            </div>
+          );
+
+          // rank3: jackpot/sky_castle_clear/boss_hard/lv100
+          if (rank === 3) return (
+            <div key={i} style={{
+              borderRadius:8,
+              background:'rgba(255,255,255,0.03)',
+              border:`1px solid ${s.color}88`,
+              boxShadow:`inset 0 0 0 1px ${s.color}22`,
+              padding:'9px 12px',
+              display:'flex', alignItems:'center', gap:8,
+            }}>
+              <span style={{fontSize:'1.1rem'}}>{s.emoji}</span>
+              <div style={{flex:1}}>
+                <span style={{fontSize:'0.82rem', fontWeight:700, color: s.color}}>{e.displayName}</span>
+                <span style={{fontSize:'0.8rem', color:'#c0bcd8'}}>{e.message.replace(e.displayName,'')}</span>
+              </div>
+              <span style={{fontSize:'0.62rem', color:'#4a5070', whiteSpace:'nowrap'}}>{timeLabel}</span>
+            </div>
+          );
+
+          // rank1-2: default
+          return (
+            <div key={i} style={{
+              borderRadius:7,
+              background:'rgba(255,255,255,0.015)',
+              border:'1px solid #1c2235',
+              padding:'8px 12px',
+              display:'flex', alignItems:'center', gap:8,
+            }}>
+              <span style={{fontSize:'1rem'}}>{s.emoji}</span>
+              <div style={{flex:1}}>
+                <span style={{fontSize:'0.8rem', fontWeight:600, color: s.color}}>{e.displayName}</span>
+                <span style={{fontSize:'0.78rem', color:'#8a92b2'}}>{e.message.replace(e.displayName,'')}</span>
+              </div>
+              <span style={{fontSize:'0.62rem', color:'#4a5070', whiteSpace:'nowrap'}}>{timeLabel}</span>
             </div>
           );
         })}
@@ -322,7 +417,7 @@ function NaturalNewsPanel() {
   }, []);
 
   const natural = entries.filter(e =>
-    ['mining','fishing','auction','crafting','level_up','dungeon_clear','gamble_win','gamble_lose','pvp_win','pvp_lose','treasure'].includes(e.type) && !WORLD_NEWS_TYPES.has(e.type)
+    ['mining','fishing','auction','crafting','level_up','dungeon_clear'].includes(e.type) && !WORLD_NEWS_TYPES.has(e.type)
   );
 
   return (
