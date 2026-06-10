@@ -1687,7 +1687,7 @@ export async function fetchOnlinePlayerList(): Promise<{ uid: string; displayNam
 // ============================================================
 // NPC依頼システム
 // ============================================================
-export async function subscribeNpcQuests(cb: (quests: NpcQuest[]) => void): () => void {
+export function subscribeNpcQuests(cb: (quests: NpcQuest[]) => void): () => void {
   const ref = collection(db, 'npc_quests');
   const unsub = onSnapshot(query(ref, orderBy('rank', 'asc'), limit(50)), snap => {
     const quests: NpcQuest[] = [];

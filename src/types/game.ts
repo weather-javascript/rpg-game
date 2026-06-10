@@ -390,6 +390,8 @@ export interface PlayerData {
   // 株式保有
   stockHoldings?: Record<string, StockHolding>; // key: StockId
   totalStockProfit?: number;
+  // ナビ報酬受取済み
+  naviClaimed?: Record<string, boolean>;
   // プロフィール
   profile?: {
     icon: string;          // 絵文字アイコン
