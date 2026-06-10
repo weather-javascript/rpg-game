@@ -57,6 +57,28 @@ interface TurnBattleState {
   itemCooldowns: Record<string, number>;
   // 単発攻撃の一時保存（ターゲット選択後に使う）
   pendingAction: null | { type: 'attack' | 'weapon' | 'ultimate'; itemId?: string };
+  // KXモード用（省略可）
+  kx?: KxState;
+}
+
+// KXボス戦専用状態
+interface KxState {
+  hp: number;
+  maxHp: number;
+  phase: number;       // 1-4
+  isAwakened: boolean;
+  awakeHp: number;
+  awakeMaxHp: number;
+  burnTurns: number;   // カオスフレア燃焼残りターン
+}
+
+// TurnBattle に渡す KX設定
+interface KxConfig {
+  initialHp: number;
+  initialPhase: number;
+  initialAwakened: boolean;
+  onVictory: (isAwakened: boolean) => void;
+  onDefeat: () => void;
 }
 
 // ============================================================
@@ -160,8 +182,17 @@ function spawnEnemies(dungeon: DungeonMaster, areaIdx: number, _kxPhase?: number
   return result;
 }
 
-// ============================================================
-// ホットバーUI
+// KX眷属スポーン（フェーズに応じて複数体）
+function spawnKxMinions(phase: number): EnemyState[] {
+  const mult = phase >= 4 ? 2 : 1;
+  const base = [
+    { monsterId: 'roam_armor', hp: 60, maxHp: 60 },
+    { monsterId: 'death_armor', hp: 75, maxHp: 75 },
+  ];
+  const result: EnemyState[] = [];
+  for (let i = 0; i < mult; i++) result.push(...base.map(m => ({ ...m })));
+  return result;
+}
 // ============================================================
 const SLOT_LABELS: Record<string, string> = {
   helmet: '🪖', chestplate: '🛡️', leggings: '👖', boots: '👟', offhand: '✋'
@@ -276,19 +307,21 @@ function HotbarSetModal({ slot, idx, equipment, inventory, onSet, onClose }: {
 // ============================================================
 // ターン制バトル画面
 // ============================================================
-function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, onManaUpdate }: {
+function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, onManaUpdate, kxConfig }: {
   runState: DungeonRunState;
   equipment: EquipmentSlots;
   onBattleEnd: (won: boolean, expGained: number, goldGained: number, drops: {itemId:string;amount:number}[], hpDelta: number) => void;
   onEscape: () => void;
   initialMana?: number;
   onManaUpdate?: (mana: number) => void;
+  kxConfig?: KxConfig;
 }) {
   const player = useGameStore(s => s.player)!;
   const consumeItem = useGameStore(s => s.consumeItem);
   const changeHp = useGameStore(s => s.changeHp);
   const changeSatiety = useGameStore(s => s.changeSatiety);
   const addNotification = useGameStore(s => s.addNotification);
+  const addItems = useGameStore(s => s.addItems);
 
   const dungeon = { ...DUNGEON_MASTER[runState.dungeonId], areas: _dungeonOverrideCache[runState.dungeonId]?.areas ?? DUNGEON_MASTER[runState.dungeonId]?.areas };
   const combatLv = player.skillLevels['combat'] ?? 1;
@@ -296,17 +329,23 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
   // 初期敵グループ生成
   const [battle, setBattle] = useState<TurnBattleState>(() => {
     const areaIdx = runState.currentAreaIdx ?? 0;
-    const enemies = spawnEnemies(dungeon, areaIdx);
+    const enemies = kxConfig
+      ? spawnKxMinions(1)
+      : spawnEnemies(dungeon, areaIdx);
     const hotbarWeaponId = equipment.hotbar.find(id => id && ITEM_MASTER[id]?.itemType === 'Weapon') ?? null;
     const weaponItem = hotbarWeaponId ? ITEM_MASTER[hotbarWeaponId] : null;
     const manaSkill = weaponItem?.weaponSkills?.find((s): s is WeaponManaSkill => s.type === 'mana_charge');
     const names = enemies.map(e => getMergedMonster(e.monsterId)?.name ?? '?').join('、');
+    const KX_MAX_HP = 38750;
+    const AWAKE_MAX_HP = 1900;
     return {
       enemies,
       targetIdx: 0,
       playerHpSnapshot: player.stats.hp,
       turn: 'player',
-      log: [{ text: `⚔️ ${names} が現れた！`, color: '#f0c060' }],
+      log: kxConfig
+        ? [{ text: '⚠️ KX-G21が現れた！眷属を倒してダメージを与えよ！', color: '#f0c060' }]
+        : [{ text: `⚔️ ${names} が現れた！`, color: '#f0c060' }],
       result: null,
       expGained: 0, goldGained: 0, drops: [],
       isDefending: false,
@@ -319,6 +358,15 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       skillTurn: 0,
       itemCooldowns: {},
       pendingAction: null,
+      kx: kxConfig ? {
+        hp: kxConfig.initialHp,
+        maxHp: KX_MAX_HP,
+        phase: kxConfig.initialPhase,
+        isAwakened: kxConfig.initialAwakened,
+        awakeHp: AWAKE_MAX_HP,
+        awakeMaxHp: AWAKE_MAX_HP,
+        burnTurns: 0,
+      } : undefined,
     };
   });
 
@@ -450,9 +498,100 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     // 全滅チェック
     const aliveAfterPassive = newBattle.enemies.filter(e => e.hp > 0);
     if (aliveAfterPassive.length === 0) {
-      const { exp, gold, drops } = calcWinRewards(newBattle.enemies);
-      newLog.push({ text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' });
-      return { ...newBattle, log: newLog, turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, isDefending: false };
+      // KXモード: 全眷属討伐時は勝利ではなく再召喚（executeAttack側で処理済みの場合あり）
+      if (newBattle.kx && !newBattle.kx.isAwakened && newBattle.kx.hp > 0) {
+        newLog.push({ text: 'KX-G21が眷属を再召喚した！', color: '#e05555' });
+        return { ...newBattle, enemies: spawnKxMinions(newBattle.kx.phase), log: newLog, turn: 'player', isDefending: false };
+      }
+      if (!newBattle.kx) {
+        const { exp, gold, drops } = calcWinRewards(newBattle.enemies);
+        newLog.push({ text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' });
+        return { ...newBattle, log: newLog, turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, isDefending: false };
+      }
+    }
+
+    // === KXモード: KXのターン行動 ===
+    if (newBattle.kx) {
+      const kx = newBattle.kx;
+      // 覚醒KXは普通に攻撃
+      if (kx.isAwakened) {
+        const dmg = 30 + Math.floor(secureRandom() * 40);
+        changeHp(-dmg);
+        newLog.push({ text: `⚡ KX-G21[ライフエナジー]の攻撃！${dmg}ダメージ！`, color: '#ff00ff' });
+        if (player.stats.hp - dmg <= 0) {
+          return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
+        }
+        return { ...newBattle, log: newLog, turn: 'player', isDefending: false };
+      }
+      // フェーズに応じたKXアクション選択
+      const actions = ['minion_summon', 'cannon_create', 'summon_combat'];
+      if (kx.phase >= 2) actions.push('stork_ex', 'slash');
+      if (kx.phase >= 3) actions.push('chaos_flare', 'lightning_bolt', 'summon_tech_snipe');
+      const action = actions[Math.floor(secureRandom() * actions.length)];
+      let dmg = 0;
+      let logText = '';
+      let logColor = '#e05555';
+      let newKxBurnTurns = kx.burnTurns;
+      let extraEnemies: EnemyState[] = [];
+
+      if (action === 'slash') {
+        dmg = 15 + Math.floor(secureRandom() * 20);
+        logText = `⚔️ 「貴様など叩き切ってくれるわ！」 KX-G21が貫通斬撃！${dmg}ダメ！`;
+        changeHp(-dmg);
+      } else if (action === 'chaos_flare') {
+        dmg = 20 + Math.floor(secureRandom() * 15);
+        newKxBurnTurns = 4;
+        logText = `🔥 カオスフレア！${dmg}ダメ＋燃焼4ターン！`;
+        changeHp(-dmg);
+        logColor = '#ff6b00';
+      } else if (action === 'lightning_bolt') {
+        dmg = 60 + Math.floor(secureRandom() * 40);
+        logText = `⚡ ライトニングボルト！超高火力${dmg}ダメ！`;
+        changeHp(-dmg);
+        logColor = '#f0f000';
+      } else if (action === 'summon_tech_snipe') {
+        dmg = 10;
+        logText = `🎯 サモンテックスナイプ！貫通+10、エクス＆雷4体ずつ召喚！`;
+        changeHp(-dmg);
+        extraEnemies = [
+          ...Array(4).fill(null).map(() => ({ monsterId: 'exs_minion', hp: 100, maxHp: 100 })),
+          ...Array(4).fill(null).map(() => ({ monsterId: 'lightning_minion', hp: 60, maxHp: 60 })),
+        ];
+      } else if (action === 'cannon_create') {
+        logText = `💣 キャノンクリエイト！キャノン付きゾンビを召喚！`;
+        logColor = '#8a92b2';
+        extraEnemies = [{ monsterId: 'cannon_zombie', hp: 120, maxHp: 120 }];
+      } else if (action === 'summon_combat') {
+        logText = `⚔️ サモン:コンバット！コンバットを召喚！`;
+        logColor = '#8a92b2';
+        extraEnemies = [{ monsterId: 'combat_minion', hp: 80, maxHp: 80 }];
+      } else if (action === 'stork_ex') {
+        logText = `🤖 ストークエクス！エクスを召喚！`;
+        logColor = '#8a92b2';
+        extraEnemies = [{ monsterId: 'exs_minion', hp: 100, maxHp: 100 }];
+      } else {
+        logText = `👾 眷属召喚！ロウムアーマーとデスアーマーが現れた！`;
+        logColor = '#e05555';
+        extraEnemies = spawnKxMinions(kx.phase);
+      }
+
+      // 燃焼ダメージ
+      if (kx.burnTurns > 0) {
+        const bDmg = 8;
+        changeHp(-bDmg);
+        newKxBurnTurns = kx.burnTurns - 1;
+        logText += ` 🔥燃焼${bDmg}ダメ(残${newKxBurnTurns}T)`;
+      }
+      newLog.push({ text: logText, color: logColor });
+
+      const liveEnemies = newBattle.enemies.filter(e => e.hp > 0);
+      const finalEnemies = [...liveEnemies, ...extraEnemies];
+      const updatedKx: KxState = { ...kx, burnTurns: newKxBurnTurns };
+
+      if (player.stats.hp - dmg <= 0) {
+        return { ...newBattle, kx: updatedKx, enemies: finalEnemies, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
+      }
+      return { ...newBattle, kx: updatedKx, enemies: finalEnemies, log: newLog, turn: 'player', isDefending: false };
     }
 
     // 生存敵が順に攻撃
@@ -543,7 +682,94 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     const logMsg = isArea
       ? { text: `🌀 ${weaponMsg}で全体攻撃！ 合計${totalDmg}ダメージ！`, color: '#4caf87' }
       : { text: `⚔️ ${weaponMsg}で攻撃！ ${totalDmg}ダメージ！`, color: '#4caf87' };
-    const newLog = [...battle.log, logMsg];
+    let newLog = [...battle.log, logMsg];
+
+    // === KXモード: 眷属討伐でKXにダメージ ===
+    if (battle.kx && !battle.kx.isAwakened) {
+      const KX_MAX_HP = battle.kx.maxHp;
+      const MINION_DMG: Record<string, number> = {
+        roam_armor: Math.floor(KX_MAX_HP * 0.04),
+        death_armor: Math.floor(KX_MAX_HP * 0.08),
+      };
+      let newKxHp = battle.kx.hp;
+      let newDrops: {itemId:string;amount:number}[] = [];
+      for (let i = 0; i < newEnemies.length; i++) {
+        const prev = battle.enemies[i];
+        const next = newEnemies[i];
+        if (prev.hp > 0 && next.hp <= 0) {
+          const fixedDmg = MINION_DMG[prev.monsterId];
+          if (fixedDmg) {
+            newKxHp = Math.max(0, newKxHp - fixedDmg);
+            newLog.push({ text: `💥 ${getMergedMonster(prev.monsterId)?.name}を倒した！KX-G21に${fixedDmg}ダメージ！(HP: ${newKxHp}/${KX_MAX_HP})`, color: '#f0c060' });
+          }
+          if (prev.monsterId === 'roam_armor') newDrops.push({ itemId: 'mech_armor_oparts', amount: 1 });
+          if (prev.monsterId === 'death_armor') newDrops.push({ itemId: 'rusty_mystery_obj', amount: 1 });
+        }
+      }
+      if (newDrops.length > 0) addItems(newDrops);
+
+      if (newKxHp <= 0) {
+        // KX撃破 → 20%で覚醒
+        if (secureRandom() < 0.2) {
+          newLog.push({ text: '「さぁ、延長戦の始まりだ！」 KX-G21が覚醒した！', color: '#ff00ff' });
+          const awakeKx: KxState = { ...battle.kx, hp: 0, isAwakened: true, awakeHp: battle.kx.awakeMaxHp, burnTurns: 0 };
+          const after: TurnBattleState = { ...battle, enemies: [], log: newLog, turn: 'player', kx: awakeKx, pendingAction: null };
+          setBattle(after);
+        } else {
+          newLog.push({ text: '🏆 KX-G21を討伐した！', color: '#f0c060' });
+          addItems([{ itemId: 'super_spanner', amount: 10 }, { itemId: 'makai_bihin', amount: 10 }, { itemId: 'kx_mech_track', amount: 1 }]);
+          setBattle(b => ({ ...b, enemies: newEnemies, log: [...newLog], turn: 'result', result: 'win', kx: { ...battle.kx!, hp: 0 }, pendingAction: null }));
+        }
+        return;
+      }
+
+      // フェーズ変化チェック
+      const pct = newKxHp / KX_MAX_HP * 100;
+      let newPhase = battle.kx.phase;
+      if (pct <= 30 && newPhase < 4) newPhase = 4;
+      else if (pct <= 50 && newPhase < 3) newPhase = 3;
+      else if (pct <= 80 && newPhase < 2) newPhase = 2;
+      const phaseMessages: Record<number, string> = {
+        2: 'KX-G21.軽度の損傷を確認...攻撃方法を変更します...',
+        3: 'KX-G21...ｷﾞｷﾞ...中度ﾉ損傷を確認...魔術回路を構成ｼまス...',
+        4: 'KX-G21...ﾌｶイ損ｼｮ...ｦｶｸﾆﾝ...リミｯﾀｰヲかｲｼﾞｮｼまｽ..',
+      };
+      if (newPhase !== battle.kx.phase) {
+        newLog.push({ text: `🔴 【第${newPhase}形態】${phaseMessages[newPhase]}`, color: '#ff6b6b' });
+      }
+
+      // 全眷属討伐でKXが再召喚
+      const aliveAfter = newEnemies.filter(e => e.hp > 0);
+      let finalEnemies = newEnemies;
+      if (aliveAfter.length === 0 && newKxHp > 0) {
+        newLog.push({ text: 'KX-G21が眷属を再召喚した！', color: '#e05555' });
+        finalEnemies = spawnKxMinions(newPhase);
+      }
+
+      const updatedKx: KxState = { ...battle.kx, hp: newKxHp, phase: newPhase };
+      const after: TurnBattleState = { ...battle, enemies: finalEnemies, log: newLog, turn: 'monster', isDefending: false, pendingAction: null, kx: updatedKx };
+      setBattle(after);
+      setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+      return;
+    }
+
+    // KX覚醒モード: 直接攻撃
+    if (battle.kx?.isAwakened) {
+      const newAwakeHp = Math.max(0, battle.kx.awakeHp - totalDmg);
+      newLog.push({ text: `⚔️ KX覚醒に${totalDmg}ダメージ！(HP: ${newAwakeHp}/${battle.kx.awakeMaxHp})`, color: '#5b8dee' });
+      if (newAwakeHp <= 0) {
+        newLog.push({ text: '🏆 KX-G21[ライフエナジー]を討伐した！', color: '#f0c060' });
+        addItems([{ itemId: 'life_control_core', amount: 1 }]);
+        setBattle(b => ({ ...b, log: [...newLog], turn: 'result', result: 'win', kx: { ...battle.kx!, awakeHp: 0 }, pendingAction: null }));
+        return;
+      }
+      const after: TurnBattleState = { ...battle, log: newLog, turn: 'monster', isDefending: false, pendingAction: null, kx: { ...battle.kx, awakeHp: newAwakeHp } };
+      setBattle(after);
+      setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+      return;
+    }
+
+    // 通常モード
     const alive = newEnemies.filter(e => e.hp > 0);
     if (alive.length === 0) {
       const { exp, gold, drops } = calcWinRewards(newEnemies);
@@ -599,6 +825,69 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     const newEnemies = battle.enemies.map(e =>
       e.hp > 0 ? { ...e, hp: Math.max(0, e.hp - dmgTotal) } : e
     );
+
+    // KXモード: 眷属討伐でKXにダメージ
+    if (battle.kx && !battle.kx.isAwakened) {
+      const KX_MAX_HP = battle.kx.maxHp;
+      const MINION_DMG: Record<string, number> = {
+        roam_armor: Math.floor(KX_MAX_HP * 0.04),
+        death_armor: Math.floor(KX_MAX_HP * 0.08),
+      };
+      let newKxHp = battle.kx.hp;
+      for (let i = 0; i < newEnemies.length; i++) {
+        if (battle.enemies[i].hp > 0 && newEnemies[i].hp <= 0) {
+          const fd = MINION_DMG[battle.enemies[i].monsterId];
+          if (fd) {
+            newKxHp = Math.max(0, newKxHp - fd);
+            logEntries.push({ text: `💥 ${getMergedMonster(battle.enemies[i].monsterId)?.name}撃破！KX-G21に${fd}ダメージ！(HP: ${newKxHp}/${KX_MAX_HP})`, color: '#f0c060' });
+          }
+        }
+      }
+      if (newKxHp <= 0) {
+        if (secureRandom() < 0.2) {
+          logEntries.push({ text: '「さぁ、延長戦の始まりだ！」 KX-G21が覚醒した！', color: '#ff00ff' });
+          const awakeKx: KxState = { ...battle.kx, hp: 0, isAwakened: true, awakeHp: battle.kx.awakeMaxHp, burnTurns: 0 };
+          setBattle(b => ({ ...b, enemies: [], log: [...b.log, ...logEntries], turn: 'player', kx: awakeKx, weaponMana: 0, ultimateReady: false }));
+        } else {
+          logEntries.push({ text: '🏆 KX-G21を討伐した！', color: '#f0c060' });
+          addItems([{ itemId: 'super_spanner', amount: 10 }, { itemId: 'makai_bihin', amount: 10 }, { itemId: 'kx_mech_track', amount: 1 }]);
+          setBattle(b => ({ ...b, enemies: newEnemies, log: [...b.log, ...logEntries], turn: 'result', result: 'win', kx: { ...battle.kx!, hp: 0 }, weaponMana: 0, ultimateReady: false }));
+        }
+        return;
+      }
+      const pct = newKxHp / KX_MAX_HP * 100;
+      let np = battle.kx.phase;
+      if (pct <= 30 && np < 4) np = 4;
+      else if (pct <= 50 && np < 3) np = 3;
+      else if (pct <= 80 && np < 2) np = 2;
+      const aliveAfter = newEnemies.filter(e => e.hp > 0);
+      let finalEnemies = newEnemies;
+      if (aliveAfter.length === 0 && newKxHp > 0) {
+        logEntries.push({ text: 'KX-G21が眷属を再召喚した！', color: '#e05555' });
+        finalEnemies = spawnKxMinions(np);
+      }
+      const afterUlt: TurnBattleState = { ...battle, enemies: finalEnemies, log: [...battle.log, ...logEntries], turn: 'monster', isDefending: false, weaponMana: 0, ultimateReady: false, poisonBuff: newPoisonBuff, poisonDmg: newPoisonDmg, kx: { ...battle.kx, hp: newKxHp, phase: np } };
+      setBattle(afterUlt);
+      setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+      return;
+    }
+
+    // KX覚醒モード
+    if (battle.kx?.isAwakened) {
+      const newAwakeHp = Math.max(0, battle.kx.awakeHp - dmgTotal);
+      logEntries.push({ text: `⚔️ KX覚醒に必殺技${dmgTotal}ダメージ！(HP: ${newAwakeHp}/${battle.kx.awakeMaxHp})`, color: '#5b8dee' });
+      if (newAwakeHp <= 0) {
+        logEntries.push({ text: '🏆 KX-G21[ライフエナジー]を討伐した！', color: '#f0c060' });
+        addItems([{ itemId: 'life_control_core', amount: 1 }]);
+        setBattle(b => ({ ...b, log: [...b.log, ...logEntries], turn: 'result', result: 'win', kx: { ...battle.kx!, awakeHp: 0 }, weaponMana: 0, ultimateReady: false }));
+        return;
+      }
+      const afterUlt: TurnBattleState = { ...battle, log: [...battle.log, ...logEntries], turn: 'monster', isDefending: false, weaponMana: 0, ultimateReady: false, poisonBuff: newPoisonBuff, poisonDmg: newPoisonDmg, kx: { ...battle.kx, awakeHp: newAwakeHp } };
+      setBattle(afterUlt);
+      setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+      return;
+    }
+
     const alive = newEnemies.filter(e => e.hp > 0);
     if (alive.length === 0) {
       const { exp, gold, drops } = calcWinRewards(newEnemies);
@@ -633,33 +922,92 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
 
     if (item.itemType === 'Weapon') {
       const isArea = !!item.isAreaWeapon;
-      const areaPen = item.areaPenetrate ?? 0;
       const alive = battle.enemies.filter(e => e.hp > 0);
-      if (!isArea && alive.length > 1) {
+      // equippedWeaponId を更新してから executeAttack に委譲
+      setBattle(b => ({ ...b, equippedWeaponId: itemId }));
+      if (!isArea && alive.length > 1 && !battle.kx?.isAwakened) {
         setBattle(b => ({ ...b, turn: 'select_target', pendingAction: { type: 'weapon', itemId }, equippedWeaponId: itemId }));
         return;
       }
       const targetIdx = battle.enemies.findIndex(e => e.hp > 0);
-      const newEnemies = battle.enemies.map((e, i) => {
-        if (e.hp <= 0) return e;
-        if (!isArea && i !== targetIdx) return e;
-        const mon = getMergedMonster(e.monsterId);
-        const atkBase = item.weaponAtk ?? (item.useEffect?.attackBonus ? player.stats.attack + item.useEffect.attackBonus : player.stats.attack);
-        const dmg = areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0);
-        return { ...e, hp: Math.max(0, e.hp - dmg) };
-      });
-      const msg = item.useEffect?.message ?? `${item.name}で攻撃した`;
-      const logEntries = [{ text: `🗡️ ${msg}`, color: '#f0c060' }];
-      const aliveAfter = newEnemies.filter(e => e.hp > 0);
-      if (aliveAfter.length === 0) {
-        const { exp, gold, drops } = calcWinRewards(newEnemies);
-        logEntries.push({ text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' });
-        setBattle(b => ({ ...b, enemies: newEnemies, log: [...b.log, ...logEntries], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, equippedWeaponId: itemId }));
-      } else {
-        const after: TurnBattleState = { ...battle, enemies: newEnemies, log: [...battle.log, ...logEntries], turn: 'monster', isDefending: false, equippedWeaponId: itemId };
-        setBattle(after);
+      // 少し遅らせて state 更新を待つ
+      setTimeout(() => {
+        setBattle(prev => {
+          const newBattle = { ...prev, equippedWeaponId: itemId };
+          // executeAttack の参照が古い battle を使うため、直接計算
+          const isAreaW = !!item.isAreaWeapon;
+          const areaPen = item.areaPenetrate ?? 0;
+          const atkBase = item.weaponAtk ?? (item.useEffect?.attackBonus ? player.stats.attack + item.useEffect.attackBonus : player.stats.attack);
+          const newEnemies = prev.enemies.map((e, i) => {
+            if (e.hp <= 0) return e;
+            if (!isAreaW && i !== targetIdx) return e;
+            const mon = getMergedMonster(e.monsterId);
+            const dmg = areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0);
+            return { ...e, hp: Math.max(0, e.hp - dmg) };
+          });
+          const msg = item.useEffect?.message ?? `${item.name}で攻撃した`;
+          let logEntries: { text: string; color: string }[] = [{ text: `🗡️ ${msg}`, color: '#f0c060' }];
+
+          // KXモード: 眷属討伐でKXにダメージ
+          if (prev.kx && !prev.kx.isAwakened) {
+            const KX_MAX_HP = prev.kx.maxHp;
+            const MINION_DMG: Record<string, number> = {
+              roam_armor: Math.floor(KX_MAX_HP * 0.04),
+              death_armor: Math.floor(KX_MAX_HP * 0.08),
+            };
+            let newKxHp = prev.kx.hp;
+            for (let i = 0; i < newEnemies.length; i++) {
+              if (prev.enemies[i].hp > 0 && newEnemies[i].hp <= 0) {
+                const fd = MINION_DMG[prev.enemies[i].monsterId];
+                if (fd) {
+                  newKxHp = Math.max(0, newKxHp - fd);
+                  logEntries.push({ text: `💥 ${getMergedMonster(prev.enemies[i].monsterId)?.name}撃破！KX-G21に${fd}ダメージ！(HP: ${newKxHp}/${KX_MAX_HP})`, color: '#f0c060' });
+                }
+              }
+            }
+            if (newKxHp <= 0) {
+              if (secureRandom() < 0.2) {
+                logEntries.push({ text: '「さぁ、延長戦の始まりだ！」 KX-G21が覚醒した！', color: '#ff00ff' });
+                return { ...newBattle, enemies: [], log: [...prev.log, ...logEntries], turn: 'player', kx: { ...prev.kx, hp: 0, isAwakened: true, awakeHp: prev.kx.awakeMaxHp, burnTurns: 0 } };
+              }
+              addItems([{ itemId: 'super_spanner', amount: 10 }, { itemId: 'makai_bihin', amount: 10 }, { itemId: 'kx_mech_track', amount: 1 }]);
+              logEntries.push({ text: '🏆 KX-G21を討伐した！', color: '#f0c060' });
+              return { ...newBattle, enemies: newEnemies, log: [...prev.log, ...logEntries], turn: 'result', result: 'win', kx: { ...prev.kx, hp: 0 } };
+            }
+            let np = prev.kx.phase;
+            const pct = newKxHp / KX_MAX_HP * 100;
+            if (pct <= 30 && np < 4) np = 4;
+            else if (pct <= 50 && np < 3) np = 3;
+            else if (pct <= 80 && np < 2) np = 2;
+            const aliveAfter = newEnemies.filter(e => e.hp > 0);
+            const finalEnemies = aliveAfter.length === 0 ? spawnKxMinions(np) : newEnemies;
+            if (aliveAfter.length === 0) logEntries.push({ text: 'KX-G21が眷属を再召喚した！', color: '#e05555' });
+            return { ...newBattle, enemies: finalEnemies, log: [...prev.log, ...logEntries], turn: 'monster', isDefending: false, kx: { ...prev.kx, hp: newKxHp, phase: np } };
+          }
+
+          // KX覚醒
+          if (prev.kx?.isAwakened) {
+            const totalDmg = newEnemies.reduce((acc, e, i) => !isAreaW && i !== targetIdx ? acc : acc, 0) || atkBase;
+            const newAwakeHp = Math.max(0, prev.kx.awakeHp - atkBase);
+            logEntries.push({ text: `⚔️ KX覚醒に${atkBase}ダメージ！(HP: ${newAwakeHp}/${prev.kx.awakeMaxHp})`, color: '#5b8dee' });
+            if (newAwakeHp <= 0) {
+              addItems([{ itemId: 'life_control_core', amount: 1 }]);
+              return { ...newBattle, log: [...prev.log, ...logEntries, { text: '🏆 KX-G21[ライフエナジー]を討伐した！', color: '#f0c060' }], turn: 'result', result: 'win', kx: { ...prev.kx, awakeHp: 0 } };
+            }
+            return { ...newBattle, log: [...prev.log, ...logEntries], turn: 'monster', isDefending: false, kx: { ...prev.kx, awakeHp: newAwakeHp } };
+          }
+
+          // 通常モード
+          const aliveAfter = newEnemies.filter(e => e.hp > 0);
+          if (aliveAfter.length === 0) {
+            const { exp, gold, drops } = calcWinRewards(newEnemies);
+            logEntries.push({ text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' });
+            return { ...newBattle, enemies: newEnemies, log: [...prev.log, ...logEntries], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops };
+          }
+          return { ...newBattle, enemies: newEnemies, log: [...prev.log, ...logEntries], turn: 'monster', isDefending: false };
+        });
         setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
-      }
+      }, 0);
       return;
     }
 
@@ -740,10 +1088,18 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     if (!battle.result) return;
     if (battle.result === 'win') {
       onManaUpdate?.(0);
-      onBattleEnd(true, battle.expGained, battle.goldGained, battle.drops, 0);
+      if (kxConfig) {
+        kxConfig.onVictory(battle.kx?.isAwakened ?? false);
+      } else {
+        onBattleEnd(true, battle.expGained, battle.goldGained, battle.drops, 0);
+      }
     } else if (battle.result === 'lose') {
       onManaUpdate?.(0);
-      onBattleEnd(false, 0, 0, [], 0);
+      if (kxConfig) {
+        kxConfig.onDefeat();
+      } else {
+        onBattleEnd(false, 0, 0, [], 0);
+      }
     } else if (battle.result === 'escaped') {
       onManaUpdate?.(battle.weaponMana);
       onEscape();
@@ -790,6 +1146,36 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           }}
           onCancel={() => setBattle(b => ({ ...b, turn: 'player', pendingAction: null }))}
         />
+      )}
+
+      {/* KXボスHP（KXモード時） */}
+      {battle.kx && (
+        <div style={{ background: '#0a0d18', border: `2px solid ${battle.kx.isAwakened ? '#ff00ff' : '#f0c060'}`, borderRadius: 10, padding: '10px 12px', marginBottom: 10 }}>
+          {battle.kx.isAwakened ? (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontWeight: 700, color: '#ff00ff', fontSize: '0.9rem' }}>⚡ KX-G21[ライフエナジー]</span>
+                <span style={{ fontSize: '0.75rem', color: '#e05555' }}>{battle.kx.awakeHp}/{battle.kx.awakeMaxHp}</span>
+              </div>
+              <div style={{ height: 7, background: '#2d3752', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ height: '100%', background: '#ff00ff', width: `${(battle.kx.awakeHp / battle.kx.awakeMaxHp) * 100}%`, transition: 'width 0.3s' }} />
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontWeight: 700, color: ['#8a92b2','#f0a830','#e05555','#ff00ff'][battle.kx.phase - 1] ?? '#f0c060', fontSize: '0.9rem' }}>
+                  🤖 KX-G21 【第{battle.kx.phase}形態】
+                </span>
+                <span style={{ fontSize: '0.75rem', color: '#f0c060' }}>{battle.kx.hp}/{battle.kx.maxHp}</span>
+              </div>
+              <div style={{ height: 7, background: '#2d3752', borderRadius: 4, overflow: 'hidden', marginBottom: 4 }}>
+                <div style={{ height: '100%', background: '#f0c060', width: `${(battle.kx.hp / battle.kx.maxHp) * 100}%`, transition: 'width 0.3s' }} />
+              </div>
+              <div style={{ fontSize: '0.65rem', color: '#4a5070' }}>※ 眷属（ロウムアーマー/デスアーマー）を倒すとKXにダメージ</div>
+            </>
+          )}
+        </div>
       )}
 
       {/* 敵HP表示（複数対応） */}
@@ -1357,368 +1743,6 @@ function TrapWorldPanel({ player, addItems, addNotification }: {
 }
 
 
-// ============================================================
-// KX裏ボス戦コンポーネント
-// ============================================================
-function KXBattlePanel({ player, runState, onVictory, onDefeat }: {
-  player: PlayerData;
-  runState: import('../../types/game').DungeonRunState;
-  onVictory: (isAwakened: boolean) => void;
-  onDefeat: () => void;
-}) {
-  const { changeHp, addItems, consumeItem, updateEquipment } = useGameStore(s => ({
-    changeHp: s.changeHp, addItems: s.addItems, consumeItem: s.consumeItem, updateEquipment: s.updateEquipment,
-  }));
-  const [localEquip, setLocalEquip] = useState<EquipmentSlots>(() => player.equipment ?? defaultEquipmentSlots());
-  const [showHotbar, setShowHotbar] = useState(false);
-  const [hotbarModal, setHotbarModal] = useState<{slot:string;idx?:number} | null>(null);
-
-  const setLocalEquipAndSave = (updater: (prev: EquipmentSlots) => EquipmentSlots) => {
-    setLocalEquip(prev => {
-      const next = updater(prev);
-      updateEquipment(next);
-      return next;
-    });
-  };
-
-  const KX_MAX_HP = 38750;
-  const AWAKE_MAX_HP = 1900;
-  const MINION_DMG_ROAM = Math.floor(KX_MAX_HP * 0.04);  // 4%
-  const MINION_DMG_DEATH = Math.floor(KX_MAX_HP * 0.08); // 8%
-
-  const [kxHp, setKxHp] = useState(runState.kxHp ?? KX_MAX_HP);
-  const [isAwakened, setIsAwakened] = useState(runState.kxIsAwakened ?? false);
-  const [awakeHp, setAwakeHp] = useState(AWAKE_MAX_HP);
-  const [log, setLog] = useState<{text:string;color:string}[]>([
-    { text: '⚠️ KX-G21が現れた！眷属を倒してダメージを与えよ！', color: '#f0c060' },
-  ]);
-  const [turn, setTurn] = useState<'player'|'kx'|'result'>('player');
-  const [phase, setPhase] = useState(runState.kxPhase ?? 1);
-  const [phaseMsg, setPhaseMsg] = useState<string | null>(null);
-  // ミニオン（眷属）
-  type Minion = { id: string; name: string; hp: number; maxHp: number; isKxMinion: boolean };
-  const spawnMinions = (p: number): Minion[] => {
-    const mult = p >= 4 ? 2 : 1;
-    const base: Minion[] = [
-      { id:'roam_armor', name:'ロウムアーマー', hp:60, maxHp:60, isKxMinion:true },
-      { id:'death_armor', name:'デスアーマー', hp:75, maxHp:75, isKxMinion:true },
-    ];
-    const result: Minion[] = [];
-    for (let i = 0; i < mult; i++) result.push(...base.map(m => ({ ...m })));
-    return result;
-  };
-  const [minions, setMinions] = useState<Minion[]>(spawnMinions(1));
-  // kxAction state removed - action logged directly
-  const [burnTurns, setBurnTurns] = useState(0); // カオスフレア燃焼
-  const [_pierceStacks, setPierceStacks] = useState(0); // 貫通
-
-  const addLog = (text: string, color = '#e8e6ff') => setLog(prev => [...prev.slice(-20), { text, color }]);
-
-  // KX形態チェック
-  const checkPhase = (hp: number, currentPhase: number) => {
-    const pct = hp / KX_MAX_HP * 100;
-    let newPhase = currentPhase;
-    if (pct <= 30 && currentPhase < 4) newPhase = 4;
-    else if (pct <= 50 && currentPhase < 3) newPhase = 3;
-    else if (pct <= 80 && currentPhase < 2) newPhase = 2;
-    if (newPhase !== currentPhase) {
-      setPhase(newPhase);
-      const msgs: Record<number,string> = {
-        2: 'KX-G21.軽度の損傷を確認...攻撃方法を変更します...',
-        3: 'KX-G21...ｷﾞｷﾞ...中度ﾉ損傷を確認...魔術回路を構成ｼまス...',
-        4: 'KX-G21...ﾌｶイ損ｼｮ...ｦｶｸﾆﾝ...リミｯﾀｰヲかｲｼﾞｮｼまｽ..',
-      };
-      setPhaseMsg(msgs[newPhase] ?? null);
-      // 形態変化で眷属再召喚
-      setMinions(spawnMinions(newPhase));
-      addLog(`🔴 【第${newPhase}形態】${msgs[newPhase]}`, '#ff6b6b');
-    }
-    return newPhase;
-  };
-
-  // 眷属攻撃
-  const attackMinion = (idx: number) => {
-    if (turn !== 'player') return;
-    const m = minions[idx];
-    if (!m || m.hp <= 0) return;
-    const atk = player.stats.attack + ((player.equipment?.hotbar ?? []).reduce((acc, id) => acc + (id ? (ITEM_MASTER[id]?.weaponAtk ?? 0) : 0), 0));
-    const dmg = Math.max(1, atk - 5);
-    const newHp = Math.max(0, m.hp - dmg);
-    const newMinions = minions.map((mn, i) => i === idx ? { ...mn, hp: newHp } : mn);
-    setMinions(newMinions);
-    addLog(`⚔️ ${m.name}に${dmg}ダメージ！`, '#5b8dee');
-    if (newHp <= 0) {
-      // 眷属討伐でKXにダメージ
-      const fixedDmg = m.id === 'roam_armor' ? MINION_DMG_ROAM : MINION_DMG_DEATH;
-      const newKxHp = Math.max(0, kxHp - fixedDmg);
-      setKxHp(newKxHp);
-      addLog(`💥 ${m.name}を倒した！KX-G21に${fixedDmg}ダメージ！(HP: ${newKxHp}/${KX_MAX_HP})`, '#f0c060');
-      // ドロップ
-      addItems([{ itemId: m.id === 'roam_armor' ? 'mech_armor_oparts' : 'rusty_mystery_obj', amount: 1 }]);
-      if (newKxHp <= 0) {
-        // KX撃破 → 20%で覚醒
-        if (secureRandom() < 0.2) {
-          addLog('「さぁ、延長戦の始まりだ！」 KX-G21が覚醒した！', '#ff00ff');
-          setIsAwakened(true);
-          setAwakeHp(AWAKE_MAX_HP);
-          setMinions([]);
-        } else {
-          addLog('🏆 KX-G21を討伐した！', '#f0c060');
-          // ドロップ
-          addItems([
-            { itemId: 'super_spanner', amount: 10 },
-            { itemId: 'makai_bihin', amount: 10 },
-            { itemId: 'kx_mech_track', amount: 1 },
-          ]);
-          setTurn('result');
-          setTimeout(() => onVictory(false), 1500);
-          return;
-        }
-      } else {
-        checkPhase(newKxHp, phase);
-      }
-    }
-    // 全眷属討伐でKXが新たに召喚
-    const aliveAfter = newMinions.filter((mn, i) => (i === idx ? newHp : mn.hp) > 0);
-    if (aliveAfter.length === 0 && kxHp > 0 && !isAwakened) {
-      setTimeout(() => {
-        addLog('KX-G21が眷属を再召喚した！', '#e05555');
-        setMinions(spawnMinions(phase));
-      }, 500);
-    }
-    setTurn('kx');
-    setTimeout(() => doKxTurn(), 800);
-  };
-
-  // 覚醒KX攻撃
-  const attackAwakened = () => {
-    if (turn !== 'player' || !isAwakened) return;
-    const atk = player.stats.attack + ((player.equipment?.hotbar ?? []).reduce((acc, id) => acc + (id ? (ITEM_MASTER[id]?.weaponAtk ?? 0) : 0), 0));
-    const dmg = Math.max(1, atk - 0);
-    const newHp = Math.max(0, awakeHp - dmg);
-    setAwakeHp(newHp);
-    addLog(`⚔️ KX覚醒に${dmg}ダメージ！(HP: ${newHp}/${AWAKE_MAX_HP})`, '#5b8dee');
-    if (newHp <= 0) {
-      addLog('🏆 KX-G21[ライフエナジー]を討伐した！', '#f0c060');
-      addItems([{ itemId: 'life_control_core', amount: 1 }]);
-      setTurn('result');
-      setTimeout(() => onVictory(true), 1500);
-      return;
-    }
-    setTurn('kx');
-    setTimeout(() => doKxTurn(), 800);
-  };
-
-  const doKxTurn = () => {
-    setTurn('kx');
-    // KXアクション選択
-    const actions = ['minion_summon', 'cannon_create', 'summon_combat'];
-    if (phase >= 2) actions.push('stork_ex', 'slash');
-    if (phase >= 3) actions.push('chaos_flare', 'lightning_bolt', 'summon_tech_snipe');
-
-    const action = actions[Math.floor(secureRandom() * actions.length)];
-    // action selected
-
-    let dmg = 0;
-    let logText = '';
-    let logColor = '#e05555';
-
-    if (action === 'slash') {
-      dmg = 15 + Math.floor(secureRandom() * 20);
-      logText = `⚔️ 「貴様など叩き切ってくれるわ！」 KX-G21が貫通斬撃！${dmg}ダメ！`;
-      changeHp(-dmg);
-    } else if (action === 'chaos_flare') {
-      dmg = 20 + Math.floor(secureRandom() * 15);
-      setBurnTurns(4);
-      logText = `🔥 カオスフレア！${dmg}ダメ＋燃焼4ターン！`;
-      changeHp(-dmg);
-      logColor = '#ff6b00';
-    } else if (action === 'lightning_bolt') {
-      dmg = 60 + Math.floor(secureRandom() * 40);
-      logText = `⚡ ライトニングボルト！超高火力${dmg}ダメ！`;
-      changeHp(-dmg);
-      logColor = '#f0f000';
-    } else if (action === 'summon_tech_snipe') {
-      setPierceStacks(prev => prev + 10);
-      dmg = 10;
-      logText = `🎯 サモンテックスナイプ！貫通+10、エクス＆雷4体ずつ召喚！`;
-      changeHp(-dmg);
-      const newMinions: Minion[] = Array(4).fill(null).map(() => ({ id:'exs_minion', name:'エクス', hp:100, maxHp:100, isKxMinion:false }))
-        .concat(Array(4).fill(null).map(() => ({ id:'lightning_minion', name:'ライトニングボルト', hp:60, maxHp:60, isKxMinion:false })));
-      setMinions(prev => [...prev.filter(m => m.hp > 0), ...newMinions]);
-    } else if (action === 'cannon_create') {
-      logText = `💣 キャノンクリエイト！キャノン付きゾンビを召喚！(CT:5)`;
-      logColor = '#8a92b2';
-      setMinions(prev => [...prev.filter(m => m.hp > 0), { id:'cannon_zombie', name:'キャノン付きゾンビ', hp:120, maxHp:120, isKxMinion:false }]);
-    } else if (action === 'summon_combat') {
-      logText = `⚔️ サモン:コンバット！コンバットを召喚！`;
-      logColor = '#8a92b2';
-      setMinions(prev => [...prev.filter(m => m.hp > 0), { id:'combat_minion', name:'コンバット', hp:80, maxHp:80, isKxMinion:false }]);
-    } else if (action === 'stork_ex') {
-      logText = `🤖 ストークエクス！エクスを召喚（魔改造品ドロップ）！`;
-      logColor = '#8a92b2';
-      setMinions(prev => [...prev.filter(m => m.hp > 0), { id:'exs_minion', name:'エクス', hp:100, maxHp:100, isKxMinion:false }]);
-    } else {
-      // minion_summon
-      logText = `👾 眷属召喚！ロウムアーマーとデスアーマーが現れた！`;
-      logColor = '#e05555';
-      setMinions(prev => [...prev.filter(m => m.hp > 0), ...spawnMinions(phase)]);
-    }
-
-    // 燃焼ダメージ
-    if (burnTurns > 0) {
-      const bDmg = 8;
-      changeHp(-bDmg);
-      setBurnTurns(t => t - 1);
-      logText += ` 🔥燃焼${bDmg}ダメ(残${burnTurns-1}T)`;
-    }
-
-    addLog(logText, logColor);
-
-    if (player.stats.hp <= 0) {
-      addLog('💀 HPが0になった...', '#e05555');
-      setTurn('result');
-      setTimeout(() => onDefeat(), 1000);
-      return;
-    }
-    setTurn('player');
-  };
-
-  const hpPct = isAwakened ? (awakeHp / AWAKE_MAX_HP) * 100 : (kxHp / KX_MAX_HP) * 100;
-  const hpColor = hpPct > 50 ? '#4caf87' : hpPct > 30 ? '#f0a830' : '#e05555';
-  const phaseColors: Record<number,string> = { 1:'#8a92b2', 2:'#f0a830', 3:'#e05555', 4:'#ff00ff' };
-
-  return (
-    <div style={{ background:'#0a0d18', border:`2px solid ${isAwakened ? '#ff00ff' : '#f0c060'}`, borderRadius:12, padding:14 }}>
-      {/* フェーズメッセージ */}
-      {phaseMsg && (
-        <div style={{ background:'rgba(255,0,0,0.1)', border:'1px solid #e05555', borderRadius:8, padding:'8px 12px', marginBottom:10, fontSize:'0.8rem', color:'#ff6b6b', fontFamily:'monospace' }}>
-          {phaseMsg}
-          <button onClick={() => setPhaseMsg(null)} style={{ float:'right', background:'none', border:'none', color:'#8a92b2', cursor:'pointer' }}>×</button>
-        </div>
-      )}
-
-      {/* KXステータス */}
-      <div style={{ marginBottom:10 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
-          <span style={{ fontWeight:700, color: isAwakened ? '#ff00ff' : phaseColors[phase] ?? '#f0c060' }}>
-            {isAwakened ? '⚡ KX-G21[ライフエナジー]' : `🤖 KX-G21 【第${phase}形態】`}
-          </span>
-          <span style={{ fontSize:'0.75rem', color:hpColor }}>{isAwakened ? awakeHp : kxHp}/{isAwakened ? AWAKE_MAX_HP : KX_MAX_HP}</span>
-        </div>
-        <div style={{ height:8, background:'#2d3752', borderRadius:4, overflow:'hidden' }}>
-          <div style={{ height:'100%', background:hpColor, width:`${hpPct}%`, transition:'width 0.3s' }} />
-        </div>
-        {!isAwakened && <div style={{ fontSize:'0.7rem', color:'#4a5070', marginTop:2 }}>
-          ※ 眷属（ロウムアーマー/デスアーマー）を倒すとHPが減る
-        </div>}
-      </div>
-
-      {/* 覚醒KX攻撃ボタン */}
-      {isAwakened && (
-        <button onClick={attackAwakened} disabled={turn !== 'player'}
-          style={{ width:'100%', padding:'10px', background: turn==='player' ? 'linear-gradient(135deg,#e05555,#c03030)' : '#2d3752', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, marginBottom:10 }}>
-          ⚔️ KX覚醒を攻撃！
-        </button>
-      )}
-
-      {/* 眷属リスト */}
-      {!isAwakened && minions.length > 0 && (
-        <div style={{ marginBottom:10 }}>
-          <div style={{ fontSize:'0.75rem', color:'#8a92b2', marginBottom:4 }}>眷属・召喚体（タップして攻撃）</div>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-            {minions.map((m, i) => m.hp > 0 && (
-              <button key={i} onClick={() => attackMinion(i)} disabled={turn !== 'player'}
-                style={{ padding:'6px 10px', background: m.isKxMinion ? 'rgba(224,85,85,0.2)' : 'rgba(91,141,238,0.2)',
-                  border:`1px solid ${m.isKxMinion ? '#e05555' : '#5b8dee'}`, color:'#e8e6ff', borderRadius:6, cursor:'pointer', fontSize:'0.75rem' }}>
-                <div>{m.isKxMinion ? '👾' : '🤖'} {m.name}</div>
-                <div style={{ fontSize:'0.65rem', color: m.isKxMinion ? '#e05555' : '#5b8dee' }}>{m.hp}/{m.maxHp}</div>
-                {m.isKxMinion && <div style={{ fontSize:'0.6rem', color:'#f0c060' }}>KX -{m.id==='roam_armor'?'4':'8'}%</div>}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* アクション表示 */}
-      {turn === 'kx' && (
-        <div style={{ textAlign:'center', color:'#f0a830', fontSize:'0.8rem', marginBottom:8, animation:'none' }}>
-          ⏳ KX-G21 行動中...
-        </div>
-      )}
-
-
-      {/* ホットバー（通常ダンジョンと同様の表示） */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
-        {localEquip.hotbar.map((itemId, i) => {
-          const item = itemId ? ITEM_MASTER[itemId] : null;
-          const qty = itemId ? (player.inventory[itemId] ?? 0) : 0;
-          const canUse = item && qty > 0 && turn === 'player' && item.itemType !== 'Weapon' && item.itemType !== 'Armor' && item.useEffect && (item.useEffect.hpRestore || item.useEffect.satietyRestore);
-          return (
-            <button key={i}
-              onClick={() => {
-                if (!canUse || !item?.useEffect) return;
-                consumeItem(itemId!, 1);
-                if (item.useEffect.hpRestore) changeHp(item.useEffect.hpRestore);
-                addLog(`🧪 ${item.name} 使用${item.useEffect.message ? '：' + item.useEffect.message : ''}`, '#4caf87');
-              }}
-              disabled={!canUse}
-              title={item ? `${item.name} ×${qty}` : `スロット${i+1}（空）`}
-              style={{
-                width: 38, height: 38,
-                background: canUse ? 'rgba(155,109,240,0.2)' : '#161b26',
-                border: `1px solid ${canUse ? '#9b6df0' : '#2d3752'}`,
-                borderRadius: 6,
-                cursor: canUse ? 'pointer' : 'not-allowed',
-                position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-              {item
-                ? <><GameIcon id={item.icon} size={18} />
-                    <span style={{ position:'absolute', bottom:1, right:2, fontSize:'0.5rem', color:'#f0c060' }}>{qty}</span>
-                  </>
-                : <span style={{ fontSize: '0.6rem', color: '#4a5070' }}>{i+1}</span>}
-            </button>
-          );
-        })}
-        <button onClick={() => setShowHotbar(h => !h)} disabled={turn !== 'player'}
-          style={{ padding: '0 10px', height: 38, background: '#161b26', border: '1px dashed #5b8dee', borderRadius: 6, color: '#5b8dee', cursor: 'pointer', fontSize: '0.72rem' }}>
-          🎒 装備
-        </button>
-      </div>
-
-      {showHotbar && (
-        <HotbarPanel equipment={localEquip} inventory={player.inventory}
-          onSlotClick={(slot, idx) => setHotbarModal({ slot, idx })} />
-      )}
-
-      {hotbarModal && (
-        <HotbarSetModal
-          slot={hotbarModal.slot} idx={hotbarModal.idx}
-          equipment={localEquip} inventory={player.inventory}
-          onSet={itemId => {
-            setLocalEquipAndSave(prev => {
-              const next = { ...prev, hotbar: [...prev.hotbar] };
-              if (hotbarModal.slot === 'hotbar' && hotbarModal.idx !== undefined) {
-                next.hotbar[hotbarModal.idx] = itemId;
-              } else {
-                (next as any)[hotbarModal.slot] = itemId;
-              }
-              return next;
-            });
-            setHotbarModal(null);
-          }}
-          onClose={() => setHotbarModal(null)}
-        />
-      )}
-
-      {/* バトルログ */}
-      <div style={{ background:'#0e1220', borderRadius:6, padding:'6px 10px', height:140, overflowY:'auto', fontSize:'0.72rem' }}
-        ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}>
-        {log.map((l, i) => <div key={i} style={{ color:l.color, marginBottom:1, lineHeight:1.4 }}>{l.text}</div>)}
-      </div>
-    </div>
-  );
-}
 
 export function DungeonScreen() {
   const player = useGameStore(s => s.player);
@@ -2205,19 +2229,32 @@ export function DungeonScreen() {
               </div>
             </div>
           ) : kxBossMode ? (
-            <KXBattlePanel
-              player={player}
-              runState={runState}
-              onVictory={(_isAwakened) => {
+            <TurnBattle
+              key={battleKey}
+              runState={{ ...runState, dungeonId: 'sky_castle_ex', currentAreaIdx: 0 }}
+              equipment={equipment}
+              onBattleEnd={() => {}}
+              onEscape={() => {
                 setKxBossMode(false);
-                addNotification('success', '🌟 裏超上級クリア！「生命の超越」を達成！');
-                postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'dungeon_clear', message: `が「生命の超越」を達成しました！` }).catch(() => {});
-                setRunState(prev => prev ? { ...prev, isComplete: true } : null);
-              }}
-              onDefeat={() => {
-                setKxBossMode(false);
-                addNotification('error', 'KX-G21に敗北した...');
                 setRunState(prev => prev ? { ...prev, isFailed: true } : null);
+              }}
+              initialMana={dungeonMana}
+              onManaUpdate={setDungeonMana}
+              kxConfig={{
+                initialHp: runState.kxHp ?? 38750,
+                initialPhase: runState.kxPhase ?? 1,
+                initialAwakened: runState.kxIsAwakened ?? false,
+                onVictory: (_isAwakened) => {
+                  setKxBossMode(false);
+                  addNotification('success', '🌟 裏超上級クリア！「生命の超越」を達成！');
+                  postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'dungeon_clear', message: `が「生命の超越」を達成しました！` }).catch(() => {});
+                  setRunState(prev => prev ? { ...prev, isComplete: true } : null);
+                },
+                onDefeat: () => {
+                  setKxBossMode(false);
+                  addNotification('error', 'KX-G21に敗北した...');
+                  setRunState(prev => prev ? { ...prev, isFailed: true } : null);
+                },
               }}
             />
           ) : inBattle ? (
