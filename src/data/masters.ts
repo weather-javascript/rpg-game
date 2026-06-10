@@ -1089,6 +1089,33 @@ export const GAMBLE_MASTER: Record<string, GambleMaster> = {
       { label:'裏（ハズレ）', probability:0.51, multiplier:0, symbols:['💨'] },
     ],
   },
+  highlow: {
+    id:'highlow', name:'ハイローカード', description:'カードを引いて「高い・低い」を予想。連勝で倍率が上がる！',
+    icon:'joker_card', type:'chohan', minBet:100, maxBet:1000000, returnRate:0.95,
+    rewardTable:[
+      { label:'1連勝', probability:0.46, multiplier:1.5, symbols:['🃏'] },
+      { label:'2連勝', probability:0.21, multiplier:2.25, symbols:['🃏'] },
+      { label:'3連勝', probability:0.10, multiplier:3.0, symbols:['🃏'] },
+      { label:'4連勝', probability:0.04, multiplier:4.5, symbols:['🃏'] },
+      { label:'5連勝以上', probability:0.02, multiplier:6.0, symbols:['👑'] },
+    ],
+  },
+  texas: {
+    id:'texas', name:'テキサスホールデム', description:'2〜6人のマルチプレイヤーポーカー。場のカード5枚と手札2枚で最強の5枚役を競う。勝者がポット総取り！',
+    icon:'joker_card', type:'poker', minBet:100, maxBet:10000000, returnRate:0.97,
+    rewardTable:[
+      { label:'ロイヤルフラッシュ', probability:0.0002, multiplier:0, symbols:['👑'] },
+      { label:'ストレートフラッシュ', probability:0.0014, multiplier:0, symbols:['✨'] },
+      { label:'フォーカード', probability:0.024, multiplier:0, symbols:['🃏'] },
+      { label:'フルハウス', probability:0.144, multiplier:0, symbols:['🃏'] },
+      { label:'フラッシュ', probability:0.197, multiplier:0, symbols:['🃏'] },
+      { label:'ストレート', probability:0.392, multiplier:0, symbols:['🃏'] },
+      { label:'スリーカード', probability:2.113, multiplier:0, symbols:['🃏'] },
+      { label:'ツーペア', probability:4.754, multiplier:0, symbols:['🃏'] },
+      { label:'ワンペア', probability:42.3, multiplier:0, symbols:['🃏'] },
+      { label:'ハイカード', probability:50.1, multiplier:0, symbols:['💨'] },
+    ],
+  },
 };
 
 // ============================================================

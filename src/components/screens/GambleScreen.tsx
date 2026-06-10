@@ -2762,11 +2762,22 @@ function getActiveEvent(): DailyEvent | null {
 function GambleRankingPanel() {
   const [entries, setEntries] = useState<GambleRankingEntry[]>([]);
   const [rankTab, setRankTab] = useState<'weekly' | 'monthly' | 'total'>('weekly');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const player = useGameStore(s => s.player);
 
   useEffect(() => {
-    const unsub = subscribeGambleRanking(setEntries);
-    return unsub;
+    setLoading(true);
+    setError(null);
+    const unsub = subscribeGambleRanking((data) => {
+      setEntries(data);
+      setLoading(false);
+    });
+    // timeout fallback: if still loading after 8s, show error
+    const timer = setTimeout(() => {
+      setLoading(prev => { if (prev) setError('ランキングデータの読み込みに失敗しました。Firestoreインデックスが必要な場合があります。'); return false; });
+    }, 8000);
+    return () => { unsub(); clearTimeout(timer); };
   }, []);
 
   const sorted = [...entries].sort((a, b) => {
@@ -2825,7 +2836,17 @@ function GambleRankingPanel() {
         </div>
       )}
 
-      {sorted.length === 0 && (
+      {loading && (
+        <div style={{ textAlign: 'center', color: '#8a92b2', fontSize: '0.82rem', padding: '20px 0' }}>
+          ⏳ 読み込み中...
+        </div>
+      )}
+      {error && !loading && (
+        <div style={{ textAlign: 'center', color: '#e05555', fontSize: '0.78rem', padding: '12px', background: 'rgba(224,85,85,0.1)', border: '1px solid rgba(224,85,85,0.3)', borderRadius: 8 }}>
+          ⚠️ {error}
+        </div>
+      )}
+      {!loading && !error && sorted.length === 0 && (
         <div style={{ textAlign: 'center', color: '#4a5070', fontSize: '0.82rem', padding: '20px 0' }}>
           ランキングデータがありません<br/>
           <span style={{ fontSize: '0.72rem' }}>ギャンブルで勝利するとランキングに載ります！</span>
@@ -2938,7 +2959,7 @@ export function GambleScreen() {
   };
 
   if (!player) return null;
-  const gameMasterKey = activeGame === 'slot' ? 'slot_machine' : activeGame === 'treasure_box' ? 'treasure_box_silver' : activeGame;
+  const gameMasterKey = activeGame === 'slot' ? 'slot_machine' : activeGame === 'treasure_box' ? 'treasure_box_silver' : activeGame === 'pvp' ? 'chohan' : activeGame;
   const game = GAMBLE_MASTER[gameMasterKey] ?? GAMBLE_MASTER['chohan'];
   const netProfit = stats.totalWon - stats.totalBet;
   const gambleRankInfo = getGambleRank(player.totalWagered ?? 0);
@@ -3106,14 +3127,18 @@ export function GambleScreen() {
         )}
       </div>
 
-      {activeGame !== 'pvp' && activeGame !== 'treasure_box' && activeGame !== 'slot' && (
+      {activeGame !== 'pvp' && activeGame !== 'treasure_box' && activeGame !== 'slot' && activeGame !== 'highlow' && (
         <details style={{ marginTop: 10 }}>
-          <summary style={{ cursor: 'pointer', color: '#8a92b2', fontSize: '0.8rem', padding: '6px 0' }}>📋 配当表</summary>
+          <summary style={{ cursor: 'pointer', color: '#8a92b2', fontSize: '0.8rem', padding: '6px 0' }}>📋 {activeGame === 'texas' ? '役の出現確率' : '配当表'}</summary>
           <div style={{ background: '#161b26', border: '1px solid #2d3752', borderRadius: 8, padding: 10, marginTop: 6 }}>
+            {activeGame === 'texas' && <div style={{ fontSize: '0.7rem', color: '#5b8dee', marginBottom: 6 }}>※勝者がポットを総取りします。倍率はゲーム参加人数により変動。</div>}
             {game.rewardTable.map((r, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', padding: '3px 0', borderBottom: '1px solid #2d3752', color: '#8a92b2' }}>
                 <span>{r.label}</span>
-                <span><span style={{ color: '#f0c060' }}>{r.multiplier > 0 ? `×${r.multiplier}` : 'ハズレ'}</span><span style={{ color: '#4a5070', marginLeft: 8 }}>{(r.probability * 100).toFixed(2)}%</span></span>
+                <span>
+                  {activeGame !== 'texas' && <span style={{ color: '#f0c060' }}>{r.multiplier > 0 ? `×${r.multiplier}` : 'ハズレ'}</span>}
+                  <span style={{ color: '#4a5070', marginLeft: 8 }}>{(r.probability * 100).toFixed(2)}%</span>
+                </span>
               </div>
             ))}
           </div>
