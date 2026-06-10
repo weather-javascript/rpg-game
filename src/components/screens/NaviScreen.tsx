@@ -56,7 +56,7 @@ function computeGoal(player: PlayerData): NaviGoal {
         // レベル不足 → レベル上げ提案
         // 前のダンジョンを推奨狩場に
         const prevIdx = MAIN_DUNGEON_ORDER.indexOf(dungeonId) - 1;
-        const prevDungeon = prevIdx >= 0 ? DUNGEON_MASTER[MAIN_DUNGEON_ORDER[prevIdx]] : null;
+        void (prevIdx >= 0 ? DUNGEON_MASTER[MAIN_DUNGEON_ORDER[prevIdx]] : null);
         return {
           emoji: '⚔️',
           title: `レベル${reqLevel}を目指そう`,
@@ -128,7 +128,7 @@ function computeGoal(player: PlayerData): NaviGoal {
 
   // 4. PvP未体験
   if (level >= 20) {
-    const hasPvp = (player.totalWagered ?? 0) > 0 || hasGambled;
+    void ((player.totalWagered ?? 0) > 0 || hasGambled);
     // PvP記録はないので、ギャンブルの対戦履歴で代用（pvp専用フィールドなし）
     return {
       emoji: '⚔️',
@@ -317,9 +317,9 @@ function DungeonProgress({ player }: { player: PlayerData }) {
           const canTry = player.stats.level >= reqLevel;
           const prevDone = idx === 0 || (cleared[MAIN_DUNGEON_ORDER[idx - 1]] ?? 0) > 0;
 
-          let statusColor = '#2d3752';
+          let _statusColor = '#2d3752';
           let statusText = '🔒';
-          if (done) { statusColor = '#4caf87'; statusText = '✅'; }
+          if (done) { _statusColor = '#4caf87'; statusText = '✅'; }
           else if (canTry && prevDone) { statusColor = '#f0c060'; statusText = '👉'; }
 
           return (

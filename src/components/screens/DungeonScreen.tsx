@@ -987,7 +987,6 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
 
           // KX覚醒
           if (prev.kx?.isAwakened) {
-            const totalDmg = newEnemies.reduce((acc, e, i) => !isAreaW && i !== targetIdx ? acc : acc, 0) || atkBase;
             const newAwakeHp = Math.max(0, prev.kx.awakeHp - atkBase);
             logEntries.push({ text: `⚔️ KX覚醒に${atkBase}ダメージ！(HP: ${newAwakeHp}/${prev.kx.awakeMaxHp})`, color: '#5b8dee' });
             if (newAwakeHp <= 0) {
