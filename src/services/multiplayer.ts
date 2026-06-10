@@ -1552,34 +1552,20 @@ export interface GambleFeedEntry {
   isSuperJackpot?: boolean;
 }
 
-const GAMBLE_FEED_REF = () => doc(db, 'shared', 'gamble_feed');
+const GAMBLE_FEED_REF = () => doc(db, 'gamble_feed', 'entries');
 
-let _gambleFeedBuffer: Omit<GambleFeedEntry, 'timestamp'>[] = [];
-let _gambleFeedFlushTimer: ReturnType<typeof setTimeout> | null = null;
-
-async function _flushGambleFeed() {
-  _gambleFeedFlushTimer = null;
-  if (_gambleFeedBuffer.length === 0) return;
-  const toWrite = _gambleFeedBuffer.map(e => ({ ...e, timestamp: Date.now() }));
-  _gambleFeedBuffer = [];
+/** ギャンブル結果をフィードに即時追記 */
+export async function postGambleFeed(entry: Omit<GambleFeedEntry, 'timestamp'>): Promise<void> {
+  const toWrite = { ...entry, timestamp: Date.now() };
   try {
     const snap = await getDoc(GAMBLE_FEED_REF());
     const prev: GambleFeedEntry[] = snap.exists() ? ((snap.data()['entries'] ?? []) as GambleFeedEntry[]) : [];
-    const next = [...toWrite, ...prev].slice(0, 100); // 最新100件のみ保持
+    const next = [toWrite, ...prev].slice(0, 100);
     await setDoc(GAMBLE_FEED_REF(), { entries: next, updatedAt: Date.now() });
   } catch { /* ignore */ }
 }
 
-/** ギャンブル結果をフィードに追記（バッファして10秒に1回まとめてWrite） */
-export async function postGambleFeed(entry: Omit<GambleFeedEntry, 'timestamp'>): Promise<void> {
-  _gambleFeedBuffer.unshift(entry);
-  if (_gambleFeedBuffer.length > 20) _gambleFeedBuffer = _gambleFeedBuffer.slice(0, 20);
-  if (!_gambleFeedFlushTimer) {
-    _gambleFeedFlushTimer = setTimeout(_flushGambleFeed, 10_000);
-  }
-}
-
-/** ギャンブル速報をポーリング購読（30秒間隔） */
+/** ギャンブル速報をポーリング購読（20秒間隔） */
 export function subscribeGambleFeed(cb: (entries: GambleFeedEntry[]) => void): Unsubscribe {
   let stopped = false;
   const fetch = () => getDoc(GAMBLE_FEED_REF()).then(snap => {
@@ -1587,6 +1573,6 @@ export function subscribeGambleFeed(cb: (entries: GambleFeedEntry[]) => void): U
     cb(snap.exists() ? ((snap.data()['entries'] ?? []) as GambleFeedEntry[]) : []);
   }).catch(() => {});
   fetch();
-  const timer = setInterval(fetch, 30_000);
+  const timer = setInterval(fetch, 20_000);
   return () => { stopped = true; clearInterval(timer); };
 }

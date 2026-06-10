@@ -3244,10 +3244,19 @@ export function GambleScreen() {
 
       {/* メインタブ */}
       <div style={{ display: 'flex', gap: 3, marginBottom: 12, overflowX: 'auto', paddingBottom: 2 }}>
-        {([['home','🏠'],['gamble','🎲'],['rank','🏅'],['mission','📋'],['ranking','🏆'],['exchange','🔄'],['spectate','📺']] as [MainTab, string][]).map(([id, label]) => (
+        {([
+          ['home','🏠','ホーム'],
+          ['gamble','🎲','ゲーム'],
+          ['rank','🏅','ランク'],
+          ['mission','📋','任務'],
+          ['ranking','🏆','順位'],
+          ['exchange','🔄','両替'],
+          ['spectate','📺','観戦'],
+        ] as [MainTab, string, string][]).map(([id, icon, name]) => (
           <button key={id} onClick={() => setMainTab(id)}
-            style={{ flexShrink: 0, padding: '7px 8px', fontSize: '0.75rem', fontWeight: 700, background: mainTab === id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${mainTab === id ? '#5b8dee' : '#2d3752'}`, color: mainTab === id ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer' }}>
-            {label}
+            style={{ flexShrink: 0, padding: '6px 7px', fontSize: '0.68rem', fontWeight: 700, background: mainTab === id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${mainTab === id ? '#5b8dee' : '#2d3752'}`, color: mainTab === id ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+            <span style={{fontSize:'0.9rem'}}>{icon}</span>
+            <span>{name}</span>
           </button>
         ))}
       </div>

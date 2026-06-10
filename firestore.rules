@@ -185,8 +185,15 @@ service cloud.firestore {
             && isAuthed()
             && request.resource.data.pool is int
             && request.resource.data.pool >= resource.data.get('pool', 0))
-        || (docId == 'activity_feed' && isAuthed())
-        || (docId == 'gamble_feed' && isAuthed());
+        || (docId == 'activity_feed' && isAuthed());
+    }
+
+    // ============================================================
+    // gamble_feed/{docId} — ギャンブル速報（独立コレクション）
+    // ============================================================
+    match /gamble_feed/{docId} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
     }
 
     // ============================================================
