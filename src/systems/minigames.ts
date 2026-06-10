@@ -27,21 +27,13 @@ export function playChohan(bet: number, choice: 'cho' | 'han'): GambleResult & {
   const d1 = rollDice();
   const d2 = rollDice();
   const sum = d1 + d2;
-  const isDouble = d1 === d2;
   const isEven = sum % 2 === 0;
 
   let multiplier: number;
   let label: string;
 
-  if (isDouble) {
-    // ゾロ目は必ず偶数になるため丁（偶数）扱い
-    const wonAsCho = choice === 'cho';
-    multiplier = wonAsCho ? 2.0 : 0;
-    label = wonAsCho
-      ? `ゾロ目（${d1}-${d2}）偶数 → 丁当たり！`
-      : `ゾロ目（${d1}-${d2}）偶数 → 丁なのでハズレ`;
-  } else if ((isEven && choice === 'cho') || (!isEven && choice === 'han')) {
-    multiplier = 2.0;
+  if ((isEven && choice === 'cho') || (!isEven && choice === 'han')) {
+    multiplier = 1.9;
     label = `${choice === 'cho' ? '丁（偶数）' : '半（奇数）'} 当たり！ (${d1}+${d2}=${sum})`;
   } else {
     multiplier = 0;
@@ -76,19 +68,19 @@ export function getChinchiroRole(dice: number[]): ChinchiroRole | null {
   const s = dice.slice().sort((a, b) => a - b);
   // ピンゾロ 1-1-1
   if (s[0]===1 && s[1]===1 && s[2]===1) {
-    return { name: 'ピンゾロ (1-1-1)', rank: 100, multiplier: 5, isInstantWin: true, isInstantLoss: false };
+    return { name: 'ピンゾロ (1-1-1)', rank: 100, multiplier: 4, isInstantWin: true, isInstantLoss: false };
   }
-  // ヒフミ 1-2-3 → 目なしと同じハズレ（nullを返してplayChinchiroで負け扱い）
+  // ヒフミ 1-2-3 → 即負け
   if (s[0]===1 && s[1]===2 && s[2]===3) {
-    return null;
+    return { name: 'ヒフミ (1-2-3)', rank: -1, multiplier: 0, isInstantWin: false, isInstantLoss: true };
   }
   // シゴロ 4-5-6
   if (s[0]===4 && s[1]===5 && s[2]===6) {
     return { name: 'シゴロ (4-5-6)', rank: 90, multiplier: 2, isInstantWin: false, isInstantLoss: false };
   }
-  // アラシ（ピンゾロ以外のゾロ目）
+  // アラシ（ゾロ目: ピンゾロ以外） → 通常勝利扱い 1.8倍
   if (s[0]===s[1] && s[1]===s[2]) {
-    return { name: `アラシ (${s[0]}-${s[0]}-${s[0]})`, rank: 10 + s[0] * 10, multiplier: 3, isInstantWin: false, isInstantLoss: false };
+    return { name: `アラシ (${s[0]}-${s[0]}-${s[0]})`, rank: 10 + s[0] * 10, multiplier: 1.8, isInstantWin: false, isInstantLoss: false };
   }
   // 通常目: 2つ被り + 残り1つ。残りの1つが目
   const counts: Record<number, number> = {};
@@ -97,7 +89,7 @@ export function getChinchiroRole(dice: number[]): ChinchiroRole | null {
   const singles = Object.entries(counts).filter(([, c]) => c === 1);
   if (pairs.length === 1 && singles.length === 1) {
     const pip = Number(singles[0][0]);
-    return { name: `通常目 ${pip}`, rank: pip, multiplier: 1.6, isInstantWin: false, isInstantLoss: false };
+    return { name: `通常目 ${pip}`, rank: pip, multiplier: 1.8, isInstantWin: false, isInstantLoss: false };
   }
   // 目なし（3つとも別々 & 役なし）
   return null;
@@ -195,16 +187,16 @@ function evaluatePokerHand(hand: Card[], bet: number): GambleResult {
   let handName: string;
   let multiplier: number;
 
-  if (isFlush && isRoyalStraight)            { handName='ロイヤルストレートフラッシュ'; multiplier=250; }
-  else if (isFlush && isStraight)            { handName='ストレートフラッシュ';         multiplier=50;  }
-  else if (counts[0]===4)                    { handName='フォーカード';                 multiplier=25;  }
-  else if (counts[0]===3 && counts[1]===2)   { handName='フルハウス';                   multiplier=9;   }
-  else if (isFlush)                          { handName='フラッシュ';                   multiplier=6;   }
-  else if (isStraight)                       { handName='ストレート';                   multiplier=4;   }
-  else if (counts[0]===3)                    { handName='スリーカード';                 multiplier=3;   }
-  else if (counts[0]===2 && counts[1]===2)   { handName='ツーペア';                    multiplier=2;   }
-  else if (counts[0]===2 && Math.max(...Object.keys(rankCounts).filter(k => rankCounts[Number(k)]===2).map(Number)) >= 11) {
-    handName='ワンペア（JJ以上）'; multiplier=1.5;
+  if (isFlush && isRoyalStraight)            { handName='ロイヤルストレートフラッシュ'; multiplier=50;  }
+  else if (isFlush && isStraight)            { handName='ストレートフラッシュ';         multiplier=20;  }
+  else if (counts[0]===4)                    { handName='フォーカード';                 multiplier=10;  }
+  else if (counts[0]===3 && counts[1]===2)   { handName='フルハウス';                   multiplier=5;   }
+  else if (isFlush)                          { handName='フラッシュ';                   multiplier=2.8; }
+  else if (isStraight)                       { handName='ストレート';                   multiplier=2.3; }
+  else if (counts[0]===3)                    { handName='スリーカード';                 multiplier=2;   }
+  else if (counts[0]===2 && counts[1]===2)   { handName='ツーペア';                    multiplier=1.5; }
+  else if (counts[0]===2) {
+    handName='ワンペア'; multiplier=1.2;
   }
   else { handName='ブタ（役なし）'; multiplier=0; }
 
