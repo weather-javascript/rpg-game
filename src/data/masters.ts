@@ -1139,6 +1139,14 @@ export const DEFAULT_PLAYER_STATS = {
 // ============================================================
 export const VERSION_PATCHES = [
   {
+    version: '2.5.7',
+    date: '2026-06-10',
+    changes: [
+      '🔧 GambleScreen: SlotPanel関数の閉じ括弧欠落によるビルドエラーを修正',
+      '🧹 未使用コード削除: RankPanel・MissionPanel・MISSIONS・MissionDef・SLOT_MACHINE_TIERSを削除',
+    ],
+  },
+  {
     version: '2.5.6',
     date: '2026-06-10',
     changes: [
