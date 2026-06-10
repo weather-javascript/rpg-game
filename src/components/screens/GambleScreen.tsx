@@ -1704,6 +1704,7 @@ function SlotPanel({ onResult, onJackpotContrib, multiplierBonus = 1.0 }: { onRe
       </button>
     </div>
   );
+}
 
 function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { game: GambleMaster; bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
   const { player, changeGold: _cg2, changeWealthCoin, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, changeWealthCoin: s.changeWealthCoin, addItems: s.addItems, addNotification: s.addNotification }));
