@@ -130,6 +130,15 @@ const ICONS: Record<string, SvgDef> = {
     <line x1="6" y1="8" x2="6" y2="28" stroke="${C.dimWhite}" stroke-width="1.5"/>
   ` },
 
+  compass: { content: `
+    <circle cx="16" cy="16" r="11" fill="#6a8ba8" opacity="0.5" stroke="#9eb8d4" stroke-width="1.5"/>
+    <circle cx="16" cy="16" r="2" fill="#f0c060"/>
+    <polygon points="16,7 14,16 16,13 18,16" fill="#f06830"/>
+    <polygon points="16,25 18,16 16,19 14,16" fill="rgba(232,240,255,0.6)"/>
+    <polygon points="7,16 16,14 13,16 16,18" fill="rgba(232,240,255,0.6)"/>
+    <polygon points="25,16 16,18 19,16 16,14" fill="#f06830"/>
+  ` },
+
   // ──────────────────────────────────────────
   // アイテム：素材系
   // ──────────────────────────────────────────

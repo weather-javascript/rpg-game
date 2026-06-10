@@ -14,12 +14,14 @@ import { OnlineScreen }    from './components/screens/OnlineScreen';
 import { FishingScreen }   from './components/screens/FishingScreen';
 import { AdminScreen }     from './components/screens/AdminScreen';
 import { CraftingScreen }   from './components/screens/CraftingScreen';
+import { NaviScreen }       from './components/screens/NaviScreen';
 import { subscribeSoldNotifications, markSoldNotificationRead, subscribeMaintenanceStatus } from './services/multiplayer';
 import { onSnapshot, doc } from 'firebase/firestore';
 import { db } from './services/firebase';
 import { ITEM_MASTER, VERSION_PATCHES } from './data/masters';
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
+  { id:'navi',      label:'冒険ナビ',  icon:'compass' },
   { id:'gathering', label:'採取',     icon:'pickaxe' },
   { id:'fishing',   label:'釣り',     icon:'fishing_rod' },
   { id:'crafting',  label:'製作',     icon:'hammer' },
@@ -517,6 +519,7 @@ function ReliefPanel() {
 
 function ActiveScreen({ tab }: { tab: TabId }) {
   switch (tab) {
+    case 'navi':      return <NaviScreen />;
     case 'gathering': return <GatheringScreen />;
     case 'fishing':   return <FishingScreen />;
     case 'crafting':  return <CraftingScreen />;
