@@ -37,8 +37,6 @@ const WORLD_NEWS_TYPES = new Set([
 ]);
 
 // ワールドニュースに表示するギャンブルの大勝ち閾値（WC）
-const GAMBLE_BIG_WIN_THRESHOLD = 50000;
-
 const NEWS_STYLE: Record<string, { emoji: string; color: string }> = {
   dungeon_clear:        { emoji: '🏰', color: '#f0c060' },
   sky_castle_clear:     { emoji: '🏯', color: '#f0c060' },
