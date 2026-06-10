@@ -500,6 +500,21 @@ export interface GambleBattle {
   battleData?: GambleBattleData;
   createdAt: number;
   expiresAt: number;
+  spectatorCount?: number;
+}
+
+export interface BattleHistoryEntry {
+  id?: string;
+  battleId: string;
+  hostUid: string;
+  hostName: string;
+  guestUid: string;
+  guestName: string;
+  gambleType: string;
+  betAmount: number;
+  winnerId: string;
+  battleData: GambleBattleData;
+  createdAt: number;
 }
 
 // ============================================================

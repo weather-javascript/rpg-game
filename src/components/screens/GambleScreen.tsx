@@ -17,9 +17,10 @@ import {
   subscribeTreasureProbs,
   contributeToSlotJackpot, subscribeSlotJackpotPool, checkSlotJackpotWin,
   subscribeGambleRanking, updateGambleRanking,
+  subscribeActiveBattles, spectateGambleBattle, joinSpectate, leaveSpectate,
 } from '../../services/multiplayer';
 import type { TreasureProbEntry, GambleRankingEntry } from '../../services/multiplayer';
-import type { GambleResult, GambleMaster, PokerTable, MissionProgress } from '../../types/game';
+import type { GambleResult, GambleMaster, PokerTable, MissionProgress, BattleHistoryEntry as _BH } from '../../types/game';
 import type { PokerState } from '../../systems/minigames';
 import type { GambleBattle } from '../../types/game';
 
@@ -2475,6 +2476,169 @@ function HighLowPanel({ bet, onResult, onMissionUpdate }: {
   );
 }
 
+// ============================================================
+// 観戦パネル
+// ============================================================
+const GAME_NAMES_JP: Record<string, string> = {
+  chohan: '丁半', chinchiro: 'チンチロリン', coin_flip: 'コイントス', slot_machine: 'スロット',
+};
+
+function SpectatePanel() {
+  const player = useGameStore(s => s.player);
+  const [battles, setBattles] = useState<import('../../types/game').GambleBattle[]>([]);
+  const [watching, setWatching] = useState<import('../../types/game').GambleBattle | null>(null);
+  const [replayAnim, setReplayAnim] = useState<import('../../types/game').GambleBattle | null>(null);
+  const watchingIdRef = useState<{ id: string | null }>({ id: null })[0];
+
+  useEffect(() => {
+    const unsub = subscribeActiveBattles(setBattles);
+    return unsub;
+  }, []);
+
+  // 観戦開始
+  const startWatch = (battle: import('../../types/game').GambleBattle) => {
+    if (watchingIdRef.id) leaveSpectate(watchingIdRef.id).catch(() => {});
+    watchingIdRef.id = battle.id;
+    joinSpectate(battle.id).catch(() => {});
+    if (battle.status === 'finished') {
+      setReplayAnim(battle);
+    } else {
+      setWatching(battle);
+    }
+  };
+
+  // 観戦終了
+  const stopWatch = () => {
+    if (watchingIdRef.id) {
+      leaveSpectate(watchingIdRef.id).catch(() => {});
+      watchingIdRef.id = null;
+    }
+    setWatching(null);
+    setReplayAnim(null);
+  };
+
+  // リアルタイム観戦: battleをポーリング
+  useEffect(() => {
+    if (!watching) return;
+    const unsub = spectateGambleBattle(watching.id, (b) => {
+      if (!b) { stopWatch(); return; }
+      setWatching(b);
+    });
+    return unsub;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watching?.id]);
+
+  // リプレイ表示中
+  if (replayAnim?.battleData) {
+    return (
+      <div>
+        <div style={{ marginBottom: 8, fontSize: '0.82rem', color: '#8a92b2' }}>
+          📺 リプレイ: {replayAnim.hostName} vs {replayAnim.guestName ?? '???'}
+        </div>
+        <BattleAnimation
+          opponentName={replayAnim.guestName ?? '???'}
+          gameName={replayAnim.gambleType}
+          result={{ won: replayAnim.winnerId === replayAnim.hostUid, amount: replayAnim.betAmount }}
+          battleData={replayAnim.battleData}
+          iAmHost={true}
+          onDone={stopWatch}
+        />
+        <button onClick={stopWatch} style={{ marginTop: 8, padding: '6px 16px', background: '#2d3752', color: '#8a92b2', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: '0.8rem' }}>
+          ✕ 閉じる
+        </button>
+      </div>
+    );
+  }
+
+  // 対戦中観戦表示
+  if (watching) {
+    return (
+      <div>
+        <div style={{ marginBottom: 8, fontSize: '0.82rem', color: '#8a92b2' }}>
+          📺 観戦中: {watching.hostName} vs {watching.guestName ?? '対戦相手待ち'}
+        </div>
+        {watching.status === 'finished' && watching.battleData ? (
+          <>
+            <div style={{ color: '#4caf87', fontSize: '0.85rem', marginBottom: 8 }}>
+              🏆 勝者: {watching.winnerId === watching.hostUid ? watching.hostName : watching.guestName}
+            </div>
+            <BattleAnimation
+              opponentName={watching.guestName ?? '???'}
+              gameName={watching.gambleType}
+              result={{ won: watching.winnerId === watching.hostUid, amount: watching.betAmount }}
+              battleData={watching.battleData}
+              iAmHost={true}
+              onDone={stopWatch}
+            />
+          </>
+        ) : (
+          <div style={{ textAlign: 'center', color: '#8a92b2', padding: '24px 0', fontSize: '0.85rem' }}>
+            ⏳ 対戦中... ({GAME_NAMES_JP[watching.gambleType] ?? watching.gambleType} / {watching.betAmount.toLocaleString()}WC)
+            <br />
+            <span style={{ color: '#4a5070', fontSize: '0.75rem' }}>観戦者: {watching.spectatorCount ?? 1}人</span>
+          </div>
+        )}
+        <button onClick={stopWatch} style={{ marginTop: 8, padding: '6px 16px', background: '#2d3752', color: '#8a92b2', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: '0.8rem' }}>
+          ✕ 観戦をやめる
+        </button>
+      </div>
+    );
+  }
+
+  const activeBattles = battles.filter(b => b.status === 'active');
+  const finishedBattles = battles.filter(b => b.status === 'finished');
+
+  return (
+    <div>
+      <div style={{ fontSize: '0.85rem', color: '#f0c060', fontWeight: 700, marginBottom: 8 }}>📺 対戦中 ({activeBattles.length}件)</div>
+      {activeBattles.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#4a5070', fontSize: '0.82rem', padding: '12px 0' }}>現在対戦中のPvPはありません</div>
+      ) : activeBattles.map(b => (
+        <div key={b.id} style={{ background: '#1c2235', border: '1px solid #2d5230', borderRadius: 8, padding: '10px 12px', marginBottom: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>⚔️ {b.hostName} vs {b.guestName ?? '???'}</span>
+            <span style={{ color: '#4caf87', fontSize: '0.75rem', fontWeight: 700 }}>対戦中</span>
+          </div>
+          <div style={{ fontSize: '0.75rem', color: '#8a92b2', marginBottom: 6 }}>
+            {GAME_NAMES_JP[b.gambleType] ?? b.gambleType} / {b.betAmount.toLocaleString()}WC
+            {(b.spectatorCount ?? 0) > 0 && <span style={{ marginLeft: 8, color: '#5b8dee' }}>👁 {b.spectatorCount}人観戦中</span>}
+          </div>
+          <button onClick={() => startWatch(b)} disabled={b.hostUid === player?.uid || b.guestUid === player?.uid}
+            style={{ width: '100%', padding: '5px', background: 'rgba(76,175,135,0.15)', border: '1px solid #4caf87', color: '#4caf87', borderRadius: 5, cursor: 'pointer', fontSize: '0.78rem' }}>
+            👁 観戦する
+          </button>
+        </div>
+      ))}
+
+      <div style={{ fontSize: '0.85rem', color: '#8a92b2', fontWeight: 700, marginTop: 12, marginBottom: 8 }}>🕑 終了済み ({finishedBattles.length}件)</div>
+      {finishedBattles.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#4a5070', fontSize: '0.82rem', padding: '8px 0' }}>終了済みの対戦はありません</div>
+      ) : finishedBattles.map(b => (
+        <div key={b.id} style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 8, padding: '10px 12px', marginBottom: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{b.hostName} vs {b.guestName ?? '???'}</span>
+            <span style={{ color: '#4a5070', fontSize: '0.75rem' }}>終了</span>
+          </div>
+          <div style={{ fontSize: '0.75rem', color: '#8a92b2', marginBottom: 4 }}>
+            {GAME_NAMES_JP[b.gambleType] ?? b.gambleType} / {b.betAmount.toLocaleString()}WC
+          </div>
+          {b.winnerId && (
+            <div style={{ fontSize: '0.75rem', color: '#f0c060', marginBottom: 6 }}>
+              🏆 勝者: {b.winnerId === b.hostUid ? b.hostName : b.guestName}
+            </div>
+          )}
+          {b.battleData && (
+            <button onClick={() => startWatch(b)}
+              style={{ width: '100%', padding: '5px', background: 'rgba(91,141,238,0.1)', border: '1px solid #5b8dee', color: '#5b8dee', borderRadius: 5, cursor: 'pointer', fontSize: '0.78rem' }}>
+              ▶ リプレイを見る
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 
 function ExchangePanel() {
   const { player, changeGold, changeWealthCoin, addNotification } = useGameStore(s => ({
@@ -2540,7 +2704,7 @@ function ExchangePanel() {
   );
 }
 
-type MainTab = 'home' | 'gamble' | 'ranking' | 'exchange';
+type MainTab = 'home' | 'gamble' | 'ranking' | 'exchange' | 'spectate';
 
 // ============================================================
 // デイリーカジノ設定
@@ -2790,7 +2954,7 @@ export function GambleScreen() {
 
       {/* メインタブ */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-        {([['home','🏠 ホーム'],['gamble','🎲 ギャンブル'],['ranking','🏆 ランキング'],['exchange','🔄 交換所']] as [MainTab, string][]).map(([id, label]) => (
+        {([['home','🏠 ホーム'],['gamble','🎲 ギャンブル'],['ranking','🏆 ランキング'],['exchange','🔄 交換所'],['spectate','📺 観戦']] as [MainTab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setMainTab(id)}
             style={{ flex: 1, padding: '7px 4px', fontSize: '0.75rem', fontWeight: 700, background: mainTab === id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${mainTab === id ? '#5b8dee' : '#2d3752'}`, color: mainTab === id ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer' }}>
             {label}
@@ -2800,6 +2964,7 @@ export function GambleScreen() {
 
       {mainTab === 'exchange' && <ExchangePanel />}
       {mainTab === 'ranking' && <GambleRankingPanel />}
+      {mainTab === 'spectate' && <SpectatePanel />}
       {mainTab === 'home' && (
         <div>
           {/* デイリーカジノ */}

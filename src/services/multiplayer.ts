@@ -5,15 +5,16 @@ import {
   arrayUnion, arrayRemove, runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, PokerTable, PokerCard, PokerPlayer, PokerPhase } from '../types/game';
+import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, BattleHistoryEntry, PokerTable, PokerCard, PokerPlayer, PokerPhase } from '../types/game';
 import { calcJackpotContrib, rollJackpot } from '../systems/minigames';
 
 const COLLECTIONS = {
-  ONLINE:   'online_users',
-  BOARD:    'board_messages',
-  AUCTIONS: 'auctions',
-  BATTLES:  'gamble_battles',
-  POKER:    'poker_tables',
+  ONLINE:         'online_users',
+  BOARD:          'board_messages',
+  AUCTIONS:       'auctions',
+  BATTLES:        'gamble_battles',
+  POKER:          'poker_tables',
+  BATTLE_HISTORY: 'battle_history',
 } as const;
 
 // ============================================================
@@ -458,6 +459,21 @@ export async function joinGambleBattle(
       type: 'gamble_battle',
       message: `が${loserName}との${gameNameJp}対戦に勝利！${battle.betAmount.toLocaleString()}G獲得！`,
     }).catch(() => {});
+    // 対戦履歴保存
+    if (battle.battleData) {
+      saveBattleHistory({
+        battleId: battle.id,
+        hostUid: battle.hostUid,
+        hostName: battle.hostName,
+        guestUid,
+        guestName,
+        gambleType: battle.gambleType,
+        betAmount: battle.betAmount,
+        winnerId: battle.winnerId!,
+        battleData: battle.battleData,
+        createdAt: Date.now(),
+      }).catch(() => {});
+    }
   }
 
   return { success, battle: finalBattle };
@@ -469,6 +485,60 @@ export function subscribeGambleBattle(battleId: string, cb: (battle: GambleBattl
     if (!snap.exists()) { cb(null); return; }
     cb({ id: snap.id, ...(snap.data() as Omit<GambleBattle, 'id'>) });
   });
+}
+
+// 観戦: spectatorCount +1/-1
+export async function joinSpectate(battleId: string): Promise<void> {
+  const ref = doc(db, COLLECTIONS.BATTLES, battleId);
+  await updateDoc(ref, { spectatorCount: increment(1) }).catch(() => {});
+}
+
+export async function leaveSpectate(battleId: string): Promise<void> {
+  const ref = doc(db, COLLECTIONS.BATTLES, battleId);
+  await updateDoc(ref, { spectatorCount: increment(-1) }).catch(() => {});
+}
+
+// 観戦: 進行中・終了済みバトル一覧購読
+export function subscribeActiveBattles(cb: (battles: GambleBattle[]) => void): () => void {
+  const q = query(
+    collection(db, COLLECTIONS.BATTLES),
+    where('status', 'in', ['active', 'finished']),
+    orderBy('createdAt', 'desc'),
+    limit(30)
+  );
+  return onSnapshot(q, snap => {
+    const now = Date.now();
+    const cutoff = now - 30 * 60 * 1000; // 30分以内
+    cb(snap.docs
+      .map(d => ({ id: d.id, ...(d.data() as Omit<GambleBattle,'id'>) }))
+      .filter(b => b.createdAt > cutoff)
+    );
+  }, () => {});
+}
+
+// 観戦: 1バトルのリアルタイム購読
+export function spectateGambleBattle(battleId: string, cb: (battle: GambleBattle | null) => void): () => void {
+  return onSnapshot(doc(db, COLLECTIONS.BATTLES, battleId), snap => {
+    if (!snap.exists()) { cb(null); return; }
+    cb({ id: snap.id, ...(snap.data() as Omit<GambleBattle,'id'>) });
+  }, () => {});
+}
+
+// 対戦履歴保存
+export async function saveBattleHistory(entry: Omit<BattleHistoryEntry, 'id'>): Promise<void> {
+  await addDoc(collection(db, COLLECTIONS.BATTLE_HISTORY), entry).catch(() => {});
+}
+
+// 対戦履歴取得（最新30件）
+export async function getBattleHistory(limit_n = 30): Promise<BattleHistoryEntry[]> {
+  const q = query(
+    collection(db, COLLECTIONS.BATTLE_HISTORY),
+    orderBy('createdAt', 'desc'),
+    limit(limit_n)
+  );
+  const snap = await getDocs(q).catch(() => null);
+  if (!snap) return [];
+  return snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<BattleHistoryEntry,'id'>) }));
 }
 
 export async function cancelGambleBattle(battleId: string, hostUid: string): Promise<boolean> {
