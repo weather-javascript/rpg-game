@@ -677,6 +677,8 @@ export interface PokerTable {
 // ============================================================
 export type QuestRank = 'C' | 'B' | 'A' | 'S' | 'SS';
 
+export type QuestType = 'delivery' | 'bulk' | 'urgent' | 'select' | 'chain';
+
 export interface NpcQuest {
   id: string;
   npcName: string;
@@ -689,6 +691,13 @@ export interface NpcQuest {
   rewardGold: number;
   expiresAt: number;   // タイムスタンプ（定期更新）
   createdAt: number;
+  // 拡張フィールド
+  questType?: QuestType;
+  alternateItemIds?: string[];   // select型：代替可能なアイテムID（報酬-20%）
+  urgentDeadlineMs?: number;     // urgent型：短縮期限（ms）
+  marketMultiplier?: number;     // 市場連動補正（0.7〜1.5）
+  difficultyMultiplier?: number; // 難易度係数
+  npcType?: 'villager' | 'blacksmith' | 'merchant' | 'noble' | 'alchemist' | 'adventurer' | 'fisherman';
 }
 
 export interface QuestAcceptance {

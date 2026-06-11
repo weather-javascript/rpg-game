@@ -5,8 +5,9 @@ import {
   arrayUnion, arrayRemove, runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, BattleHistoryEntry, PokerTable, PokerCard, PokerPlayer, PokerPhase, NpcQuest, StockId } from '../types/game';
+import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, BattleHistoryEntry, PokerTable, PokerCard, PokerPlayer, PokerPhase, NpcQuest, QuestType, StockId } from '../types/game';
 import { calcJackpotContrib, rollJackpot } from '../systems/minigames';
+import { enqueueActivityFeed } from './activityFeedBuffer';
 
 const COLLECTIONS = {
   ONLINE:         'online_users',
@@ -748,36 +749,12 @@ export interface ActivityFeedEntry {
 const FEED_REF = () => doc(db, 'shared', 'activity_feed');
 
 // ============================================================
-// ActivityFeed — 30秒バッファでまとめてFlush
+// ActivityFeed — バッファ処理は activityFeedBuffer.ts に委譲
 // ============================================================
-const FEED_MAX = 100;
 
-let _activityFeedBuffer: ActivityFeedEntry[] = [];
-let _activityFeedFlushTimer: ReturnType<typeof setTimeout> | null = null;
-
-async function _flushActivityFeed(): Promise<void> {
-  if (_activityFeedBuffer.length === 0) return;
-  const toWrite = [..._activityFeedBuffer];
-  _activityFeedBuffer = [];
-  try {
-    await runTransaction(db, async (tx) => {
-      const snap = await tx.get(FEED_REF());
-      const prev: ActivityFeedEntry[] = snap.exists() ? ((snap.data()['entries'] ?? []) as ActivityFeedEntry[]) : [];
-      const next = [...toWrite, ...prev].slice(0, FEED_MAX);
-      tx.set(FEED_REF(), { entries: next, updatedAt: Date.now() });
-    });
-  } catch { /* ignore */ }
-}
-
-/** アクティビティを30秒バッファ経由でフィードに追記 */
+/** アクティビティをバッファ経由でフィードに追記（再利用可能な共通API） */
 export async function postActivityFeed(entry: Omit<ActivityFeedEntry, 'timestamp'>): Promise<void> {
-  _activityFeedBuffer.unshift({ ...entry, timestamp: Date.now() });
-  if (!_activityFeedFlushTimer) {
-    _activityFeedFlushTimer = setTimeout(() => {
-      _activityFeedFlushTimer = null;
-      _flushActivityFeed();
-    }, 30_000);
-  }
+  enqueueActivityFeed(entry);
 }
 
 /** アクティビティフィードをリアルタイム購読（onSnapshot） */
@@ -1715,29 +1692,240 @@ export function subscribeNpcQuests(cb: (quests: NpcQuest[]) => void): () => void
 }
 
 export async function generateNpcQuests(): Promise<void> {
-  // クライアント側でランダム依頼を生成してFirestoreに保存
-  const QUEST_TEMPLATES: Omit<NpcQuest, 'id' | 'createdAt' | 'expiresAt'>[] = [
-    { npcName: '村人', npcIcon: '👨‍🌾', rank: 'C', title: '鉄鉱石の調達', description: '鉄鉱石30個を届けてほしい', requiredItemId: 'iron_ore', requiredAmount: 30, rewardGold: 10000 },
-    { npcName: '村人', npcIcon: '👨‍🌾', rank: 'C', title: '木材の調達', description: '木材20個を届けてほしい', requiredItemId: 'wood', requiredAmount: 20, rewardGold: 8000 },
-    { npcName: '鍛冶屋', npcIcon: '⚒️', rank: 'B', title: '鋼鉄インゴット', description: '鋼鉄インゴット10個が必要だ', requiredItemId: 'steel_ingot', requiredAmount: 10, rewardGold: 50000 },
-    { npcName: '鍛冶屋', npcIcon: '⚒️', rank: 'B', title: '鉄インゴット', description: '鉄インゴット20個を持ってきてくれ', requiredItemId: 'iron_ingot', requiredAmount: 20, rewardGold: 30000 },
-    { npcName: '漁師', npcIcon: '🎣', rank: 'B', title: 'サケの調達', description: 'サケ50匹を届けてほしい', requiredItemId: 'salmon', requiredAmount: 50, rewardGold: 30000 },
-    { npcName: '商人', npcIcon: '🧑‍💼', rank: 'A', title: '宝石の調達', description: '宝石5個を持ってきてほしい', requiredItemId: 'gem', requiredAmount: 5, rewardGold: 200000 },
-    { npcName: '商人', npcIcon: '🧑‍💼', rank: 'A', title: '洞窟王の宝石', description: '洞窟王の宝石32個が必要だ', requiredItemId: 'cave_gem', requiredAmount: 32, rewardGold: 300000 },
-    { npcName: '貴族', npcIcon: '👑', rank: 'A', title: '黄金の塊', description: '金塊を10個持ってきなさい', requiredItemId: 'gold_bar', requiredAmount: 10, rewardGold: 500000 },
-    { npcName: '王様', npcIcon: '🤴', rank: 'S', title: 'ドラゴンの心臓', description: '勇者よ、ドラゴンの心臓を持ってきてくれ！', requiredItemId: 'dragon_heart', requiredAmount: 1, rewardGold: 5000000 },
-    { npcName: 'S級冒険者', npcIcon: '🗡️', rank: 'SS', title: '伝説の素材', description: '伝説の宝珠を届けてほしい。必ず報いよう。', requiredItemId: 'legendary_gem', requiredAmount: 1, rewardGold: 10000000 },
-    { npcName: '錬金術師', npcIcon: '⚗️', rank: 'A', title: '魔法の粉', description: 'モグラの爪8個が必要だ', requiredItemId: 'mole_claw', requiredAmount: 8, rewardGold: 180000 },
-    { npcName: '村人', npcIcon: '👩‍🌾', rank: 'C', title: '石炭の調達', description: '石炭50個を届けてほしい', requiredItemId: 'coal', requiredAmount: 50, rewardGold: 12000 },
+  // ============================================================
+  // NPC定義（口調・背景あり）
+  // ============================================================
+  type NpcDef = { name: string; icon: string; type: NpcQuest['npcType']; rankRange: QuestRank[] };
+  const NPC_DEFS: NpcDef[] = [
+    { name: '農夫のガレス',  icon: '👨‍🌾', type: 'villager',    rankRange: ['C','C','B'] },
+    { name: '農婦のミア',    icon: '👩‍🌾', type: 'villager',    rankRange: ['C','C','B'] },
+    { name: '鍛冶屋のドーガ', icon: '⚒️',  type: 'blacksmith',  rankRange: ['B','B','A'] },
+    { name: '行商人のクロス', icon: '🧑‍💼', type: 'merchant',    rankRange: ['B','A','A'] },
+    { name: '錬金術師のセラ', icon: '⚗️',  type: 'alchemist',   rankRange: ['A','A','S'] },
+    { name: '貴族のエルバン', icon: '👑',  type: 'noble',       rankRange: ['A','S','S'] },
+    { name: '漁師のバルド',  icon: '🎣',  type: 'fisherman',   rankRange: ['B','B','A'] },
+    { name: 'S級剣士ライオス', icon: '🗡️', type: 'adventurer',  rankRange: ['S','S','SS'] },
   ];
+
+  // ============================================================
+  // アイテムプール（ITEM_MASTERに実在するIDのみ）
+  // 各エントリ: [itemId, name, sellPrice, rank]
+  // ============================================================
+  type ItemPool = { id: string; name: string; price: number; rank: QuestRank };
+  const ITEM_POOL: ItemPool[] = [
+    // C ランク素材
+    { id: 'wood',          name: '木材',           price: 5,    rank: 'C' },
+    { id: 'stone',         name: '石',             price: 4,    rank: 'C' },
+    { id: 'coal',          name: '石炭',           price: 10,   rank: 'C' },
+    { id: 'plank',         name: '板材',           price: 8,    rank: 'C' },
+    { id: 'slime_gel',     name: 'スライムゼリー', price: 8,    rank: 'C' },
+    { id: 'dwarf_fragment',name: 'ドワーフの欠片', price: 15,   rank: 'C' },
+    { id: 'cave_fragment', name: '洞窟の欠片',     price: 8,    rank: 'C' },
+    { id: 'gunpowder',     name: '火薬',           price: 8,    rank: 'C' },
+    // B ランク素材
+    { id: 'iron_ore',      name: '鉄鉱石',         price: 25,   rank: 'B' },
+    { id: 'iron_ingot',    name: '鉄塊',           price: 40,   rank: 'B' },
+    { id: 'mole_claw',     name: 'モグラの爪',     price: 40,   rank: 'B' },
+    { id: 'goblin_ear',    name: 'ゴブリンの耳',   price: 30,   rank: 'B' },
+    { id: 'magma_stone',   name: 'マグマストーン', price: 35,   rank: 'B' },
+    { id: 'fortress_order',name: '要塞防衛出兵状', price: 20,   rank: 'B' },
+    { id: 'spear_shaft',   name: '槍の柄',         price: 35,   rank: 'B' },
+    { id: 'raw_salmon',    name: '生鮭',           price: 10,   rank: 'B' },
+    { id: 'gold_ore',      name: '金鉱石',         price: 120,  rank: 'B' },
+    // A ランク素材
+    { id: 'cave_gem',      name: '洞窟王の宝石',   price: 200,  rank: 'A' },
+    { id: 'golden_bar',    name: '金塊',           price: 180,  rank: 'A' },
+    { id: 'spirit_ice',    name: '霊氷',           price: 80,   rank: 'A' },
+    { id: 'stalactite',    name: '鍾乳石',         price: 150,  rank: 'A' },
+    { id: 'diamond_ore',   name: 'ダイヤモンド鉱石', price: 400, rank: 'A' },
+    { id: 'emerald',       name: 'エメラルド',     price: 200,  rank: 'A' },
+    { id: 'memento',       name: '形見の写真',     price: 60,   rank: 'A' },
+    { id: 'hard_magic_stone', name: '硬魔石',      price: 200,  rank: 'A' },
+    { id: 'magic_stone',   name: '魔導石',         price: 80,   rank: 'A' },
+    { id: 'upper_magic_book', name: '上級魔導書',  price: 300,  rank: 'A' },
+    { id: 'wolf_fang',     name: 'ハーブウルフの牙', price: 300, rank: 'A' },
+    { id: 'dragon_soul',   name: 'ドラゴンソール', price: 1000, rank: 'A' },
+    { id: 'brilliant_salmon', name: 'ブリリアントキングサーモン', price: 80, rank: 'A' },
+    // S ランク素材
+    { id: 'wolf_crystal',  name: '狼牙魔結晶',     price: 1500, rank: 'S' },
+    { id: 'devil_reactor', name: 'デビルリアクター', price: 500, rank: 'S' },
+    { id: 'chaos_reactor', name: 'カオスリアクター', price: 600, rank: 'S' },
+    { id: 'kx_mech_track', name: 'KX-MECHANIC-TRACK', price: 5000, rank: 'S' },
+    { id: 'life_control_core', name: 'LIFE CONTROL CORE', price: 10000, rank: 'S' },
+    { id: 'ancient_shard', name: '古代の欠片',     price: 45000, rank: 'S' },
+    // SS ランク素材
+    { id: 'dragon_scale',  name: 'ドラゴンの鱗',   price: 250000, rank: 'SS' },
+  ];
+
+  // ============================================================
+  // NPC口調別メッセージ生成
+  // ============================================================
+  function buildDescription(
+    npcType: NpcQuest['npcType'],
+    itemName: string,
+    amount: number,
+    questType: QuestType,
+    isAlternate: boolean,
+    isUrgent: boolean,
+  ): string {
+    const alt = isAlternate ? '代替品でも構いません。' : '';
+    const urg = isUrgent ? '急いでいます！' : '';
+    switch (npcType) {
+      case 'villager':
+        return `${urg}${itemName}が${amount}個必要なんじゃ。畑の修繕に使うんだ。${alt}`;
+      case 'blacksmith':
+        return `${urg}今すぐ${itemName}を${amount}個用意しろ。注文が立て込んでいて手が離せん。${alt}`;
+      case 'merchant':
+        return `${urg}${itemName}を${amount}個まとめて仕入れたい。需要が高騰しているうちに動かねば。${alt}`;
+      case 'noble':
+        return `${urg}${itemName}を${amount}個持参しなさい。見返りは保証しましょう。${alt}`;
+      case 'alchemist':
+        return `${urg}研究に${itemName}が${amount}個必要です。精製の最終段階に入ったところで。${alt}`;
+      case 'fisherman':
+        return `${urg}${itemName}を${amount}個分けてくれ。今が旬なんだ。${alt}`;
+      case 'adventurer':
+        return `${urg}${itemName}が${amount}個要る。詳しくは聞かないでくれ。${alt}`;
+      default:
+        return `${urg}${itemName}を${amount}個届けてほしい。${alt}`;
+    }
+  }
+
+  // ============================================================
+  // タイトル生成
+  // ============================================================
+  function buildTitle(questType: QuestType, itemName: string, _rank: QuestRank): string {
+    switch (questType) {
+      case 'bulk':    return `【大量】${itemName}の大口調達`;
+      case 'urgent':  return `【至急】${itemName}の緊急納品`;
+      case 'select':  return `${itemName}（代替可）の調達`;
+      case 'chain':   return `【連続】${itemName}の継続供給`;
+      default:        return `${itemName}の調達依頼`;
+    }
+  }
+
+  // ============================================================
+  // 報酬計算
+  // ============================================================
+  function calcReward(
+    price: number,
+    amount: number,
+    rank: QuestRank,
+    questType: QuestType,
+    marketMult: number,
+    isAlternate: boolean,
+    isUrgent: boolean,
+  ): number {
+    const difficultyMult: Record<QuestRank, number> = { C: 2.2, B: 3.5, A: 5.0, S: 7.0, SS: 9.0 };
+    const typeMult: Record<QuestType, number> = {
+      delivery: 1.0, bulk: 1.1, urgent: 1.4, select: 0.85, chain: 1.2,
+    };
+    const altPenalty = isAlternate ? 0.8 : 1.0;
+    const urgBonus   = isUrgent   ? 1.3 : 1.0;
+
+    const raw = price * amount
+      * difficultyMult[rank]
+      * typeMult[questType]
+      * marketMult
+      * altPenalty
+      * urgBonus;
+
+    const minReward = price * amount * 1.2;
+    const maxReward = price * amount * 10;
+    return Math.round(Math.max(minReward, Math.min(maxReward, raw)) / 10) * 10;
+  }
+
+  // ============================================================
+  // 市場連動 multiplier（0.7 〜 1.5）
+  // ============================================================
+  function marketMultiplier(rank: QuestRank): number {
+    const base = 0.9 + Math.random() * 0.5; // 0.9〜1.4
+    // ランクが高いほど変動幅大
+    const volatility = { C: 0.05, B: 0.10, A: 0.15, S: 0.20, SS: 0.25 }[rank];
+    const mult = base + (Math.random() - 0.5) * volatility;
+    return Math.min(1.5, Math.max(0.7, parseFloat(mult.toFixed(2))));
+  }
+
+  // ============================================================
+  // 依頼1件を動的生成
+  // ============================================================
+  type QuestType = NpcQuest['questType'] & string;
+  function rand<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function generateOne(npc: NpcDef): Omit<NpcQuest, 'id' | 'createdAt' | 'expiresAt'> {
+    // NPCのランク帯からランクを選択
+    const rank = rand(npc.rankRange);
+    // アイテムプールからランクに合ったものを選ぶ（±1ランク許容）
+    const rankOrder: QuestRank[] = ['C','B','A','S','SS'];
+    const ri = rankOrder.indexOf(rank);
+    const eligible = ITEM_POOL.filter(i => {
+      const ii = rankOrder.indexOf(i.rank);
+      return ii >= Math.max(0, ri - 1) && ii <= Math.min(rankOrder.length - 1, ri + 1);
+    });
+    const item = rand(eligible);
+
+    // 依頼タイプ
+    const questTypes: QuestType[] = ['delivery','delivery','bulk','urgent','select','chain'];
+    const questType = rand(questTypes);
+
+    // 数量（ランク・タイプ別）
+    const amountMap: Record<QuestRank, [number, number]> = {
+      C: [10, 60], B: [5, 40], A: [3, 20], S: [1, 8], SS: [1, 3],
+    };
+    const [minA, maxA] = amountMap[rank];
+    const bulkMult = questType === 'bulk' ? 2 : 1;
+    const amount = (Math.floor(Math.random() * (maxA - minA + 1)) + minA) * bulkMult;
+
+    // 代替・至急フラグ
+    const isAlternate = questType === 'select';
+    const isUrgent    = questType === 'urgent';
+
+    // 代替アイテム（同ランクから1〜2個）
+    const alternateItemIds = isAlternate
+      ? eligible.filter(i => i.id !== item.id).sort(() => Math.random() - 0.5).slice(0, 2).map(i => i.id)
+      : undefined;
+
+    const mMult = marketMultiplier(rank);
+    const rewardGold = calcReward(item.price, amount, rank, questType, mMult, isAlternate, isUrgent);
+
+    return {
+      npcName: npc.name,
+      npcIcon: npc.icon,
+      npcType: npc.type,
+      rank,
+      questType,
+      title: buildTitle(questType, item.name, rank),
+      description: buildDescription(npc.type, item.name, amount, questType, isAlternate, isUrgent),
+      requiredItemId: item.id,
+      requiredAmount: amount,
+      rewardGold,
+      marketMultiplier: mMult,
+      difficultyMultiplier: { C: 2.2, B: 3.5, A: 5.0, S: 7.0, SS: 9.0 }[rank],
+      ...(alternateItemIds ? { alternateItemIds } : {}),
+      ...(isUrgent ? { urgentDeadlineMs: 2 * 60 * 60 * 1000 } : {}), // 緊急は2時間
+    };
+  }
+
+  // ============================================================
+  // 8件生成（ランクバランスを確保: C×2, B×2, A×2, S×1, SS×1）
+  // ============================================================
   const now = Date.now();
-  const expiresAt = now + 6 * 60 * 60 * 1000; // 6時間後
-  // ランダムに6件選ぶ
-  const shuffled = [...QUEST_TEMPLATES].sort(() => Math.random() - 0.5).slice(0, 6);
-  for (const tmpl of shuffled) {
-    await addDoc(collection(db, 'npc_quests'), { ...tmpl, createdAt: now, expiresAt });
+  const BASE_EXPIRY = 6 * 60 * 60 * 1000; // 6時間
+
+  const rankSlots: QuestRank[] = ['C','C','B','B','A','A','S','SS'];
+  const shuffledNpcs = [...NPC_DEFS].sort(() => Math.random() - 0.5);
+
+  for (let i = 0; i < 8; i++) {
+    const npc = shuffledNpcs[i % shuffledNpcs.length];
+    // ランクスロットに合わせてrankRangeを一時上書き
+    const overriddenNpc: NpcDef = { ...npc, rankRange: [rankSlots[i]] };
+    const quest = generateOne(overriddenNpc);
+    const expiresAt = quest.urgentDeadlineMs
+      ? now + quest.urgentDeadlineMs
+      : now + BASE_EXPIRY;
+    await addDoc(collection(db, 'npc_quests'), { ...quest, createdAt: now, expiresAt });
   }
 }
+
 
 export async function deleteExpiredNpcQuests(): Promise<void> {
   try {
