@@ -1166,6 +1166,13 @@ export const DEFAULT_PLAYER_STATS = {
 // ============================================================
 export const VERSION_PATCHES = [
   {
+    version: '2.9.1',
+    date: '2026-06-11',
+    changes: [
+      '🔧 TypeScriptビルドエラー修正（TS6133/TS6196）',
+    ],
+  },
+  {
     version: '2.9.0',
     date: '2026-06-11',
     changes: [

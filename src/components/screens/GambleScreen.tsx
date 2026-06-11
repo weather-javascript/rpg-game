@@ -2993,7 +2993,7 @@ function StockMarketPanel() {
   const [rankTab, setRankTab] = useState<'profit' | 'assets'>('profit');
   const [stockView, setStockView] = useState<'market' | 'detail' | 'portfolio' | 'analysis' | 'ranking'>('market');
   const [chartMode, setChartMode] = useState<'line' | 'candle'>('line');
-  const [prevPrices, setPrevPrices] = useState<Record<StockId, number>>({} as Record<StockId, number>);
+  const [_prevPrices, setPrevPrices] = useState<Record<StockId, number>>({} as Record<StockId, number>);
 
   useEffect(() => {
     const unsub = subscribeStockPrices((p, h, t) => {
@@ -3223,7 +3223,7 @@ function StockMarketPanel() {
               const change = prevPrice > 0 ? (p - prevPrice) / prevPrice * 100 : 0;
               const isSelected = selectedStock === id;
               const halted = isHalted(id);
-              const trendInfo = selectedTrend && id === selectedStock ? getTrendLabel(selectedTrend.trend) : null;
+              const trendInfo = selectedTrend && id === selectedStock ? getTrendLabel(selectedTrend.trend) : null; void trendInfo;
               const trend = trends[id];
               const tl = trend ? getTrendLabel(trend.trend) : null;
               return (
@@ -3403,7 +3403,7 @@ function StockMarketPanel() {
           {(() => {
             const scored = STOCK_ID_LIST.map(id => {
               const t = trends[id] ?? { trend: 0, volatility: 0.03, stability: 0.5, consecutiveTicks: 0 };
-              const hist = history[id] ?? [];
+              const hist = history[id] ?? []; void hist;
               const p = getPrice(id);
               const base = STOCK_MASTERS[id].basePrice;
               const fromBase = (p - base) / base;
