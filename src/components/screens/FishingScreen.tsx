@@ -1,7 +1,7 @@
 // src/components/screens/FishingScreen.tsx
 // 釣りシステム v2 – 全面改修
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import {
   FISH_MASTER, FISH_IDS, calcWeight, calcFishSellPrice,
