@@ -3,7 +3,7 @@
 // PvP対戦機能追加
 import { GameIcon } from '../icons';
 import { secureRandom } from '../../utils/random';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { GAMBLE_MASTER, ITEM_MASTER } from '../../data/masters';
 import { playChohan, playChinchiro, dealPoker, drawPoker } from '../../systems/minigames';
@@ -312,7 +312,7 @@ function BattleAnimation({ opponentName, gameName, result, battleData, iAmHost, 
   const [slotTurn, setSlotTurn] = useState<'me'|'opp'>('me');
   // slotTurnState removed - now managed via slotStep
 
-  const overlayStyle: React.CSSProperties = {
+  const overlayStyle: import('react').CSSProperties = {
     position:'fixed', inset:0, zIndex:600, background:'rgba(0,0,0,0.97)',
     display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:14,
     padding:'0 20px', overflowY:'auto',
@@ -1801,7 +1801,7 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus =
   );
 }
 
-function ChohanPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
+function ChohanPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, onLockChange }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number; onLockChange?: (locked: boolean) => void }) {
   const { player, changeWealthCoin, addNotification } = useGameStore(s => ({ player: s.player, changeWealthCoin: s.changeWealthCoin, addNotification: s.addNotification }));
   const [choice, setChoice] = useState<'cho'|'han'>('cho');
   const [result, setResult] = useState<GambleResult | null>(null);
@@ -1815,6 +1815,7 @@ function ChohanPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }:
   const play = async () => {
     if (animating || !player || (player.wealthCoin ?? 0) < bet) { addNotification('error', 'WCが足りません！'); return; }
     setAnimating(true); setResult(null); setFinalDice(null);
+    onLockChange?.(true);
     changeWealthCoin(-bet); onJackpotContrib(bet);
     const r = playChohan(bet, choice);
     const adjustedDelta = r.goldDelta > 0 ? Math.floor(r.goldDelta * multiplierBonus) : r.goldDelta;
@@ -1831,11 +1832,11 @@ function ChohanPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }:
         setPhase('reveal');
         setTimeout(async () => {
           const rr = pendingRef.r;
-          if (!rr) { setAnimating(false); return; }
+          if (!rr) { setAnimating(false); onLockChange?.(false); return; }
           if (rr.goldDelta > 0) changeWealthCoin(rr.goldDelta + bet);
           setResult(rr); onResult(rr); setPhase('done');
           try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeWealthCoin(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}WC！`); } } catch { /**/ }
-          setAnimating(false);
+          setAnimating(false); onLockChange?.(false);
         }, 1000);
       }
     }, 70);
@@ -1884,7 +1885,7 @@ function ChohanPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }:
   );
 }
 
-function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
+function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, onLockChange }: { bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number; onLockChange?: (locked: boolean) => void }) {
   const { player, changeWealthCoin, addNotification } = useGameStore(s => ({ player: s.player, changeWealthCoin: s.changeWealthCoin, addNotification: s.addNotification }));
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
@@ -1904,6 +1905,7 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
   const play = async () => {
     if (animating || !player || (player.wealthCoin ?? 0) < bet) { addNotification('error', 'WCが足りません！'); return; }
     setAnimating(true); setResult(null); setRollLogs([]); setCurrentDice(null);
+    onLockChange?.(true);
     changeWealthCoin(-bet); onJackpotContrib(bet);
     const r = playChinchiro(bet);
     const effectiveMult = r.multiplier > 0 ? r.multiplier * multiplierBonus : 0;
@@ -1926,11 +1928,11 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
         } else {
           setTimeout(async () => {
             const rr = pendingRef.r;
-            if (!rr) { setAnimating(false); return; }
+            if (!rr) { setAnimating(false); onLockChange?.(false); return; }
             if (rr.multiplier > 0) changeWealthCoin(rr.goldDelta + bet);
             setResult(rr); onResult(rr);
             try { const { won, pool } = await checkJackpotWin(); if (won && pool > 0) { changeWealthCoin(pool); addNotification('success', `🌟 JACKPOT!! ${pool.toLocaleString()}WC！`); } } catch { /**/ }
-            setAnimating(false);
+            setAnimating(false); onLockChange?.(false);
           }, 1200);
         }
       }, 1000);
@@ -2348,10 +2350,11 @@ export function getGambleRank(totalWagered: number) {
 // HighLow Panel
 // ============================================================
 const HIGHLOW_MULTIPLIERS = [1.3, 1.8, 2.5, 3.5, 5.0];
-function HighLowPanel({ bet, onResult, onMissionUpdate }: {
+function HighLowPanel({ bet, onResult, onMissionUpdate, onLockChange }: {
   bet: number;
   onResult: (r: GambleResult) => void;
   onMissionUpdate?: (won: boolean, streak: number) => void;
+  onLockChange?: (locked: boolean) => void;
 }) {
   const { player, changeWealthCoin, addNotification } = useGameStore(s => ({
     player: s.player, changeWealthCoin: s.changeWealthCoin, addNotification: s.addNotification,
@@ -2390,6 +2393,7 @@ function HighLowPanel({ bet, onResult, onMissionUpdate }: {
     setGameActive(true);
     setLastResult(null);
     setHistory([card]);
+    onLockChange?.(true);
   };
 
   const guess = (choice: 'high' | 'low') => {
@@ -2406,6 +2410,7 @@ function HighLowPanel({ bet, onResult, onMissionUpdate }: {
         setStreak(0);
         setGameActive(false);
         setAnimating(false);
+        onLockChange?.(false);
         const goldDelta = -bet;
         onResult({ rewardLabel: '敗北', multiplier: 0, goldDelta, itemRewards: [], symbols: ['💀'] });
         onMissionUpdate?.(false, 0);
@@ -2431,6 +2436,7 @@ function HighLowPanel({ bet, onResult, onMissionUpdate }: {
     setStreak(0);
     setCurrentCard(null);
     setHistory([]);
+    onLockChange?.(false);
     addNotification('success', `+${winAmount.toLocaleString()}WC 獲得！（×${mult.toFixed(2)}）`);
   };
 
@@ -2939,11 +2945,64 @@ function ExchangePanel() {
 // ============================================================
 const STOCK_ID_LIST: StockId[] = ['wealth_mining','wealth_fishery','wealth_casino','wealth_tech','wealth_energy','wealth_logistics','wealth_foods','wealth_finance'];
 
+// ローカルで価格変動をシミュレートするユーティリティ
+function simulateLocalTick(
+  currentPrices: Record<StockId, number>,
+  currentHistory: Record<StockId, StockPricePoint[]>,
+): { prices: Record<StockId, number>; history: Record<StockId, StockPricePoint[]>; news: string[] } {
+  const now = Date.now();
+  const newsItems: string[] = [];
+  const NEWS_TEMPLATES = [
+    '{name}が新技術を発表！', '{name}の業績が悪化', '{name}が大型契約を締結',
+    '{name}の経営不振が明らかに', '市場全体に追い風！{name}も上昇', '規制強化で{name}に逆風',
+    '{name}が記録的な利益を達成！', '{name}の不祥事が発覚',
+  ];
+  const newPrices = { ...currentPrices } as Record<StockId, number>;
+  const newHistory = { ...currentHistory } as Record<StockId, StockPricePoint[]>;
+  for (const id of STOCK_ID_LIST) {
+    const base = STOCK_MASTERS[id].basePrice;
+    const current = newPrices[id] ?? base;
+    const roll = Math.random();
+    let changePct = 0;
+    let newsText: string | undefined;
+    if (roll < 0.005) {
+      changePct = 0.5;
+      newsText = `🚀 【ストップ高】${STOCK_MASTERS[id].name} +50%！`;
+    } else if (roll < 0.01) {
+      changePct = -0.5;
+      newsText = `📉 【ストップ安】${STOCK_MASTERS[id].name} -50%！`;
+    } else if (roll < 0.06) {
+      const pct = 0.08 + Math.random() * 0.12;
+      changePct = Math.random() < 0.5 ? pct : -pct;
+      const tmpl = NEWS_TEMPLATES[Math.floor(Math.random() * NEWS_TEMPLATES.length)];
+      newsText = `📰 ${tmpl.replace('{name}', STOCK_MASTERS[id].name)}（${changePct > 0 ? '+' : ''}${(changePct * 100).toFixed(0)}%）`;
+    } else {
+      const pct = 0.005 + Math.random() * 0.025;
+      changePct = Math.random() < 0.52 ? pct : -pct; // 微妙に上昇バイアス
+    }
+    // 基準値から乖離しすぎたら戻す力
+    const deviation = (current - base) / base;
+    changePct -= deviation * 0.05;
+    const newPrice = Math.max(1, Math.round(current * (1 + changePct)));
+    newPrices[id] = newPrice;
+    if (newsText) newsItems.push(newsText);
+    const hist = [...(newHistory[id] ?? [])];
+    hist.push({ timestamp: now, price: newPrice, news: newsText });
+    if (hist.length > 120) hist.splice(0, hist.length - 120);
+    newHistory[id] = hist;
+  }
+  return { prices: newPrices, history: newHistory, news: newsItems };
+}
+
 function StockMarketPanel() {
   const player = useGameStore(s => s.player);
   const changeWealthCoin = useGameStore(s => s.changeWealthCoin);
   const addNotification = useGameStore(s => s.addNotification);
-  const [prices, setPrices] = useState<Record<StockId, number>>({} as Record<StockId, number>);
+  const [prices, setPrices] = useState<Record<StockId, number>>(() => {
+    const p = {} as Record<StockId, number>;
+    for (const id of STOCK_ID_LIST) p[id] = STOCK_MASTERS[id].basePrice;
+    return p;
+  });
   const [history, setHistory] = useState<Record<StockId, StockPricePoint[]>>({} as Record<StockId, StockPricePoint[]>);
   const [news, setNews] = useState<string[]>([]);
   const [selectedStock, setSelectedStock] = useState<StockId>('wealth_mining');
@@ -2951,9 +3010,22 @@ function StockMarketPanel() {
   const [stockRanking, setStockRanking] = useState<StockRankingEntry[]>([]);
   const [rankTab, setRankTab] = useState<'profit' | 'assets'>('profit');
   const [stockView, setStockView] = useState<'market' | 'portfolio' | 'ranking'>('market');
+  const localPricesRef = useRef<Record<StockId, number>>({} as Record<StockId, number>);
+  const localHistoryRef = useRef<Record<StockId, StockPricePoint[]>>({} as Record<StockId, StockPricePoint[]>);
 
+  // Firestoreから初期データ購読
   useEffect(() => {
-    const unsub = subscribeStockPrices((p, h) => { setPrices(p); setHistory(h); });
+    const unsub = subscribeStockPrices((p, h) => {
+      // Firestoreデータで初期化（ローカルrefも更新）
+      const initPrices = { ...p } as Record<StockId, number>;
+      for (const id of STOCK_ID_LIST) {
+        if (!initPrices[id]) initPrices[id] = STOCK_MASTERS[id].basePrice;
+      }
+      localPricesRef.current = initPrices;
+      localHistoryRef.current = { ...h };
+      setPrices(initPrices);
+      setHistory({ ...h });
+    });
     return unsub;
   }, []);
 
@@ -2962,20 +3034,29 @@ function StockMarketPanel() {
     return unsub;
   }, []);
 
+  // ローカルシミュレーション: 30秒ごとに価格変動
   useEffect(() => {
-    // 起動時に株価更新を試みる + 3分ごとに定期更新
     const doTick = () => {
-      tickStockPrices().then(res => {
-        if (res.news.length > 0) setNews(prev => [...res.news, ...prev].slice(0, 20));
-      }).catch(() => {});
+      // ローカルでシミュレート
+      const { prices: newP, history: newH, news: newN } = simulateLocalTick(
+        localPricesRef.current,
+        localHistoryRef.current,
+      );
+      localPricesRef.current = newP;
+      localHistoryRef.current = newH;
+      setPrices({ ...newP });
+      setHistory({ ...newH });
+      if (newN.length > 0) setNews(prev => [...newN, ...prev].slice(0, 20));
+      // バックグラウンドでFirestoreにも書き込み（エラーは無視）
+      tickStockPrices().catch(() => {});
     };
-    doTick();
-    const timer = setInterval(doTick, 3 * 60 * 1000);
-    return () => clearInterval(timer);
+    // 初回は2秒後に即実行してグラフを表示
+    const initTimer = setTimeout(doTick, 2000);
+    const interval = setInterval(doTick, 30_000);
+    return () => { clearTimeout(initTimer); clearInterval(interval); };
   }, []);
 
   const holdings: Record<string, StockHolding> = (player?.stockHoldings ?? {}) as Record<string, StockHolding>;
-
   const getPrice = (id: StockId) => prices[id] ?? STOCK_MASTERS[id].basePrice;
 
   const handleBuy = () => {
@@ -3003,12 +3084,6 @@ function StockMarketPanel() {
     if (!player) return;
     const h = holdings[id];
     if (!h || h.amount <= 0) return;
-    const now = Date.now();
-    if (now - h.purchasedAt < 24 * 60 * 60 * 1000) {
-      const remain = Math.ceil((h.purchasedAt + 24 * 60 * 60 * 1000 - now) / 60000);
-      addNotification('error', `購入後24時間は売却できません（あと${remain}分）`);
-      return;
-    }
     const price = getPrice(id);
     const total = price * h.amount;
     const profit = (price - h.avgBuyPrice) * h.amount;
@@ -3019,7 +3094,6 @@ function StockMarketPanel() {
       delete newHoldings[id];
       const newProfit = (latest.totalStockProfit ?? 0) + profit;
       useGameStore.setState({ player: { ...latest, stockHoldings: newHoldings, totalStockProfit: newProfit } });
-      // ランキング更新
       const totalAssets = STOCK_ID_LIST.reduce((sum, sid) => {
         const sh = newHoldings[sid] as StockHolding | undefined;
         return sum + (sh ? getPrice(sid) * sh.amount : 0);
@@ -3032,6 +3106,52 @@ function StockMarketPanel() {
   const selectedHistory = history[selectedStock] ?? [];
   const selectedPrice = getPrice(selectedStock);
   const selectedMaster = STOCK_MASTERS[selectedStock];
+
+  // チャート描画用
+  const renderChart = (id: StockId, compact = false) => {
+    const hist = history[id] ?? [];
+    const currentPrice = getPrice(id);
+    const h = compact ? 50 : 110;
+    const basePrice = STOCK_MASTERS[id].basePrice;
+    if (hist.length < 2) {
+      // データなしでも現在値を点として表示
+      return (
+        <svg viewBox={`0 0 100 ${h}`} preserveAspectRatio="none" style={{width:'100%',height:'100%'}}>
+          <line x1="50" y1={h*0.2} x2="50" y2={h*0.8} stroke="#5b8dee" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          <circle cx="50" cy={h*0.5} r="2" fill="#5b8dee" vectorEffect="non-scaling-stroke" />
+        </svg>
+      );
+    }
+    const pts = hist.slice(-60);
+    const allPrices = pts.map(p => p.price);
+    allPrices.push(currentPrice);
+    const maxP = Math.max(...allPrices);
+    const minP = Math.min(...allPrices);
+    const range = maxP - minP || maxP * 0.01;
+    const pad = compact ? 4 : 8;
+    const chartH = h - pad * 2;
+    const w = 100 / Math.max(pts.length, 1);
+    const toY = (price: number) => (pad + ((maxP - price) / range) * chartH).toFixed(1);
+    const points = pts.map((p, i) => `${(i * w).toFixed(1)},${toY(p.price)}`).join(' ');
+    const isUp = pts.length > 1 ? pts[pts.length-1].price >= pts[0].price : true;
+    const lineColor = isUp ? '#4caf87' : '#e05555';
+    const fillColor = isUp ? 'rgba(76,175,135,0.12)' : 'rgba(224,85,85,0.12)';
+    const lastX = ((pts.length - 1) * w).toFixed(1);
+    const lastY = toY(pts[pts.length-1].price);
+    const baseY = toY(basePrice < minP ? minP : basePrice > maxP ? maxP : basePrice);
+    // fill area under line
+    const fillPts = `0,${h} ` + points + ` ${lastX},${h}`;
+    return (
+      <svg viewBox={`0 0 100 ${h}`} preserveAspectRatio="none" style={{width:'100%',height:'100%'}}>
+        <polygon points={fillPts} fill={fillColor} />
+        <polyline points={points} fill="none" stroke={lineColor} strokeWidth={compact ? '1.2' : '1.5'} vectorEffect="non-scaling-stroke" />
+        {!compact && (
+          <line x1="0" y1={baseY} x2="100" y2={baseY} stroke="#f0c060" strokeWidth="0.5" strokeDasharray="2,2" vectorEffect="non-scaling-stroke" />
+        )}
+        <circle cx={lastX} cy={lastY} r={compact ? '1.5' : '2'} fill={lineColor} vectorEffect="non-scaling-stroke" />
+      </svg>
+    );
+  };
 
   return (
     <div>
@@ -3049,11 +3169,10 @@ function StockMarketPanel() {
 
       {stockView === 'market' && (
         <>
-          {/* ニュース */}
           {news.length > 0 && (
-            <div style={{background:'rgba(240,192,96,0.08)', border:'1px solid rgba(240,192,96,0.25)', borderRadius:8, padding:'8px 12px', marginBottom:10, maxHeight:80, overflowY:'auto'}}>
-              <div style={{fontSize:'0.68rem', color:'#f0c060', fontWeight:700, marginBottom:4}}>📰 マーケットニュース</div>
-              {news.slice(0,5).map((n,i) => <div key={i} style={{fontSize:'0.72rem', color:'#8a92b2', padding:'1px 0'}}>{n}</div>)}
+            <div style={{background:'rgba(240,192,96,0.08)', border:'1px solid rgba(240,192,96,0.25)', borderRadius:8, padding:'8px 12px', marginBottom:10, maxHeight:72, overflowY:'auto'}}>
+              <div style={{fontSize:'0.68rem', color:'#f0c060', fontWeight:700, marginBottom:3}}>📰 マーケットニュース</div>
+              {news.slice(0,4).map((n,i) => <div key={i} style={{fontSize:'0.7rem', color:'#8a92b2', padding:'1px 0'}}>{n}</div>)}
             </div>
           )}
 
@@ -3068,16 +3187,20 @@ function StockMarketPanel() {
               const isSelected = selectedStock === id;
               return (
                 <div key={id} onClick={() => setSelectedStock(id)}
-                  style={{display:'flex', alignItems:'center', gap:8, padding:'8px 10px', marginBottom:4, borderRadius:6, cursor:'pointer',
+                  style={{display:'flex', alignItems:'center', gap:8, padding:'7px 10px', marginBottom:3, borderRadius:6, cursor:'pointer',
                     background: isSelected ? 'rgba(91,141,238,0.15)' : '#1c2235',
                     border:`1px solid ${isSelected ? '#5b8dee' : '#2d3752'}`}}>
-                  <span style={{fontSize:'1.2rem'}}>{m.icon}</span>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:'0.82rem', fontWeight:600}}>{m.name}</div>
+                  <span style={{fontSize:'1.1rem'}}>{m.icon}</span>
+                  <div style={{flex:1, minWidth:0}}>
+                    <div style={{fontSize:'0.78rem', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{m.name}</div>
                   </div>
-                  <div style={{textAlign:'right'}}>
-                    <div style={{fontSize:'0.88rem', fontWeight:700, color:'#e8e6ff'}}>{p.toLocaleString()}WC</div>
-                    <div style={{fontSize:'0.7rem', color: change >= 0 ? '#4caf87' : '#e05555'}}>
+                  {/* ミニチャート */}
+                  <div style={{width:60, height:28, flexShrink:0}}>
+                    {renderChart(id, true)}
+                  </div>
+                  <div style={{textAlign:'right', minWidth:72}}>
+                    <div style={{fontSize:'0.85rem', fontWeight:700, color:'#e8e6ff'}}>{p.toLocaleString()}<span style={{fontSize:'0.65rem',color:'#4a5070'}}>WC</span></div>
+                    <div style={{fontSize:'0.68rem', color: change >= 0 ? '#4caf87' : '#e05555'}}>
                       {change >= 0 ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
                     </div>
                   </div>
@@ -3088,31 +3211,27 @@ function StockMarketPanel() {
 
           {/* チャートと購入 */}
           <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'12px 14px'}}>
-            <div style={{fontWeight:700, fontSize:'0.9rem', marginBottom:8}}>{selectedMaster.icon} {selectedMaster.name}</div>
-            {/* 簡易チャート */}
-            <div style={{height:80, position:'relative', marginBottom:12, background:'#161b26', borderRadius:6, overflow:'hidden'}}>
-              {selectedHistory.length === 0 ? (
-                <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'#4a5070', fontSize:'0.75rem'}}>
-                  ━━━━━ 価格履歴なし（誰かがログインすると動き始めます）
-                </div>
-              ) : (() => {
-                const pts = selectedHistory.slice(-48);
-                const maxP = Math.max(...pts.map(p => p.price));
-                const minP = Math.min(...pts.map(p => p.price));
-                const range = maxP - minP || 1;
-                const w = 100 / Math.max(pts.length - 1, 1);
-                const points = pts.map((p, i) => `${i * w},${((maxP - p.price) / range * 70 + 5).toFixed(1)}`).join(' ');
-                return (
-                  <svg viewBox={`0 0 100 80`} preserveAspectRatio="none" style={{width:'100%', height:'100%'}}>
-                    <polyline points={points} fill="none" stroke="#5b8dee" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-                    <line x1="0" y1={((maxP - selectedPrice) / range * 70 + 5).toFixed(1)} x2="100" y2={((maxP - selectedPrice) / range * 70 + 5).toFixed(1)} stroke="#f0c060" strokeWidth="0.5" strokeDasharray="2,2" vectorEffect="non-scaling-stroke" />
-                  </svg>
-                );
-              })()}
+            <div style={{fontWeight:700, fontSize:'0.9rem', marginBottom:6}}>{selectedMaster.icon} {selectedMaster.name}</div>
+            {/* メインチャート */}
+            <div style={{height:110, position:'relative', marginBottom:8, background:'#161b26', borderRadius:6, overflow:'hidden'}}>
+              {renderChart(selectedStock, false)}
             </div>
-            <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.78rem', color:'#8a92b2', marginBottom:10}}>
-              <span>現在値: <strong style={{color:'#e8e6ff'}}>{selectedPrice.toLocaleString()}WC</strong></span>
-              <span>保有: {holdings[selectedStock]?.amount ?? 0}株</span>
+            {/* 価格レンジ表示 */}
+            {selectedHistory.length > 1 && (() => {
+              const pts = selectedHistory.slice(-60);
+              const maxP = Math.max(...pts.map(p => p.price));
+              const minP = Math.min(...pts.map(p => p.price));
+              return (
+                <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.65rem', color:'#4a5070', marginBottom:6}}>
+                  <span>最安: {minP.toLocaleString()}WC</span>
+                  <span style={{color:'#f0c060', fontSize:'0.7rem'}}>現在: <strong style={{color:'#e8e6ff'}}>{selectedPrice.toLocaleString()}WC</strong></span>
+                  <span>最高: {maxP.toLocaleString()}WC</span>
+                </div>
+              );
+            })()}
+            <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.75rem', color:'#8a92b2', marginBottom:10}}>
+              <span>基準値: {selectedMaster.basePrice.toLocaleString()}WC</span>
+              <span>保有: <strong style={{color:'#e8e6ff'}}>{holdings[selectedStock]?.amount ?? 0}株</strong></span>
             </div>
             {/* 購入UI */}
             <div style={{display:'flex', gap:6, alignItems:'center'}}>
@@ -3126,7 +3245,6 @@ function StockMarketPanel() {
                 📈 購入
               </button>
             </div>
-            <div style={{fontSize:'0.68rem', color:'#4a5070', marginTop:4}}>※購入後24時間は売却禁止</div>
           </div>
         </>
       )}
@@ -3143,15 +3261,16 @@ function StockMarketPanel() {
             const currentPrice = getPrice(id);
             const totalVal = currentPrice * h.amount;
             const profit = (currentPrice - h.avgBuyPrice) * h.amount;
-            const now = Date.now();
-            const canSell = now - h.purchasedAt >= 24 * 60 * 60 * 1000;
-            const remainMin = canSell ? 0 : Math.ceil((h.purchasedAt + 24 * 60 * 60 * 1000 - now) / 60000);
             return (
               <div key={id} style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'12px 14px', marginBottom:8}}>
                 <div style={{display:'flex', alignItems:'center', gap:6, marginBottom:6}}>
                   <span>{m.icon}</span>
                   <span style={{fontWeight:700, fontSize:'0.88rem'}}>{m.name}</span>
                   <span style={{marginLeft:'auto', fontSize:'0.78rem', color:'#8a92b2'}}>{h.amount}株</span>
+                </div>
+                {/* ミニチャート */}
+                <div style={{height:44, marginBottom:6, background:'#161b26', borderRadius:4, overflow:'hidden'}}>
+                  {renderChart(id, false)}
                 </div>
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.78rem', marginBottom:4}}>
                   <span style={{color:'#8a92b2'}}>取得均価: {h.avgBuyPrice.toLocaleString()}WC</span>
@@ -3161,10 +3280,10 @@ function StockMarketPanel() {
                   <span style={{fontSize:'0.82rem', fontWeight:700, color: profit >= 0 ? '#4caf87' : '#e05555'}}>
                     {profit >= 0 ? '+' : ''}{profit.toLocaleString()}WC
                   </span>
-                  <button onClick={() => handleSell(id)} disabled={!canSell}
-                    style={{padding:'5px 12px', background: canSell ? 'linear-gradient(135deg,#e05555,#c03030)' : '#2d3752',
-                      color: canSell ? '#fff' : '#4a5070', border:'none', borderRadius:5, cursor: canSell ? 'pointer' : 'not-allowed', fontSize:'0.78rem', fontWeight:700}}>
-                    {canSell ? '📉 全売却' : `🔒 ${remainMin}分後`}
+                  <button onClick={() => handleSell(id)}
+                    style={{padding:'5px 12px', background:'linear-gradient(135deg,#e05555,#c03030)',
+                      color:'#fff', border:'none', borderRadius:5, cursor:'pointer', fontSize:'0.78rem', fontWeight:700}}>
+                    📉 全売却
                   </button>
                 </div>
               </div>
@@ -3364,6 +3483,10 @@ export function GambleScreen() {
   const [gambleMultipliers, setGambleMultipliers] = useState<Record<string, number>>({});
   const [pokerBetLocked, setPokerBetLocked] = useState(false);
   const [coinFlipBetLocked, setCoinFlipBetLocked] = useState(false);
+  const [chohanBetLocked, setChohanBetLocked] = useState(false);
+  const [chinchiroBetLocked, setChinchiroBetLocked] = useState(false);
+  const [highlowBetLocked, setHighlowBetLocked] = useState(false);
+  const isGambling = pokerBetLocked || coinFlipBetLocked || chohanBetLocked || chinchiroBetLocked || highlowBetLocked;
   const [ticketActive, setTicketActive] = useState(false);
   const [_treasureProbs, setTreasureProbs] = useState<TreasureProbEntry[] | null>(null);
   const [activeEvent, setActiveEvent] = useState<ReturnType<typeof getActiveEvent>>(null);
@@ -3631,8 +3754,8 @@ export function GambleScreen() {
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto', paddingBottom: 2 }}>
         {GAME_TABS.map(t => (
-          <button key={t.id} onClick={() => setActiveGame(t.id)}
-            style={{ flexShrink: 0, padding: '6px 10px', fontSize: '0.75rem', background: activeGame===t.id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${activeGame===t.id ? '#5b8dee' : '#2d3752'}`, color: activeGame===t.id ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer' }}>
+          <button key={t.id} onClick={() => !isGambling && setActiveGame(t.id)}
+            style={{ flexShrink: 0, padding: '6px 10px', fontSize: '0.75rem', background: activeGame===t.id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${activeGame===t.id ? '#5b8dee' : '#2d3752'}`, color: activeGame===t.id ? '#e8e6ff' : isGambling ? '#4a5070' : '#8a92b2', borderRadius: 6, cursor: isGambling ? 'not-allowed' : 'pointer', opacity: isGambling && activeGame!==t.id ? 0.5 : 1 }}>
             <GameIcon id={t.icon} size={15} style={{marginRight:3}} /> {t.label}
           </button>
         ))}
@@ -3645,16 +3768,16 @@ export function GambleScreen() {
             <div style={{ fontSize: '0.78rem', color: '#8a92b2', marginTop: 2 }}>{game.description}</div>
           </div>
         )}
-        {activeGame !== 'pvp' && activeGame !== 'treasure_box' && activeGame !== 'highlow' && activeGame !== 'slot' && <BetInput game={game} bet={bet} setBet={setBet} disabled={(activeGame === 'poker' && pokerBetLocked) || (activeGame === 'coin_flip' && coinFlipBetLocked)} />}
-        {activeGame === 'highlow' && <BetInput game={{ minBet: 100, maxBet: 1000000 } as GambleMaster} bet={bet} setBet={setBet} />}
+        {activeGame !== 'pvp' && activeGame !== 'treasure_box' && activeGame !== 'highlow' && activeGame !== 'slot' && <BetInput game={game} bet={bet} setBet={setBet} disabled={(activeGame === 'poker' && pokerBetLocked) || (activeGame === 'coin_flip' && coinFlipBetLocked) || (activeGame === 'chohan' && chohanBetLocked) || (activeGame === 'chinchiro' && chinchiroBetLocked)} />}
+        {activeGame === 'highlow' && <BetInput game={{ minBet: 100, maxBet: 1000000 } as GambleMaster} bet={bet} setBet={setBet} disabled={highlowBetLocked} />}
 
-        {activeGame === 'chohan'       && <ChohanPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chohan'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'chohan' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'chohan' ? activeEvent.bonusValue : 1)} />}
-        {activeGame === 'chinchiro'    && <ChinchiroPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chinchiro'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'chinchiro' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'chinchiro' ? activeEvent.bonusValue : 1)} />}
+        {activeGame === 'chohan'       && <ChohanPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chohan'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'chohan' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'chohan' ? activeEvent.bonusValue : 1)} onLockChange={setChohanBetLocked} />}
+        {activeGame === 'chinchiro'    && <ChinchiroPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chinchiro'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'chinchiro' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'chinchiro' ? activeEvent.bonusValue : 1)} onLockChange={setChinchiroBetLocked} />}
         {activeGame === 'coin_flip'    && <CoinFlipPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['coin_flip'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'coin_flip' ? dailyCasino.bonus : 1)} onLockChange={setCoinFlipBetLocked} />}
         {activeGame === 'slot'         && <SlotPanel onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['slot_machine'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'slot' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'slot' ? activeEvent.bonusValue : 1)} />}
         {activeGame === 'treasure_box' && <TreasureBoxPanel onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['treasure_box'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
         {activeGame === 'poker'        && <PokerPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['poker'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'poker' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'poker' ? activeEvent.bonusValue : 1)} onBetLock={setPokerBetLocked} />}
-        {activeGame === 'highlow'      && <HighLowPanel  bet={bet} onResult={handleResult} onMissionUpdate={handleHighlowMissionUpdate} />}
+        {activeGame === 'highlow'      && <HighLowPanel  bet={bet} onResult={handleResult} onMissionUpdate={handleHighlowMissionUpdate} onLockChange={setHighlowBetLocked} />}
         {activeGame === 'pvp'          && (
           <>
             <div style={{ fontWeight:700, fontSize:'1rem', marginBottom:8 }}>⚔️ PvP対戦</div>

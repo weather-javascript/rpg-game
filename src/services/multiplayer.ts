@@ -1780,7 +1780,6 @@ export function subscribeStockPrices(cb: (prices: Record<StockId, number>, histo
 }
 
 export async function tickStockPrices(): Promise<{ prices: Record<StockId, number>; news: string[] }> {
-  // 誰かがログインした時に価格を更新（15分インターバル）
   const ref = doc(db, 'stock_market', 'prices');
   const NEWS_TEMPLATES = [
     { text: '{name}が新技術を発表！', type: 'good' as const },
@@ -1795,15 +1794,7 @@ export async function tickStockPrices(): Promise<{ prices: Record<StockId, numbe
   try {
     const snap = await getDoc(ref);
     const now = Date.now();
-    const INTERVAL = 3 * 60 * 1000;
     const data = snap.exists() ? snap.data() : {};
-    const lastTick: number = data['lastTickAt'] ?? 0;
-    if (now - lastTick < INTERVAL) {
-      // まだ更新時刻でない
-      const prices: Record<string, number> = {};
-      for (const id of STOCK_IDS) prices[id] = data[id] ?? STOCK_MASTERS[id].basePrice;
-      return { prices: prices as Record<StockId, number>, news: [] };
-    }
     const newData: Record<string, unknown> = { lastTickAt: now };
     const prices: Record<string, number> = {};
     const newsItems: string[] = [];

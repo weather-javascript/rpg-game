@@ -198,7 +198,13 @@ function evaluatePokerHand(hand: Card[], bet: number): GambleResult {
   else if (counts[0]===3)                    { handName='スリーカード';                 multiplier=2;   }
   else if (counts[0]===2 && counts[1]===2)   { handName='ツーペア';                    multiplier=1.5; }
   else if (counts[0]===2) {
-    handName='ワンペア'; multiplier=1.2;
+    // ワンペアはJJ以上のみ有効（11=J, 12=Q, 13=K, 14=A）
+    const pairRank = Number(Object.entries(rankCounts).find(([, c]) => c === 2)?.[0] ?? 0);
+    if (pairRank >= 11) {
+      handName='ワンペア'; multiplier=1.2;
+    } else {
+      handName='ブタ（役なし）'; multiplier=0;
+    }
   }
   else { handName='ブタ（役なし）'; multiplier=0; }
 
