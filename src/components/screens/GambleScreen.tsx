@@ -2349,7 +2349,7 @@ export function getGambleRank(totalWagered: number) {
 // ============================================================
 // HighLow Panel
 // ============================================================
-const HIGHLOW_MULTIPLIERS = [1.3, 1.8, 2.5, 3.5, 5.0];
+const HIGHLOW_MULTIPLIERS = [1.3, 1.8, 2.5, 3.5, 5.0, 7.5, 11.0, 16.0, 24.0, 35.0];
 function HighLowPanel({ bet, onResult, onMissionUpdate, onLockChange }: {
   bet: number;
   onResult: (r: GambleResult) => void;
@@ -2427,7 +2427,7 @@ function HighLowPanel({ bet, onResult, onMissionUpdate, onLockChange }: {
 
   const cashOut = () => {
     if (!gameActive || streak === 0) return;
-    const mult = (HIGHLOW_MULTIPLIERS[streak - 1] ?? 1) * rankInfo.multiplier;
+    const mult = (HIGHLOW_MULTIPLIERS[Math.min(streak, HIGHLOW_MULTIPLIERS.length) - 1] ?? HIGHLOW_MULTIPLIERS[HIGHLOW_MULTIPLIERS.length - 1]) * rankInfo.multiplier;
     const winAmount = Math.floor(bet * mult);
     changeWealthCoin(winAmount);
     const goldDelta = winAmount - bet;
@@ -2463,7 +2463,7 @@ function HighLowPanel({ bet, onResult, onMissionUpdate, onLockChange }: {
           <div style={{ fontSize: '3.5rem', fontWeight: 700, color: '#f0c060', letterSpacing: 4 }}>
             {animating ? '🃏' : cardLabel(currentCard)}
           </div>
-          {streak > 0 && <div style={{ fontSize: '0.85rem', color: '#4caf87', marginTop: 4 }}>{streak}連勝中！ 確定倍率: ×{(HIGHLOW_MULTIPLIERS[streak-1] * rankInfo.multiplier).toFixed(2)}</div>}
+          {streak > 0 && <div style={{ fontSize: '0.85rem', color: '#4caf87', marginTop: 4 }}>{streak}連勝中！ 確定倍率: ×{((HIGHLOW_MULTIPLIERS[Math.min(streak, HIGHLOW_MULTIPLIERS.length) - 1] ?? HIGHLOW_MULTIPLIERS[HIGHLOW_MULTIPLIERS.length - 1]) * rankInfo.multiplier).toFixed(2)}</div>}
         </div>
       )}
 
@@ -2802,6 +2802,27 @@ function MissionPanel() {
   };
 
   const completedCount = missionsForTab.filter(m => isRewarded(m)).length;
+  const claimableCount = missionsForTab.filter(m => isMissionCompleted(m) && !isRewarded(m)).length;
+
+  const claimAll = () => {
+    const claimable = missionsForTab.filter(m => isMissionCompleted(m) && !isRewarded(m));
+    if (claimable.length === 0) return;
+    let totalWC = 0;
+    const latestAfter = useGameStore.getState().player ?? player!;
+    const latestMp = ensureMissionProgress(latestAfter.missionProgress);
+    const newClaimed = [...latestMp.claimedMissions];
+    const newCompleted = [...latestMp.completedMissions];
+    for (const m of claimable) {
+      const reward = Math.floor(m.rewardWC * rewardBonus);
+      totalWC += reward;
+      newClaimed.push(m.id);
+      if (m.type === 'achievement' && !newCompleted.includes(m.id)) newCompleted.push(m.id);
+    }
+    changeWealthCoin(totalWC);
+    const latest2 = useGameStore.getState().player ?? player!;
+    setPlayer({ ...latest2, missionProgress: { ...ensureMissionProgress(latest2.missionProgress), claimedMissions: newClaimed, completedMissions: newCompleted } });
+    addNotification('success', `🎁 ${claimable.length}件一括受取！ +${totalWC.toLocaleString()}WC`);
+  };
 
   return (
     <div style={{ padding: '0 4px' }}>
@@ -2825,9 +2846,17 @@ function MissionPanel() {
         ))}
       </div>
 
-      <div style={{ fontSize: '0.72rem', color: '#4a5070', marginBottom: 8 }}>
-        {completedCount}/{missionsForTab.length} クリア済み
-        {missionTab === 'daily' && now - mp.dailyResetAt > DAY_MS && <span style={{ color: '#e05555', marginLeft: 8 }}>（明日リセット）</span>}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ fontSize: '0.72rem', color: '#4a5070' }}>
+          {completedCount}/{missionsForTab.length} クリア済み
+          {missionTab === 'daily' && now - mp.dailyResetAt > DAY_MS && <span style={{ color: '#e05555', marginLeft: 8 }}>（明日リセット）</span>}
+        </div>
+        {claimableCount > 0 && (
+          <button onClick={claimAll}
+            style={{ padding: '5px 12px', background: 'linear-gradient(135deg,#f0c060,#c08020)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}>
+            🎁 一括受取（{claimableCount}件）
+          </button>
+        )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -2982,13 +3011,18 @@ function StockMarketPanel() {
   // アクセス時にtickをFirestoreへ書き込む（誰かが開いていれば動く）
   useEffect(() => {
     const doTick = () => {
+      // 取引時間チェック: 9:30〜16:30
+      const now = new Date();
+      const h = now.getHours(), m = now.getMinutes();
+      const inMarket = (h > 9 || (h === 9 && m >= 30)) && (h < 16 || (h === 16 && m < 30));
+      if (!inMarket) return;
       tickStockPrices().then(({ news: newN }) => {
         if (newN.length > 0) setNews(prev => [...newN, ...prev].slice(0, 20));
       }).catch(() => {});
     };
     // 初回は3秒後に実行
     const initTimer = setTimeout(doTick, 3000);
-    const interval = setInterval(doTick, 30_000);
+    const interval = setInterval(doTick, 120_000);
     return () => { clearTimeout(initTimer); clearInterval(interval); };
   }, []);
 
@@ -3020,6 +3054,12 @@ function StockMarketPanel() {
     if (!player) return;
     const h = holdings[id];
     if (!h || h.amount <= 0) return;
+    // 購入から24時間は売却禁止
+    if (h.purchasedAt && Date.now() - h.purchasedAt < 86_400_000) {
+      const remaining = Math.ceil((h.purchasedAt + 86_400_000 - Date.now()) / 3_600_000);
+      addNotification('error', `購入から24時間は売却できません（あと約${remaining}時間）`);
+      return;
+    }
     const price = getPrice(id);
     const total = price * h.amount;
     const profit = (price - h.avgBuyPrice) * h.amount;

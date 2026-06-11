@@ -748,21 +748,36 @@ export interface ActivityFeedEntry {
 const FEED_REF = () => doc(db, 'shared', 'activity_feed');
 
 // ============================================================
-// ActivityFeed — transactionで競合安全に書き込み、最新100件保持
+// ActivityFeed — 30秒バッファでまとめてFlush
 // ============================================================
 const FEED_MAX = 100;
 
-/** アクティビティをフィードに追記（transactionで競合安全） */
-export async function postActivityFeed(entry: Omit<ActivityFeedEntry, 'timestamp'>): Promise<void> {
-  const newEntry: ActivityFeedEntry = { ...entry, timestamp: Date.now() };
+let _activityFeedBuffer: ActivityFeedEntry[] = [];
+let _activityFeedFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function _flushActivityFeed(): Promise<void> {
+  if (_activityFeedBuffer.length === 0) return;
+  const toWrite = [..._activityFeedBuffer];
+  _activityFeedBuffer = [];
   try {
     await runTransaction(db, async (tx) => {
       const snap = await tx.get(FEED_REF());
       const prev: ActivityFeedEntry[] = snap.exists() ? ((snap.data()['entries'] ?? []) as ActivityFeedEntry[]) : [];
-      const next = [newEntry, ...prev].slice(0, FEED_MAX);
+      const next = [...toWrite, ...prev].slice(0, FEED_MAX);
       tx.set(FEED_REF(), { entries: next, updatedAt: Date.now() });
     });
   } catch { /* ignore */ }
+}
+
+/** アクティビティを30秒バッファ経由でフィードに追記 */
+export async function postActivityFeed(entry: Omit<ActivityFeedEntry, 'timestamp'>): Promise<void> {
+  _activityFeedBuffer.unshift({ ...entry, timestamp: Date.now() });
+  if (!_activityFeedFlushTimer) {
+    _activityFeedFlushTimer = setTimeout(() => {
+      _activityFeedFlushTimer = null;
+      _flushActivityFeed();
+    }, 30_000);
+  }
 }
 
 /** アクティビティフィードをリアルタイム購読（onSnapshot） */
@@ -1516,12 +1531,13 @@ export const ACTIVITY_LABELS: Record<PlayerActivityCode, string> = {
 /** 画面遷移時のみ呼ぶ（Firebase節約: 状態変更時のみ） */
 export async function setPlayerActivity(uid: string, activity: PlayerActivityCode): Promise<void> {
   try {
-    await updateDoc(doc(db, COLLECTIONS.ONLINE, uid), {
+    await setDoc(doc(db, COLLECTIONS.ONLINE, uid), {
       currentActivityCode: activity,
       currentActivity: ACTIVITY_LABELS[activity],
+      lastSeen: Date.now(),
       updatedAt: Date.now(),
-    });
-  } catch { /* ignore — online doc may not exist yet */ }
+    }, { merge: true });
+  } catch { /* ignore */ }
 }
 
 // ============================================================
@@ -1539,15 +1555,31 @@ export interface GambleFeedEntry {
 
 const GAMBLE_FEED_REF = () => doc(db, 'gamble_feed', 'entries');
 
-/** ギャンブル結果をフィードに即時追記 */
-export async function postGambleFeed(entry: Omit<GambleFeedEntry, 'timestamp'>): Promise<void> {
-  const toWrite = { ...entry, timestamp: Date.now() };
+// 30秒バッファ: ローカルに貯めてまとめてFlush
+let _gambleFeedBuffer: GambleFeedEntry[] = [];
+let _gambleFeedFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function _flushGambleFeed(): Promise<void> {
+  if (_gambleFeedBuffer.length === 0) return;
+  const toWrite = [..._gambleFeedBuffer];
+  _gambleFeedBuffer = [];
   try {
     const snap = await getDoc(GAMBLE_FEED_REF());
     const prev: GambleFeedEntry[] = snap.exists() ? ((snap.data()['entries'] ?? []) as GambleFeedEntry[]) : [];
-    const next = [toWrite, ...prev].slice(0, 100);
+    const next = [...toWrite, ...prev].slice(0, 100);
     await setDoc(GAMBLE_FEED_REF(), { entries: next, updatedAt: Date.now() });
   } catch { /* ignore */ }
+}
+
+/** ギャンブル結果を30秒バッファ経由でフィードに追記 */
+export async function postGambleFeed(entry: Omit<GambleFeedEntry, 'timestamp'>): Promise<void> {
+  _gambleFeedBuffer.unshift({ ...entry, timestamp: Date.now() });
+  if (!_gambleFeedFlushTimer) {
+    _gambleFeedFlushTimer = setTimeout(() => {
+      _gambleFeedFlushTimer = null;
+      _flushGambleFeed();
+    }, 30_000);
+  }
 }
 
 /** ギャンブル速報をポーリング購読（20秒間隔） */
@@ -1766,7 +1798,20 @@ export const STOCK_MASTERS: Record<StockId, { id: StockId; name: string; icon: s
 const STOCK_IDS: StockId[] = ['wealth_mining','wealth_fishery','wealth_casino','wealth_tech','wealth_energy','wealth_logistics','wealth_foods','wealth_finance'];
 
 export function subscribeStockPrices(cb: (prices: Record<StockId, number>, history: Record<StockId, StockPricePoint[]>) => void): () => void {
-  return onSnapshot(doc(db, 'stock_market', 'prices'), snap => {
+  // stock_market/prices が存在しなければ初期データで作成
+  const ref = doc(db, 'stock_market', 'prices');
+  getDoc(ref).then(snap => {
+    if (!snap.exists()) {
+      const initData: Record<string, unknown> = { lastTickAt: 0 };
+      for (const id of STOCK_IDS) {
+        initData[id] = STOCK_MASTERS[id].basePrice;
+        initData[`history_${id}`] = [{ timestamp: Date.now(), price: STOCK_MASTERS[id].basePrice }];
+      }
+      setDoc(ref, initData).catch(() => {});
+    }
+  }).catch(() => {});
+
+  return onSnapshot(ref, snap => {
     if (!snap.exists()) { cb({} as Record<StockId, number>, {} as Record<StockId, StockPricePoint[]>); return; }
     const data = snap.data();
     const prices: Record<string, number> = {};
@@ -1795,6 +1840,16 @@ export async function tickStockPrices(): Promise<{ prices: Record<StockId, numbe
     const snap = await getDoc(ref);
     const now = Date.now();
     const data = snap.exists() ? snap.data() : {};
+
+    // 2分throttle: 最後のtickから120秒未満なら何もしない
+    const lastTick = (data['lastTickAt'] as number) ?? 0;
+    if (now - lastTick < 110_000) {
+      // 現在の価格だけ返す
+      const prices: Record<string, number> = {};
+      for (const id of STOCK_IDS) prices[id] = (data[id] as number) ?? STOCK_MASTERS[id].basePrice;
+      return { prices: prices as Record<StockId, number>, news: [] };
+    }
+
     const newData: Record<string, unknown> = { lastTickAt: now };
     const prices: Record<string, number> = {};
     const newsItems: string[] = [];
@@ -1804,25 +1859,24 @@ export async function tickStockPrices(): Promise<{ prices: Record<StockId, numbe
       let changePct = 0;
       let newsText: string | undefined;
       if (roll < 0.005) {
-        changePct = 0.5; // ストップ高
+        changePct = 0.5;
         newsText = `🚀 【ストップ高】${STOCK_MASTERS[id].name} +50%！`;
       } else if (roll < 0.01) {
-        changePct = -0.5; // ストップ安
+        changePct = -0.5;
         newsText = `📉 【ストップ安】${STOCK_MASTERS[id].name} -50%！`;
       } else if (roll < 0.06) {
         const pct = 0.1 + Math.random() * 0.1;
-        changePct = Math.random() < 0.5 ? pct : -pct; // ±10~20%
+        changePct = Math.random() < 0.5 ? pct : -pct;
         const tmpl = NEWS_TEMPLATES[Math.floor(Math.random() * NEWS_TEMPLATES.length)];
         newsText = `📰 ${tmpl.text.replace('{name}', STOCK_MASTERS[id].name)}（${changePct > 0 ? '+' : ''}${(changePct * 100).toFixed(0)}%）`;
       } else {
         const pct = 0.01 + Math.random() * 0.04;
-        changePct = Math.random() < 0.5 ? pct : -pct; // ±1~5%
+        changePct = Math.random() < 0.5 ? pct : -pct;
       }
       const newPrice = Math.max(1, Math.round(current * (1 + changePct)));
       prices[id] = newPrice;
       newData[id] = newPrice;
       if (newsText) newsItems.push(newsText);
-      // 履歴更新（最大96件 = 24h分）
       const histKey = `history_${id}`;
       const hist: StockPricePoint[] = (data[histKey] as StockPricePoint[]) ?? [];
       hist.push({ timestamp: now, price: newPrice, news: newsText });
@@ -1831,7 +1885,7 @@ export async function tickStockPrices(): Promise<{ prices: Record<StockId, numbe
     }
     await setDoc(ref, newData, { merge: true });
     return { prices: prices as Record<StockId, number>, news: newsItems };
-  } catch { 
+  } catch {
     const prices: Record<string, number> = {};
     for (const id of STOCK_IDS) prices[id] = STOCK_MASTERS[id].basePrice;
     return { prices: prices as Record<StockId, number>, news: [] };
