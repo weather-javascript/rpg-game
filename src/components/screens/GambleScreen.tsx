@@ -1931,7 +1931,7 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
           const finalDice = Array.isArray((r as any).dice) ? (r as any).dice as number[] : dice;
           const finalEv = evalChinchiro(finalDice);
           setCurrentDice(finalDice);
-          const finalLogs = attempt === 0 ? newLogs : [...newLogs.slice(0,-1), { dice: finalDice, label: finalEv.label, isRole: true }];
+          const finalLogs = attempt === 0 ? newLogs : [...newLogs.slice(0,-1), { dice: finalDice, label: finalEv.label, isRole: finalEv.type !== 'nashi' }];
           setRollLogs(finalLogs);
           setTimeout(async () => {
             const rr = pendingRef.r;
