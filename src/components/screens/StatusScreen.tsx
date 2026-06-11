@@ -618,7 +618,9 @@ export function StatusScreen() {
               { label:'🐟 総釣果数', value: (player.fishingTotalCount ?? 0).toLocaleString() + ' 匹' },
               { label:'📏 最大サイズ', value: (player.fishingMaxSizeCm ?? 0) + ' cm' },
               { label:'⚖️ 最大重量', value: (player.fishingMaxWeightKg ?? 0) + ' kg' },
-              { label:'📖 図鑑完成率', value: Object.keys(player.fishBook ?? {}).length + '/20 (' + Math.floor(Object.keys(player.fishBook ?? {}).length / 20 * 100) + '%)' },
+              { label:'📖 図鑑完成率', value: Object.keys(player.fishBook ?? {}).length + '/35 (' + Math.floor(Object.keys(player.fishBook ?? {}).length / 35 * 100) + '%)' },
+              { label:'🏅 釣り実績', value: (player.fishingAchievements ?? []).length + '/100' },
+              { label:'⭐ 釣り称号', value: (player.fishingUnlockedTitles ?? []).length + '種' },
             ].map(s => (
               <div key={s.label} style={{display:'flex', justifyContent:'space-between', fontSize:'0.78rem', padding:'4px 0', borderBottom:'1px solid #2d3752'}}>
                 <span style={{color:'#8a92b2'}}>{s.label}</span>

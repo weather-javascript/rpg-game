@@ -355,6 +355,15 @@ export interface PlayerData {
   fishingMaxSizeCm?: number;
   fishingMaxWeightKg?: number;
   fishBook?: Record<string, FishBookEntry>; // key: fishId
+  fishingEquippedBaitId?: string;
+  fishingSelectedSpotId?: string;
+  fishingUnlockedSpots?: string[];
+  fishingRodEnhance?: Record<string, number>; // rodId -> enhance level (+0~+20)
+  fishingRodDurability?: Record<string, number>; // rodId -> current durability
+  fishingTotalBaitUsed?: number;
+  fishingTotalGoldEarned?: number;
+  fishingAchievements?: string[]; // achieved FA ids
+  fishingUnlockedTitles?: string[]; // unlocked title ids
   activeJob: string | null;
   activeBuffs: { id: string; name: string; expiry: number; fishingBonus?: number; miningBonus?: number }[];
   reliefUsedCount: number;
