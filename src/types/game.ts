@@ -85,7 +85,8 @@ export interface WeaponUltimate {
   postBuffPoisonDmg?: number;
 }
 export type TabId = 'gathering' | 'market' | 'dungeon' | 'gamble' | 'status' | 'online' | 'fishing' | 'admin' | 'crafting' | 'navi';
-export type GambleType = 'slot' | 'treasure_box' | 'coin_flip' | 'chohan' | 'chinchiro' | 'jackpot' | 'poker' | 'highlow';
+export type GambleType = 'slot' | 'treasure_box' | 'coin_flip' | 'chohan' | 'chinchiro' | 'jackpot' | 'poker' | 'highlow' | 'mines' | 'dice_race' | 'roulette' | 'blackjack' | 'scratch' | 'race';
+export type GambleGameCategory = 'instant' | 'choice' | 'step' | 'reveal' | 'card';
 export type GambleRank = '見習い' | 'ギャンブラー' | '熟練ギャンブラー' | '賭博王' | 'レジェンド';
 
 export interface MissionDef {
@@ -107,12 +108,24 @@ export interface MissionProgress {
   dailyHighlowWins: number;
   dailyPokerWins: number;
   dailyGamblePlays: number;
+  dailyMinesWins: number;
+  dailyDiceRaceWins: number;
+  dailyRouletteWins: number;
+  dailyBlackjackWins: number;
+  dailyScratchWins: number;
+  dailyRaceWins: number;
   weeklySlotPlays: number;
   weeklyChohanWins: number;
   weeklyChinchiroWins: number;
   weeklyPokerWins: number;
   weeklyGamblePlays: number;
   weeklyHighlowMaxStreak: number;
+  weeklyMinesWins: number;
+  weeklyDiceRaceWins: number;
+  weeklyRouletteWins: number;
+  weeklyBlackjackWins: number;
+  weeklyScratchWins: number;
+  weeklyRaceWins: number;
   // all-time stats
   totalSlotPlays: number;
   totalChohanPlays: number;
@@ -127,6 +140,18 @@ export interface MissionProgress {
   totalHighlowWins: number;
   totalHighlowMaxStreak: number;
   totalJackpotWins: number;
+  totalMinesPlays: number;
+  totalMinesWins: number;
+  totalDiceRacePlays: number;
+  totalDiceRaceWins: number;
+  totalRoulettePlays: number;
+  totalRouletteWins: number;
+  totalBlackjackPlays: number;
+  totalBlackjackWins: number;
+  totalScratchPlays: number;
+  totalScratchWins: number;
+  totalRacePlays: number;
+  totalRaceWins: number;
   totalWagered: number;
   totalWinAmount: number;
   totalLoseCount: number;

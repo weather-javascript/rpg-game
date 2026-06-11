@@ -71,6 +71,20 @@ export const MISSION_DEFS: MissionDef[] = [
   { id: 'd_poker_win3',     title: 'ポーカー3勝',         description: '本日ポーカーで3勝する',             type: 'daily',  target: 3,   rewardWC: 10_000,  statKey: 'dailyPokerWins' },
   { id: 'd_poker_win5',     title: 'ポーカー5勝',         description: '本日ポーカーで5勝する',             type: 'daily',  target: 5,   rewardWC: 20_000,  statKey: 'dailyPokerWins' },
 
+  // --- 新規ゲーム デイリー ---
+  { id: 'd_mines_win3',     title: 'マイン3勝',           description: '本日ミニマインで3勝する',           type: 'daily',  target: 3,   rewardWC: 5_000,   statKey: 'dailyMinesWins' },
+  { id: 'd_mines_win10',    title: 'マイン10勝',          description: '本日ミニマインで10勝する',          type: 'daily',  target: 10,  rewardWC: 15_000,  statKey: 'dailyMinesWins' },
+  { id: 'd_dicerace_win3',  title: 'ダイスレース3勝',     description: '本日ダイスレースで3勝する',         type: 'daily',  target: 3,   rewardWC: 5_000,   statKey: 'dailyDiceRaceWins' },
+  { id: 'd_dicerace_win10', title: 'ダイスレース10勝',    description: '本日ダイスレースで10勝する',        type: 'daily',  target: 10,  rewardWC: 15_000,  statKey: 'dailyDiceRaceWins' },
+  { id: 'd_roulette_win3',  title: 'ルーレット3勝',       description: '本日ルーレットで3勝する',           type: 'daily',  target: 3,   rewardWC: 5_000,   statKey: 'dailyRouletteWins' },
+  { id: 'd_roulette_win10', title: 'ルーレット10勝',      description: '本日ルーレットで10勝する',          type: 'daily',  target: 10,  rewardWC: 15_000,  statKey: 'dailyRouletteWins' },
+  { id: 'd_bj_win3',        title: 'BJ3勝',               description: '本日ブラックジャックで3勝する',     type: 'daily',  target: 3,   rewardWC: 5_000,   statKey: 'dailyBlackjackWins' },
+  { id: 'd_bj_win10',       title: 'BJ10勝',              description: '本日ブラックジャックで10勝する',    type: 'daily',  target: 10,  rewardWC: 15_000,  statKey: 'dailyBlackjackWins' },
+  { id: 'd_scratch_win3',   title: 'スクラッチ3勝',       description: '本日スクラッチで3勝する',           type: 'daily',  target: 3,   rewardWC: 5_000,   statKey: 'dailyScratchWins' },
+  { id: 'd_scratch_win10',  title: 'スクラッチ10勝',      description: '本日スクラッチで10勝する',          type: 'daily',  target: 10,  rewardWC: 15_000,  statKey: 'dailyScratchWins' },
+  { id: 'd_race_win3',      title: 'レース3勝',           description: '本日ミニレースで3勝する',           type: 'daily',  target: 3,   rewardWC: 5_000,   statKey: 'dailyRaceWins' },
+  { id: 'd_race_win10',     title: 'レース10勝',          description: '本日ミニレースで10勝する',          type: 'daily',  target: 10,  rewardWC: 15_000,  statKey: 'dailyRaceWins' },
+
   // =========================================================
   // WEEKLY
   // =========================================================
@@ -86,6 +100,14 @@ export const MISSION_DEFS: MissionDef[] = [
   { id: 'w_poker_win30',    title: '週ポーカー30勝',      description: '今週ポーカーで30勝する',             type: 'weekly', target: 30,   rewardWC: 250_000,  statKey: 'weeklyPokerWins' },
   { id: 'w_highlow_streak3',title: '週ハイロー3連勝',     description: '今週ハイローで3連勝する',            type: 'weekly', target: 3,    rewardWC: 30_000,   statKey: 'weeklyHighlowMaxStreak' },
   { id: 'w_highlow_streak5',title: '週ハイロー5連勝',     description: '今週ハイローで5連勝する',            type: 'weekly', target: 5,    rewardWC: 100_000,  statKey: 'weeklyHighlowMaxStreak' },
+
+  // --- 新規ゲーム ウィークリー ---
+  { id: 'w_mines_win20',    title: '週マイン20勝',        description: '今週ミニマインで20勝する',           type: 'weekly', target: 20,   rewardWC: 60_000,   statKey: 'weeklyMinesWins' },
+  { id: 'w_dicerace_win20', title: '週ダイスレース20勝',  description: '今週ダイスレースで20勝する',         type: 'weekly', target: 20,   rewardWC: 60_000,   statKey: 'weeklyDiceRaceWins' },
+  { id: 'w_roulette_win20', title: '週ルーレット20勝',    description: '今週ルーレットで20勝する',           type: 'weekly', target: 20,   rewardWC: 60_000,   statKey: 'weeklyRouletteWins' },
+  { id: 'w_bj_win20',       title: '週BJ20勝',            description: '今週ブラックジャックで20勝する',     type: 'weekly', target: 20,   rewardWC: 60_000,   statKey: 'weeklyBlackjackWins' },
+  { id: 'w_scratch_win20',  title: '週スクラッチ20勝',    description: '今週スクラッチで20勝する',           type: 'weekly', target: 20,   rewardWC: 60_000,   statKey: 'weeklyScratchWins' },
+  { id: 'w_race_win20',     title: '週レース20勝',        description: '今週ミニレースで20勝する',           type: 'weekly', target: 20,   rewardWC: 60_000,   statKey: 'weeklyRaceWins' },
 
   // =========================================================
   // ACHIEVEMENTS: スロット
@@ -322,6 +344,36 @@ export const MISSION_DEFS: MissionDef[] = [
   { id: 'a_chohan_p5000',   title: '丁半5000回',          description: '丁半を5000回プレイ',                 type: 'achievement', target: 5000,  rewardWC: 4_000_000,   statKey: 'totalChohanPlays' },
   { id: 'a_slot_7000',      title: 'スロット7000回',      description: 'スロットを7000回プレイ',             type: 'achievement', target: 7000,  rewardWC: 7_000_000,   statKey: 'totalSlotPlays' },
   { id: 'a_poker_w5000',    title: 'ポーカー5000勝',      description: 'ポーカーで通算5000勝',               type: 'achievement', target: 5000,  rewardWC: 8_000_000,   statKey: 'totalPokerWins' },
+
+  // =========================================================
+  // ACHIEVEMENTS: 新規ゲーム
+  // =========================================================
+  { id: 'a_mines_p10',      title: 'マイン入門',          description: 'ミニマインを10回プレイ',             type: 'achievement', target: 10,    rewardWC: 10_000,      statKey: 'totalMinesPlays' },
+  { id: 'a_mines_p100',     title: 'マイン好き',          description: 'ミニマインを100回プレイ',            type: 'achievement', target: 100,   rewardWC: 100_000,     statKey: 'totalMinesPlays' },
+  { id: 'a_mines_p500',     title: 'マイン常連',          description: 'ミニマインを500回プレイ',            type: 'achievement', target: 500,   rewardWC: 500_000,     statKey: 'totalMinesPlays' },
+  { id: 'a_mines_w10',      title: 'マイン10勝',          description: 'ミニマインで通算10勝',               type: 'achievement', target: 10,    rewardWC: 15_000,      statKey: 'totalMinesWins' },
+  { id: 'a_mines_w100',     title: 'マイン100勝',         description: 'ミニマインで通算100勝',              type: 'achievement', target: 100,   rewardWC: 150_000,     statKey: 'totalMinesWins' },
+  { id: 'a_mines_w500',     title: 'マイン500勝',         description: 'ミニマインで通算500勝',              type: 'achievement', target: 500,   rewardWC: 750_000,     statKey: 'totalMinesWins' },
+  { id: 'a_dicerace_p10',   title: 'ダイスレース入門',    description: 'ダイスレースを10回プレイ',           type: 'achievement', target: 10,    rewardWC: 10_000,      statKey: 'totalDiceRacePlays' },
+  { id: 'a_dicerace_p100',  title: 'ダイスレース好き',    description: 'ダイスレースを100回プレイ',          type: 'achievement', target: 100,   rewardWC: 100_000,     statKey: 'totalDiceRacePlays' },
+  { id: 'a_dicerace_w10',   title: 'ダイスレース10勝',    description: 'ダイスレースで通算10勝',             type: 'achievement', target: 10,    rewardWC: 15_000,      statKey: 'totalDiceRaceWins' },
+  { id: 'a_dicerace_w100',  title: 'ダイスレース100勝',   description: 'ダイスレースで通算100勝',            type: 'achievement', target: 100,   rewardWC: 150_000,     statKey: 'totalDiceRaceWins' },
+  { id: 'a_roulette_p10',   title: 'ルーレット入門',      description: 'ルーレットを10回プレイ',             type: 'achievement', target: 10,    rewardWC: 10_000,      statKey: 'totalRoulettePlays' },
+  { id: 'a_roulette_p100',  title: 'ルーレット好き',      description: 'ルーレットを100回プレイ',            type: 'achievement', target: 100,   rewardWC: 100_000,     statKey: 'totalRoulettePlays' },
+  { id: 'a_roulette_w10',   title: 'ルーレット10勝',      description: 'ルーレットで通算10勝',               type: 'achievement', target: 10,    rewardWC: 15_000,      statKey: 'totalRouletteWins' },
+  { id: 'a_roulette_w100',  title: 'ルーレット100勝',     description: 'ルーレットで通算100勝',              type: 'achievement', target: 100,   rewardWC: 150_000,     statKey: 'totalRouletteWins' },
+  { id: 'a_bj_p10',         title: 'BJ入門',              description: 'ブラックジャックを10回プレイ',       type: 'achievement', target: 10,    rewardWC: 10_000,      statKey: 'totalBlackjackPlays' },
+  { id: 'a_bj_p100',        title: 'BJ好き',              description: 'ブラックジャックを100回プレイ',      type: 'achievement', target: 100,   rewardWC: 100_000,     statKey: 'totalBlackjackPlays' },
+  { id: 'a_bj_w10',         title: 'BJ10勝',              description: 'ブラックジャックで通算10勝',         type: 'achievement', target: 10,    rewardWC: 15_000,      statKey: 'totalBlackjackWins' },
+  { id: 'a_bj_w100',        title: 'BJ100勝',             description: 'ブラックジャックで通算100勝',        type: 'achievement', target: 100,   rewardWC: 150_000,     statKey: 'totalBlackjackWins' },
+  { id: 'a_scratch_p10',    title: 'スクラッチ入門',      description: 'スクラッチを10回プレイ',             type: 'achievement', target: 10,    rewardWC: 10_000,      statKey: 'totalScratchPlays' },
+  { id: 'a_scratch_p100',   title: 'スクラッチ好き',      description: 'スクラッチを100回プレイ',            type: 'achievement', target: 100,   rewardWC: 100_000,     statKey: 'totalScratchPlays' },
+  { id: 'a_scratch_w10',    title: 'スクラッチ10勝',      description: 'スクラッチで通算10勝',               type: 'achievement', target: 10,    rewardWC: 15_000,      statKey: 'totalScratchWins' },
+  { id: 'a_scratch_w100',   title: 'スクラッチ100勝',     description: 'スクラッチで通算100勝',              type: 'achievement', target: 100,   rewardWC: 150_000,     statKey: 'totalScratchWins' },
+  { id: 'a_race_p10',       title: 'レース入門',          description: 'ミニレースを10回プレイ',             type: 'achievement', target: 10,    rewardWC: 10_000,      statKey: 'totalRacePlays' },
+  { id: 'a_race_p100',      title: 'レース好き',          description: 'ミニレースを100回プレイ',            type: 'achievement', target: 100,   rewardWC: 100_000,     statKey: 'totalRacePlays' },
+  { id: 'a_race_w10',       title: 'レース10勝',          description: 'ミニレースで通算10勝',               type: 'achievement', target: 10,    rewardWC: 15_000,      statKey: 'totalRaceWins' },
+  { id: 'a_race_w100',      title: 'レース100勝',         description: 'ミニレースで通算100勝',              type: 'achievement', target: 100,   rewardWC: 150_000,     statKey: 'totalRaceWins' },
 ];
 
 // ============================================================
@@ -349,13 +401,23 @@ export function defaultMissionProgress(): import('../types/game').MissionProgres
   return {
     dailySlotPlays: 0, dailyChohanWins: 0, dailyChinchiroWins: 0,
     dailyCoinFlipWins: 0, dailyHighlowWins: 0, dailyPokerWins: 0, dailyGamblePlays: 0,
+    dailyMinesWins: 0, dailyDiceRaceWins: 0, dailyRouletteWins: 0,
+    dailyBlackjackWins: 0, dailyScratchWins: 0, dailyRaceWins: 0,
     weeklySlotPlays: 0, weeklyChohanWins: 0, weeklyChinchiroWins: 0,
     weeklyPokerWins: 0, weeklyGamblePlays: 0, weeklyHighlowMaxStreak: 0,
+    weeklyMinesWins: 0, weeklyDiceRaceWins: 0, weeklyRouletteWins: 0,
+    weeklyBlackjackWins: 0, weeklyScratchWins: 0, weeklyRaceWins: 0,
     totalSlotPlays: 0, totalChohanPlays: 0, totalChohanWins: 0,
     totalChinchiroPlays: 0, totalChinchiroWins: 0,
     totalPokerPlays: 0, totalPokerWins: 0,
     totalCoinFlipPlays: 0, totalCoinFlipWins: 0,
     totalHighlowPlays: 0, totalHighlowWins: 0, totalHighlowMaxStreak: 0,
+    totalMinesPlays: 0, totalMinesWins: 0,
+    totalDiceRacePlays: 0, totalDiceRaceWins: 0,
+    totalRoulettePlays: 0, totalRouletteWins: 0,
+    totalBlackjackPlays: 0, totalBlackjackWins: 0,
+    totalScratchPlays: 0, totalScratchWins: 0,
+    totalRacePlays: 0, totalRaceWins: 0,
     totalJackpotWins: 0, totalWagered: 0, totalWinAmount: 0,
     totalLoseCount: 0, totalWinCount: 0, maxSingleWin: 0, maxSingleBet: 0,
     maxHighlowStreak: 0,

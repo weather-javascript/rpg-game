@@ -1116,6 +1116,67 @@ export const GAMBLE_MASTER: Record<string, GambleMaster> = {
       { label:'ハイカード', probability:50.1, multiplier:0, symbols:['💨'] },
     ],
   },
+  // ============================================================
+  // 新規追加ゲーム（期待値 ~0.93）
+  // ============================================================
+  mines: {
+    id:'mines', name:'ミニマイン', description:'5マス中1つが爆弾。1マスずつ選択し、途中で止めると倍率獲得！',
+    icon:'target', type:'mines', minBet:50, maxBet:200000, returnRate:0.93,
+    rewardTable:[
+      { label:'1マス成功',    probability:0.64, multiplier:1.2,  symbols:['⛏️'] },
+      { label:'2マス成功',    probability:0.19, multiplier:1.5,  symbols:['⛏️⛏️'] },
+      { label:'3マス成功',    probability:0.10, multiplier:2.2,  symbols:['💎'] },
+      { label:'4マス成功',    probability:0.05, multiplier:3.5,  symbols:['💎💎'] },
+      { label:'爆弾！ハズレ', probability:0.02, multiplier:0,    symbols:['💣'] },
+    ],
+  },
+  dice_race: {
+    id:'dice_race', name:'ダイスレース', description:'3つのダイスから1つ選択。最大値のダイスが勝ち！',
+    icon:'dice', type:'dice_race', minBet:50, maxBet:200000, returnRate:0.93,
+    rewardTable:[
+      { label:'勝ち！',  probability:0.340, multiplier:2.7,  symbols:['🎲🏆'] },
+      { label:'同点',    probability:0.030, multiplier:1.3,  symbols:['🎲🤝'] },
+      { label:'負け',    probability:0.630, multiplier:0,    symbols:['🎲💨'] },
+    ],
+  },
+  roulette: {
+    id:'roulette', name:'ルーレット', description:'赤・黒・緑のどれかに賭ける。緑は超高配当！',
+    icon:'target', type:'roulette', minBet:50, maxBet:200000, returnRate:0.93,
+    rewardTable:[
+      { label:'赤 当たり！', probability:0.4500, multiplier:2.0, symbols:['🔴'] },
+      { label:'黒 当たり！', probability:0.4500, multiplier:2.0, symbols:['⚫'] },
+      { label:'緑 当たり！', probability:0.0300, multiplier:9.3, symbols:['🟢'] },
+      { label:'外れ',        probability:0.0700, multiplier:0,   symbols:['💨'] },
+    ],
+  },
+  blackjack: {
+    id:'blackjack', name:'ブラックジャック', description:'1〜10のカード。21に近いほど勝ち。ディーラーは17以上で停止。',
+    icon:'joker_card', type:'blackjack', minBet:50, maxBet:200000, returnRate:0.93,
+    rewardTable:[
+      { label:'勝ち！',   probability:0.4400, multiplier:1.9, symbols:['🃏✨'] },
+      { label:'引き分け', probability:0.0800, multiplier:1.0, symbols:['🃏🤝'] },
+      { label:'負け',     probability:0.4800, multiplier:0,   symbols:['🃏💨'] },
+    ],
+  },
+  scratch: {
+    id:'scratch', name:'スクラッチ', description:'3x3のマスから3つ選択。同じ絵が揃えば当たり！',
+    icon:'coin', type:'scratch', minBet:100, maxBet:200000, returnRate:0.928,
+    rewardTable:[
+      { label:'🌟 大当たり！', probability:0.0200, multiplier:10.0, symbols:['🌟','🌟','🌟'] },
+      { label:'💎 中当たり！', probability:0.0800, multiplier:3.0,  symbols:['💎','💎','💎'] },
+      { label:'🍀 小当たり！', probability:0.2000, multiplier:1.5,  symbols:['🍀','🍀','🍀'] },
+      { label:'ハズレ',        probability:0.7000, multiplier:0,    symbols:['💨','💨','💨'] },
+    ],
+  },
+  race: {
+    id:'race', name:'ミニレース', description:'3キャラから1つ選択。AはW率50%、BはW率30%、CはW率20%。',
+    icon:'swords', type:'race', minBet:50, maxBet:200000, returnRate:0.93,
+    rewardTable:[
+      { label:'Aが勝った！', probability:0.500, multiplier:1.8, symbols:['🐎A'] },
+      { label:'Bが勝った！', probability:0.300, multiplier:3.0, symbols:['🐎B'] },
+      { label:'Cが勝った！', probability:0.200, multiplier:5.0, symbols:['🐎C'] },
+    ],
+  },
 };
 
 // ============================================================
@@ -1165,6 +1226,21 @@ export const DEFAULT_PLAYER_STATS = {
 // フォーマット: { version: 'x.x.x', date: 'YYYY-MM-DD', changes: ['変更内容...'] }
 // ============================================================
 export const VERSION_PATCHES = [
+  {
+    version: '2.9.4',
+    date: '2026-06-12',
+    changes: [
+      '🎰 ギャンブル新ゲーム6種追加',
+      '⛏️ ミニマイン：5マス中1爆弾、途中離脱で最大3.5倍',
+      '🎲 ダイスレース：3ダイスから1つ予想、最大2.7倍',
+      '🎡 ルーレット：赤/黒/緑の3択、緑は9.3倍',
+      '🃏 ブラックジャック：ヒット/スタンド、勝ち1.9倍',
+      '🎫 スクラッチ：3マス選択、大当たり10倍',
+      '🐎 ミニレース：ABC3キャラ予想、最大5倍',
+      '📋 デイリー/ウィークリーミッションに新ゲーム対応',
+      '🎉 日替わりイベント・デイリーカジノに新ゲーム追加',
+    ],
+  },
   {
     version: '2.9.3',
     date: '2026-06-12',
