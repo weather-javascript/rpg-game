@@ -3029,12 +3029,12 @@ function StockMarketPanel() {
       tickStockPrices().then(({ news: newN }) => {
         console.log('[StockTick] tick成功', newN.length > 0 ? newN : '(ニュースなし)');
         if (newN.length > 0) setNews(prev => [...newN, ...prev].slice(0, 20));
-      }).catch((e) => { console.error('[StockTick] tick失敗', e); });
+      }).catch((e) => { console.error('[StockTick] tick失敗 - Firestoreエラー詳細:', JSON.stringify(e), e); });
     };
     // 初回は即時実行
     console.log('[StockTick] useEffect開始 - 初回tick実行');
     doTick();
-    const interval = setInterval(doTick, 120_000);
+    const interval = setInterval(doTick, 30_000);
     return () => { clearInterval(interval); };
   }, []);
 

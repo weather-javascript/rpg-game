@@ -1836,59 +1836,64 @@ export async function tickStockPrices(): Promise<{ prices: Record<StockId, numbe
     { text: '{name}が記録的な利益を達成！', type: 'super_good' as const },
     { text: '{name}の不祥事が発覚', type: 'super_bad' as const },
   ];
+  const now = Date.now();
+  const prices: Record<string, number> = {};
+  const newsItems: string[] = [];
+
   try {
-    const snap = await getDoc(ref);
-    const now = Date.now();
-    const data = snap.exists() ? snap.data() : {};
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const data = snap.exists() ? snap.data() : {};
 
-    // 2分throttle: 最後のtickから110秒未満なら何もしない（lastTickAt=0は必ず通す）
-    const lastTick = (data['lastTickAt'] as number) ?? 0;
-    if (lastTick !== 0 && now - lastTick < 110_000) {
-      // 現在の価格だけ返す
-      const prices: Record<string, number> = {};
-      for (const id of STOCK_IDS) prices[id] = (data[id] as number) ?? STOCK_MASTERS[id].basePrice;
-      return { prices: prices as Record<StockId, number>, news: [] };
-    }
-
-    const newData: Record<string, unknown> = { lastTickAt: now };
-    const prices: Record<string, number> = {};
-    const newsItems: string[] = [];
-    for (const id of STOCK_IDS) {
-      const current: number = (data[id] as number) ?? STOCK_MASTERS[id].basePrice;
-      const roll = Math.random();
-      let changePct = 0;
-      let newsText: string | undefined;
-      if (roll < 0.005) {
-        changePct = 0.5;
-        newsText = `🚀 【ストップ高】${STOCK_MASTERS[id].name} +50%！`;
-      } else if (roll < 0.01) {
-        changePct = -0.5;
-        newsText = `📉 【ストップ安】${STOCK_MASTERS[id].name} -50%！`;
-      } else if (roll < 0.06) {
-        const pct = 0.1 + Math.random() * 0.1;
-        changePct = Math.random() < 0.5 ? pct : -pct;
-        const tmpl = NEWS_TEMPLATES[Math.floor(Math.random() * NEWS_TEMPLATES.length)];
-        newsText = `📰 ${tmpl.text.replace('{name}', STOCK_MASTERS[id].name)}（${changePct > 0 ? '+' : ''}${(changePct * 100).toFixed(0)}%）`;
-      } else {
-        const pct = 0.01 + Math.random() * 0.04;
-        changePct = Math.random() < 0.5 ? pct : -pct;
+      // 30秒throttle: lastTickAt=0は必ず通す
+      const lastTick = (data['lastTickAt'] as number) ?? 0;
+      if (lastTick !== 0 && now - lastTick < 25_000) {
+        // throttle中: 現在価格をpricesにセットして抜ける
+        for (const id of STOCK_IDS) prices[id] = (data[id] as number) ?? STOCK_MASTERS[id].basePrice;
+        return;
       }
-      const newPrice = Math.max(1, Math.round(current * (1 + changePct)));
-      prices[id] = newPrice;
-      newData[id] = newPrice;
-      if (newsText) newsItems.push(newsText);
-      const histKey = `history_${id}`;
-      const hist: StockPricePoint[] = (data[histKey] as StockPricePoint[]) ?? [];
-      hist.push({ timestamp: now, price: newPrice, news: newsText });
-      if (hist.length > 96) hist.splice(0, hist.length - 96);
-      newData[histKey] = hist;
-    }
-    await setDoc(ref, newData, { merge: true });
+
+      console.log('[tickStockPrices] tick実行 lastTickAt=', lastTick, 'diff=', now - lastTick);
+
+      const newData: Record<string, unknown> = { lastTickAt: now };
+      newsItems.length = 0;
+      for (const id of STOCK_IDS) {
+        const current: number = (data[id] as number) ?? STOCK_MASTERS[id].basePrice;
+        const roll = Math.random();
+        let changePct = 0;
+        let newsText: string | undefined;
+        if (roll < 0.005) {
+          changePct = 0.5;
+          newsText = `🚀 【ストップ高】${STOCK_MASTERS[id].name} +50%！`;
+        } else if (roll < 0.01) {
+          changePct = -0.5;
+          newsText = `📉 【ストップ安】${STOCK_MASTERS[id].name} -50%！`;
+        } else if (roll < 0.06) {
+          const pct = 0.1 + Math.random() * 0.1;
+          changePct = Math.random() < 0.5 ? pct : -pct;
+          const tmpl = NEWS_TEMPLATES[Math.floor(Math.random() * NEWS_TEMPLATES.length)];
+          newsText = `📰 ${tmpl.text.replace('{name}', STOCK_MASTERS[id].name)}（${changePct > 0 ? '+' : ''}${(changePct * 100).toFixed(0)}%）`;
+        } else {
+          const pct = 0.01 + Math.random() * 0.04;
+          changePct = Math.random() < 0.5 ? pct : -pct;
+        }
+        const newPrice = Math.max(1, Math.round(current * (1 + changePct)));
+        prices[id] = newPrice;
+        newData[id] = newPrice;
+        if (newsText) newsItems.push(newsText);
+        const histKey = `history_${id}`;
+        const hist: StockPricePoint[] = (data[histKey] as StockPricePoint[]) ?? [];
+        hist.push({ timestamp: now, price: newPrice, news: newsText });
+        if (hist.length > 96) hist.splice(0, hist.length - 96);
+        newData[histKey] = hist;
+      }
+      tx.set(ref, newData, { merge: true });
+    });
+    console.log('[tickStockPrices] transaction完了 prices=', prices);
     return { prices: prices as Record<StockId, number>, news: newsItems };
-  } catch {
-    const prices: Record<string, number> = {};
-    for (const id of STOCK_IDS) prices[id] = STOCK_MASTERS[id].basePrice;
-    return { prices: prices as Record<StockId, number>, news: [] };
+  } catch (e) {
+    console.error('[tickStockPrices] Firestoreへの書き込みに失敗:', e);
+    throw e;
   }
 }
 
