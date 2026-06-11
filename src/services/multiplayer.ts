@@ -748,43 +748,28 @@ export interface ActivityFeedEntry {
 const FEED_REF = () => doc(db, 'shared', 'activity_feed');
 
 // ============================================================
-// ActivityFeed — バッファ+15秒flush（Read+Write毎回→15秒に1Write）
+// ActivityFeed — transactionで競合安全に書き込み、最新100件保持
 // ============================================================
-let _feedBuffer: Omit<ActivityFeedEntry, 'timestamp'>[] = [];
-let _feedFlushTimer: ReturnType<typeof setTimeout> | null = null;
+const FEED_MAX = 100;
 
-async function _flushFeed() {
-  _feedFlushTimer = null;
-  if (_feedBuffer.length === 0) return;
-  const toWrite = _feedBuffer.map(e => ({ ...e, timestamp: Date.now() }));
-  _feedBuffer = [];
+/** アクティビティをフィードに追記（transactionで競合安全） */
+export async function postActivityFeed(entry: Omit<ActivityFeedEntry, 'timestamp'>): Promise<void> {
+  const newEntry: ActivityFeedEntry = { ...entry, timestamp: Date.now() };
   try {
-    const snap = await getDoc(FEED_REF());
-    const prev: ActivityFeedEntry[] = snap.exists() ? ((snap.data()['entries'] ?? []) as ActivityFeedEntry[]) : [];
-    const next = [...toWrite, ...prev].slice(0, 50);
-    await setDoc(FEED_REF(), { entries: next, updatedAt: Date.now() });
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(FEED_REF());
+      const prev: ActivityFeedEntry[] = snap.exists() ? ((snap.data()['entries'] ?? []) as ActivityFeedEntry[]) : [];
+      const next = [newEntry, ...prev].slice(0, FEED_MAX);
+      tx.set(FEED_REF(), { entries: next, updatedAt: Date.now() });
+    });
   } catch { /* ignore */ }
 }
 
-/** アクティビティをフィードに追記（バッファして15秒に1回まとめてWrite） */
-export async function postActivityFeed(entry: Omit<ActivityFeedEntry, 'timestamp'>): Promise<void> {
-  _feedBuffer.unshift(entry);
-  if (_feedBuffer.length > 10) _feedBuffer = _feedBuffer.slice(0, 10); // バッファ上限
-  if (!_feedFlushTimer) {
-    _feedFlushTimer = setTimeout(_flushFeed, 15_000);
-  }
-}
-
-/** アクティビティフィードをポーリング購読（60秒間隔） */
+/** アクティビティフィードをリアルタイム購読（onSnapshot） */
 export function subscribeActivityFeed(cb: (entries: ActivityFeedEntry[]) => void): Unsubscribe {
-  let stopped = false;
-  const fetch = () => getDoc(FEED_REF()).then(snap => {
-    if (stopped) return;
+  return onSnapshot(FEED_REF(), (snap) => {
     cb(snap.exists() ? ((snap.data()['entries'] ?? []) as ActivityFeedEntry[]) : []);
-  }).catch(() => {});
-  fetch();
-  const timer = setInterval(fetch, 60_000);
-  return () => { stopped = true; clearInterval(timer); };
+  }, () => {});
 }
 
 // ============================================================
