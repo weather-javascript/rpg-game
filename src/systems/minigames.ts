@@ -95,17 +95,19 @@ export function getChinchiroRole(dice: number[]): ChinchiroRole | null {
   return null;
 }
 
-export function playChinchiro(bet: number): GambleResult & { dice: number[]; roleName: string } {
+export function playChinchiro(bet: number): GambleResult & { dice: number[]; roleName: string; rollHistory: number[][] } {
   // 最大2回振る。役が出た時点で終了。2回とも役なし → 目なし負け
   let dice: number[] = [];
   let role: ChinchiroRole | null = null;
+  const rollHistory: number[][] = [];
   for (let i = 0; i < 2; i++) {
     dice = [rollDice(), rollDice(), rollDice()];
+    rollHistory.push(dice);
     role = getChinchiroRole(dice);
     if (role !== null) break;
   }
   if (!role) {
-    return { rewardLabel: '目なし（ハズレ）', multiplier: 0, goldDelta: -bet, itemRewards: [], symbols: dice.map(String), dice, roleName: '目なし' };
+    return { rewardLabel: '目なし（ハズレ）', multiplier: 0, goldDelta: -bet, itemRewards: [], symbols: dice.map(String), dice, roleName: '目なし', rollHistory };
   }
   const goldDelta = role.multiplier > 0 ? Math.floor(bet * role.multiplier) - bet : -bet;
   return {
@@ -116,6 +118,7 @@ export function playChinchiro(bet: number): GambleResult & { dice: number[]; rol
     symbols: dice.map(String),
     dice,
     roleName: role.name,
+    rollHistory,
   };
 }
 

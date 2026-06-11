@@ -1909,30 +1909,21 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
     const effectiveMult = r.multiplier > 0 ? r.multiplier * multiplierBonus : 0;
     pendingRef.r = { ...r, multiplier: effectiveMult, goldDelta: r.goldDelta > 0 ? Math.floor(bet * effectiveMult) - bet : r.goldDelta };
 
-    // サイコロを何回か振るアニメーション
+    // rollHistoryを使ってサイコロ演出を完全同期
+    const history: number[][] = Array.isArray((r as any).rollHistory) ? (r as any).rollHistory : [r.dice];
     const runRoll = (attempt: number, logs: typeof rollLogs) => {
       setRolling(true); setCurrentDice(null);
       setTimeout(() => {
-        // 2回目は演出用役なしダイスを使わず実際の結果ダイスを使う
-        const dice = attempt >= 1
-          ? (Array.isArray((r as any).dice) ? (r as any).dice as number[] : [Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1])
-          : (attempt < 1 && Math.random() < 0.4 ? [1,2,4] : [Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1]);
+        const dice = history[attempt] ?? r.dice;
         const ev = evalChinchiro(dice);
-        // 2回目(attempt=1)は役なしでも強制終了（負け確定）
-        const isLast = ev.type !== 'nashi' || attempt >= 1;
         setCurrentDice(dice);
         setRolling(false);
         const newLogs = [...logs, { dice, label: ev.label, isRole: ev.type !== 'nashi' }];
         setRollLogs(newLogs);
+        const isLast = attempt >= history.length - 1;
         if (!isLast) {
-          setTimeout(() => runRoll(attempt+1, newLogs), 1200);
+          setTimeout(() => runRoll(attempt + 1, newLogs), 1200);
         } else {
-          // 最終: 本当の結果サイコロを使う
-          const finalDice = Array.isArray((r as any).dice) ? (r as any).dice as number[] : dice;
-          const finalEv = evalChinchiro(finalDice);
-          setCurrentDice(finalDice);
-          const finalLogs = attempt === 0 ? newLogs : [...newLogs.slice(0,-1), { dice: finalDice, label: finalEv.label, isRole: finalEv.type !== 'nashi' }];
-          setRollLogs(finalLogs);
           setTimeout(async () => {
             const rr = pendingRef.r;
             if (!rr) { setAnimating(false); return; }
