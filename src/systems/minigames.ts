@@ -96,10 +96,10 @@ export function getChinchiroRole(dice: number[]): ChinchiroRole | null {
 }
 
 export function playChinchiro(bet: number): GambleResult & { dice: number[]; roleName: string } {
-  // 最大3回振る。役が出た時点で終了。3回とも役なし → 目なし負け
+  // 最大2回振る。役が出た時点で終了。2回とも役なし → 目なし負け
   let dice: number[] = [];
   let role: ChinchiroRole | null = null;
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 2; i++) {
     dice = [rollDice(), rollDice(), rollDice()];
     role = getChinchiroRole(dice);
     if (role !== null) break;

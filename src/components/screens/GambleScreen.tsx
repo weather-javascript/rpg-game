@@ -1913,13 +1913,13 @@ function ChinchiroPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
     const runRoll = (attempt: number, logs: typeof rollLogs) => {
       setRolling(true); setCurrentDice(null);
       setTimeout(() => {
-        // 3回目は演出用役なしダイスを使わず実際の結果ダイスを使う
-        const dice = attempt >= 2
+        // 2回目は演出用役なしダイスを使わず実際の結果ダイスを使う
+        const dice = attempt >= 1
           ? (Array.isArray((r as any).dice) ? (r as any).dice as number[] : [Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1])
-          : (attempt < 2 && Math.random() < 0.4 ? [1,2,4] : [Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1]);
+          : (attempt < 1 && Math.random() < 0.4 ? [1,2,4] : [Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1, Math.floor(secureRandom()*6)+1]);
         const ev = evalChinchiro(dice);
-        // 3回目(attempt=2)は役なしでも強制終了（負け確定）
-        const isLast = ev.type !== 'nashi' || attempt >= 2;
+        // 2回目(attempt=1)は役なしでも強制終了（負け確定）
+        const isLast = ev.type !== 'nashi' || attempt >= 1;
         setCurrentDice(dice);
         setRolling(false);
         const newLogs = [...logs, { dice, label: ev.label, isRole: ev.type !== 'nashi' }];
