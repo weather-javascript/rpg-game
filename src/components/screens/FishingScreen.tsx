@@ -1,504 +1,518 @@
 // src/components/screens/FishingScreen.tsx
-// 釣りシステム：Wiki準拠のFFGG・GGR・通常釣りを実装
+// 釣りシステム v2 – 全面改修
 
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useGameStore } from '../../stores/gameStore';
-import { randomIntRange, randomChance, drawFromTableSecure } from '../../utils/random';
-import { GATHER_NODE_MASTER, ITEM_MASTER, FISHING_RODS } from '../../data/masters';
-import type { GatherNodeMaster } from '../../types/game';
+import {
+  FISH_MASTER, FISH_IDS, calcWeight, calcFishSellPrice,
+  getFishingBonuses, fishingExpRequired, RARITY_COLOR, RARITY_LABEL,
+  FISHING_LEVEL_BONUSES,
+} from '../../data/fishMasters';
+import type { FishMaster } from '../../data/fishMasters';
+import { ITEM_MASTER } from '../../data/masters';
 
-// 釣り竿ごとに解放されるノードのマッピング
-const ROD_NODE_MAP: Record<string, string> = {
-  basic_rod:   'fishing_pond',
-  ore_rod:     'fishing_ore_pond',
-  all_rod_x:   'fishing_ticket_pond',
-  master_rod:  'fishing_master_pond',
-  master_rod_z:'fishing_master_pond',
-  ffgg_rod_r1: 'fishing_ffgg_pond',
-  ffgg_rod_r3: 'fishing_ffgg_pond',
-  ffgg_rod_r6: 'fishing_ffgg_pond',
-  ffggr_rod:   'fishing_ggr_pond',
+// ─── 釣り竿の種類 ───────────────────────────────────────────────
+interface RodConfig {
+  id: string;
+  label: string;
+  rarityBonus: number;   // 追加レア率
+  legendBonus: number;   // 伝説魚追加率
+  cooldownMs: number;
+  minLevel: number;
+  staminaCost: number;
+}
+const ROD_CONFIGS: Record<string, RodConfig> = {
+  basic_rod:    { id: 'basic_rod',    label: '基本の釣り竿',    rarityBonus: 0,    legendBonus: 0,     cooldownMs: 5000, minLevel: 1,  staminaCost: 4 },
+  ore_rod:      { id: 'ore_rod',      label: '鉱石ロッド',      rarityBonus: 0.02, legendBonus: 0,     cooldownMs: 4500, minLevel: 5,  staminaCost: 4 },
+  all_rod_x:    { id: 'all_rod_x',    label: 'オールロッドX',   rarityBonus: 0.05, legendBonus: 0.005, cooldownMs: 4000, minLevel: 10, staminaCost: 5 },
+  master_rod:   { id: 'master_rod',   label: 'マスターロッド',  rarityBonus: 0.08, legendBonus: 0.010, cooldownMs: 3500, minLevel: 20, staminaCost: 5 },
+  master_rod_z: { id: 'master_rod_z', label: 'マスターロッドZ', rarityBonus: 0.12, legendBonus: 0.015, cooldownMs: 3000, minLevel: 30, staminaCost: 6 },
+  ffgg_rod_r1:  { id: 'ffgg_rod_r1',  label: 'FFGGロッドR1',   rarityBonus: 0.10, legendBonus: 0.012, cooldownMs: 3500, minLevel: 15, staminaCost: 5 },
+  ffgg_rod_r3:  { id: 'ffgg_rod_r3',  label: 'FFGGロッドR3',   rarityBonus: 0.15, legendBonus: 0.018, cooldownMs: 3000, minLevel: 25, staminaCost: 6 },
+  ffgg_rod_r6:  { id: 'ffgg_rod_r6',  label: 'FFGGロッドR6',   rarityBonus: 0.20, legendBonus: 0.025, cooldownMs: 2500, minLevel: 40, staminaCost: 7 },
+  ffggr_rod:    { id: 'ffggr_rod',    label: 'FFGGRロッド',     rarityBonus: 0.25, legendBonus: 0.035, cooldownMs: 2000, minLevel: 50, staminaCost: 8 },
 };
+const DEFAULT_ROD = ROD_CONFIGS['basic_rod'];
 
-function calcFishingResult(node: GatherNodeMaster, fishingLv: number, buffBonus: number) {
-  const drops: { itemId: string; amount: number }[] = [];
-  for (const drop of node.drops) {
-    const rate = Math.min(1.0, (drop.baseRate + (drop.skillRateBonus ?? 0) * fishingLv) * buffBonus);
-    if (randomChance(rate)) {
-      const amount = randomIntRange(drop.minAmount, drop.maxAmount);
-      drops.push({ itemId: drop.itemId, amount });
-    }
+// ─── 釣り計算 ───────────────────────────────────────────────────
+interface CatchResult {
+  fish: FishMaster;
+  sizeCm: number;
+  weightKg: number;
+  sellPrice: number;
+  exp: number;
+  isNew: boolean;
+  isRecord: boolean;
+}
+
+function tryFishCatch(
+  fishingLevel: number,
+  rod: RodConfig,
+  buffBonus: number,
+  fishBook: Record<string, { maxSizeCm: number }>,
+): CatchResult | null {
+  const bonuses = getFishingBonuses(fishingLevel);
+  const totalRarityBonus = bonuses.rarityBonus + rod.rarityBonus;
+  const totalLegendBonus = bonuses.legendaryBonus * rod.legendBonus + rod.legendBonus;
+
+  // 魚ごとの重み計算
+  const pool: { fish: FishMaster; weight: number }[] = [];
+  for (const id of FISH_IDS) {
+    const f = FISH_MASTER[id];
+    if (f.minLevel > fishingLevel) continue;
+    let w = f.baseRate;
+    // レア率ボーナス適用
+    if (f.rarity === 'rare' || f.rarity === 'epic') w += totalRarityBonus * 0.5;
+    if (f.rarity === 'legendary') w += totalLegendBonus;
+    // 大型魚ボーナス (大型魚=minSizeCm >= 100)
+    if (f.minSizeCm >= 100) w += bonuses.largeFishBonus * 0.3;
+    w *= buffBonus;
+    if (w > 0) pool.push({ fish: f, weight: w });
   }
-  const expGained = 8 + fishingLv * 2;
-  return { drops, expGained };
+  if (pool.length === 0) return null;
+
+  const total = pool.reduce((s, p) => s + p.weight, 0);
+  const rand = Math.random() * total;
+  let acc = 0;
+  let chosen = pool[0].fish;
+  for (const p of pool) {
+    acc += p.weight;
+    if (rand <= acc) { chosen = p.fish; break; }
+  }
+
+  // サイズ決定（大型魚ボーナスで上振れあり）
+  const sizeRange = chosen.maxSizeCm - chosen.minSizeCm;
+  let sizeRoll = Math.random();
+  if (bonuses.largeFishBonus > 0 && chosen.minSizeCm >= 50) {
+    sizeRoll = Math.max(sizeRoll, Math.random() * bonuses.largeFishBonus + sizeRoll * (1 - bonuses.largeFishBonus));
+  }
+  const sizeCm = Math.round(chosen.minSizeCm + sizeRange * sizeRoll);
+  const weightKg = calcWeight(chosen, sizeCm);
+  const sellPrice = calcFishSellPrice(chosen, sizeCm);
+  const exp = chosen.baseExp + Math.floor(sizeCm / chosen.maxSizeCm * chosen.baseExp);
+
+  const isNew = !fishBook[chosen.id];
+  const isRecord = !isNew && sizeCm > (fishBook[chosen.id]?.maxSizeCm ?? 0);
+
+  return { fish: chosen, sizeCm, weightKg, sellPrice, exp, isNew, isRecord };
 }
 
-// FF小判⇒大判交換レート（1大判 = 100小判）
-const COIN_EXCHANGE_RATE = 100;
-
-// 釣りチケット⇒Yリアクター変換チェーン
-const TICKET_TO_TOTEM = 50;  // 釣りチケット50枚→不死のトーテム1つ
-const TOTEM_TO_REACTOR = 5;  // 不死のトーテム5つ→Yリアクター1つ
-
-interface FeverState {
-  active: boolean;
-  remaining: number;
-  scoreBonus: number;
+// ─── ログエントリ ───────────────────────────────────────────────
+interface LogEntry {
+  id: number;
+  message: string;
+  rarity?: string;
+  color?: string;
 }
+
+let logCounter = 0;
+
+// ─── メインコンポーネント ───────────────────────────────────────
+type Tab = 'fish' | 'book' | 'rod' | 'level';
 
 export function FishingScreen() {
-  const player = useGameStore(s => s.player);
-  const addItems = useGameStore(s => s.addItems);
-  const consumeItem = useGameStore(s => s.consumeItem);
-  const changeSatiety = useGameStore(s => s.changeSatiety);
-  const addSkillExp = useGameStore(s => s.addSkillExp);
-  const addExp = useGameStore(s => s.addExp);
-  const changeGold = useGameStore(s => s.changeGold);
-  const addNotification = useGameStore(s => s.addNotification);
-  const equipRod = useGameStore(s => s.equipRod);
-  const addFishingScore = useGameStore(s => s.addFishingScore);
-  const getActiveBuffBonus = useGameStore(s => s.getActiveBuffBonus);
-  const addBuff = useGameStore(s => s.addBuff);
+  const player = useGameStore((s: any) => s.player);
+  const addItems = useGameStore((s: any) => s.addItems);
+  const changeSatiety = useGameStore((s: any) => s.changeSatiety);
+  const changeGold = useGameStore((s: any) => s.changeGold);
+  const addNotification = useGameStore((s: any) => s.addNotification);
+  const equipRod = useGameStore((s: any) => s.equipRod);
+  const addFishingExp = useGameStore((s: any) => s.addFishingExp);
+  const recordCatch = useGameStore((s: any) => s.recordCatch);
+  const getActiveBuffBonus = useGameStore((s: any) => s.getActiveBuffBonus);
+  const savePlayer = useGameStore((s: any) => s.savePlayer);
 
-  const [log, setLog] = useState<string[]>([]);
+  const [tab, setTab] = useState<Tab>('fish');
+  const [log, setLog] = useState<LogEntry[]>([]);
   const [cooldown, setCooldown] = useState(0);
-  const [activeTab, setActiveTab] = useState<'fish' | 'rod' | 'exchange'>('fish');
-  const [fever, setFever] = useState<FeverState>({ active: false, remaining: 0, scoreBonus: 1 });
-  const [feverMissCount, setFeverMissCount] = useState(0);
+  const [isFishing, setIsFishing] = useState(false);
+  const [casting, setCasting] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [autoFish, setAutoFish] = useState(false);
+  const autoFishRef = useRef(false);
 
-  // フィーバー判定
-  const checkFever = useCallback(() => {
-    if (fever.active) return;
-    // ミス回数が増えるほど発生しやすく（最大30%）
-    const feverRate = Math.min(0.30, 0.02 + feverMissCount * 0.005);
-    if (randomChance(feverRate)) {
-      setFever({ active: true, remaining: 100, scoreBonus: 2 });
-      setFeverMissCount(0);
-      addNotification('success', '🔥 釣りフィーバー発動！スコア2倍・特別ドロップ確率UP！');
-    } else {
-      setFeverMissCount(prev => prev + 1);
-    }
-  }, [fever.active, feverMissCount, addNotification]);
-
+  const fishingLevel = player?.fishingLevel ?? 1;
+  const fishingExp = player?.fishingExp ?? 0;
+  const fishBook = player?.fishBook ?? {};
   const equippedRodId = player?.equippedRodId ?? 'basic_rod';
-  const nodeId = ROD_NODE_MAP[equippedRodId] ?? 'fishing_pond';
-  const node = GATHER_NODE_MASTER[nodeId];
+  const rod = ROD_CONFIGS[equippedRodId] ?? DEFAULT_ROD;
+  const expRequired = fishingExpRequired(fishingLevel);
+  const expPct = fishingLevel >= 100 ? 100 : Math.floor((fishingExp / expRequired) * 100);
+  const bookCount = Object.keys(fishBook).length;
+  const totalFish = Object.keys(FISH_MASTER).length;
+  const bookPct = Math.floor((bookCount / totalFish) * 100);
 
-  const handleFish = useCallback(() => {
-    if (!player || !node || cooldown > 0) return;
-    if (player.stats.satiety < node.staminaCost) {
-      addNotification('warning', '満腹度が足りません！');
+  // クールダウンタイマー
+  useEffect(() => {
+    if (cooldown <= 0) {
+      if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
-
-    const fishingLv = player.skillLevels['fishing'] ?? 1;
-    const buffBonus = getActiveBuffBonus('fishing');
-    const result = calcFishingResult(node, fishingLv, buffBonus);
-
-    changeSatiety(-node.staminaCost);
-    addSkillExp('fishing', result.expGained);
-    addExp(Math.floor(result.expGained / 3));
-
-    if (result.drops.length > 0) {
-      addItems(result.drops);
-      const msgs = result.drops.map(d => `${ITEM_MASTER[d.itemId]?.icon ?? '?'} ${ITEM_MASTER[d.itemId]?.name ?? d.itemId} ×${d.amount}`).join('、');
-      const feverTag = fever.active ? '🔥' : '';
-      setLog(prev => [`${feverTag}[${node.name}] ${msgs}`, ...prev].slice(0, 25));
-      // レアアイテム取得時のみフィードに投稿（頻度を抑える）
-      const hasRare = result.drops.some(d => {
-        const item = ITEM_MASTER[d.itemId];
-        return item && (item.rarity === 'rare' || item.rarity === 'epic' || item.rarity === 'legendary' || d.itemId.includes('reactor') || d.itemId.includes('totem'));
-      });
-      if (hasRare && player) {
-        import('../../services/multiplayer').then(({ postActivityFeed }) => {
-          postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'fishing', message: `が釣りで${msgs}を手に入れました！` }).catch(() => {});
-        });
-      }
-    } else {
-      setLog(prev => [`[${node.name}] 何も釣れなかった...`, ...prev].slice(0, 25));
-    }
-
-    // FFGGロッドRank4以上かつFFGG釣り場で釣りスコア加算
-    if ((equippedRodId === 'ffgg_rod_r6' || equippedRodId === 'ffggr_rod') && nodeId === 'fishing_ffgg_pond') {
-      const scoreGain = fever.active ? 3 : (randomChance(0.3) ? 2 : 1);
-      addFishingScore(scoreGain * fever.scoreBonus);
-    }
-
-    // フィーバー消費
-    if (fever.active) {
-      setFever(prev => {
-        const newRem = prev.remaining - 1;
-        if (newRem <= 0) {
-          addNotification('info', 'フィーバー終了！');
-          return { active: false, remaining: 0, scoreBonus: 1 };
+    timerRef.current = setInterval(() => {
+      setCooldown((prev: number) => {
+        const next = prev - 100;
+        if (next <= 0) {
+          clearInterval(timerRef.current!);
+          return 0;
         }
-        return { ...prev, remaining: newRem };
+        return next;
       });
-    }
+    }, 100);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [cooldown]);
 
-    // フィーバー判定
-    checkFever();
+  const addLog = useCallback((msg: string, rarity?: string, color?: string) => {
+    const entry: LogEntry = { id: ++logCounter, message: msg, rarity, color };
+    setLog((prev: LogEntry[]) => [entry, ...prev].slice(0, 30));
+  }, []);
 
-    // ジョブ収入（釣り師）
-    if (player.activeJob === 'fisher') {
-      const jobGold = 5 + fishingLv * 2;
-      changeGold(jobGold);
-    }
-
-    // クールダウン
-    setCooldown(node.cooldownMs);
-    const start = Date.now();
-    const tick = () => {
-      const rem = node.cooldownMs - (Date.now() - start);
-      if (rem <= 0) setCooldown(0);
-      else { setCooldown(rem); requestAnimationFrame(tick); }
-    };
-    requestAnimationFrame(tick);
-  }, [player, node, cooldown, equippedRodId, nodeId, fever, feverMissCount, getActiveBuffBonus, changeSatiety, addSkillExp, addExp, addItems, addNotification, addFishingScore, changeGold, checkFever]);
-
-  // ===== 交換処理 =====
-  const exchangeCoins = () => {
-    const small = player?.inventory['ff_coin_small'] ?? 0;
-    const canExchange = Math.floor(small / COIN_EXCHANGE_RATE);
-    if (canExchange <= 0) { addNotification('error', `FF小判が${COIN_EXCHANGE_RATE}枚未満です`); return; }
-    consumeItem('ff_coin_small', canExchange * COIN_EXCHANGE_RATE);
-    addItems([{ itemId: 'ff_coin_large', amount: canExchange }]);
-    addNotification('success', `FF小判${canExchange * COIN_EXCHANGE_RATE}枚 → FF大判${canExchange}枚に交換！`);
-  };
-
-  const exchangeTicketToTotem = () => {
-    const tickets = player?.inventory['fishing_ticket'] ?? 0;
-    const canExchange = Math.floor(tickets / TICKET_TO_TOTEM);
-    if (canExchange <= 0) { addNotification('error', `釣りチケットが${TICKET_TO_TOTEM}枚未満です`); return; }
-    consumeItem('fishing_ticket', canExchange * TICKET_TO_TOTEM);
-    addItems([{ itemId: 'totem', amount: canExchange }]);
-    addNotification('success', `釣りチケット${canExchange * TICKET_TO_TOTEM}枚 → 不死のトーテム${canExchange}個！`);
-  };
-
-  const exchangeTotemToReactor = () => {
-    const totems = player?.inventory['totem'] ?? 0;
-    const canExchange = Math.floor(totems / TOTEM_TO_REACTOR);
-    if (canExchange <= 0) { addNotification('error', `不死のトーテムが${TOTEM_TO_REACTOR}個未満です`); return; }
-    consumeItem('totem', canExchange * TOTEM_TO_REACTOR);
-    addItems([{ itemId: 'y_reactor', amount: canExchange }]);
-    addNotification('success', `不死のトーテム${canExchange * TOTEM_TO_REACTOR}個 → Yリアクター${canExchange}個！`);
-  };
-
-  const exchangeYBoxToProof = () => {
-    const boxes = player?.inventory['y_random_box'] ?? 0;
-    if (boxes <= 0) { addNotification('error', 'Yランダムボックスがありません'); return; }
-    consumeItem('y_random_box', boxes);
-    addItems([{ itemId: 'nether_proof', amount: boxes }]);
-    addNotification('success', `Yランダムボックス${boxes}個 → ネザー解放の証${boxes}個！`);
-  };
-
-  const exchangeToZReactor = () => {
-    const reactors = player?.inventory['y_reactor'] ?? 0;
-    const proofs = player?.inventory['nether_proof'] ?? 0;
-    if (reactors < 3 || proofs < 2) {
-      addNotification('error', 'Yリアクター×3・ネザー解放の証×2が必要');
+  const doFish = useCallback(() => {
+    if (!player || cooldown > 0 || isFishing) return;
+    if ((player.stats.satiety ?? 0) < rod.staminaCost) {
+      addNotification('warning', '満腹度が足りません！');
+      autoFishRef.current = false;
+      setAutoFish(false);
       return;
     }
-    consumeItem('y_reactor', 3);
-    consumeItem('nether_proof', 2);
-    addItems([{ itemId: 'z_reactor', amount: 1 }]);
-    addNotification('success', '⚡ Zリアクター完成！通常釣りの到達点！');
-  };
 
-  const drinkRaJuice = (type: string) => {
-    const has = player?.inventory[type] ?? 0;
-    if (has <= 0) { addNotification('error', 'ラジュースを持っていません'); return; }
-    consumeItem(type, 1);
-    const bonus = type === 'la_juice_high' ? 1.6 : 1.3;
-    const dur = type === 'la_juice_high' ? 10 * 60 * 1000 : 5 * 60 * 1000;
-    addBuff({ id: 'la_juice', name: `ラジュース(${type === 'la_juice_high' ? '上位' : '通常'})`, durationMs: dur, fishingBonus: bonus, miningBonus: bonus });
-    addNotification('success', `🧉 ラジュース効果発動！釣り・採掘効率${Math.round((bonus - 1) * 100)}%UP（${dur / 60000}分間）`);
-  };
+    setIsFishing(true);
+    setCasting(true);
+    setTimeout(() => setCasting(false), 600);
 
-  const openCrate = (crateId: string) => {
-    const has = player?.inventory[crateId] ?? 0;
-    if (has <= 0) { addNotification('error', 'クレートがありません'); return; }
-    consumeItem(crateId, 1);
+    const buffBonus = getActiveBuffBonus('fishing');
+    const result = tryFishCatch(fishingLevel, rod, buffBonus, fishBook);
 
-    // クレートの報酬テーブル
-    const tables: Record<string, { items: {itemId: string; amount: number}[]; gold: number; prob: number }[]> = {
-      crate_leather: [
-        { items: [{itemId:'health_potion', amount:3}], gold: 0, prob: 0.40 },
-        { items: [{itemId:'food_ration', amount:5}], gold: 0, prob: 0.30 },
-        { items: [], gold: 500, prob: 0.20 },
-        { items: [{itemId:'la_juice_normal', amount:1}], gold: 0, prob: 0.10 },
-      ],
-      crate_gold: [
-        { items: [{itemId:'mega_potion', amount:2}], gold: 0, prob: 0.30 },
-        { items: [], gold: 2000, prob: 0.25 },
-        { items: [{itemId:'la_juice_normal', amount:2}], gold: 0, prob: 0.20 },
-        { items: [{itemId:'ff_coin_small', amount:5}], gold: 0, prob: 0.15 },
-        { items: [{itemId:'scale_low_1', amount:1}], gold: 0, prob: 0.10 },
-      ],
-      crate_diamond: [
-        { items: [], gold: 5000, prob: 0.30 },
-        { items: [{itemId:'la_juice_high', amount:1}], gold: 0, prob: 0.20 },
-        { items: [{itemId:'scale_high_1', amount:1}], gold: 0, prob: 0.20 },
-        { items: [{itemId:'ff_coin_large', amount:1}], gold: 0, prob: 0.15 },
-        { items: [{itemId:'elixir', amount:1}], gold: 0, prob: 0.10 },
-        { items: [{itemId:'z_reactor', amount:1}], gold: 0, prob: 0.05 },
-      ],
-      crate_enhanced: [
-        { items: [{itemId:'z_reactor', amount:1}], gold: 0, prob: 0.15 },
-        { items: [{itemId:'la_juice_high', amount:3}], gold: 0, prob: 0.20 },
-        { items: [], gold: 20000, prob: 0.25 },
-        { items: [{itemId:'scale_high_1', amount:2},{itemId:'scale_high_2', amount:2}], gold: 0, prob: 0.20 },
-        { items: [{itemId:'dragon_scale', amount:1}], gold: 0, prob: 0.05 },
-        { items: [{itemId:'ff_coin_large', amount:5}], gold: 0, prob: 0.15 },
-      ],
+    changeSatiety(-rod.staminaCost);
+
+    if (result) {
+      addFishingExp(result.exp);
+      recordCatch(result.fish.id, result.sizeCm, result.weightKg);
+      // インベントリには魚アイテムを追加（既存アイテムIDに合わせてマッピング）
+      const fishItemMap: Record<string, string> = {
+        iwashi: 'raw_cod', aji: 'raw_cod', fugu: 'pufferfish', tai: 'raw_salmon',
+        sake: 'raw_salmon', buri: 'raw_salmon', hirame: 'raw_cod', tako: 'raw_cod',
+        maguro: 'hoshi_tuna', katsuo: 'hoshi_tuna', shark: 'brilliant_salmon',
+        ika: 'brilliant_salmon', ryujin_sea_bass: 'arowanna', golden_carp: 'arowanna',
+        deep_whale: 'arowanna', ryujin: 'arowanna', phantom_tuna: 'hoshi_tuna',
+        sea_god: 'arowanna', infinity_fish: 'arowanna',
+      };
+      const itemId = fishItemMap[result.fish.id] ?? 'raw_cod';
+      addItems([{ itemId, amount: 1 }]);
+      changeGold(result.sellPrice);
+
+      const isLegendary = result.fish.rarity === 'legendary';
+      const isEpic = result.fish.rarity === 'epic';
+      const sizeLabel = result.sizeCm >= result.fish.maxSizeCm * 0.95 ? ' 🏆最大級!' : '';
+      const newLabel = result.isNew ? ' ✨初図鑑登録!' : result.isRecord ? ' 📏自己記録更新!' : '';
+      const color = RARITY_COLOR[result.fish.rarity];
+      addLog(
+        `${result.fish.icon} ${result.fish.name} ${result.sizeCm}cm / ${result.weightKg}kg +${result.sellPrice}G +${result.exp}EXP${sizeLabel}${newLabel}`,
+        RARITY_LABEL[result.fish.rarity],
+        color,
+      );
+      if (isLegendary) addNotification('success', `🌟 伝説の魚「${result.fish.name}」を釣り上げた！`);
+      else if (isEpic) addNotification('success', `✨ エピック「${result.fish.name}」を釣り上げた！`);
+      if (result.isNew) addNotification('info', `📖 魚図鑑に「${result.fish.name}」を初登録！`);
+    } else {
+      addLog('…ボーズ。何も釣れなかった。', undefined, '#6b7280');
+    }
+
+    // レベルアップ通知 (簡易チェック)
+    const oldLv = fishingLevel;
+    setTimeout(() => {
+      const newLv = useGameStore.getState().player?.fishingLevel ?? 1;
+      if (newLv > oldLv) {
+        addNotification('success', `🎣 釣りレベルアップ！ Lv${newLv} になった！`);
+        const bonusMilestone = FISHING_LEVEL_BONUSES.find(b => b.level === newLv);
+        if (bonusMilestone) addNotification('info', `🎁 特典解放: ${bonusMilestone.description}`);
+      }
+    }, 100);
+
+    savePlayer();
+    setIsFishing(false);
+    setCooldown(rod.cooldownMs);
+  }, [player, cooldown, isFishing, rod, fishingLevel, fishBook, getActiveBuffBonus, addFishingExp, recordCatch, addItems, changeGold, changeSatiety, addNotification, addLog, savePlayer]);
+
+  // 自動釣り
+  useEffect(() => {
+    autoFishRef.current = autoFish;
+  }, [autoFish]);
+
+  useEffect(() => {
+    if (!autoFish) return;
+    const schedule = () => {
+      if (!autoFishRef.current) return;
+      autoRef.current = setTimeout(() => {
+        doFish();
+        if (autoFishRef.current) schedule();
+      }, rod.cooldownMs + 200);
     };
-
-    const table = tables[crateId] ?? tables['crate_leather'];
-    const reward = drawFromTableSecure(table.map(r => ({ ...r, probability: r.prob })));
-
-    if (reward.items.length > 0) addItems(reward.items);
-    if (reward.gold > 0) changeGold(reward.gold);
-    const itemStr = reward.items.map(i => `${ITEM_MASTER[i.itemId]?.icon} ${ITEM_MASTER[i.itemId]?.name}×${i.amount}`).join('、');
-    addNotification('success', `📦 クレート開封！ ${itemStr || ''}${reward.gold > 0 ? ` ${reward.gold}G` : ''}`);
-  };
+    schedule();
+    return () => { if (autoRef.current) clearTimeout(autoRef.current); };
+  }, [autoFish, rod.cooldownMs, doFish]);
 
   if (!player) return null;
 
-  const fishingLv = player.skillLevels['fishing'] ?? 1;
-  const buffBonus = getActiveBuffBonus('fishing');
-  const equippedRod = ITEM_MASTER[equippedRodId];
-  const fishingScore = player.fishingScore ?? 0;
-  const buffActive = buffBonus > 1.0;
+  const bonuses = getFishingBonuses(fishingLevel);
 
-  const tabBtn = (id: typeof activeTab, label: string) => (
-    <button
-      key={id}
-      onClick={() => setActiveTab(id)}
-      style={{
-        flex: 1, padding: '7px 2px', fontSize: '0.75rem',
-        background: activeTab === id ? 'rgba(91,141,238,0.2)' : '#1c2235',
-        border: `1px solid ${activeTab === id ? '#5b8dee' : '#2d3752'}`,
-        color: activeTab === id ? '#e8e6ff' : '#8a92b2',
-        borderRadius: 6, cursor: 'pointer',
-      }}
-    >{label}</button>
-  );
-
+  // ─── タブUI ─────────────────────────────────────────────────
   return (
-    <div style={{ padding: '12px 8px' }}>
-      <h2 style={{ fontFamily: 'Cinzel,serif', color: '#f0c060', marginBottom: 8, borderBottom: '1px solid #2d3752', paddingBottom: 8 }}>
-        🎣 釣り
-      </h2>
-
-      {/* フィーバーバナー */}
-      {fever.active && (
-        <div style={{ background: 'linear-gradient(135deg, rgba(240,168,48,0.3), rgba(224,85,85,0.3))', border: '2px solid #f0a830', borderRadius: 8, padding: '6px 12px', marginBottom: 8, textAlign: 'center', animation: 'pulse 1s infinite' }}>
-          <span style={{ color: '#f0c060', fontWeight: 700 }}>🔥 フィーバー中！ 残り {fever.remaining}回 🔥</span>
+    <div style={{ padding: '12px', maxWidth: 480, margin: '0 auto', fontFamily: 'sans-serif' }}>
+      {/* ヘッダー */}
+      <div style={{ background: 'linear-gradient(135deg,#0f4c81,#1a7db5)', borderRadius: 12, padding: '12px 16px', marginBottom: 12, color: '#fff' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 'bold' }}>🎣 釣りシステム</div>
+            <div style={{ fontSize: 13, opacity: 0.85 }}>装備中: {rod.label}</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 20, fontWeight: 'bold' }}>Lv {fishingLevel}</div>
+            <div style={{ fontSize: 12, opacity: 0.8 }}>
+              {fishingLevel >= 100 ? 'MAX' : `${fishingExp} / ${expRequired} EXP`}
+            </div>
+          </div>
         </div>
-      )}
-
-      {/* ステータスバー */}
-      <div style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 8, padding: '8px 12px', marginBottom: 8, display: 'flex', gap: 16, fontSize: '0.8rem', flexWrap: 'wrap' }}>
-        <span>🎣 釣りLv.{fishingLv}</span>
-        <span style={{ color: '#5b8dee' }}>⭐ スコア: {fishingScore} ({fishingScore % 1000}/1000→上位鱗)</span>
-        {buffActive && <span style={{ color: '#f0a830' }}>🧉 ラジュース効果中 ×{buffBonus.toFixed(1)}</span>}
-        <span style={{ color: '#f0c060' }}>🎣 装備: {equippedRod?.name ?? '基本の釣り竿'}</span>
+        {fishingLevel < 100 && (
+          <div style={{ marginTop: 8, background: 'rgba(255,255,255,0.2)', borderRadius: 6, height: 8, overflow: 'hidden' }}>
+            <div style={{ width: `${expPct}%`, height: '100%', background: '#7dd3fc', transition: 'width 0.3s' }} />
+          </div>
+        )}
+        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
+          図鑑: {bookCount}/{totalFish} ({bookPct}%) | 総釣果: {(player.fishingTotalCount ?? 0).toLocaleString()}匹
+        </div>
       </div>
 
       {/* タブ */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        {tabBtn('fish', '🎣 釣る')}
-        {tabBtn('rod', '🔧 釣り竿')}
-        {tabBtn('exchange', '🔄 交換')}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+        {(['fish', 'book', 'rod', 'level'] as Tab[]).map(t => (
+          <button key={t} onClick={() => setTab(t)} style={{
+            flex: 1, padding: '7px 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 'bold',
+            background: tab === t ? '#1a7db5' : '#1e293b', color: tab === t ? '#fff' : '#94a3b8',
+          }}>
+            {t === 'fish' ? '🎣 釣り' : t === 'book' ? '📖 図鑑' : t === 'rod' ? '🪄 竿' : '⭐ レベル'}
+          </button>
+        ))}
       </div>
 
-      {/* ===== 釣るタブ ===== */}
-      {activeTab === 'fish' && (
-        <>
-          <div style={{ background: '#161b26', border: '1px solid #2d3752', borderRadius: 10, padding: 12, marginBottom: 12 }}>
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>{node?.icon} {node?.name}</div>
-            <div style={{ fontSize: '0.78rem', color: '#8a92b2', marginBottom: 8 }}>{node?.description}</div>
-            <div style={{ fontSize: '0.75rem', color: '#4a5070', marginBottom: 8 }}>
-              釣れるもの: {node?.drops.map(d => `${ITEM_MASTER[d.itemId]?.icon}${ITEM_MASTER[d.itemId]?.name}`).join(' / ')}
-            </div>
-            <div style={{ display: 'flex', gap: 6, fontSize: '0.75rem' }}>
-              <span style={{ color: '#8a92b2' }}>満腹度消費: {node?.staminaCost}</span>
-              <span style={{ color: '#8a92b2' }}>現在: {player.stats.satiety}/{player.stats.maxSatiety}</span>
+      {/* ─── 釣りタブ ─── */}
+      {tab === 'fish' && (
+        <div>
+          {/* 釣りボタン */}
+          <div style={{ textAlign: 'center', marginBottom: 12 }}>
+            <button
+              onClick={doFish}
+              disabled={cooldown > 0 || isFishing}
+              style={{
+                width: '100%', padding: '16px', fontSize: 20, fontWeight: 'bold',
+                borderRadius: 12, border: 'none', cursor: cooldown > 0 ? 'not-allowed' : 'pointer',
+                background: casting ? '#f59e0b' : cooldown > 0 ? '#374151' : 'linear-gradient(135deg,#0ea5e9,#0284c7)',
+                color: '#fff', transition: 'all 0.15s',
+                transform: casting ? 'scale(0.97)' : 'scale(1)',
+              }}>
+              {casting ? '🌊 キャスト中…' : cooldown > 0 ? `⏳ ${(cooldown / 1000).toFixed(1)}s` : '🎣 釣る'}
+            </button>
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <button onClick={() => setAutoFish((v: boolean) => !v)} style={{
+                padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13,
+                background: autoFish ? '#dc2626' : '#0f4c81', color: '#fff',
+              }}>
+                {autoFish ? '⏹ 自動停止' : '▶ 自動釣り'}
+              </button>
+              <span style={{ fontSize: 12, color: '#94a3b8', lineHeight: '28px' }}>
+                満腹度: {player.stats.satiety ?? 0} | コスト: {rod.staminaCost}
+              </span>
             </div>
           </div>
 
-          {player.stats.satiety <= 20 && (
-            <div style={{ background: 'rgba(224,85,85,0.15)', border: '1px solid #e05555', borderRadius: 8, padding: '6px 12px', marginBottom: 8, fontSize: '0.8rem', color: '#e05555' }}>
-              ⚠️ 満腹度が低い！市場で食料を補給してください。
-            </div>
-          )}
-
-          <button
-            onClick={handleFish}
-            disabled={cooldown > 0 || player.stats.satiety < (node?.staminaCost ?? 5)}
-            style={{
-              width: '100%', padding: '14px', fontWeight: 700, fontSize: '1.1rem',
-              background: cooldown > 0 ? '#2d3752' : fever.active ? 'linear-gradient(135deg,#f0a830,#e05555)' : 'linear-gradient(135deg,#4caf87,#2d8f6f)',
-              color: '#fff', border: 'none', borderRadius: 8, cursor: cooldown > 0 ? 'not-allowed' : 'pointer',
-              marginBottom: 10,
-            }}
-          >
-            {cooldown > 0 ? `🎣 キャスト中... (${(cooldown / 1000).toFixed(1)}s)` : fever.active ? '🔥 フィーバー釣り！' : '🎣 釣りをする'}
-          </button>
-
-          {/* ラジュースボタン */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-            <button
-              onClick={() => drinkRaJuice('la_juice_normal')}
-              disabled={(player.inventory['la_juice_normal'] ?? 0) <= 0}
-              style={{ flex: 1, padding: '7px', background: '#1c2235', border: '1px solid #2d3752', color: '#e8e6ff', borderRadius: 6, cursor: 'pointer', fontSize: '0.8rem' }}
-            >
-              🧉 ラジュース({player.inventory['la_juice_normal'] ?? 0})
-            </button>
-            <button
-              onClick={() => drinkRaJuice('la_juice_high')}
-              disabled={(player.inventory['la_juice_high'] ?? 0) <= 0}
-              style={{ flex: 1, padding: '7px', background: '#1c2235', border: '1px solid #9b6df0', color: '#e8e6ff', borderRadius: 6, cursor: 'pointer', fontSize: '0.8rem' }}
-            >
-              🍹 上位ラジュース({player.inventory['la_juice_high'] ?? 0})
-            </button>
-          </div>
-
-          {/* クレート開封 */}
-          {(['crate_leather','crate_gold','crate_diamond','crate_enhanced'] as const).some(id => (player.inventory[id] ?? 0) > 0) && (
-            <div style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 8, padding: 10, marginBottom: 10 }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 6, color: '#f0c060' }}>📦 クレート開封</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {[
-                  { id: 'crate_leather', name: '革', color: '#8a92b2' },
-                  { id: 'crate_gold', name: '金', color: '#f0c060' },
-                  { id: 'crate_diamond', name: 'ダイヤ', color: '#5b8dee' },
-                  { id: 'crate_enhanced', name: '強化ダイヤ', color: '#9b6df0' },
-                ].map(c => (player.inventory[c.id] ?? 0) > 0 ? (
-                  <button key={c.id} onClick={() => openCrate(c.id)}
-                    style={{ padding: '6px 10px', background: '#161b26', border: `1px solid ${c.color}`, color: c.color, borderRadius: 6, cursor: 'pointer', fontSize: '0.78rem' }}>
-                    {ITEM_MASTER[c.id]?.icon} {c.name}クレート×{player.inventory[c.id]}
-                  </button>
-                ) : null)}
-              </div>
+          {/* クールダウンバー */}
+          {cooldown > 0 && (
+            <div style={{ background: '#1e293b', borderRadius: 6, height: 6, overflow: 'hidden', marginBottom: 8 }}>
+              <div style={{
+                width: `${(1 - cooldown / rod.cooldownMs) * 100}%`,
+                height: '100%', background: '#0ea5e9', transition: 'width 0.1s linear',
+              }} />
             </div>
           )}
 
           {/* ログ */}
-          {log.length > 0 && (
-            <div style={{ background: '#0d0f14', border: '1px solid #2d3752', borderRadius: 8, padding: 8, maxHeight: 160, overflowY: 'auto' }}>
-              {log.map((l, i) => (
-                <div key={i} style={{ fontSize: '0.75rem', color: '#8a92b2', borderBottom: '1px solid #2d3752', padding: '2px 0' }}>{l}</div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ===== 釣り竿タブ ===== */}
-      {activeTab === 'rod' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ fontSize: '0.8rem', color: '#8a92b2', marginBottom: 4 }}>
-            釣り竿を持っていれば装備できます。釣り竿によって釣れるものが変わります。
-          </div>
-          {Object.values(FISHING_RODS).map(rod => {
-            const inInventory = (player.inventory[rod.id] ?? 0) > 0;
-            const isEquipped = equippedRodId === rod.id;
-            const rodItem = ITEM_MASTER[rod.id];
-            return (
-              <div key={rod.id} style={{
-                background: isEquipped ? 'rgba(76,175,135,0.1)' : '#1c2235',
-                border: `1px solid ${isEquipped ? '#4caf87' : '#2d3752'}`,
-                borderRadius: 8, padding: '10px 12px',
-                opacity: !inInventory ? 0.5 : 1,
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <span style={{ fontWeight: 700 }}>{rodItem?.icon} {rod.name}</span>
-                    {isEquipped && <span style={{ marginLeft: 8, color: '#4caf87', fontSize: '0.75rem' }}>✓ 装備中</span>}
-                    <div style={{ fontSize: '0.75rem', color: '#8a92b2', marginTop: 2 }}>{rod.description}</div>
-                    <div style={{ fontSize: '0.72rem', color: '#4a5070', marginTop: 2 }}>釣りLv.{rod.requiredFishingLv}以上で使用可</div>
-                  </div>
-                  {inInventory && !isEquipped && (
-                    <button onClick={() => equipRod(rod.id)}
-                      style={{ padding: '5px 12px', background: '#5b8dee', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                      装備
-                    </button>
-                  )}
-                  {!inInventory && (
-                    <span style={{ fontSize: '0.75rem', color: '#4a5070' }}>未所持</span>
-                  )}
-                </div>
+          <div style={{ background: '#0f172a', borderRadius: 10, padding: 10, minHeight: 200, maxHeight: 320, overflowY: 'auto' }}>
+            {log.length === 0 && (
+              <div style={{ color: '#475569', textAlign: 'center', marginTop: 60, fontSize: 14 }}>
+                🎣 竿を投げて魚を釣ろう！
               </div>
-            );
-          })}
-          <div style={{ background: '#1c2235', border: '1px dashed #2d3752', borderRadius: 8, padding: 10, fontSize: '0.78rem', color: '#4a5070' }}>
-            💡 釣り竿は市場で購入するか、ダンジョン・ギャンブルで入手できます。
-            FFGGロッドは提案チケット+OTT64枚で交換可能です。
+            )}
+            {log.map((entry: LogEntry) => (
+              <div key={entry.id} style={{ marginBottom: 4, fontSize: 13, lineHeight: 1.4 }}>
+                {entry.rarity && (
+                  <span style={{ color: entry.color, fontWeight: 'bold', marginRight: 4, fontSize: 11 }}>
+                    [{entry.rarity}]
+                  </span>
+                )}
+                <span style={{ color: entry.color ?? '#cbd5e1' }}>{entry.message}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* ステータス */}
+          <div style={{ marginTop: 10, background: '#1e293b', borderRadius: 10, padding: 10, fontSize: 12, color: '#94a3b8' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              <div>📏 最大サイズ: <b style={{ color: '#e2e8f0' }}>{player.fishingMaxSizeCm ?? 0}cm</b></div>
+              <div>⚖️ 最大重量: <b style={{ color: '#e2e8f0' }}>{player.fishingMaxWeightKg ?? 0}kg</b></div>
+              <div>🎣 竿レベル制限: <b style={{ color: '#e2e8f0' }}>Lv{rod.minLevel}+</b></div>
+              <div>⏱ クールダウン: <b style={{ color: '#e2e8f0' }}>{rod.cooldownMs / 1000}s</b></div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ===== 交換タブ ===== */}
-      {activeTab === 'exchange' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 8, padding: 10 }}>
-            <div style={{ fontWeight: 700, marginBottom: 6, color: '#f0c060' }}>🔄 焚火交換所（チケット系）</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem' }}>
-                <span>🎫 釣りチケット×{TICKET_TO_TOTEM} → 🪬 不死のトーテム×1</span>
-                <button onClick={exchangeTicketToTotem} style={{ padding: '4px 10px', background: '#4caf87', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.75rem' }}>
-                  交換 (持:{player.inventory['fishing_ticket'] ?? 0})
-                </button>
+      {/* ─── 図鑑タブ ─── */}
+      {tab === 'book' && (
+        <div>
+          <div style={{ background: '#1e293b', borderRadius: 10, padding: '10px 14px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontSize: 16, fontWeight: 'bold', color: '#e2e8f0' }}>📖 魚図鑑</div>
+            <div style={{ fontSize: 18, fontWeight: 'bold', color: '#fbbf24' }}>{bookCount}/{totalFish}<span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 6 }}>({bookPct}%)</span></div>
+          </div>
+          <div style={{ display: 'grid', gap: 6 }}>
+            {Object.values(FISH_MASTER).map(fish => {
+              const entry = fishBook[fish.id];
+              const caught = !!entry;
+              return (
+                <div key={fish.id} style={{
+                  background: caught ? '#1e293b' : '#0f172a',
+                  border: `1px solid ${caught ? RARITY_COLOR[fish.rarity] + '44' : '#1e293b'}`,
+                  borderRadius: 8, padding: '8px 12px',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  opacity: caught ? 1 : 0.5,
+                }}>
+                  <div style={{ fontSize: 24, width: 32, textAlign: 'center' }}>
+                    {caught ? fish.icon : '❓'}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: 14 }}>
+                        {caught ? fish.name : '???'}
+                      </span>
+                      <span style={{ fontSize: 11, color: RARITY_COLOR[fish.rarity], fontWeight: 'bold' }}>
+                        {RARITY_LABEL[fish.rarity]}
+                      </span>
+                    </div>
+                    {caught ? (
+                      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                        最大 {entry.maxSizeCm}cm / {entry.maxWeightKg}kg | {entry.totalCaught}匹獲得 |
+                        初回: {new Date(entry.firstCaughtAt).toLocaleDateString('ja-JP')}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 11, color: '#475569' }}>Lv{fish.minLevel}~ 未発見</div>
+                    )}
+                  </div>
+                  {caught && (
+                    <div style={{ textAlign: 'right', fontSize: 11, color: '#94a3b8' }}>
+                      <div>範囲</div>
+                      <div>{fish.minSizeCm}~{fish.maxSizeCm}cm</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ─── 釣り竿タブ ─── */}
+      {tab === 'rod' && (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {Object.values(ROD_CONFIGS).map(r => {
+            const owned = (player.inventory[r.id] ?? 0) > 0;
+            const equipped = equippedRodId === r.id;
+            const itemMaster = ITEM_MASTER[r.id];
+            return (
+              <div key={r.id} style={{
+                background: equipped ? '#0f4c81' : '#1e293b',
+                border: equipped ? '1px solid #0ea5e9' : '1px solid #334155',
+                borderRadius: 10, padding: '10px 14px',
+                display: 'flex', alignItems: 'center', gap: 10,
+                opacity: owned ? 1 : 0.5,
+              }}>
+                <div style={{ fontSize: 22 }}>🎣</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: 14 }}>
+                    {r.label}
+                    {equipped && <span style={{ marginLeft: 6, fontSize: 11, color: '#7dd3fc', fontWeight: 'normal' }}>装備中</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                    レア+{Math.round(r.rarityBonus * 100)}% | 伝説+{Math.round(r.legendBonus * 100)}% | CD {r.cooldownMs / 1000}s | Lv{r.minLevel}+ | 所持:{player.inventory[r.id] ?? 0}
+                  </div>
+                  {itemMaster && <div style={{ fontSize: 11, color: '#64748b' }}>{itemMaster.description}</div>}
+                </div>
+                {owned && !equipped && (
+                  <button onClick={() => equipRod(r.id)} style={{
+                    padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                    background: '#0ea5e9', color: '#fff', fontSize: 12, fontWeight: 'bold',
+                  }}>装備</button>
+                )}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem' }}>
-                <span>🪬 不死のトーテム×{TOTEM_TO_REACTOR} → ⚡ Yリアクター×1</span>
-                <button onClick={exchangeTotemToReactor} style={{ padding: '4px 10px', background: '#5b8dee', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.75rem' }}>
-                  交換 (持:{player.inventory['totem'] ?? 0})
-                </button>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem' }}>
-                <span>📦 Yランダムボックス全部 → 🌋 ネザー解放の証</span>
-                <button onClick={exchangeYBoxToProof} style={{ padding: '4px 10px', background: '#f0a830', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.75rem' }}>
-                  変換 (持:{player.inventory['y_random_box'] ?? 0})
-                </button>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem' }}>
-                <span>⚡ Yリアクター×3 + 🌋 ネザー解放×2 → 🔋 Zリアクター</span>
-                <button onClick={exchangeToZReactor} style={{ padding: '4px 10px', background: '#9b6df0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.75rem' }}>
-                  合成
-                </button>
-              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ─── レベル特典タブ ─── */}
+      {tab === 'level' && (
+        <div>
+          <div style={{ background: '#1e293b', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
+            <div style={{ fontSize: 15, fontWeight: 'bold', color: '#e2e8f0', marginBottom: 8 }}>現在のボーナス</div>
+            <div style={{ fontSize: 13, color: '#94a3b8', display: 'grid', gap: 4 }}>
+              <div>📈 レア率 +{Math.round(bonuses.rarityBonus * 100)}%</div>
+              <div>🐋 大型魚率 +{Math.round(bonuses.largeFishBonus * 100)}%</div>
+              <div>🌟 伝説魚率 +{Math.round(bonuses.legendaryBonus * 100)}%</div>
             </div>
           </div>
-
-          <div style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 8, padding: 10 }}>
-            <div style={{ fontWeight: 700, marginBottom: 6, color: '#f0c060' }}>💴 FF小判交換</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem' }}>
-              <span>💴 FF小判×{COIN_EXCHANGE_RATE} → 💵 FF大判×1</span>
-              <button onClick={exchangeCoins} style={{ padding: '4px 10px', background: '#4caf87', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.75rem' }}>
-                交換 (持:{player.inventory['ff_coin_small'] ?? 0})
-              </button>
-            </div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {FISHING_LEVEL_BONUSES.map(bonus => {
+              const unlocked = fishingLevel >= bonus.level;
+              return (
+                <div key={bonus.level} style={{
+                  background: unlocked ? '#1e293b' : '#0f172a',
+                  border: `1px solid ${unlocked ? '#0ea5e9' : '#1e293b'}`,
+                  borderRadius: 8, padding: '10px 14px',
+                  display: 'flex', alignItems: 'center', gap: 12,
+                }}>
+                  <div style={{ fontSize: 20 }}>{unlocked ? '✅' : '🔒'}</div>
+                  <div>
+                    <div style={{ fontWeight: 'bold', color: unlocked ? '#7dd3fc' : '#475569' }}>
+                      Lv{bonus.level} 特典
+                    </div>
+                    <div style={{ fontSize: 13, color: unlocked ? '#e2e8f0' : '#475569' }}>
+                      {bonus.description}
+                    </div>
+                  </div>
+                  {!unlocked && (
+                    <div style={{ marginLeft: 'auto', fontSize: 12, color: '#64748b' }}>
+                      あと{bonus.level - fishingLevel}Lv
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-
-          {/* 所持アイテムサマリー */}
-          <div style={{ background: '#161b26', border: '1px solid #2d3752', borderRadius: 8, padding: 10 }}>
-            <div style={{ fontWeight: 700, marginBottom: 6, color: '#8a92b2', fontSize: '0.82rem' }}>📦 釣り関連所持品</div>
-            {[
-              'fishing_ticket','totem','y_reactor','nether_proof','z_reactor',
-              'ff_coin_small','ff_coin_large','scale_high_1','scale_high_2',
-              'scale_high_3','scale_high_4','scale_low_1','scale_low_2',
-              'wolf_crystal','caribbean_wave','dragon_soul',
-            ].map(id => (player.inventory[id] ?? 0) > 0 ? (
-              <div key={id} style={{ fontSize: '0.78rem', color: '#8a92b2', padding: '2px 0' }}>
-                {ITEM_MASTER[id]?.icon} {ITEM_MASTER[id]?.name}: {player.inventory[id]}
+          {/* 経験値テーブル */}
+          <div style={{ marginTop: 14, background: '#1e293b', borderRadius: 10, padding: '10px 14px' }}>
+            <div style={{ fontSize: 13, fontWeight: 'bold', color: '#e2e8f0', marginBottom: 8 }}>次のレベルまで</div>
+            {fishingLevel < 100 ? (
+              <div style={{ fontSize: 13, color: '#94a3b8' }}>
+                現在: {fishingExp.toLocaleString()} EXP / 必要: {expRequired.toLocaleString()} EXP
+                <div style={{ marginTop: 6, background: '#0f172a', borderRadius: 4, height: 8 }}>
+                  <div style={{ width: `${expPct}%`, height: '100%', background: '#0ea5e9', borderRadius: 4 }} />
+                </div>
+                <div style={{ marginTop: 4 }}>残り: {(expRequired - fishingExp).toLocaleString()} EXP</div>
               </div>
-            ) : null)}
+            ) : (
+              <div style={{ fontSize: 14, color: '#fbbf24', fontWeight: 'bold' }}>🏆 最大レベル達成！</div>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 }
-

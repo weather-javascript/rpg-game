@@ -326,6 +326,15 @@ export function defaultEquipmentSlots(): EquipmentSlots {
   return { hotbar: Array(9).fill(null), helmet: null, chestplate: null, leggings: null, boots: null, offhand: null };
 }
 
+// 魚図鑑エントリ
+export interface FishBookEntry {
+  fishId: string;
+  firstCaughtAt: number;
+  totalCaught: number;
+  maxSizeCm: number;
+  maxWeightKg: number;
+}
+
 export interface PlayerData {
   uid: string;
   displayName: string;
@@ -339,6 +348,13 @@ export interface PlayerData {
   dungeonClearedCount: IdMap<number>;
   fishingScore: number;
   equippedRodId: string;
+  // 釣りシステム v2
+  fishingLevel?: number;
+  fishingExp?: number;
+  fishingTotalCount?: number;
+  fishingMaxSizeCm?: number;
+  fishingMaxWeightKg?: number;
+  fishBook?: Record<string, FishBookEntry>; // key: fishId
   activeJob: string | null;
   activeBuffs: { id: string; name: string; expiry: number; fishingBonus?: number; miningBonus?: number }[];
   reliefUsedCount: number;

@@ -261,7 +261,7 @@ const TITLE_MASTER: { id: string; label: string; condition: (p: PlayerData) => b
   { id: 'dungeon10',label: '🏰 ダンジョンマスター', condition: p => Object.values(p.dungeonClearedCount ?? {}).reduce((a,b)=>a+b,0) >= 10 },
   { id: 'dungeon50',label: '🌟 ダンジョン王',       condition: p => Object.values(p.dungeonClearedCount ?? {}).reduce((a,b)=>a+b,0) >= 50 },
   { id: 'rich',     label: '💰 大富豪',             condition: p => p.gold >= 1_000_000 },
-  { id: 'fisher',   label: '🎣 釣り名人',           condition: p => (p.fishingScore ?? 0) >= 100 },
+  { id: 'fisher',   label: '🎣 釣り名人',           condition: p => (p.fishingLevel ?? 1) >= 10 },
   { id: 'crafter',  label: '🔨 名工',               condition: p => (p.skillLevels?.crafting ?? 0) >= 10 },
   { id: 'slayer100',label: '⚔️ 百獣狩り',          condition: p => (p.lifetimeStats?.monstersDefeated ?? 0) >= 100 },
   { id: 'slayer500',label: '🩸 屠龍者',             condition: p => (p.lifetimeStats?.monstersDefeated ?? 0) >= 500 },
@@ -614,7 +614,11 @@ export function StatusScreen() {
               { label:'討伐数', value: (player.lifetimeStats?.monstersDefeated ?? 0).toLocaleString() + ' 体' },
               { label:'総獲得G', value: (player.lifetimeStats?.totalGoldEarned ?? 0).toLocaleString() + ' G' },
               { label:'総ダンジョンクリア', value: Object.values(player.dungeonClearedCount ?? {}).reduce((a,b)=>a+b,0).toLocaleString() + ' 回' },
-              { label:'釣りスコア', value: (player.fishingScore ?? 0).toLocaleString() },
+              { label:'🎣 釣りレベル', value: 'Lv' + (player.fishingLevel ?? 1) },
+              { label:'🐟 総釣果数', value: (player.fishingTotalCount ?? 0).toLocaleString() + ' 匹' },
+              { label:'📏 最大サイズ', value: (player.fishingMaxSizeCm ?? 0) + ' cm' },
+              { label:'⚖️ 最大重量', value: (player.fishingMaxWeightKg ?? 0) + ' kg' },
+              { label:'📖 図鑑完成率', value: Object.keys(player.fishBook ?? {}).length + '/20 (' + Math.floor(Object.keys(player.fishBook ?? {}).length / 20 * 100) + '%)' },
             ].map(s => (
               <div key={s.label} style={{display:'flex', justifyContent:'space-between', fontSize:'0.78rem', padding:'4px 0', borderBottom:'1px solid #2d3752'}}>
                 <span style={{color:'#8a92b2'}}>{s.label}</span>

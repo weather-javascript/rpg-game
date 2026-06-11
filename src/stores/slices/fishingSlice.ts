@@ -1,17 +1,19 @@
 // src/stores/slices/fishingSlice.ts
-// 釣りスコア・釣り竿装備・バフ管理スライス
+// 釣りシステム v2 スライス
 
 import type { StateCreator } from 'zustand';
 import type { GameState } from '../gameStore';
 import { ITEM_MASTER } from '../../data/masters';
-import { randomInt } from '../../utils/random';
+import { FISH_MASTER, fishingExpRequired } from '../../data/fishMasters';
 
 export interface FishingSlice {
-  addFishingScore:  (amount: number) => void;
-  equipRod:         (rodId: string) => void;
-  setActiveJob:     (jobId: string | null) => void;
-  addBuff:          (buff: { id: string; name: string; durationMs: number; fishingBonus?: number; miningBonus?: number }) => void;
+  addFishingScore:   (amount: number) => void;
+  equipRod:          (rodId: string) => void;
+  setActiveJob:      (jobId: string | null) => void;
+  addBuff:           (buff: { id: string; name: string; durationMs: number; fishingBonus?: number; miningBonus?: number }) => void;
   getActiveBuffBonus:(type: 'fishing' | 'mining') => number;
+  addFishingExp:     (exp: number) => void;
+  recordCatch:       (fishId: string, sizeCm: number, weightKg: number) => void;
 }
 
 export const createFishingSlice: StateCreator<GameState, [], [], FishingSlice> = (set, get) => ({
@@ -20,17 +22,6 @@ export const createFishingSlice: StateCreator<GameState, [], [], FishingSlice> =
       if (!state.player) return state;
       return { player: { ...state.player, fishingScore: (state.player.fishingScore ?? 0) + amount } };
     });
-    const { player, addItems, addNotification } = get();
-    if (!player) return;
-    const score = player.fishingScore ?? 0;
-    const prevMilestone = Math.floor((score - amount) / 1000);
-    const currMilestone = Math.floor(score / 1000);
-    if (currMilestone > prevMilestone) {
-      const scales = ['scale_high_1', 'scale_high_2', 'scale_high_3', 'scale_high_4'];
-      const scale = scales[randomInt(scales.length)];
-      addItems([{ itemId: scale, amount: 1 }]);
-      addNotification('success', `🎣 釣りスコア${currMilestone * 1000}達成！上位鱗を1枚入手！`);
-    }
   },
 
   equipRod: (rodId) => {
@@ -73,5 +64,52 @@ export const createFishingSlice: StateCreator<GameState, [], [], FishingSlice> =
       if (type === 'mining' && b.miningBonus) bonus *= b.miningBonus;
     }
     return bonus;
+  },
+
+  addFishingExp: (exp: number) => {
+    set((state) => {
+      if (!state.player) return state;
+      let lv = state.player.fishingLevel ?? 1;
+      let currentExp = (state.player.fishingExp ?? 0) + exp;
+      // レベルアップ処理
+      while (lv < 100) {
+        const required = fishingExpRequired(lv);
+        if (currentExp >= required) {
+          currentExp -= required;
+          lv += 1;
+        } else {
+          break;
+        }
+      }
+      if (lv >= 100) currentExp = 0;
+      return { player: { ...state.player, fishingLevel: lv, fishingExp: currentExp } };
+    });
+    // レベルアップ通知は外側でやる (stateが読めないため)
+  },
+
+  recordCatch: (fishId: string, sizeCm: number, weightKg: number) => {
+    const fish = FISH_MASTER[fishId];
+    if (!fish) return;
+    set((state) => {
+      if (!state.player) return state;
+      const now = Date.now();
+      const existing = state.player.fishBook?.[fishId];
+      const newEntry = {
+        fishId,
+        firstCaughtAt: existing?.firstCaughtAt ?? now,
+        totalCaught: (existing?.totalCaught ?? 0) + 1,
+        maxSizeCm: Math.max(existing?.maxSizeCm ?? 0, sizeCm),
+        maxWeightKg: Math.max(existing?.maxWeightKg ?? 0, weightKg),
+      };
+      return {
+        player: {
+          ...state.player,
+          fishBook: { ...(state.player.fishBook ?? {}), [fishId]: newEntry },
+          fishingTotalCount: (state.player.fishingTotalCount ?? 0) + 1,
+          fishingMaxSizeCm: Math.max(state.player.fishingMaxSizeCm ?? 0, sizeCm),
+          fishingMaxWeightKg: Math.max(state.player.fishingMaxWeightKg ?? 0, weightKg),
+        },
+      };
+    });
   },
 });
