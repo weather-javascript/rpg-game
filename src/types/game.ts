@@ -671,7 +671,19 @@ export interface StockMaster {
 export interface StockPricePoint {
   timestamp: number;
   price: number;
-  news?: string;   // イベント発生時のニュース文
+  news?: string;
+  open?: number;
+  high?: number;
+  low?: number;
+  close?: number;
+}
+
+export interface StockTrendData {
+  trend: number;        // -0.05 ~ 0.05
+  volatility: number;  // 0.01 ~ 0.1
+  stability: number;   // 0 ~ 1
+  consecutiveTicks: number;
+  haltedAt?: number;   // ストップ高/安で取引停止した timestamp (ms), ない場合はundefined
 }
 
 export interface StockHolding {

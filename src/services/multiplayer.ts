@@ -5,7 +5,7 @@ import {
   arrayUnion, arrayRemove, runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, BattleHistoryEntry, PokerTable, PokerCard, PokerPlayer, PokerPhase, NpcQuest, StockPricePoint, StockId } from '../types/game';
+import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, BattleHistoryEntry, PokerTable, PokerCard, PokerPlayer, PokerPhase, NpcQuest, StockPricePoint, StockId, StockTrendData } from '../types/game';
 import { calcJackpotContrib, rollJackpot } from '../systems/minigames';
 
 const COLLECTIONS = {
@@ -1797,8 +1797,70 @@ export const STOCK_MASTERS: Record<StockId, { id: StockId; name: string; icon: s
 
 const STOCK_IDS: StockId[] = ['wealth_mining','wealth_fishery','wealth_casino','wealth_tech','wealth_energy','wealth_logistics','wealth_foods','wealth_finance'];
 
-export function subscribeStockPrices(cb: (prices: Record<StockId, number>, history: Record<StockId, StockPricePoint[]>) => void): () => void {
-  // stock_market/prices が存在しなければ初期データで作成
+// 30種類以上のマーケットイベント
+const MARKET_EVENTS: Array<{
+  text: string;
+  changePct: number;
+  targets?: StockId[];
+  allMarket?: boolean;
+}> = [
+  { text: '🤖 AI革命！次世代AIチップが実用化', changePct: 0.18, targets: ['wealth_tech'] },
+  { text: '💻 大手テック企業が史上最高益を記録', changePct: 0.14, targets: ['wealth_tech'] },
+  { text: '🔒 サイバー攻撃多発でセキュリティ需要急増', changePct: 0.12, targets: ['wealth_tech'] },
+  { text: '⚡ 原油価格が急騰、エネルギー株に恩恵', changePct: 0.16, targets: ['wealth_energy'] },
+  { text: '🌞 再生可能エネルギー政策が強化', changePct: 0.13, targets: ['wealth_energy'] },
+  { text: '🛢️ 産油国が減産を決定', changePct: 0.10, targets: ['wealth_energy'] },
+  { text: '🍣 食品安全基準の見直しで食品株上昇', changePct: 0.11, targets: ['wealth_foods'] },
+  { text: '🌾 農作物の大豊作で食品業績改善', changePct: 0.09, targets: ['wealth_foods'] },
+  { text: '⛏️ 希少金属の新鉱床を発見', changePct: 0.17, targets: ['wealth_mining'] },
+  { text: '⛏️ 採掘コストが大幅に削減される新技術', changePct: 0.13, targets: ['wealth_mining'] },
+  { text: '🎣 水産資源保護法の緩和で漁業回復', changePct: 0.12, targets: ['wealth_fishery'] },
+  { text: '🚚 物流DX化で配送コスト30%削減', changePct: 0.14, targets: ['wealth_logistics'] },
+  { text: '🏦 金融緩和政策で投資マインド上昇', changePct: 0.12, targets: ['wealth_finance'] },
+  { text: '💰 大型M&Aで金融コングロマリット誕生', changePct: 0.15, targets: ['wealth_finance'] },
+  { text: '🎰 カジノライセンス新規発行で株価急騰', changePct: 0.16, targets: ['wealth_casino'] },
+  { text: '🌍 世界同時株高！リスクオンムード', changePct: 0.08, allMarket: true },
+  { text: '📈 外国人投資家の買い越しが続く', changePct: 0.07, allMarket: true },
+  // 下落イベント
+  { text: '💻 大手テック企業が業績下方修正', changePct: -0.16, targets: ['wealth_tech'] },
+  { text: '🔌 半導体不足が深刻化', changePct: -0.13, targets: ['wealth_tech'] },
+  { text: '⚡ 電力価格の高騰でエネルギー株急落', changePct: -0.12, targets: ['wealth_energy'] },
+  { text: '🌊 大型台風で採掘施設が被害', changePct: -0.14, targets: ['wealth_mining'] },
+  { text: '🐟 漁業資源の枯渇問題が浮上', changePct: -0.11, targets: ['wealth_fishery'] },
+  { text: '🍔 食品偽装問題が発覚し信頼失墜', changePct: -0.18, targets: ['wealth_foods'] },
+  { text: '🚛 燃料費高騰で物流コスト急増', changePct: -0.13, targets: ['wealth_logistics'] },
+  { text: '🏦 金融不安が広がり銀行株急落', changePct: -0.15, targets: ['wealth_finance'] },
+  { text: '🎰 カジノ規制強化の法案が可決', changePct: -0.19, targets: ['wealth_casino'] },
+  { text: '📉 世界同時株安！リスクオフムード', changePct: -0.09, allMarket: true },
+  { text: '🌐 地政学リスクが高まり全面安', changePct: -0.10, allMarket: true },
+  { text: '💸 急激な円高で輸出関連株が下落', changePct: -0.07, allMarket: true },
+  { text: '😱 著名投資家が大量売却を開始', changePct: -0.11, allMarket: true },
+  { text: '⚠️ 規制当局が独占禁止法違反で調査開始', changePct: -0.12, targets: ['wealth_tech', 'wealth_finance'] },
+  { text: '🌋 天災により複数セクターで操業停止', changePct: -0.10, targets: ['wealth_mining', 'wealth_energy'] },
+];
+
+// トレンドラベル変換
+export function getTrendLabel(trend: number): { label: string; color: string; icon: string } {
+  if (trend > 0.03)  return { label: '強い上昇トレンド', color: '#4caf87', icon: '🚀' };
+  if (trend > 0.01)  return { label: '緩やかな上昇',     color: '#4caf87', icon: '📈' };
+  if (trend > -0.01) return { label: '横ばい',           color: '#8a92b2', icon: '➡️' };
+  if (trend > -0.03) return { label: '下落気味',         color: '#e08855', icon: '📉' };
+  return                     { label: '強い下落トレンド', color: '#e05555', icon: '🔻' };
+}
+
+export function getVolatilityLabel(v: number): { label: string; color: string } {
+  if (v < 0.03) return { label: '低', color: '#4caf87' };
+  if (v < 0.07) return { label: '中', color: '#f0c060' };
+  return               { label: '高', color: '#e05555' };
+}
+
+export function subscribeStockPrices(
+  cb: (
+    prices: Record<StockId, number>,
+    history: Record<StockId, import('../types/game').StockPricePoint[]>,
+    trends: Record<StockId, import('../types/game').StockTrendData>
+  ) => void
+): () => void {
   const ref = doc(db, 'stock_market', 'prices');
   getDoc(ref).then(snap => {
     if (!snap.exists()) {
@@ -1806,91 +1868,210 @@ export function subscribeStockPrices(cb: (prices: Record<StockId, number>, histo
       for (const id of STOCK_IDS) {
         initData[id] = STOCK_MASTERS[id].basePrice;
         initData[`history_${id}`] = [{ timestamp: Date.now(), price: STOCK_MASTERS[id].basePrice }];
+        initData[`trend_${id}`] = { trend: 0, volatility: 0.03, stability: 0.5, consecutiveTicks: 0 };
       }
       setDoc(ref, initData).catch(() => {});
     }
   }).catch(() => {});
 
   return onSnapshot(ref, snap => {
-    if (!snap.exists()) { cb({} as Record<StockId, number>, {} as Record<StockId, StockPricePoint[]>); return; }
+    if (!snap.exists()) {
+      cb({} as Record<StockId, number>, {} as Record<StockId, import('../types/game').StockPricePoint[]>, {} as Record<StockId, import('../types/game').StockTrendData>);
+      return;
+    }
     const data = snap.data();
     const prices: Record<string, number> = {};
-    const history: Record<string, StockPricePoint[]> = {};
+    const history: Record<string, import('../types/game').StockPricePoint[]> = {};
+    const trends: Record<string, import('../types/game').StockTrendData> = {};
     for (const id of STOCK_IDS) {
       prices[id] = data[id] ?? STOCK_MASTERS[id].basePrice;
       history[id] = data[`history_${id}`] ?? [];
+      trends[id] = data[`trend_${id}`] ?? { trend: 0, volatility: 0.03, stability: 0.5, consecutiveTicks: 0 };
     }
-    cb(prices as Record<StockId, number>, history as Record<StockId, StockPricePoint[]>);
+    cb(
+      prices as Record<StockId, number>,
+      history as Record<StockId, import('../types/game').StockPricePoint[]>,
+      trends as Record<StockId, import('../types/game').StockTrendData>
+    );
   }, () => {});
 }
 
-export async function tickStockPrices(): Promise<{ prices: Record<StockId, number>; news: string[] }> {
+// 1日あたり約5件のニュースになるよう確率調整（1tickあたり）
+// 30秒tick × 120ticks/hour × 15hours(7-22) = 1800 ticks/day → 5/1800 ≈ 0.0028
+// ただしイベント自体はtick毎に複数銘柄を評価するので、全体発生率を0.003程度に
+const NEWS_PER_TICK_PROB = 0.003;
+
+export async function tickStockPrices(): Promise<{
+  prices: Record<StockId, number>;
+  news: string[];
+  trends: Record<StockId, import('../types/game').StockTrendData>;
+}> {
   const ref = doc(db, 'stock_market', 'prices');
-  const NEWS_TEMPLATES = [
-    { text: '{name}が新技術を発表！', type: 'good' as const },
-    { text: '{name}の業績が悪化', type: 'bad' as const },
-    { text: '{name}が大型契約を締結', type: 'good' as const },
-    { text: '{name}の経営不振が明らかに', type: 'bad' as const },
-    { text: '市場全体に追い風！{name}も上昇', type: 'good' as const },
-    { text: '規制強化で{name}に逆風', type: 'bad' as const },
-    { text: '{name}が記録的な利益を達成！', type: 'super_good' as const },
-    { text: '{name}の不祥事が発覚', type: 'super_bad' as const },
-  ];
   const now = Date.now();
   const prices: Record<string, number> = {};
   const newsItems: string[] = [];
+  const trends: Record<string, import('../types/game').StockTrendData> = {};
 
   try {
     await runTransaction(db, async (tx) => {
       const snap = await tx.get(ref);
       const data = snap.exists() ? snap.data() : {};
 
-      // 30秒throttle: lastTickAt=0は必ず通す
       const lastTick = (data['lastTickAt'] as number) ?? 0;
       if (lastTick !== 0 && now - lastTick < 25_000) {
-        // throttle中: 現在価格をpricesにセットして抜ける
-        for (const id of STOCK_IDS) prices[id] = (data[id] as number) ?? STOCK_MASTERS[id].basePrice;
+        for (const id of STOCK_IDS) {
+          prices[id] = (data[id] as number) ?? STOCK_MASTERS[id].basePrice;
+          trends[id] = (data[`trend_${id}`] as import('../types/game').StockTrendData) ?? { trend: 0, volatility: 0.03, stability: 0.5, consecutiveTicks: 0 };
+        }
         return;
       }
 
-      console.log('[tickStockPrices] tick実行 lastTickAt=', lastTick, 'diff=', now - lastTick);
+      console.log('[tickStockPrices] tick実行 diff=', now - lastTick);
+
+      // 今日の開始時刻
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+      const todayStartMs = todayStart.getTime();
+
+      // ランダムイベント発生判定（1日5件ペース）
+      let eventForTick: typeof MARKET_EVENTS[number] | null = null;
+      if (Math.random() < NEWS_PER_TICK_PROB) {
+        eventForTick = MARKET_EVENTS[Math.floor(Math.random() * MARKET_EVENTS.length)];
+      }
 
       const newData: Record<string, unknown> = { lastTickAt: now };
       newsItems.length = 0;
+
       for (const id of STOCK_IDS) {
         const current: number = (data[id] as number) ?? STOCK_MASTERS[id].basePrice;
-        const roll = Math.random();
-        let changePct = 0;
-        let newsText: string | undefined;
-        if (roll < 0.005) {
-          changePct = 0.5;
-          newsText = `🚀 【ストップ高】${STOCK_MASTERS[id].name} +50%！`;
-        } else if (roll < 0.01) {
-          changePct = -0.5;
-          newsText = `📉 【ストップ安】${STOCK_MASTERS[id].name} -50%！`;
-        } else if (roll < 0.06) {
-          const pct = 0.1 + Math.random() * 0.1;
-          changePct = Math.random() < 0.5 ? pct : -pct;
-          const tmpl = NEWS_TEMPLATES[Math.floor(Math.random() * NEWS_TEMPLATES.length)];
-          newsText = `📰 ${tmpl.text.replace('{name}', STOCK_MASTERS[id].name)}（${changePct > 0 ? '+' : ''}${(changePct * 100).toFixed(0)}%）`;
-        } else {
-          const pct = 0.01 + Math.random() * 0.04;
-          changePct = Math.random() < 0.5 ? pct : -pct;
+        let trendData: import('../types/game').StockTrendData = (data[`trend_${id}`] as import('../types/game').StockTrendData) ?? {
+          trend: (Math.random() - 0.5) * 0.04,
+          volatility: 0.02 + Math.random() * 0.04,
+          stability: 0.3 + Math.random() * 0.5,
+          consecutiveTicks: 0,
+        };
+
+        // ストップ高/安チェック: その日の取引停止
+        const haltedAt = trendData.haltedAt;
+        if (haltedAt && haltedAt >= todayStartMs) {
+          // 今日は取引停止
+          prices[id] = current;
+          trends[id] = trendData;
+          newData[id] = current;
+          newData[`trend_${id}`] = trendData;
+          continue;
         }
+
+        // トレンド更新
+        const stabilityFactor = trendData.stability;
+        // 同方向が続くほど反転しやすくなる
+        const revertProb = Math.min(0.8, 0.05 + trendData.consecutiveTicks * 0.04);
+        let newTrend = trendData.trend;
+        if (Math.random() > stabilityFactor || Math.random() < revertProb) {
+          // トレンド変化
+          newTrend = newTrend * 0.3 + (Math.random() - 0.5) * 0.08;
+        } else {
+          // 小さなドリフト
+          newTrend = newTrend * 0.9 + (Math.random() - 0.5) * 0.01;
+        }
+        newTrend = Math.max(-0.05, Math.min(0.05, newTrend));
+
+        const newConsec = Math.sign(newTrend) === Math.sign(trendData.trend) ? trendData.consecutiveTicks + 1 : 0;
+        // volatilityも少しランダムウォーク
+        const newVol = Math.max(0.01, Math.min(0.1, trendData.volatility + (Math.random() - 0.5) * 0.005));
+
+        // 価格変動計算
+        const noise = (Math.random() - 0.5) * 2 * newVol;
+        let changePct = newTrend + noise;
+
+        // バブル発生 (1.5%)
+        let newsText: string | undefined;
+        const bubbleRoll = Math.random();
+        const isStopHigh = Math.random() < 0.002;
+        const isStopLow = !isStopHigh && Math.random() < 0.002;
+
+        if (isStopHigh) {
+          changePct = 0.5;
+          newsText = `🚀 【ストップ高】${STOCK_MASTERS[id].name} +50%！本日の取引終了`;
+          trendData = { ...trendData, trend: newTrend, volatility: newVol, consecutiveTicks: newConsec, haltedAt: now };
+        } else if (isStopLow) {
+          changePct = -0.5;
+          newsText = `📉 【ストップ安】${STOCK_MASTERS[id].name} -50%！本日の取引終了`;
+          trendData = { ...trendData, trend: newTrend, volatility: newVol, consecutiveTicks: newConsec, haltedAt: now };
+        } else if (bubbleRoll < 0.015) {
+          // バブル
+          changePct = 1.0 + Math.random() * 1.0; // +100%~+200%
+          newsText = `🚀 【バブル発生！】${STOCK_MASTERS[id].name} が急騰中！`;
+          trendData = { ...trendData, trend: 0.05, volatility: Math.min(0.1, newVol * 1.5), consecutiveTicks: 0 };
+        } else if (eventForTick) {
+          // マーケットイベント
+          const affects = eventForTick.allMarket ||
+            (eventForTick.targets && eventForTick.targets.includes(id));
+          if (affects) {
+            changePct = eventForTick.changePct + noise * 0.3;
+            newsText = `📰 ${eventForTick.text}（${changePct > 0 ? '+' : ''}${(changePct * 100).toFixed(1)}%）`;
+            trendData = {
+              ...trendData,
+              trend: newTrend + eventForTick.changePct * 0.3,
+              volatility: newVol,
+              consecutiveTicks: newConsec,
+            };
+          } else {
+            trendData = { ...trendData, trend: newTrend, volatility: newVol, consecutiveTicks: newConsec };
+          }
+        } else {
+          trendData = { ...trendData, trend: newTrend, volatility: newVol, consecutiveTicks: newConsec };
+        }
+
         const newPrice = Math.max(1, Math.round(current * (1 + changePct)));
+
+        // ローソク足データ生成
+        const candleOpen = current;
+        const candleClose = newPrice;
+        const swing = Math.abs(changePct) * current * 0.3;
+        const candleHigh = Math.max(candleOpen, candleClose) + Math.round(Math.random() * swing);
+        const candleLow  = Math.max(1, Math.min(candleOpen, candleClose) - Math.round(Math.random() * swing));
+
         prices[id] = newPrice;
+        trends[id] = trendData;
         newData[id] = newPrice;
+        newData[`trend_${id}`] = trendData;
+
         if (newsText !== undefined) newsItems.push(newsText);
+        if (eventForTick && newsText && !newsItems.includes(newsText)) {
+          // already pushed above
+        }
+
         const histKey = `history_${id}`;
-        const hist: StockPricePoint[] = (data[histKey] as StockPricePoint[]) ?? [];
-        hist.push({ timestamp: now, price: newPrice, ...(newsText !== undefined ? { news: newsText } : {}) });
+        const hist: import('../types/game').StockPricePoint[] = (data[histKey] as import('../types/game').StockPricePoint[]) ?? [];
+        const point: import('../types/game').StockPricePoint = {
+          timestamp: now,
+          price: newPrice,
+          open: candleOpen,
+          high: candleHigh,
+          low: candleLow,
+          close: candleClose,
+          ...(newsText !== undefined ? { news: newsText } : {}),
+        };
+        hist.push(point);
         if (hist.length > 96) hist.splice(0, hist.length - 96);
         newData[histKey] = hist;
       }
+
+      // イベントが発生したら全体ニュースとして1件だけ
+      if (eventForTick && newsItems.length === 0) {
+        // イベントは何も影響しなかった場合でもニュースだけ出す
+        newsItems.push(`📰 ${eventForTick.text}`);
+      }
+
       tx.set(ref, newData, { merge: true });
     });
-    console.log('[tickStockPrices] transaction完了 prices=', prices);
-    return { prices: prices as Record<StockId, number>, news: newsItems };
+
+    return {
+      prices: prices as Record<StockId, number>,
+      news: newsItems,
+      trends: trends as Record<StockId, import('../types/game').StockTrendData>,
+    };
   } catch (e) {
     console.error('[tickStockPrices] Firestoreへの書き込みに失敗:', e);
     throw e;
@@ -1918,6 +2099,8 @@ export function subscribeStockRanking(cb: (entries: StockRankingEntry[]) => void
     cb(entries);
   }, () => cb([]));
 }
+
+
 
 // ============================================================
 // ギルドシステム
