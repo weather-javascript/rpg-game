@@ -1166,6 +1166,13 @@ export const DEFAULT_PLAYER_STATS = {
 // ============================================================
 export const VERSION_PATCHES = [
   {
+    version: '2.8.1',
+    date: '2026-06-11',
+    changes: [
+      '株式市場: ローカルシミュレーションを廃止、Firestore統一価格に変更（全ユーザーで同一価格を表示）',
+    ],
+  },
+  {
     version: '2.8.0',
     date: '2026-06-11',
     changes: [

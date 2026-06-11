@@ -3,7 +3,7 @@
 // PvP対戦機能追加
 import { GameIcon } from '../icons';
 import { secureRandom } from '../../utils/random';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { GAMBLE_MASTER, ITEM_MASTER } from '../../data/masters';
 import { playChohan, playChinchiro, dealPoker, drawPoker } from '../../systems/minigames';
@@ -2945,55 +2945,6 @@ function ExchangePanel() {
 // ============================================================
 const STOCK_ID_LIST: StockId[] = ['wealth_mining','wealth_fishery','wealth_casino','wealth_tech','wealth_energy','wealth_logistics','wealth_foods','wealth_finance'];
 
-// ローカルで価格変動をシミュレートするユーティリティ
-function simulateLocalTick(
-  currentPrices: Record<StockId, number>,
-  currentHistory: Record<StockId, StockPricePoint[]>,
-): { prices: Record<StockId, number>; history: Record<StockId, StockPricePoint[]>; news: string[] } {
-  const now = Date.now();
-  const newsItems: string[] = [];
-  const NEWS_TEMPLATES = [
-    '{name}が新技術を発表！', '{name}の業績が悪化', '{name}が大型契約を締結',
-    '{name}の経営不振が明らかに', '市場全体に追い風！{name}も上昇', '規制強化で{name}に逆風',
-    '{name}が記録的な利益を達成！', '{name}の不祥事が発覚',
-  ];
-  const newPrices = { ...currentPrices } as Record<StockId, number>;
-  const newHistory = { ...currentHistory } as Record<StockId, StockPricePoint[]>;
-  for (const id of STOCK_ID_LIST) {
-    const base = STOCK_MASTERS[id].basePrice;
-    const current = newPrices[id] ?? base;
-    const roll = Math.random();
-    let changePct = 0;
-    let newsText: string | undefined;
-    if (roll < 0.005) {
-      changePct = 0.5;
-      newsText = `🚀 【ストップ高】${STOCK_MASTERS[id].name} +50%！`;
-    } else if (roll < 0.01) {
-      changePct = -0.5;
-      newsText = `📉 【ストップ安】${STOCK_MASTERS[id].name} -50%！`;
-    } else if (roll < 0.06) {
-      const pct = 0.08 + Math.random() * 0.12;
-      changePct = Math.random() < 0.5 ? pct : -pct;
-      const tmpl = NEWS_TEMPLATES[Math.floor(Math.random() * NEWS_TEMPLATES.length)];
-      newsText = `📰 ${tmpl.replace('{name}', STOCK_MASTERS[id].name)}（${changePct > 0 ? '+' : ''}${(changePct * 100).toFixed(0)}%）`;
-    } else {
-      const pct = 0.005 + Math.random() * 0.025;
-      changePct = Math.random() < 0.52 ? pct : -pct; // 微妙に上昇バイアス
-    }
-    // 基準値から乖離しすぎたら戻す力
-    const deviation = (current - base) / base;
-    changePct -= deviation * 0.05;
-    const newPrice = Math.max(1, Math.round(current * (1 + changePct)));
-    newPrices[id] = newPrice;
-    if (newsText) newsItems.push(newsText);
-    const hist = [...(newHistory[id] ?? [])];
-    hist.push({ timestamp: now, price: newPrice, news: newsText });
-    if (hist.length > 120) hist.splice(0, hist.length - 120);
-    newHistory[id] = hist;
-  }
-  return { prices: newPrices, history: newHistory, news: newsItems };
-}
-
 function StockMarketPanel() {
   const player = useGameStore(s => s.player);
   const changeWealthCoin = useGameStore(s => s.changeWealthCoin);
@@ -3010,19 +2961,13 @@ function StockMarketPanel() {
   const [stockRanking, setStockRanking] = useState<StockRankingEntry[]>([]);
   const [rankTab, setRankTab] = useState<'profit' | 'assets'>('profit');
   const [stockView, setStockView] = useState<'market' | 'portfolio' | 'ranking'>('market');
-  const localPricesRef = useRef<Record<StockId, number>>({} as Record<StockId, number>);
-  const localHistoryRef = useRef<Record<StockId, StockPricePoint[]>>({} as Record<StockId, StockPricePoint[]>);
-
-  // Firestoreから初期データ購読
+  // Firestoreから価格購読（全員共通）
   useEffect(() => {
     const unsub = subscribeStockPrices((p, h) => {
-      // Firestoreデータで初期化（ローカルrefも更新）
       const initPrices = { ...p } as Record<StockId, number>;
       for (const id of STOCK_ID_LIST) {
         if (!initPrices[id]) initPrices[id] = STOCK_MASTERS[id].basePrice;
       }
-      localPricesRef.current = initPrices;
-      localHistoryRef.current = { ...h };
       setPrices(initPrices);
       setHistory({ ...h });
     });
@@ -3034,24 +2979,15 @@ function StockMarketPanel() {
     return unsub;
   }, []);
 
-  // ローカルシミュレーション: 30秒ごとに価格変動
+  // アクセス時にtickをFirestoreへ書き込む（誰かが開いていれば動く）
   useEffect(() => {
     const doTick = () => {
-      // ローカルでシミュレート
-      const { prices: newP, history: newH, news: newN } = simulateLocalTick(
-        localPricesRef.current,
-        localHistoryRef.current,
-      );
-      localPricesRef.current = newP;
-      localHistoryRef.current = newH;
-      setPrices({ ...newP });
-      setHistory({ ...newH });
-      if (newN.length > 0) setNews(prev => [...newN, ...prev].slice(0, 20));
-      // バックグラウンドでFirestoreにも書き込み（エラーは無視）
-      tickStockPrices().catch(() => {});
+      tickStockPrices().then(({ news: newN }) => {
+        if (newN.length > 0) setNews(prev => [...newN, ...prev].slice(0, 20));
+      }).catch(() => {});
     };
-    // 初回は2秒後に即実行してグラフを表示
-    const initTimer = setTimeout(doTick, 2000);
+    // 初回は3秒後に実行
+    const initTimer = setTimeout(doTick, 3000);
     const interval = setInterval(doTick, 30_000);
     return () => { clearTimeout(initTimer); clearInterval(interval); };
   }, []);
