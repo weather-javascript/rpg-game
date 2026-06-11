@@ -5,7 +5,7 @@ import {
   arrayUnion, arrayRemove, runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, BattleHistoryEntry, PokerTable, PokerCard, PokerPlayer, PokerPhase, NpcQuest, QuestType, StockId } from '../types/game';
+import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, BattleHistoryEntry, PokerTable, PokerCard, PokerPlayer, PokerPhase, NpcQuest, QuestType, QuestRank, StockId } from '../types/game';
 import { calcJackpotContrib, rollJackpot } from '../systems/minigames';
 import { enqueueActivityFeed } from './activityFeedBuffer';
 
@@ -1764,7 +1764,7 @@ export async function generateNpcQuests(): Promise<void> {
     npcType: NpcQuest['npcType'],
     itemName: string,
     amount: number,
-    questType: QuestType,
+    _questType: QuestType,
     isAlternate: boolean,
     isUrgent: boolean,
   ): string {
