@@ -1880,10 +1880,10 @@ export async function tickStockPrices(): Promise<{ prices: Record<StockId, numbe
         const newPrice = Math.max(1, Math.round(current * (1 + changePct)));
         prices[id] = newPrice;
         newData[id] = newPrice;
-        if (newsText) newsItems.push(newsText);
+        if (newsText !== undefined) newsItems.push(newsText);
         const histKey = `history_${id}`;
         const hist: StockPricePoint[] = (data[histKey] as StockPricePoint[]) ?? [];
-        hist.push({ timestamp: now, price: newPrice, news: newsText });
+        hist.push({ timestamp: now, price: newPrice, ...(newsText !== undefined ? { news: newsText } : {}) });
         if (hist.length > 96) hist.splice(0, hist.length - 96);
         newData[histKey] = hist;
       }
