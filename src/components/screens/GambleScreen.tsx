@@ -2356,7 +2356,7 @@ export function getGambleRank(totalWagered: number) {
 // ============================================================
 // HighLow Panel
 // ============================================================
-const HIGHLOW_MULTIPLIERS = [1.5, 2, 3, 5, 10];
+const HIGHLOW_MULTIPLIERS = [1.3, 1.8, 2.5, 3.5, 5.0];
 function HighLowPanel({ bet, onResult, onMissionUpdate }: {
   bet: number;
   onResult: (r: GambleResult) => void;
@@ -2972,10 +2972,15 @@ function StockMarketPanel() {
   }, []);
 
   useEffect(() => {
-    // 起動時に株価更新を試みる
-    tickStockPrices().then(res => {
-      if (res.news.length > 0) setNews(prev => [...res.news, ...prev].slice(0, 20));
-    }).catch(() => {});
+    // 起動時に株価更新を試みる + 3分ごとに定期更新
+    const doTick = () => {
+      tickStockPrices().then(res => {
+        if (res.news.length > 0) setNews(prev => [...res.news, ...prev].slice(0, 20));
+      }).catch(() => {});
+    };
+    doTick();
+    const timer = setInterval(doTick, 3 * 60 * 1000);
+    return () => clearInterval(timer);
   }, []);
 
   const holdings: Record<string, StockHolding> = (player?.stockHoldings ?? {}) as Record<string, StockHolding>;

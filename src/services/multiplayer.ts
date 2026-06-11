@@ -1810,7 +1810,7 @@ export async function tickStockPrices(): Promise<{ prices: Record<StockId, numbe
   try {
     const snap = await getDoc(ref);
     const now = Date.now();
-    const INTERVAL = 15 * 60 * 1000;
+    const INTERVAL = 3 * 60 * 1000;
     const data = snap.exists() ? snap.data() : {};
     const lastTick: number = data['lastTickAt'] ?? 0;
     if (now - lastTick < INTERVAL) {

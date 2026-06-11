@@ -68,7 +68,7 @@ export function getChinchiroRole(dice: number[]): ChinchiroRole | null {
   const s = dice.slice().sort((a, b) => a - b);
   // ピンゾロ 1-1-1
   if (s[0]===1 && s[1]===1 && s[2]===1) {
-    return { name: 'ピンゾロ (1-1-1)', rank: 100, multiplier: 4, isInstantWin: true, isInstantLoss: false };
+    return { name: 'ピンゾロ (1-1-1)', rank: 100, multiplier: 2, isInstantWin: true, isInstantLoss: false };
   }
   // ヒフミ 1-2-3 → 即負け
   if (s[0]===1 && s[1]===2 && s[2]===3) {
@@ -76,11 +76,11 @@ export function getChinchiroRole(dice: number[]): ChinchiroRole | null {
   }
   // シゴロ 4-5-6
   if (s[0]===4 && s[1]===5 && s[2]===6) {
-    return { name: 'シゴロ (4-5-6)', rank: 90, multiplier: 2, isInstantWin: false, isInstantLoss: false };
+    return { name: 'シゴロ (4-5-6)', rank: 90, multiplier: 1.5, isInstantWin: false, isInstantLoss: false };
   }
   // アラシ（ゾロ目: ピンゾロ以外） → 通常勝利扱い 1.8倍
   if (s[0]===s[1] && s[1]===s[2]) {
-    return { name: `アラシ (${s[0]}-${s[0]}-${s[0]})`, rank: 10 + s[0] * 10, multiplier: 1.8, isInstantWin: false, isInstantLoss: false };
+    return { name: `アラシ (${s[0]}-${s[0]}-${s[0]})`, rank: 10 + s[0] * 10, multiplier: 1.3, isInstantWin: false, isInstantLoss: false };
   }
   // 通常目: 2つ被り + 残り1つ。残りの1つが目
   const counts: Record<number, number> = {};
@@ -89,24 +89,21 @@ export function getChinchiroRole(dice: number[]): ChinchiroRole | null {
   const singles = Object.entries(counts).filter(([, c]) => c === 1);
   if (pairs.length === 1 && singles.length === 1) {
     const pip = Number(singles[0][0]);
-    return { name: `通常目 ${pip}`, rank: pip, multiplier: 1.8, isInstantWin: false, isInstantLoss: false };
+    return { name: `通常目 ${pip}`, rank: pip, multiplier: 1.2, isInstantWin: false, isInstantLoss: false };
   }
   // 目なし（3つとも別々 & 役なし）
   return null;
 }
 
 export function playChinchiro(bet: number): GambleResult & { dice: number[]; roleName: string } {
-  // 役が出るまで最大3回振る（1人プレイ版）
+  // 最大3回振る。役が出た時点で終了。3回とも役なし → 目なし負け
   let dice: number[] = [];
   let role: ChinchiroRole | null = null;
-  let roll_count = 0;
-  while (roll_count < 3) {
+  for (let i = 0; i < 3; i++) {
     dice = [rollDice(), rollDice(), rollDice()];
     role = getChinchiroRole(dice);
-    roll_count++;
     if (role !== null) break;
   }
-  // 3回振っても役なし → 目なし負け
   if (!role) {
     return { rewardLabel: '目なし（ハズレ）', multiplier: 0, goldDelta: -bet, itemRewards: [], symbols: dice.map(String), dice, roleName: '目なし' };
   }
