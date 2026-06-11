@@ -1841,9 +1841,9 @@ export async function tickStockPrices(): Promise<{ prices: Record<StockId, numbe
     const now = Date.now();
     const data = snap.exists() ? snap.data() : {};
 
-    // 2分throttle: 最後のtickから120秒未満なら何もしない
+    // 2分throttle: 最後のtickから110秒未満なら何もしない（lastTickAt=0は必ず通す）
     const lastTick = (data['lastTickAt'] as number) ?? 0;
-    if (now - lastTick < 110_000) {
+    if (lastTick !== 0 && now - lastTick < 110_000) {
       // 現在の価格だけ返す
       const prices: Record<string, number> = {};
       for (const id of STOCK_IDS) prices[id] = (data[id] as number) ?? STOCK_MASTERS[id].basePrice;

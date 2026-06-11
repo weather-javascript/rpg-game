@@ -3010,20 +3010,32 @@ function StockMarketPanel() {
 
   // アクセス時にtickをFirestoreへ書き込む（誰かが開いていれば動く）
   useEffect(() => {
+    // デバッグ用: true にすると市場時間外でもtickする
+    // デバッグ用: true にすると市場時間外でもtickする
+    const DEBUG_SKIP_MARKET_HOURS = false;
+
     const doTick = () => {
-      // 取引時間チェック: 9:30〜16:30
-      const now = new Date();
-      const h = now.getHours(), m = now.getMinutes();
-      const inMarket = (h > 9 || (h === 9 && m >= 30)) && (h < 16 || (h === 16 && m < 30));
-      if (!inMarket) return;
+      if (!DEBUG_SKIP_MARKET_HOURS) {
+        // 取引時間チェック: 7:00〜22:00 (JST)
+        const now = new Date();
+        const h = now.getHours();
+        const inMarket = h >= 7 && h < 22;
+        if (!inMarket) {
+          console.log('[StockTick] 市場時間外のためスキップ', `${h}:${String(now.getMinutes()).padStart(2,'0')}`);
+          return;
+        }
+      }
+      console.log('[StockTick] tick実行中...', new Date().toISOString());
       tickStockPrices().then(({ news: newN }) => {
+        console.log('[StockTick] tick成功', newN.length > 0 ? newN : '(ニュースなし)');
         if (newN.length > 0) setNews(prev => [...newN, ...prev].slice(0, 20));
-      }).catch(() => {});
+      }).catch((e) => { console.error('[StockTick] tick失敗', e); });
     };
-    // 初回は3秒後に実行
-    const initTimer = setTimeout(doTick, 3000);
+    // 初回は即時実行
+    console.log('[StockTick] useEffect開始 - 初回tick実行');
+    doTick();
     const interval = setInterval(doTick, 120_000);
-    return () => { clearTimeout(initTimer); clearInterval(interval); };
+    return () => { clearInterval(interval); };
   }, []);
 
   const holdings: Record<string, StockHolding> = (player?.stockHoldings ?? {}) as Record<string, StockHolding>;

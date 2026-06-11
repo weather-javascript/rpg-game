@@ -331,7 +331,7 @@ function VersionPopup({ onClose }: { onClose: () => void }) {
             </button>
             {openSections[i] && (
               <ul style={{ background:'#161b26', border:'1px solid #2d3752', borderTop:'none', borderRadius:'0 0 6px 6px', padding:'8px 12px 10px 28px', margin:0 }}>
-                {(p.changes ?? []).map((c, j) => (
+                {p.changes.map((c, j) => (
                   <li key={j} style={{ color:'#8a92b2', fontSize:'0.8rem', marginBottom:3 }}>{c}</li>
                 ))}
               </ul>
