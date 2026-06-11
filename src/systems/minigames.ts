@@ -68,7 +68,7 @@ export function getChinchiroRole(dice: number[]): ChinchiroRole | null {
   const s = dice.slice().sort((a, b) => a - b);
   // ピンゾロ 1-1-1
   if (s[0]===1 && s[1]===1 && s[2]===1) {
-    return { name: 'ピンゾロ (1-1-1)', rank: 100, multiplier: 2.6, isInstantWin: true, isInstantLoss: false };
+    return { name: 'ピンゾロ (1-1-1)', rank: 100, multiplier: 2.32, isInstantWin: true, isInstantLoss: false };
   }
   // ヒフミ 1-2-3 → 即負け
   if (s[0]===1 && s[1]===2 && s[2]===3) {
@@ -76,11 +76,11 @@ export function getChinchiroRole(dice: number[]): ChinchiroRole | null {
   }
   // シゴロ 4-5-6
   if (s[0]===4 && s[1]===5 && s[2]===6) {
-    return { name: 'シゴロ (4-5-6)', rank: 90, multiplier: 1.8, isInstantWin: false, isInstantLoss: false };
+    return { name: 'シゴロ (4-5-6)', rank: 90, multiplier: 1.66, isInstantWin: false, isInstantLoss: false };
   }
   // アラシ（ゾロ目: ピンゾロ以外） → 通常勝利扱い 1.8倍
   if (s[0]===s[1] && s[1]===s[2]) {
-    return { name: `アラシ (${s[0]}-${s[0]}-${s[0]})`, rank: 10 + s[0] * 10, multiplier: 1.5, isInstantWin: false, isInstantLoss: false };
+    return { name: `アラシ (${s[0]}-${s[0]}-${s[0]})`, rank: 10 + s[0] * 10, multiplier: 1.41, isInstantWin: false, isInstantLoss: false };
   }
   // 通常目: 2つ被り + 残り1つ。残りの1つが目
   const counts: Record<number, number> = {};
@@ -89,7 +89,9 @@ export function getChinchiroRole(dice: number[]): ChinchiroRole | null {
   const singles = Object.entries(counts).filter(([, c]) => c === 1);
   if (pairs.length === 1 && singles.length === 1) {
     const pip = Number(singles[0][0]);
-    return { name: `通常目 ${pip}`, rank: pip, multiplier: 1.33, isInstantWin: false, isInstantLoss: false };
+    // 目1~3は役なし扱い（目なし負けの確率調整）
+    if (pip <= 3) return null;
+    return { name: `通常目 ${pip}`, rank: pip, multiplier: 1.27, isInstantWin: false, isInstantLoss: false };
   }
   // 目なし（3つとも別々 & 役なし）
   return null;
