@@ -389,6 +389,9 @@ export interface PlayerData {
   fishingTotalGoldEarned?: number;
   fishingAchievements?: string[]; // achieved FA ids
   fishingUnlockedTitles?: string[]; // unlocked title ids
+  fishCoin?: number; // 釣り専用通貨
+  fishingLegendaryCount?: number; // 伝説魚累計捕獲数
+  fishingTotalWeightKg?: number; // 総重量(累計)
   activeJob: string | null;
   activeBuffs: { id: string; name: string; expiry: number; fishingBonus?: number; miningBonus?: number }[];
   reliefUsedCount: number;
