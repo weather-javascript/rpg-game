@@ -2860,6 +2860,31 @@ export async function refreshAnalyticsSummary(players: AdminPlayerData[]): Promi
   return summary;
 }
 
+// ---- タブ別メンテナンス ----
+export type MaintainableTab = 'gathering' | 'fishing' | 'crafting' | 'market' | 'dungeon' | 'gamble' | 'online' | 'navi';
+export interface TabMaintenanceEntry { active: boolean; message?: string; startedAt?: number; estimatedMinutes?: number; }
+export type TabMaintenanceConfig = Partial<Record<MaintainableTab, TabMaintenanceEntry>>;
+
+const TAB_MAINT_REF = () => doc(db, 'admin', 'tab_maintenance');
+
+export async function getTabMaintenance(): Promise<TabMaintenanceConfig> {
+  const snap = await getDoc(TAB_MAINT_REF());
+  if (!snap.exists()) return {};
+  return (snap.data() as { tabs: TabMaintenanceConfig }).tabs ?? {};
+}
+
+export async function setTabMaintenanceEntry(tab: MaintainableTab, entry: TabMaintenanceEntry | null): Promise<void> {
+  const current = await getTabMaintenance();
+  if (entry === null) { delete current[tab]; } else { current[tab] = entry; }
+  await setDoc(TAB_MAINT_REF(), { tabs: current });
+}
+
+export function subscribeTabMaintenance(cb: (config: TabMaintenanceConfig) => void): Unsubscribe {
+  return onSnapshot(TAB_MAINT_REF(), snap => {
+    cb(snap.exists() ? ((snap.data() as { tabs: TabMaintenanceConfig }).tabs ?? {}) : {});
+  });
+}
+
 // ---- 釣りキャスト時間設定 ----
 const FISHING_CONFIG_REF = () => doc(db, 'admin', 'fishing_config');
 
