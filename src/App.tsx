@@ -15,7 +15,8 @@ import { FishingScreen }   from './components/screens/FishingScreen';
 import { AdminScreen }     from './components/screens/AdminScreen';
 import { CraftingScreen }   from './components/screens/CraftingScreen';
 import { NaviScreen }       from './components/screens/NaviScreen';
-import { subscribeSoldNotifications, markSoldNotificationRead, subscribeMaintenanceStatus, setPlayerActivity } from './services/multiplayer';
+import { subscribeSoldNotifications, markSoldNotificationRead, subscribeMaintenanceStatus, setPlayerActivity, subscribeTabMaintenance } from './services/multiplayer';
+import type { TabMaintenanceConfig } from './services/multiplayer';
 import type { PlayerActivityCode } from './services/multiplayer';
 
 const TAB_TO_ACTIVITY: Partial<Record<string, PlayerActivityCode>> = {
@@ -249,6 +250,45 @@ function MaintenanceScreen({ startedAt, estimatedMinutes, message, uid, displayN
               <p style={{ color:'#4a5070', fontSize:'0.75rem', marginTop:12 }}>{guessCount}回目</p>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// タブ別メンテナンス画面
+// ============================================================
+const TAB_LABELS: Record<string, string> = {
+  gathering: '採取', fishing: '釣り', crafting: '製作',
+  market: '市場', dungeon: 'ダンジョン', gamble: 'ギャンブル',
+  online: 'オンライン', navi: '冒険ナビ',
+};
+function TabMaintenanceScreen({ tab, entry }: { tab: string; entry: { message?: string; startedAt?: number; estimatedMinutes?: number } }) {
+  const startedAt = entry.startedAt ?? Date.now();
+  const estimatedMinutes = entry.estimatedMinutes ?? 0;
+  const startTime = new Date(startedAt).toLocaleString('ja-JP');
+  const endTime = estimatedMinutes > 0 ? new Date(startedAt + estimatedMinutes * 60 * 1000).toLocaleString('ja-JP') : null;
+  return (
+    <div style={{ minHeight:'60vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 16px' }}>
+      <div style={{ width:'100%', maxWidth:420, background:'#1c2235', border:'1px solid #2d3752', borderRadius:14, overflow:'hidden', textAlign:'center' }}>
+        <div style={{ padding:'28px 20px 20px', borderBottom:'1px solid #2d3752' }}>
+          <div style={{ fontSize:'2.6rem', marginBottom:10 }}>🔧</div>
+          <div style={{ fontSize:'1.1rem', fontWeight:700, color:'#f0c060', marginBottom:6 }}>
+            【{TAB_LABELS[tab] ?? tab}】メンテナンス中
+          </div>
+          {entry.message && (
+            <div style={{ background:'rgba(240,192,96,0.08)', border:'1px solid rgba(240,192,96,0.25)', borderRadius:8, padding:'8px 12px', margin:'10px 0', color:'#f0d080', fontSize:'0.83rem', lineHeight:1.7, whiteSpace:'pre-wrap' }}>
+              {entry.message}
+            </div>
+          )}
+          <div style={{ color:'#6a7290', fontSize:'0.77rem', lineHeight:1.9, marginTop:8 }}>
+            <div>開始: {startTime}</div>
+            {endTime && <div>終了予定: {endTime}</div>}
+          </div>
+        </div>
+        <div style={{ padding:'16px 20px', color:'#8a92b2', fontSize:'0.8rem' }}>
+          しばらくお待ちください。メンテナンス終了後、自動的に再開できます。
         </div>
       </div>
     </div>
@@ -572,6 +612,7 @@ export default function App() {
   const [showVersionPopup, setShowVersionPopup] = useState(false);
   const [showAdminAnnounce, setShowAdminAnnounce] = useState(false);
   const [maintenanceStatus, setMaintenanceStatus] = useState<{ active: boolean; startedAt: number; estimatedMinutes: number; message?: string } | null>(null);
+  const [tabMaintenance, setTabMaintenance] = useState<TabMaintenanceConfig>({});
   const [soldPopup, setSoldPopup] = useState<SoldPopupInfo | null>(null);
   const soldQueueRef = useRef<SoldPopupInfo[]>([]);
   useEffect(() => {
@@ -582,6 +623,12 @@ export default function App() {
   // メンテナンス監視
   useEffect(() => {
     const unsub = subscribeMaintenanceStatus(s => setMaintenanceStatus(s));
+    return unsub;
+  }, []);
+
+  // タブ別メンテナンス監視
+  useEffect(() => {
+    const unsub = subscribeTabMaintenance(cfg => setTabMaintenance(cfg));
     return unsub;
   }, []);
 
@@ -656,8 +703,14 @@ export default function App() {
       {soldPopup && <SoldPopup info={soldPopup} onClose={() => { setSoldPopup(null); const q = soldQueueRef.current; if (q.length > 0) { setTimeout(() => { setSoldPopup(q[0]); soldQueueRef.current = q.slice(1); }, 300); } }} />}
       <StatusBar />
       <main style={{ paddingBottom:72 }}>
-        <ActiveScreen tab={activeTab} />
-      </main>
+          {(() => {
+            const tabEntry = tabMaintenance[activeTab as keyof TabMaintenanceConfig];
+            if (tabEntry?.active && !ADMIN_UIDS.includes(player.uid)) {
+              return <TabMaintenanceScreen tab={activeTab} entry={tabEntry} />;
+            }
+            return <ActiveScreen tab={activeTab} />;
+          })()}
+        </main>
       <ReliefPanel />
       <TabNav activeTab={activeTab} setTab={(t) => {
         setActiveTab(t as TabId);
