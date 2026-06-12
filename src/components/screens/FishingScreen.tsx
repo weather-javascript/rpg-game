@@ -112,7 +112,6 @@ export function FishingScreen() {
   const equipBait         = useGameStore((s: any) => s.equipBait);
   const useBait           = useGameStore((s: any) => s.useBait);
   const enhanceRod        = useGameStore((s: any) => s.enhanceRod);
-  const addFishCoin       = useGameStore((s: any) => s.addFishCoin);
   const spendFishCoin     = useGameStore((s: any) => s.spendFishCoin);
   const checkFishingAchievements = useGameStore((s: any) => s.checkFishingAchievements);
 
