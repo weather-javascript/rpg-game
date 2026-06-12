@@ -124,6 +124,7 @@ export function FishingScreen() {
   const [log, setLog] = useState<LogEntry[]>([]);
   const [cooldown, setCooldown] = useState(0);
   const [casting, setCasting] = useState(false);
+  const castingRef = useRef(false);
   const [autoFish, setAutoFish] = useState(false);
   const autoRef = useRef(false);
   const cdRef   = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -168,13 +169,14 @@ export function FishingScreen() {
   }, []);
 
   const doFish = useCallback(() => {
-    if (!player || cooldown > 0 || casting) return;
+    if (!player || cooldown > 0 || castingRef.current) return;
     if ((player.stats.satiety ?? 0) < staminaCost) {
       addNotification('warning', '満腹度が足りません！');
       autoRef.current = false; setAutoFish(false); return;
     }
+    castingRef.current = true;
     setCasting(true);
-    setTimeout(() => setCasting(false), 500);
+    setTimeout(() => { setCasting(false); castingRef.current = false; }, cdMs > 0 ? Math.min(cdMs, 1500) : 1500);
     changeSatiety(-staminaCost);
 
     const buffBonus = getActiveBuffBonus('fishing');

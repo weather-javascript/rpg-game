@@ -1581,7 +1581,7 @@ const SLOT_TIERS = [
 ] as const;
 
 // スロット専用パネル（固定台制・台別ジャックポット）
-function SlotPanel({ onResult, onJackpotContrib, multiplierBonus = 1.0 }: { onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
+function SlotPanel({ onResult, onJackpotContrib, multiplierBonus = 1.0, onLockChange }: { onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number; onLockChange?: (locked: boolean) => void }) {
   const { player, changeWealthCoin, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeWealthCoin: s.changeWealthCoin, addItems: s.addItems, addNotification: s.addNotification }));
   const [selectedTier, setSelectedTier] = useState(0); // index into SLOT_TIERS
   const [result, setResult] = useState<GambleResult | null>(null);
@@ -1607,6 +1607,7 @@ function SlotPanel({ onResult, onJackpotContrib, multiplierBonus = 1.0 }: { onRe
   const play = async () => {
     if (animating || !player || (player.wealthCoin ?? 0) < bet) { addNotification('error', 'WCが足りません！'); return; }
     setAnimating(true); setResult(null); setFinalSyms(null);
+    onLockChange?.(true);
     changeWealthCoin(-bet);
     onJackpotContrib(bet);
     await contributeToSlotJackpot(bet, bet);
@@ -1658,6 +1659,7 @@ function SlotPanel({ onResult, onJackpotContrib, multiplierBonus = 1.0 }: { onRe
         }
       } catch { /**/ }
       setAnimating(false);
+      onLockChange?.(false);
     }, 2300);
   };
 
@@ -1726,7 +1728,7 @@ function SlotPanel({ onResult, onJackpotContrib, multiplierBonus = 1.0 }: { onRe
   );
 }
 
-function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: { game: GambleMaster; bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number }) {
+function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus = 1.0, onLockChange }: { game: GambleMaster; bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number; onLockChange?: (locked: boolean) => void }) {
   const { player, changeGold: _cg2, changeWealthCoin, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeGold: s.changeGold, changeWealthCoin: s.changeWealthCoin, addItems: s.addItems, addNotification: s.addNotification }));
   const [result, setResult] = useState<GambleResult | null>(null);
   const [animating, setAnimating] = useState(false);
@@ -1737,6 +1739,7 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus =
     if (animating || !player || (player.wealthCoin ?? 0) < bet) { addNotification('error', 'WCが足りません！'); return; }
     setAnimating(true);
     setResult(null);
+    onLockChange?.(true);
     changeWealthCoin(-bet);
     onJackpotContrib(bet); // ジャックポット積立
 
@@ -1748,7 +1751,7 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus =
   const handleAnimDone = async () => {
     setShowAnim(false);
     const r = pendingRef.r;
-    if (!r) { setAnimating(false); return; }
+    if (!r) { setAnimating(false); onLockChange?.(false); return; }
     if (r.multiplier > 0) changeWealthCoin(r.goldDelta + bet);
     if (r.itemRewards.length > 0) addItems(r.itemRewards);
     setResult(r);
@@ -1786,6 +1789,7 @@ function GenericPanel({ game, bet, onResult, onJackpotContrib, multiplierBonus =
       }
     } catch { /* ignore */ }
     setAnimating(false);
+    onLockChange?.(false);
   };
 
   const animType = game.type === 'slot' ? 'slot' : game.type === 'treasure_box' ? 'treasure_box' : 'generic';
@@ -2278,10 +2282,11 @@ const TREASURE_BOX_DEFS = [
   { id: 'treasure_box_mystic', label: '神秘箱', emoji: '✨', color: '#e060e0', bet: 4000000 },
 ] as const;
 
-function TreasureBoxPanel({ onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
+function TreasureBoxPanel({ onResult, onJackpotContrib, multiplierBonus = 1.0, onLockChange }: {
   onResult: (r: GambleResult) => void;
   onJackpotContrib: (bet: number) => void;
   multiplierBonus?: number;
+  onLockChange?: (locked: boolean) => void;
 }) {
   const [selectedBox, setSelectedBox] = useState(0);
   const boxDef = TREASURE_BOX_DEFS[selectedBox];
@@ -2330,7 +2335,7 @@ function TreasureBoxPanel({ onResult, onJackpotContrib, multiplierBonus = 1.0 }:
           ))}
         </div>
       </div>
-      <GenericPanel game={game} bet={bet} onResult={onResult} onJackpotContrib={onJackpotContrib} multiplierBonus={multiplierBonus} />
+      <GenericPanel game={game} bet={bet} onResult={onResult} onJackpotContrib={onJackpotContrib} multiplierBonus={multiplierBonus} onLockChange={onLockChange} />
     </div>
   );
 }
@@ -2524,8 +2529,8 @@ const GAME_NAMES_JP: Record<string, string> = {
 // ============================================================
 // ミニマインパネル
 // ============================================================
-function MinesPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
-  bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number;
+function MinesPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, onLockChange }: {
+  bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number; onLockChange?: (locked: boolean) => void;
 }) {
   const player = useGameStore(s => s.player);
   const setPlayer = useGameStore(s => s.setPlayer);
@@ -2551,6 +2556,7 @@ function MinesPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: 
     setWon(false);
     setPlaying(true);
     setMsg('マスを選択してください');
+    onLockChange?.(true);
     const latest = useGameStore.getState().player ?? player;
     setPlayer({ ...latest, wealthCoin: (latest.wealthCoin ?? 0) - bet });
     onJackpotContrib(bet);
@@ -2565,6 +2571,7 @@ function MinesPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: 
       setGameOver(true);
       setPlaying(false);
       setMsg('💣 爆弾！ゲームオーバー');
+      onLockChange?.(false);
       onResult({ rewardLabel: '爆弾！ハズレ', multiplier: 0, goldDelta: -bet, itemRewards: [], symbols: ['💣'] });
     } else {
       newBoard[i] = false;
@@ -2590,6 +2597,7 @@ function MinesPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: 
     setWon(true);
     setPlaying(false);
     setMsg(`🎉 ${sc}マス成功で ${mult.toFixed(2)}x！`);
+    onLockChange?.(false);
     onResult({ rewardLabel: `${sc}マス成功`, multiplier: mult, goldDelta, itemRewards: [], symbols: ['⛏️'] });
   };
 
@@ -2629,8 +2637,8 @@ function MinesPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: 
 // ============================================================
 // ダイスレースパネル
 // ============================================================
-function DiceRacePanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
-  bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number;
+function DiceRacePanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, onLockChange }: {
+  bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number; onLockChange?: (locked: boolean) => void;
 }) {
   const player = useGameStore(s => s.player);
   const setPlayer = useGameStore(s => s.setPlayer);
@@ -2642,6 +2650,7 @@ function DiceRacePanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
   const roll = () => {
     if (!player || (player.wealthCoin ?? 0) < bet || chosen === null) return;
     setLoading(true);
+    onLockChange?.(true);
     const latest = useGameStore.getState().player ?? player;
     setPlayer({ ...latest, wealthCoin: (latest.wealthCoin ?? 0) - bet });
     onJackpotContrib(bet);
@@ -2664,6 +2673,7 @@ function DiceRacePanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
       setResult(label);
       onResult({ rewardLabel: label, multiplier: mult, goldDelta, itemRewards: [], symbols: ['🎲'] });
       setLoading(false);
+      onLockChange?.(false);
       setChosen(null);
     }, 600);
   };
@@ -2695,8 +2705,8 @@ function DiceRacePanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
 // ============================================================
 // ルーレットパネル
 // ============================================================
-function RoulettePanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
-  bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number;
+function RoulettePanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, onLockChange }: {
+  bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number; onLockChange?: (locked: boolean) => void;
 }) {
   const player = useGameStore(s => s.player);
   const setPlayer = useGameStore(s => s.setPlayer);
@@ -2707,6 +2717,7 @@ function RoulettePanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
   const spin = () => {
     if (!player || (player.wealthCoin ?? 0) < bet || !choice) return;
     setLoading(true);
+    onLockChange?.(true);
     const latest = useGameStore.getState().player ?? player;
     setPlayer({ ...latest, wealthCoin: (latest.wealthCoin ?? 0) - bet });
     onJackpotContrib(bet);
@@ -2728,6 +2739,7 @@ function RoulettePanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
       const label = win ? `${colorEmoji} 当たり！` : `外れ（${colorEmoji}）`;
       onResult({ rewardLabel: label, multiplier: mult, goldDelta, itemRewards: [], symbols: [colorEmoji] });
       setLoading(false);
+      onLockChange?.(false);
       setChoice(null);
     }, 700);
   };
@@ -2755,8 +2767,8 @@ function RoulettePanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
 // ============================================================
 // ブラックジャックパネル
 // ============================================================
-function BlackjackPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
-  bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number;
+function BlackjackPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, onLockChange }: {
+  bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number; onLockChange?: (locked: boolean) => void;
 }) {
   const player = useGameStore(s => s.player);
   const setPlayer = useGameStore(s => s.setPlayer);
@@ -2779,6 +2791,7 @@ function BlackjackPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
     setDealerHand(dh);
     setPhase('playing');
     setMsg('ヒット or スタンド？');
+    onLockChange?.(true);
     if (sum(ph) === 21) stand(ph, dh);
   };
 
@@ -2788,6 +2801,7 @@ function BlackjackPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
     if (sum(newHand) > 21) {
       setPhase('done');
       setMsg('💥 バースト！負け');
+      onLockChange?.(false);
       onResult({ rewardLabel: '負け（バースト）', multiplier: 0, goldDelta: -bet, itemRewards: [], symbols: ['🃏💨'] });
     } else if (sum(newHand) === 21) {
       stand(newHand, dealerHand);
@@ -2808,6 +2822,7 @@ function BlackjackPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
     const latest = useGameStore.getState().player ?? player!;
     if (mult > 0) setPlayer({ ...latest, wealthCoin: (latest.wealthCoin ?? 0) + Math.floor(bet * mult) });
     setMsg(label === '勝ち！' ? `🎉 ${label} (Player:${ps} vs Dealer:${ds})` : label === '引き分け' ? `🤝 ${label} (${ps}点)` : `💀 ${label} (Player:${ps} vs Dealer:${ds})`);
+    onLockChange?.(false);
     onResult({ rewardLabel: label, multiplier: mult, goldDelta, itemRewards: [], symbols: ['🃏'] });
   };
 
@@ -2862,8 +2877,8 @@ function BlackjackPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0
 // ============================================================
 // スクラッチパネル
 // ============================================================
-function ScratchPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
-  bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number;
+function ScratchPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, onLockChange }: {
+  bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number; onLockChange?: (locked: boolean) => void;
 }) {
   const player = useGameStore(s => s.player);
   const setPlayer = useGameStore(s => s.setPlayer);
@@ -2883,9 +2898,9 @@ function ScratchPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }
     const r = secureRandom();
     let winSymbol: string | null = null;
     let newGrid: string[];
-    if (r < 0.02) { winSymbol = '🌟'; }
-    else if (r < 0.10) { winSymbol = '💎'; }
-    else if (r < 0.30) { winSymbol = '🍀'; }
+    if (r < 0.05) { winSymbol = '🌟'; }
+    else if (r < 0.20) { winSymbol = '💎'; }
+    else if (r < 0.55) { winSymbol = '🍀'; }
     if (winSymbol) {
       // place 3 of winSymbol at random positions
       const positions = [0,1,2,3,4,5,6,7,8];
@@ -2907,6 +2922,7 @@ function ScratchPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }
     setRevealed(Array(9).fill(false));
     setSelectedCells([]);
     setPhase('selecting');
+    onLockChange?.(true);
     setMsg('3マスを選んでスクラッチ！');
   };
 
@@ -2932,6 +2948,7 @@ function ScratchPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }
       if (mult > 0) setPlayer({ ...latestP, wealthCoin: (latestP.wealthCoin ?? 0) + Math.floor(bet * mult) });
       setPhase('done');
       setMsg(label);
+      onLockChange?.(false);
       onResult({ rewardLabel: label, multiplier: mult, goldDelta, itemRewards: [], symbols: [matchSymbol ?? '💨'] });
     }
   };
@@ -2960,7 +2977,7 @@ function ScratchPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }
         </button>
       )}
       <div style={{ fontSize: '0.72rem', color: '#4a5070', marginTop: 6 }}>
-        🌟×3=大当たり×10 / 💎×3=中当たり×3 / 🍀×3=小当たり×1.5
+        🌟×3=大当たり×10(5%) / 💎×3=中当たり×3(15%) / 🍀×3=小当たり×1.5(35%)
       </div>
     </div>
   );
@@ -2969,8 +2986,8 @@ function ScratchPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }
 // ============================================================
 // ミニレースパネル
 // ============================================================
-function RacePanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
-  bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number;
+function RacePanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0, onLockChange }: {
+  bet: number; onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number; onLockChange?: (locked: boolean) => void;
 }) {
   const player = useGameStore(s => s.player);
   const setPlayer = useGameStore(s => s.setPlayer);
@@ -2986,6 +3003,7 @@ function RacePanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
   const race = () => {
     if (!player || (player.wealthCoin ?? 0) < bet || !choice) return;
     setLoading(true);
+    onLockChange?.(true);
     const latest = useGameStore.getState().player ?? player;
     setPlayer({ ...latest, wealthCoin: (latest.wealthCoin ?? 0) - bet });
     onJackpotContrib(bet);
@@ -3005,6 +3023,7 @@ function RacePanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
       if (mult > 0) setPlayer({ ...latestP, wealthCoin: (latestP.wealthCoin ?? 0) + Math.floor(bet * mult) });
       onResult({ rewardLabel: win ? `${w}が勝った！` : '負け', multiplier: mult, goldDelta, itemRewards: [], symbols: [def.emoji] });
       setLoading(false);
+      onLockChange?.(false);
       setChoice(null);
     }, 800);
   };
@@ -4380,7 +4399,15 @@ export function GambleScreen() {
   const [chohanBetLocked, setChohanBetLocked] = useState(false);
   const [chinchiroBetLocked, setChinchiroBetLocked] = useState(false);
   const [highlowBetLocked, setHighlowBetLocked] = useState(false);
-  const isGambling = pokerBetLocked || coinFlipBetLocked || chohanBetLocked || chinchiroBetLocked || highlowBetLocked;
+  const [slotBetLocked, setSlotBetLocked] = useState(false);
+  const [minesBetLocked, setMinesBetLocked] = useState(false);
+  const [diceRaceBetLocked, setDiceRaceBetLocked] = useState(false);
+  const [rouletteBetLocked, setRouletteBetLocked] = useState(false);
+  const [blackjackBetLocked, setBlackjackBetLocked] = useState(false);
+  const [scratchBetLocked, setScratchBetLocked] = useState(false);
+  const [raceBetLocked, setRaceBetLocked] = useState(false);
+  const [treasureBoxBetLocked, setTreasureBoxBetLocked] = useState(false);
+  const isGambling = pokerBetLocked || coinFlipBetLocked || chohanBetLocked || chinchiroBetLocked || highlowBetLocked || slotBetLocked || minesBetLocked || diceRaceBetLocked || rouletteBetLocked || blackjackBetLocked || scratchBetLocked || raceBetLocked || treasureBoxBetLocked;
   const [ticketActive, setTicketActive] = useState(false);
   const [_treasureProbs, setTreasureProbs] = useState<TreasureProbEntry[] | null>(null);
   const [activeEvent, setActiveEvent] = useState<ReturnType<typeof getActiveEvent>>(null);
@@ -4669,22 +4696,22 @@ export function GambleScreen() {
           </div>
         )}
         {activeGame !== 'pvp' && activeGame !== 'treasure_box' && activeGame !== 'highlow' && activeGame !== 'slot' && activeGame !== 'mines' && activeGame !== 'blackjack' && activeGame !== 'scratch' && activeGame !== 'dice_race' && activeGame !== 'roulette' && activeGame !== 'race' && <BetInput game={game} bet={bet} setBet={setBet} disabled={(activeGame === 'poker' && pokerBetLocked) || (activeGame === 'coin_flip' && coinFlipBetLocked) || (activeGame === 'chohan' && chohanBetLocked) || (activeGame === 'chinchiro' && chinchiroBetLocked)} />}
-        {(activeGame === 'mines' || activeGame === 'dice_race' || activeGame === 'roulette' || activeGame === 'blackjack' || activeGame === 'scratch' || activeGame === 'race') && <BetInput game={{ minBet: 50, maxBet: 200000 } as GambleMaster} bet={bet} setBet={setBet} />}
+        {(activeGame === 'mines' || activeGame === 'dice_race' || activeGame === 'roulette' || activeGame === 'blackjack' || activeGame === 'scratch' || activeGame === 'race') && <BetInput game={{ minBet: 50, maxBet: 200000 } as GambleMaster} bet={bet} setBet={setBet} disabled={(activeGame === 'mines' && minesBetLocked) || (activeGame === 'dice_race' && diceRaceBetLocked) || (activeGame === 'roulette' && rouletteBetLocked) || (activeGame === 'blackjack' && blackjackBetLocked) || (activeGame === 'scratch' && scratchBetLocked) || (activeGame === 'race' && raceBetLocked)} />
         {activeGame === 'highlow' && <BetInput game={{ minBet: 100, maxBet: 1000000 } as GambleMaster} bet={bet} setBet={setBet} disabled={highlowBetLocked} />}
 
         {activeGame === 'chohan'       && <ChohanPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chohan'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'chohan' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'chohan' ? activeEvent.bonusValue : 1)} onLockChange={setChohanBetLocked} />}
         {activeGame === 'chinchiro'    && <ChinchiroPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['chinchiro'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'chinchiro' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'chinchiro' ? activeEvent.bonusValue : 1)} onLockChange={setChinchiroBetLocked} />}
         {activeGame === 'coin_flip'    && <CoinFlipPanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['coin_flip'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'coin_flip' ? dailyCasino.bonus : 1)} onLockChange={setCoinFlipBetLocked} />}
-        {activeGame === 'slot'         && <SlotPanel onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['slot_machine'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'slot' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'slot' ? activeEvent.bonusValue : 1)} />}
-        {activeGame === 'treasure_box' && <TreasureBoxPanel onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['treasure_box'] ?? 1.0) * (ticketActive ? 2 : 1)} />}
+        {activeGame === 'slot'         && <SlotPanel onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['slot_machine'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'slot' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'slot' ? activeEvent.bonusValue : 1)} onLockChange={setSlotBetLocked} />}
+        {activeGame === 'treasure_box' && <TreasureBoxPanel onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['treasure_box'] ?? 1.0) * (ticketActive ? 2 : 1)} onLockChange={setTreasureBoxBetLocked} />}
         {activeGame === 'poker'        && <PokerPanel    bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['poker'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'poker' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'poker' ? activeEvent.bonusValue : 1)} onBetLock={setPokerBetLocked} />}
         {activeGame === 'highlow'      && <HighLowPanel  bet={bet} onResult={handleResult} onMissionUpdate={handleHighlowMissionUpdate} onLockChange={setHighlowBetLocked} />}
-        {activeGame === 'mines'        && <MinesPanel     bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['mines'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'mines' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'mines' ? activeEvent.bonusValue : 1)} />}
-        {activeGame === 'dice_race'    && <DiceRacePanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['dice_race'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'dice_race' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'dice_race' ? activeEvent.bonusValue : 1)} />}
-        {activeGame === 'roulette'     && <RoulettePanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['roulette'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'roulette' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'roulette' ? activeEvent.bonusValue : 1)} />}
-        {activeGame === 'blackjack'    && <BlackjackPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['blackjack'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'blackjack' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'blackjack' ? activeEvent.bonusValue : 1)} />}
-        {activeGame === 'scratch'      && <ScratchPanel   bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['scratch'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'scratch' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'scratch' ? activeEvent.bonusValue : 1)} />}
-        {activeGame === 'race'         && <RacePanel      bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['race'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'race' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'race' ? activeEvent.bonusValue : 1)} />}
+        {activeGame === 'mines'        && <MinesPanel     bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['mines'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'mines' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'mines' ? activeEvent.bonusValue : 1)} onLockChange={setMinesBetLocked} />}
+        {activeGame === 'dice_race'    && <DiceRacePanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['dice_race'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'dice_race' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'dice_race' ? activeEvent.bonusValue : 1)} onLockChange={setDiceRaceBetLocked} />}
+        {activeGame === 'roulette'     && <RoulettePanel  bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['roulette'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'roulette' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'roulette' ? activeEvent.bonusValue : 1)} onLockChange={setRouletteBetLocked} />}
+        {activeGame === 'blackjack'    && <BlackjackPanel bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['blackjack'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'blackjack' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'blackjack' ? activeEvent.bonusValue : 1)} onLockChange={setBlackjackBetLocked} />}
+        {activeGame === 'scratch'      && <ScratchPanel   bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['scratch'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'scratch' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'scratch' ? activeEvent.bonusValue : 1)} onLockChange={setScratchBetLocked} />}
+        {activeGame === 'race'         && <RacePanel      bet={bet} onResult={handleResult} onJackpotContrib={handleJackpotContrib} multiplierBonus={(gambleMultipliers['race'] ?? 1.0) * (ticketActive ? 2 : 1) * (dailyCasino.id === 'race' ? dailyCasino.bonus : 1) * (activeEvent?.gameId === 'race' ? activeEvent.bonusValue : 1)} onLockChange={setRaceBetLocked} />}
         {activeGame === 'pvp'          && (
           <>
             <div style={{ fontWeight:700, fontSize:'1rem', marginBottom:8 }}>⚔️ PvP対戦</div>
