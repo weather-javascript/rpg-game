@@ -2860,6 +2860,39 @@ export async function refreshAnalyticsSummary(players: AdminPlayerData[]): Promi
   return summary;
 }
 
+// ---- 釣りキャスト時間設定 ----
+const FISHING_CONFIG_REF = () => doc(db, 'admin', 'fishing_config');
+
+export async function getFishingCastTime(): Promise<number | null> {
+  const snap = await getDoc(FISHING_CONFIG_REF());
+  if (!snap.exists()) return null;
+  const data = snap.data() as { castTimeMs?: number };
+  return data.castTimeMs ?? null;
+}
+
+export async function setFishingCastTime(castTimeMs: number | null): Promise<void> {
+  await setDoc(FISHING_CONFIG_REF(), { castTimeMs });
+}
+
+export function subscribeFishingCastTime(cb: (castTimeMs: number | null) => void): Unsubscribe {
+  const ref = FISHING_CONFIG_REF();
+  let stopped = false;
+  const fetch = () => getDoc(ref).then(snap => {
+    if (stopped) return;
+    if (!snap.exists()) { cb(null); return; }
+    const data = snap.data() as { castTimeMs?: number };
+    cb(data.castTimeMs ?? null);
+  }).catch(() => cb(null));
+  fetch();
+  const unsub = onSnapshot(ref, snap => {
+    if (stopped) return;
+    if (!snap.exists()) { cb(null); return; }
+    const data = snap.data() as { castTimeMs?: number };
+    cb(data.castTimeMs ?? null);
+  });
+  return () => { stopped = true; unsub(); };
+}
+
 // ---- プレイヤー検索強化（フロントフィルタ用ヘルパー） ----
 export function filterPlayersAdmin(
   players: AdminPlayerData[],
