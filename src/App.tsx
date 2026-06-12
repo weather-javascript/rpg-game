@@ -15,6 +15,7 @@ import { FishingScreen }   from './components/screens/FishingScreen';
 import { AdminScreen }     from './components/screens/AdminScreen';
 import { CraftingScreen }   from './components/screens/CraftingScreen';
 import { NaviScreen }       from './components/screens/NaviScreen';
+import { AquariumScreen }  from './components/screens/AquariumScreen';
 import { subscribeSoldNotifications, markSoldNotificationRead, subscribeMaintenanceStatus, setPlayerActivity, subscribeTabMaintenance } from './services/multiplayer';
 import type { TabMaintenanceConfig } from './services/multiplayer';
 import type { PlayerActivityCode } from './services/multiplayer';
@@ -38,6 +39,7 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
   { id:'navi',      label:'冒険ナビ',  icon:'compass' },
   { id:'gathering', label:'採取',     icon:'pickaxe' },
   { id:'fishing',   label:'釣り',     icon:'fishing_rod' },
+  { id:'aquarium',  label:'水族館',   icon:'fishing_rod' },
   { id:'crafting',  label:'製作',     icon:'hammer' },
   { id:'market',    label:'市場',     icon:'market' },
   { id:'dungeon',   label:'ダンジョン', icon:'swords' },
@@ -583,6 +585,7 @@ function ActiveScreen({ tab }: { tab: TabId }) {
     case 'navi':      return <NaviScreen />;
     case 'gathering': return <GatheringScreen />;
     case 'fishing':   return <FishingScreen />;
+    case 'aquarium':  return <AquariumScreen />;
     case 'crafting':  return <CraftingScreen />;
     case 'market':    return <MarketScreen />;
     case 'dungeon':   return <DungeonScreen />;
