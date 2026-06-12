@@ -14,7 +14,7 @@ import {
   FISH_COIN_SHOP, SEASON_LABEL, EVENT_DEFS, LEGENDARY_FISH_IDS,
 } from '../../data/fishMastersExtra';
 import type { WeatherEffect } from '../../data/fishMastersExtra';
-import { postBoardMessage, tryRecordWorldFirstFish, getAllWorldFirstFish } from '../../services/multiplayer';
+import { postBoardMessage, tryRecordWorldFirstFish, getAllWorldFirstFish, subscribeFishingCastTime } from '../../services/multiplayer';
 
 // ─── catch simulation ────────────────────────────────────────
 function tryCatch(
@@ -129,6 +129,7 @@ export function FishingScreen() {
   const autoRef = useRef(false);
   const cdRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [castTimeOverride, setCastTimeOverride] = useState<number | null>(null);
 
   const [rankTab, setRankTab] = useState<'size'|'weight'|'level'|'book'|'legendary'|'totalweight'>('level');
   const [rankData, setRankData] = useState<RankEntry[]>([]);
@@ -155,7 +156,13 @@ export function FishingScreen() {
   const bookCount = Object.keys(fishBook).length;
   const bookPct   = Math.floor(bookCount / TOTAL_FISH * 100);
   const staminaCost = spot.staminaCost;
-  const cdMs    = spot.cooldownMs;
+  const cdMs    = castTimeOverride !== null ? castTimeOverride : spot.cooldownMs;
+
+  // 管理者設定のキャスト時間をSubscribe
+  useEffect(() => {
+    const unsub = subscribeFishingCastTime(v => setCastTimeOverride(v));
+    return unsub;
+  }, []);
 
   // cooldown ticker
   useEffect(() => {
@@ -176,7 +183,7 @@ export function FishingScreen() {
     }
     castingRef.current = true;
     setCasting(true);
-    setTimeout(() => { setCasting(false); castingRef.current = false; }, cdMs > 0 ? Math.min(cdMs, 1500) : 1500);
+    setTimeout(() => { setCasting(false); castingRef.current = false; }, 1000);
     changeSatiety(-staminaCost);
 
     const buffBonus = getActiveBuffBonus('fishing');

@@ -14,8 +14,10 @@ import {
   getTradeRecipes, setTradeRecipes as saveTradeRecipes,
   getMonsterOverrides, setMonsterOverrides,
   getDungeonOverrides, setDungeonOverrides,
+  getFishingCastTime, setFishingCastTime,
+  getTabMaintenance, setTabMaintenanceEntry,
 } from '../../services/multiplayer';
-import type { TreasureProbEntry, TradeRecipe, MonsterOverride, DungeonOverride } from '../../services/multiplayer';
+import type { TreasureProbEntry, TradeRecipe, MonsterOverride, DungeonOverride, TabMaintenanceConfig, MaintainableTab } from '../../services/multiplayer';
 import { GAMBLE_MASTER, DUNGEON_MASTER, ITEM_MASTER, MONSTER_MASTER, CRAFT_RECIPES } from '../../data/masters';
 import type { CraftRecipe } from '../../types/game';
 import { useGameStore } from '../../stores/gameStore';
@@ -87,6 +89,12 @@ export function AdminScreen() {
   const [selectedDungeonId, setSelectedDungeonId] = useState<string>('');
   const [selectedMonsterId, setSelectedMonsterId] = useState<string>('');
   const [dungeonSaving, setDungeonSaving] = useState(false);
+  // 釣りキャスト時間
+  const [fishingCastTimeMs, setFishingCastTimeMsState] = useState<string>('');
+  // タブ別メンテナンス
+  const [tabMaintConfig, setTabMaintConfig] = useState<TabMaintenanceConfig>({});
+  const [tabMaintMessages, setTabMaintMessages] = useState<Partial<Record<MaintainableTab, string>>>({});
+  const [tabMaintEstimates, setTabMaintEstimates] = useState<Partial<Record<MaintainableTab, string>>>({});
   // 運営コンソール
   const [consoleSection, setConsoleSection] = useState<'editor' | 'commands' | 'history' | 'logs' | 'master' | 'event' | 'analytics'>('editor');
   const [searchName, setSearchName] = useState('');
@@ -149,6 +157,18 @@ export function AdminScreen() {
     getTradeRecipes().then(r => { if (r) setTradeRecipesState(r); }).catch(() => {});
     getMonsterOverrides().then(o => { if (o) setMonsterOverridesState(o); }).catch(() => {});
     getDungeonOverrides().then(o => { if (o) setDungeonOverridesState(o); }).catch(() => {});
+    getFishingCastTime().then(v => { setFishingCastTimeMsState(v !== null ? String(v) : ''); }).catch(() => {});
+    getTabMaintenance().then(cfg => {
+      setTabMaintConfig(cfg);
+      const msgs: Partial<Record<MaintainableTab, string>> = {};
+      const ests: Partial<Record<MaintainableTab, string>> = {};
+      (Object.keys(cfg) as MaintainableTab[]).forEach(t => {
+        msgs[t] = cfg[t]?.message ?? '';
+        ests[t] = cfg[t]?.estimatedMinutes ? String(cfg[t]!.estimatedMinutes) : '';
+      });
+      setTabMaintMessages(msgs);
+      setTabMaintEstimates(ests);
+    }).catch(() => {});
 
     // カスタムクラフトレシピ取得
     import('firebase/firestore').then(({ doc, getDoc }) =>
@@ -1607,6 +1627,122 @@ export function AdminScreen() {
               }} disabled={saving}
                 style={{padding:'8px 12px', background:'rgba(224,85,85,0.2)', color:'#e05555', border:'1px solid #e05555', borderRadius:6, cursor:'pointer', fontSize:'0.78rem'}}>
                 🗑️ リセット
+              </button>
+            </div>
+          </div>
+
+          {/* タブ別メンテナンス */}
+          <div style={{marginBottom:18, background:'#161b26', border:'1px solid #2d3752', borderRadius:8, padding:14}}>
+            <div style={{fontSize:'0.9rem', fontWeight:700, color:'#e05555', marginBottom:4}}>🔧 タブ別メンテナンス</div>
+            <div style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:12}}>各タブを個別にメンテナンス状態にできます。管理者は通過できます。</div>
+            {([
+              { id:'gathering', label:'⛏️ 採取' },
+              { id:'fishing',   label:'🎣 釣り' },
+              { id:'crafting',  label:'🔨 製作' },
+              { id:'market',    label:'🏪 市場' },
+              { id:'dungeon',   label:'⚔️ ダンジョン' },
+              { id:'gamble',    label:'🎰 ギャンブル' },
+              { id:'online',    label:'🌐 オンライン' },
+              { id:'navi',      label:'🧭 冒険ナビ' },
+            ] as { id: MaintainableTab; label: string }[]).map(({ id, label }) => {
+              const entry = tabMaintConfig[id];
+              const isActive = entry?.active ?? false;
+              return (
+                <div key={id} style={{marginBottom:10, background:'#1c2235', border:`1px solid ${isActive ? '#e05555' : '#2d3752'}`, borderRadius:6, padding:10}}>
+                  <div style={{display:'flex', alignItems:'center', gap:8, marginBottom: isActive ? 0 : 8}}>
+                    <span style={{flex:1, fontSize:'0.85rem', fontWeight:700, color: isActive ? '#e05555' : '#e8e6ff'}}>{label}</span>
+                    {isActive && <span style={{fontSize:'0.72rem', background:'rgba(224,85,85,0.2)', color:'#e05555', border:'1px solid #e05555', borderRadius:4, padding:'2px 6px'}}>稼働中</span>}
+                    <button onClick={async () => {
+                      if (isActive) {
+                        // 停止
+                        setSaving(true);
+                        try {
+                          await setTabMaintenanceEntry(id, null);
+                          setTabMaintConfig(p => { const n = {...p}; delete n[id]; return n; });
+                          addNotification('success', `${label} メンテナンスを終了しました`);
+                        } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
+                        setSaving(false);
+                      } else {
+                        // 開始
+                        const msg = tabMaintMessages[id] ?? '';
+                        const est = Number(tabMaintEstimates[id] ?? 0);
+                        setSaving(true);
+                        try {
+                          const newEntry = { active: true, message: msg, startedAt: Date.now(), estimatedMinutes: est || 0 };
+                          await setTabMaintenanceEntry(id, newEntry);
+                          setTabMaintConfig(p => ({ ...p, [id]: newEntry }));
+                          addNotification('success', `${label} メンテナンスを開始しました`);
+                        } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
+                        setSaving(false);
+                      }
+                    }} disabled={saving}
+                      style={{padding:'5px 12px', background: isActive ? 'rgba(224,85,85,0.15)' : 'linear-gradient(135deg,#e05555,#b03030)', color: isActive ? '#e05555' : '#fff', border:`1px solid ${isActive ? '#e05555' : 'transparent'}`, borderRadius:5, cursor:'pointer', fontWeight:700, fontSize:'0.78rem'}}>
+                      {isActive ? '▶ 終了' : '⏸ 開始'}
+                    </button>
+                  </div>
+                  {!isActive && (
+                    <div style={{display:'flex', gap:6, flexWrap:'wrap' as const}}>
+                      <input
+                        type="text"
+                        value={tabMaintMessages[id] ?? ''}
+                        onChange={e => setTabMaintMessages(p => ({...p, [id]: e.target.value}))}
+                        placeholder="メッセージ（任意）"
+                        style={{flex:'1 1 160px', padding:'5px 8px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.8rem'}}
+                      />
+                      <input
+                        type="number" min="0" step="5"
+                        value={tabMaintEstimates[id] ?? ''}
+                        onChange={e => setTabMaintEstimates(p => ({...p, [id]: e.target.value}))}
+                        placeholder="予定(分)"
+                        style={{width:80, padding:'5px 8px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.8rem'}}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 釣りキャスト時間 */}
+          <div style={{marginBottom:18, background:'#161b26', border:'1px solid #2d3752', borderRadius:8, padding:14}}>
+            <div style={{fontSize:'0.9rem', fontWeight:700, color:'#0ea5e9', marginBottom:4}}>🎣 釣りキャスト時間（全スポット共通）</div>
+            <div style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:10}}>空白にするとスポットごとのデフォルト値に戻ります（4000〜10000ms）</div>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:8}}>
+              <input
+                type="number" min="500" max="30000" step="100"
+                value={fishingCastTimeMs}
+                onChange={e => setFishingCastTimeMsState(e.target.value)}
+                placeholder="例: 3000"
+                style={{width:120, padding:'6px 8px', background:'#1c2235', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.9rem'}}
+              />
+              <span style={{color:'#8a92b2', fontSize:'0.85rem'}}>ms</span>
+              {fishingCastTimeMs && <span style={{color:'#0ea5e9', fontSize:'0.82rem'}}>= {(Number(fishingCastTimeMs)/1000).toFixed(1)}秒</span>}
+            </div>
+            <div style={{display:'flex', gap:6}}>
+              <button onClick={async () => {
+                setSaving(true);
+                try {
+                  const ms = fishingCastTimeMs === '' ? null : Number(fishingCastTimeMs);
+                  if (ms !== null && (isNaN(ms) || ms < 500)) { addNotification('error', '500ms以上の値を入力してください'); setSaving(false); return; }
+                  await setFishingCastTime(ms);
+                  addNotification('success', ms === null ? 'キャスト時間をデフォルトに戻しました' : `キャスト時間を ${ms}ms (${(ms/1000).toFixed(1)}秒) に設定しました`);
+                } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
+                setSaving(false);
+              }} disabled={saving}
+                style={{padding:'8px 16px', background:'linear-gradient(135deg,#0ea5e9,#0284c7)', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.85rem'}}>
+                💾 保存
+              </button>
+              <button onClick={async () => {
+                setSaving(true);
+                try {
+                  await setFishingCastTime(null);
+                  setFishingCastTimeMsState('');
+                  addNotification('success', 'キャスト時間をデフォルトに戻しました');
+                } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
+                setSaving(false);
+              }} disabled={saving}
+                style={{padding:'8px 12px', background:'rgba(224,85,85,0.2)', color:'#e05555', border:'1px solid #e05555', borderRadius:6, cursor:'pointer', fontSize:'0.78rem'}}>
+                🔄 デフォルトに戻す
               </button>
             </div>
           </div>
