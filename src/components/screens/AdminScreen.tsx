@@ -19,8 +19,16 @@ import type { TreasureProbEntry, TradeRecipe, MonsterOverride, DungeonOverride }
 import { GAMBLE_MASTER, DUNGEON_MASTER, ITEM_MASTER, MONSTER_MASTER, CRAFT_RECIPES } from '../../data/masters';
 import type { CraftRecipe } from '../../types/game';
 import { useGameStore } from '../../stores/gameStore';
+import { PlayerEditor } from '../admin/PlayerEditor';
+import { AdminCommands } from '../admin/AdminCommands';
+import { AdminLogs } from '../admin/AdminLogs';
+import { PlayerHistory } from '../admin/PlayerHistory';
+import { MasterEditor } from '../admin/MasterEditor';
+import { EventManager } from '../admin/EventManager';
+import { AnalyticsPanel } from '../admin/AnalyticsPanel';
+import { filterPlayersAdmin } from '../../services/multiplayer';
 
-type SubTab = 'players' | 'gamble' | 'items' | 'announce' | 'stats' | 'system' | 'recipes' | 'proposals' | 'trade' | 'dungeon';
+type SubTab = 'players' | 'gamble' | 'items' | 'announce' | 'stats' | 'system' | 'recipes' | 'proposals' | 'trade' | 'dungeon' | 'console';
 
 export function AdminScreen() {
   const player = useGameStore(s => s.player);
@@ -79,6 +87,15 @@ export function AdminScreen() {
   const [selectedDungeonId, setSelectedDungeonId] = useState<string>('');
   const [selectedMonsterId, setSelectedMonsterId] = useState<string>('');
   const [dungeonSaving, setDungeonSaving] = useState(false);
+  // 運営コンソール
+  const [consoleSection, setConsoleSection] = useState<'editor' | 'commands' | 'history' | 'logs' | 'master' | 'event' | 'analytics'>('editor');
+  const [searchName, setSearchName] = useState('');
+  const [searchId, setSearchId] = useState('');
+  const [searchMinLevel, setSearchMinLevel] = useState('');
+  const [searchMaxLevel, setSearchMaxLevel] = useState('');
+  const [searchMinGold, setSearchMinGold] = useState('');
+  const [searchMaxGold, setSearchMaxGold] = useState('');
+  const [consoleSelectedId, setConsoleSelectedId] = useState<string | null>(null);
 
   // リアルタイム購読でプレイヤー一覧を取得
   useEffect(() => {
@@ -266,6 +283,7 @@ export function AdminScreen() {
 
   const SUB_TABS: { id: SubTab; label: string; icon: string }[] = [
     { id: 'players',   label: 'プレイヤー', icon: '👥' },
+    { id: 'console',   label: '運営コンソール', icon: '🛠️' },
     { id: 'gamble',    label: 'ギャンブル', icon: '🎰' },
     { id: 'items',     label: 'アイテム',   icon: '🎒' },
     { id: 'recipes',   label: 'レシピ',     icon: '📖' },
@@ -499,7 +517,93 @@ export function AdminScreen() {
         </div>
       )}
 
-      {/* ===== ギャンブル設定 ===== */}
+      {/* ===== 運営コンソール ===== */}
+      {subTab === 'console' && (() => {
+        const filteredConsolePlayers = filterPlayersAdmin(players, {
+          id: searchId || undefined,
+          name: searchName || undefined,
+          minLevel: searchMinLevel ? Number(searchMinLevel) : undefined,
+          maxLevel: searchMaxLevel ? Number(searchMaxLevel) : undefined,
+          minGold: searchMinGold ? Number(searchMinGold) : undefined,
+          maxGold: searchMaxGold ? Number(searchMaxGold) : undefined,
+        });
+        const consolePlayer = players.find(p => p.id === consoleSelectedId) ?? null;
+        const adminId = player?.uid ?? 'unknown_admin';
+        const handleConsolePlayerUpdated = (uid: string, updates: Record<string, unknown>) => {
+          setPlayers(prev => prev.map(p => p.id === uid ? { ...p, ...updates } as any : p));
+          if (player && player.uid === uid) {
+            useGameStore.setState(s => ({ player: s.player ? { ...s.player, ...updates } as any : s.player }));
+          }
+        };
+        const CONSOLE_SECTIONS: { id: typeof consoleSection; label: string; needsPlayer: boolean }[] = [
+          { id: 'editor',    label: '完全編集',     needsPlayer: true },
+          { id: 'commands',  label: '強制コマンド', needsPlayer: true },
+          { id: 'history',   label: '巻き戻し',     needsPlayer: true },
+          { id: 'logs',      label: '管理ログ',     needsPlayer: false },
+          { id: 'master',    label: 'マスター編集', needsPlayer: false },
+          { id: 'event',     label: 'イベント',     needsPlayer: false },
+          { id: 'analytics', label: '分析',         needsPlayer: false },
+        ];
+        return (
+          <div>
+            {/* プレイヤー検索強化 */}
+            <div style={{background:'#161b26', border:'1px solid #2d3752', borderRadius:8, padding:12, marginBottom:12}}>
+              <div style={{fontSize:'0.85rem', fontWeight:700, color:'#f0c060', marginBottom:8}}>🔍 プレイヤー検索</div>
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:6}}>
+                <input value={searchName} onChange={e => setSearchName(e.target.value)} placeholder="名前（部分一致）" style={inputStyle} />
+                <input value={searchId} onChange={e => setSearchId(e.target.value)} placeholder="UID（部分一致）" style={inputStyle} />
+                <input type="number" value={searchMinLevel} onChange={e => setSearchMinLevel(e.target.value)} placeholder="レベル下限" style={inputStyle} />
+                <input type="number" value={searchMaxLevel} onChange={e => setSearchMaxLevel(e.target.value)} placeholder="レベル上限" style={inputStyle} />
+                <input type="number" value={searchMinGold} onChange={e => setSearchMinGold(e.target.value)} placeholder="ゴールド下限" style={inputStyle} />
+                <input type="number" value={searchMaxGold} onChange={e => setSearchMaxGold(e.target.value)} placeholder="ゴールド上限" style={inputStyle} />
+              </div>
+              <div style={{maxHeight:160, overflowY:'auto', display:'flex', flexDirection:'column', gap:3}}>
+                {filteredConsolePlayers.map(p => (
+                  <button key={p.id} onClick={() => setConsoleSelectedId(p.id)}
+                    style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', background: consoleSelectedId === p.id ? 'rgba(91,141,238,0.2)' : '#1c2235', border:`1px solid ${consoleSelectedId === p.id ? '#5b8dee' : '#2d3752'}`, borderRadius:6, cursor:'pointer', color:'#e8e6ff', fontSize:'0.78rem', textAlign:'left'}}>
+                    <span>{p.banned ? '🚫' : '⚔️'} {p.displayName ?? '名無し'} (Lv.{p.stats?.level ?? 1})</span>
+                    <span style={{color:'#f0c060', flexShrink:0}}>💰 {(p.gold ?? 0).toLocaleString()}G</span>
+                  </button>
+                ))}
+                {filteredConsolePlayers.length === 0 && (
+                  <div style={{color:'#4a5070', textAlign:'center', padding:10, fontSize:'0.78rem'}}>該当なし</div>
+                )}
+              </div>
+            </div>
+
+            {/* セクション切り替え */}
+            <div style={{display:'flex', gap:4, marginBottom:12, overflowX:'auto', flexWrap:'wrap'}}>
+              {CONSOLE_SECTIONS.map(s => (
+                <button key={s.id} onClick={() => setConsoleSection(s.id)}
+                  style={{flexShrink:0, padding:'6px 10px', background: consoleSection===s.id ? 'rgba(224,85,85,0.2)' : '#1c2235', border:`1px solid ${consoleSection===s.id ? '#e05555' : '#2d3752'}`, color: consoleSection===s.id ? '#e8e6ff' : '#8a92b2', borderRadius:6, cursor:'pointer', fontSize:'0.78rem'}}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+
+            {/* プレイヤー必須セクションでの未選択ガード */}
+            {CONSOLE_SECTIONS.find(s => s.id === consoleSection)?.needsPlayer && !consolePlayer && (
+              <div style={{color:'#4a5070', textAlign:'center', padding:20, fontSize:'0.85rem'}}>上の検索からプレイヤーを選択してください</div>
+            )}
+
+            {consoleSection === 'editor' && consolePlayer && (
+              <PlayerEditor player={consolePlayer} adminId={adminId} onUpdated={handleConsolePlayerUpdated} addNotification={addNotification} />
+            )}
+            {consoleSection === 'commands' && consolePlayer && (
+              <AdminCommands player={consolePlayer} adminId={adminId} onUpdated={handleConsolePlayerUpdated} addNotification={addNotification} />
+            )}
+            {consoleSection === 'history' && consolePlayer && (
+              <PlayerHistory player={consolePlayer} adminId={adminId} onUpdated={handleConsolePlayerUpdated} addNotification={addNotification} />
+            )}
+            {consoleSection === 'logs' && <AdminLogs />}
+            {consoleSection === 'master' && <MasterEditor adminId={adminId} addNotification={addNotification} />}
+            {consoleSection === 'event' && <EventManager adminId={adminId} addNotification={addNotification} />}
+            {consoleSection === 'analytics' && <AnalyticsPanel players={players} addNotification={addNotification} />}
+          </div>
+        );
+      })()}
+
+
       {subTab === 'gamble' && (
         <div>
           <p style={{fontSize:'0.8rem', color:'#8a92b2', marginBottom:12}}>
