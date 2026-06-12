@@ -198,7 +198,7 @@ export function calcWeight(fish: FishMaster, sizeCm: number): number {
 export function calcFishSellPrice(fish: FishMaster, sizeCm: number): number {
   const sizeRatio = sizeCm / fish.maxSizeCm;
   const rarityMult = { common:1, uncommon:2, rare:5, epic:15, legendary:50 }[fish.rarity];
-  return Math.floor(fish.sellPrice * sizeCm * sizeRatio * rarityMult);
+  return Math.floor(fish.sellPrice * sizeCm * sizeRatio * rarityMult / 10);
 }
 
 // 強化成功率
