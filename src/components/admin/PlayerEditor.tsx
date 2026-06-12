@@ -1,5 +1,5 @@
 // src/components/admin/PlayerEditor.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { updatePlayerAdmin, addAdminLog, savePlayerSnapshot, AdminPlayerData } from '../../services/multiplayer';
 
 type EditorTab = 'basic' | 'stats' | 'currency' | 'other';

@@ -43,7 +43,7 @@ export function MasterEditor({ adminId, addNotification }: MasterEditorProps) {
   const selectedItem = ITEM_MASTER[selectedId];
   const selectedMonster = MONSTER_MASTER[selectedId];
   const itemDraft: ItemMasterOverride = { ...(selectedItem ? { name: selectedItem.name, buyPrice: selectedItem.buyPrice, sellPrice: selectedItem.sellPrice, maxStack: selectedItem.maxStack } : {}), ...(itemOverrides[selectedId] ?? {}) };
-  const monsterDraft: MonsterOverride = { id: selectedId, ...(selectedMonster ? { maxHp: selectedMonster.maxHp, attack: selectedMonster.attack, defense: selectedMonster.defense, baseExp: selectedMonster.baseExp, baseGold: selectedMonster.baseGold } : {}), ...(monsterOverrides[selectedId] ?? {}) };
+  const monsterDraft: MonsterOverride = { ...(selectedMonster ? { maxHp: selectedMonster.maxHp, attack: selectedMonster.attack, defense: selectedMonster.defense, baseExp: selectedMonster.baseExp, baseGold: selectedMonster.baseGold } : {}), ...(monsterOverrides[selectedId] ?? {}), id: selectedId };
 
   const saveItemOverride = async (field: keyof ItemMasterOverride, value: number | string) => {
     const next = { ...itemOverrides, [selectedId]: { ...itemOverrides[selectedId], [field]: value } };

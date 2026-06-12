@@ -1,5 +1,5 @@
 // src/components/admin/EventManager.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { getGameSettings, setGameSettings, GameSettings } from '../../services/multiplayer';
 
 const DEFAULT_SETTINGS: GameSettings = {

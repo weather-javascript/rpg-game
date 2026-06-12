@@ -1,5 +1,5 @@
 // src/components/admin/AdminLogs.tsx
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { subscribeAdminLogs, AdminLogEntry } from '../../services/multiplayer';
 
 export function AdminLogs() {
