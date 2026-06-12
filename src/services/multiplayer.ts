@@ -2559,3 +2559,179 @@ export async function updateFriendCountRanking(uid: string, displayName: string)
   const count = await getFriendCount(uid);
   await setDoc(doc(db, 'friend_count_ranking', uid), { uid, displayName, friendCount: count });
 }
+
+// ============================================================
+// 運営コンソール拡張機能（追加実装・既存構造非破壊）
+// ============================================================
+
+// ---- 管理ログ (/adminLogs) ----
+export interface AdminLogEntry {
+  id: string;
+  adminId: string;
+  targetId: string;
+  action: string;
+  value: unknown;
+  createdAt: number;
+}
+
+export async function addAdminLog(log: Omit<AdminLogEntry, 'id' | 'createdAt'>): Promise<void> {
+  const { addDoc, collection: col } = await import('firebase/firestore');
+  await addDoc(col(db, 'adminLogs'), { ...log, createdAt: Date.now() });
+}
+
+export function subscribeAdminLogs(cb: (logs: AdminLogEntry[]) => void): () => void {
+  return onSnapshot(
+    query(collection(db, 'adminLogs'), orderBy('createdAt', 'desc'), limit(200)),
+    snap => cb(snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<AdminLogEntry, 'id'>) })))
+  );
+}
+
+// ---- 強制コマンド（既存playerフィールドを上書きするのみ） ----
+export async function adminGiveGold(uid: string, amount: number, adminId: string): Promise<void> {
+  await updateDoc(doc(db, 'players', uid), { gold: increment(amount) });
+  await addAdminLog({ adminId, targetId: uid, action: 'giveGold', value: amount });
+}
+
+export async function adminGiveItem(uid: string, itemId: string, amount: number, adminId: string): Promise<void> {
+  const ref = doc(db, 'players', uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const inventory = { ...(data.inventory ?? {}) };
+  inventory[itemId] = (inventory[itemId] ?? 0) + amount;
+  await updateDoc(ref, { inventory });
+  await addAdminLog({ adminId, targetId: uid, action: 'giveItem', value: { itemId, amount } });
+}
+
+export async function adminSetHp(uid: string, value: number, adminId: string): Promise<void> {
+  const ref = doc(db, 'players', uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const stats = { ...(snap.data().stats ?? {}), hp: value };
+  await updateDoc(ref, { stats });
+  await addAdminLog({ adminId, targetId: uid, action: 'setHP', value });
+}
+
+export async function adminTeleport(uid: string, dungeonId: string, floor: number, adminId: string): Promise<void> {
+  await updateDoc(doc(db, 'players', uid), { dungeonId, floor });
+  await addAdminLog({ adminId, targetId: uid, action: 'teleport', value: { dungeonId, floor } });
+}
+
+export async function adminBanPlayer(uid: string, adminId: string): Promise<void> {
+  await updateDoc(doc(db, 'players', uid), { banned: true });
+  await addAdminLog({ adminId, targetId: uid, action: 'banPlayer', value: true });
+}
+
+// ---- セーブデータ巻き戻し (/playerHistory/{playerId}/{timestamp}) ----
+export async function savePlayerSnapshot(uid: string, playerData: Record<string, unknown>, adminId: string): Promise<void> {
+  const ts = Date.now();
+  const { setDoc: setD, doc: d, collection: col } = await import('firebase/firestore');
+  await setD(d(col(db, 'playerHistory', uid, 'snapshots'), String(ts)), { ...playerData, _snapshotAt: ts });
+  await addAdminLog({ adminId, targetId: uid, action: 'saveSnapshot', value: ts });
+}
+
+export interface PlayerSnapshot {
+  id: string;
+  _snapshotAt: number;
+  [key: string]: unknown;
+}
+
+export async function getPlayerSnapshots(uid: string): Promise<PlayerSnapshot[]> {
+  const { collection: col, getDocs: gd, query: q, orderBy: ob } = await import('firebase/firestore');
+  const snap = await gd(q(col(db, 'playerHistory', uid, 'snapshots'), ob('_snapshotAt', 'desc')));
+  return snap.docs.map(dd => ({ id: dd.id, ...(dd.data() as Omit<PlayerSnapshot, 'id'>) }));
+}
+
+export async function restorePlayerSnapshot(uid: string, snapshot: Record<string, unknown>, adminId: string): Promise<void> {
+  const { _snapshotAt, ...rest } = snapshot as { _snapshotAt?: number } & Record<string, unknown>;
+  void _snapshotAt;
+  await updateDoc(doc(db, 'players', uid), rest);
+  await addAdminLog({ adminId, targetId: uid, action: 'restoreSnapshot', value: snapshot._snapshotAt });
+}
+
+// ---- ゲーム設定 / イベント管理 (/gameSettings) ----
+export interface GameSettings {
+  goldMultiplier: number;
+  gachaRateUp: boolean;
+  startAt: number;
+  endAt: number;
+}
+
+export async function getGameSettings(): Promise<GameSettings | null> {
+  try {
+    const snap = await getDoc(doc(db, 'gameSettings', 'current'));
+    return snap.exists() ? (snap.data() as GameSettings) : null;
+  } catch { return null; }
+}
+
+export async function setGameSettings(settings: GameSettings, adminId: string): Promise<void> {
+  await setDoc(doc(db, 'gameSettings', 'current'), settings);
+  await addAdminLog({ adminId, targetId: '-', action: 'setGameSettings', value: settings });
+}
+
+// ---- マスターデータ上書き (/admin/item_master_overrides) ----
+export interface ItemMasterOverride {
+  name?: string;
+  description?: string;
+  buyPrice?: number;
+  sellPrice?: number;
+  maxStack?: number;
+  weaponAtk?: number;
+  weaponDef?: number;
+  weaponHpBonus?: number;
+}
+
+export async function getItemMasterOverrides(): Promise<Record<string, ItemMasterOverride> | null> {
+  try {
+    const snap = await getDoc(doc(db, 'admin', 'item_master_overrides'));
+    return snap.exists() ? (snap.data().overrides as Record<string, ItemMasterOverride>) : null;
+  } catch { return null; }
+}
+
+export async function setItemMasterOverrides(overrides: Record<string, ItemMasterOverride>, adminId: string): Promise<void> {
+  await setDoc(doc(db, 'admin', 'item_master_overrides'), { overrides });
+  await addAdminLog({ adminId, targetId: '-', action: 'setItemMasterOverrides', value: Object.keys(overrides) });
+}
+
+// ---- 分析ダッシュボード (/analytics) ----
+export interface AnalyticsSummary {
+  totalGold: number;
+  playerCount: number;
+  avgLevel: number;
+}
+
+export async function getAnalyticsSummary(): Promise<AnalyticsSummary | null> {
+  try {
+    const snap = await getDoc(doc(db, 'analytics', 'summary'));
+    return snap.exists() ? (snap.data() as AnalyticsSummary) : null;
+  } catch { return null; }
+}
+
+export async function refreshAnalyticsSummary(players: AdminPlayerData[]): Promise<AnalyticsSummary> {
+  const totalGold = players.reduce((s, p) => s + (p.gold ?? 0), 0);
+  const playerCount = players.length;
+  const avgLevel = playerCount > 0
+    ? Math.round(players.reduce((s, p) => s + (p.stats?.level ?? 1), 0) / playerCount)
+    : 0;
+  const summary: AnalyticsSummary = { totalGold, playerCount, avgLevel };
+  await setDoc(doc(db, 'analytics', 'summary'), { ...summary, updatedAt: Date.now() });
+  return summary;
+}
+
+// ---- プレイヤー検索強化（フロントフィルタ用ヘルパー） ----
+export function filterPlayersAdmin(
+  players: AdminPlayerData[],
+  opts: { id?: string; name?: string; minLevel?: number; maxLevel?: number; minGold?: number; maxGold?: number }
+): AdminPlayerData[] {
+  return players.filter(p => {
+    if (opts.id && !p.id.includes(opts.id)) return false;
+    if (opts.name && !(p.displayName ?? '').includes(opts.name)) return false;
+    const lvl = p.stats?.level ?? 1;
+    if (opts.minLevel !== undefined && lvl < opts.minLevel) return false;
+    if (opts.maxLevel !== undefined && lvl > opts.maxLevel) return false;
+    const gold = p.gold ?? 0;
+    if (opts.minGold !== undefined && gold < opts.minGold) return false;
+    if (opts.maxGold !== undefined && gold > opts.maxGold) return false;
+    return true;
+  });
+}
