@@ -9,6 +9,12 @@ import {
   FISHING_TITLES, FISHING_ACHIEVEMENTS,
 } from '../../data/fishMasters';
 import type { FishMaster, BaitMaster, RodMaster } from '../../data/fishMasters';
+import {
+  getCurrentWeather, getCurrentSeason, getActiveEventIds, fishCoinReward,
+  FISH_COIN_SHOP, SEASON_LABEL, EVENT_DEFS, LEGENDARY_FISH_IDS,
+} from '../../data/fishMastersExtra';
+import type { WeatherEffect } from '../../data/fishMastersExtra';
+import { postBoardMessage, tryRecordWorldFirstFish, getAllWorldFirstFish } from '../../services/multiplayer';
 
 // ─── catch simulation ────────────────────────────────────────
 function tryCatch(
@@ -19,6 +25,9 @@ function tryCatch(
   spot: typeof SPOT_MASTER[string],
   buffBonus: number,
   fishBook: Record<string, { maxSizeCm: number }>,
+  weather: WeatherEffect,
+  season: string,
+  activeEvents: string[],
 ): { fish: FishMaster; sizeCm: number; weightKg: number; sellPrice: number; exp: number; isNew: boolean; isRecord: boolean } | null {
   const bonuses = getFishingBonuses(fishingLevel);
   const rodRarityBonus = rod.rarityBonus + enhanceLv * 0.01;
@@ -27,7 +36,7 @@ function tryCatch(
   const baitRarity  = bait?.rarityBonus  ?? 0;
   const baitSize    = bait?.sizeBonus    ?? 0;
   const baitExp     = bait?.expBonus     ?? 0;
-  const totalRarity = bonuses.rarityBonus + rodRarityBonus + baitRarity;
+  const totalRarity = bonuses.rarityBonus + rodRarityBonus + baitRarity + weather.rarityBonus;
   const totalLarge  = bonuses.largeFishBonus + rodLargeBonus;
   const totalLegend = bonuses.legendaryBonus;
 
@@ -35,6 +44,8 @@ function tryCatch(
     const f = FISH_MASTER[id];
     if (f.minLevel > fishingLevel) return false;
     if (f.spots && f.spots.length > 0 && !f.spots.includes(spot.id)) return false;
+    if (f.season && f.season !== season) return false;
+    if (f.eventId && !activeEvents.includes(f.eventId)) return false;
     return true;
   });
   if (spotFishIds.length === 0) return null;
@@ -43,7 +54,7 @@ function tryCatch(
     const f = FISH_MASTER[id];
     let w = f.baseRate * spot.rarityMult * buffBonus;
     if (f.rarity === 'rare'  || f.rarity === 'epic') w += totalRarity * 0.5;
-    if (f.rarity === 'legendary') w += totalLegend * spot.rarityMult;
+    if (f.rarity === 'legendary') w += (totalLegend + 0.01) * spot.rarityMult * weather.legendaryMult;
     if (f.minSizeCm >= 100) w += totalLarge * 0.3;
     return { f, w: Math.max(0, w) };
   });
@@ -55,14 +66,14 @@ function tryCatch(
 
   let sizeRoll = Math.random();
   if (totalLarge > 0 && chosen.minSizeCm >= 50) sizeRoll = Math.max(sizeRoll, Math.random() * totalLarge + sizeRoll * (1 - totalLarge));
-  sizeRoll = Math.min(1, sizeRoll * (1 + baitSize));
+  sizeRoll = Math.min(1, sizeRoll * (1 + baitSize) * weather.sizeMult);
   const sizeCm    = Math.max(chosen.minSizeCm, Math.min(chosen.maxSizeCm, Math.round(chosen.minSizeCm + (chosen.maxSizeCm - chosen.minSizeCm) * sizeRoll)));
-  const weightKg  = calcWeight(chosen, sizeCm) * (1 + (bait?.weightBonus ?? 0));
+  const weightKg  = calcWeight(chosen, sizeCm) * (1 + (bait?.weightBonus ?? 0)) * weather.weightMult;
   const sellPrice = calcFishSellPrice(chosen, sizeCm);
-  const exp       = Math.round((chosen.baseExp + Math.floor(sizeCm / chosen.maxSizeCm * chosen.baseExp)) * rodExpMult * spot.expMult * (1 + baitExp));
+  const exp       = Math.round((chosen.baseExp + Math.floor(sizeCm / chosen.maxSizeCm * chosen.baseExp)) * rodExpMult * spot.expMult * (1 + baitExp) * weather.expMult);
   const isNew     = !fishBook[chosen.id];
   const isRecord  = !isNew && sizeCm > (fishBook[chosen.id]?.maxSizeCm ?? 0);
-  return { fish: chosen, sizeCm, weightKg, sellPrice, exp, isNew, isRecord };
+  return { fish: chosen, sizeCm, weightKg: Math.round(weightKg * 100) / 100, sellPrice, exp, isNew, isRecord };
 }
 
 // ─── log ──────────────────────────────────────────────────────
@@ -70,7 +81,7 @@ interface LogEntry { id: number; msg: string; color?: string; label?: string; }
 let logId = 0;
 
 // ─── tabs ────────────────────────────────────────────────────
-type Tab = 'fish' | 'book' | 'rod' | 'bait' | 'spot' | 'title' | 'rank';
+type Tab = 'fish' | 'book' | 'rod' | 'bait' | 'spot' | 'title' | 'rank' | 'shop';
 
 // ─── ranking (Firestore) ──────────────────────────────────────
 import { collection, getDocs, orderBy, query, limit } from 'firebase/firestore';
@@ -101,7 +112,14 @@ export function FishingScreen() {
   const equipBait         = useGameStore((s: any) => s.equipBait);
   const useBait           = useGameStore((s: any) => s.useBait);
   const enhanceRod        = useGameStore((s: any) => s.enhanceRod);
+  const addFishCoin       = useGameStore((s: any) => s.addFishCoin);
+  const spendFishCoin     = useGameStore((s: any) => s.spendFishCoin);
   const checkFishingAchievements = useGameStore((s: any) => s.checkFishingAchievements);
+
+  const weather = getCurrentWeather();
+  const season  = getCurrentSeason();
+  const activeEvents = getActiveEventIds();
+  const [worldFirsts, setWorldFirsts] = useState<Record<string, { uid: string; displayName: string; caughtAt: number }>>({});
 
   const [tab, setTab] = useState<Tab>('fish');
   const [log, setLog] = useState<LogEntry[]>([]);
@@ -112,7 +130,7 @@ export function FishingScreen() {
   const cdRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [rankTab, setRankTab] = useState<'size'|'weight'|'level'|'book'>('level');
+  const [rankTab, setRankTab] = useState<'size'|'weight'|'level'|'book'|'legendary'|'totalweight'>('level');
   const [rankData, setRankData] = useState<RankEntry[]>([]);
   const [rankLoading, setRankLoading] = useState(false);
 
@@ -161,14 +179,15 @@ export function FishingScreen() {
     changeSatiety(-staminaCost);
 
     const buffBonus = getActiveBuffBonus('fishing');
-    const result = tryCatch(fishingLevel, rod, enhLv, bait, spot, buffBonus, fishBook);
+    const result = tryCatch(fishingLevel, rod, enhLv, bait, spot, buffBonus, fishBook, weather, season, activeEvents);
 
     if (bait && equippedBaitId) useBait();
 
     const oldLv = fishingLevel;
     if (result) {
       addFishingExp(result.exp);
-      recordCatch(result.fish.id, result.sizeCm, result.weightKg, result.sellPrice);
+      const coinEarned = fishCoinReward(result.fish.rarity, weather);
+      recordCatch(result.fish.id, result.sizeCm, result.weightKg, result.sellPrice, coinEarned);
       changeGold(result.sellPrice);
       // map to inventory item
       const itemMap: Record<string, string> = {
@@ -189,7 +208,19 @@ export function FishingScreen() {
         `${result.fish.icon} ${result.fish.name} ${result.sizeCm}cm/${result.weightKg}kg +${result.sellPrice}G +${result.exp}EXP${sizeLabel}${newLabel}`,
         RARITY_COLOR[result.fish.rarity], RARITY_LABEL[result.fish.rarity],
       );
-      if (result.fish.rarity === 'legendary') addNotification('success', `🌟 伝説「${result.fish.name}」釣り上げ！`);
+      if (result.fish.rarity === 'legendary') {
+        addNotification('success', `🌟 伝説「${result.fish.name}」釣り上げ！`);
+        postBoardMessage('system', '📢 ワールド通知', 0,
+          `🌟 ${player.displayName} が伝説の魚「${result.fish.name}」(${result.sizeCm}cm/${result.weightKg}kg)を釣り上げました！`)
+          .catch(() => {});
+        tryRecordWorldFirstFish(result.fish.id, player.uid, player.displayName).then(isFirst => {
+          if (isFirst) {
+            addNotification('success', `🏆 世界初発見！「${result.fish.name}」を最初に釣ったのはあなたです！`);
+            postBoardMessage('system', '📢 ワールド通知', 0,
+              `🏆 ${player.displayName} が「${result.fish.name}」の世界初発見者になりました！`).catch(() => {});
+          }
+        });
+      }
       else if (result.fish.rarity === 'epic') addNotification('success', `✨ エピック「${result.fish.name}」！`);
       if (result.isNew) addNotification('info', `📖 図鑑登録: ${result.fish.name}`);
     } else {
@@ -208,7 +239,7 @@ export function FishingScreen() {
 
     savePlayer();
     setCooldown(cdMs);
-  }, [player, cooldown, casting, staminaCost, cdMs, rod, enhLv, bait, spot, equippedBaitId, fishingLevel, fishBook, getActiveBuffBonus, addFishingExp, recordCatch, addItems, changeGold, changeSatiety, addNotification, addLog, savePlayer, useBait, checkFishingAchievements]);
+  }, [player, cooldown, casting, staminaCost, cdMs, rod, enhLv, bait, spot, equippedBaitId, fishingLevel, fishBook, getActiveBuffBonus, addFishingExp, recordCatch, addItems, changeGold, changeSatiety, addNotification, addLog, savePlayer, useBait, checkFishingAchievements, weather, season, activeEvents]);
 
   // auto fish
   useEffect(() => { autoRef.current = autoFish; }, [autoFish]);
@@ -222,11 +253,16 @@ export function FishingScreen() {
     return () => { if (autoTimerRef.current) clearTimeout(autoTimerRef.current); };
   }, [autoFish, cdMs, doFish]);
 
-  // ranking load
+  // 世界初発見データ読み込み
+  useEffect(() => {
+    if (tab !== 'book') return;
+    getAllWorldFirstFish().then(setWorldFirsts);
+  }, [tab]);
+
   useEffect(() => {
     if (tab !== 'rank') return;
     setRankLoading(true);
-    const fieldMap = { size:'fishingMaxSizeCm', weight:'fishingMaxWeightKg', level:'fishingLevel', book:'fishingTotalCount' };
+    const fieldMap = { size:'fishingMaxSizeCm', weight:'fishingMaxWeightKg', level:'fishingLevel', book:'fishingTotalCount', legendary:'fishingLegendaryCount', totalweight:'fishingTotalWeightKg' };
     fetchRanking(fieldMap[rankTab as keyof typeof fieldMap]).then(d => { setRankData(d); setRankLoading(false); });
   }, [tab, rankTab]);
 
@@ -265,13 +301,22 @@ export function FishingScreen() {
         <div style={{ marginTop:6, fontSize:11, opacity:0.7 }}>
           図鑑 {bookCount}/{TOTAL_FISH}({bookPct}%) | 総釣果 {(player.fishingTotalCount ?? 0).toLocaleString()} | 実績 {achievements.length}/{FISHING_ACHIEVEMENTS.length}
         </div>
+        <div style={{ marginTop:4, fontSize:11, display:'flex', gap:10, flexWrap:'wrap' }}>
+          <span>{weather.icon} {weather.name}</span>
+          <span>{SEASON_LABEL[season]}</span>
+          {activeEvents.map(eid => {
+            const ev = EVENT_DEFS.find(e => e.id === eid);
+            return ev ? <span key={eid}>{ev.icon} {ev.name}</span> : null;
+          })}
+          <span>🐟 Fish Coin {(player.fishCoin ?? 0).toLocaleString()}</span>
+        </div>
       </div>
 
       {/* tabs */}
       <div style={{ display:'flex', gap:3, marginBottom:10, flexWrap:'wrap' }}>
-        {(['fish','book','rod','bait','spot','title','rank'] as Tab[]).map(t => (
+        {(['fish','book','rod','bait','spot','shop','title','rank'] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{ ...S.btn(tab===t), flex:'1 1 auto', padding:'6px 4px', fontSize:11 }}>
-            {t==='fish'?'🎣釣り':t==='book'?'📖図鑑':t==='rod'?'🎣竿':t==='bait'?'🪱餌':t==='spot'?'📍場所':t==='title'?'⭐称号':'🏆ランク'}
+            {t==='fish'?'🎣釣り':t==='book'?'📖図鑑':t==='rod'?'🎣竿':t==='bait'?'🪱餌':t==='spot'?'📍場所':t==='shop'?'🐟交換所':t==='title'?'⭐称号':'🏆ランク'}
           </button>
         ))}
       </div>
@@ -340,6 +385,9 @@ export function FishingScreen() {
                     ? <div style={{ fontSize:11, color:'#94a3b8', marginTop:2 }}>最大 {e.maxSizeCm}cm / {e.maxWeightKg}kg | {e.totalCaught}匹 | {new Date(e.firstCaughtAt).toLocaleDateString('ja-JP')}</div>
                     : <div style={{ fontSize:11, color:'#475569' }}>未発見（{fish.spots?.join('・') ?? '全スポット'}）</div>
                   }
+                  {LEGENDARY_FISH_IDS.includes(fish.id) && worldFirsts[fish.id] && (
+                    <div style={{ fontSize:11, color:'#fbbf24', marginTop:2 }}>🏆 世界初発見: {worldFirsts[fish.id].displayName}</div>
+                  )}
                 </div>
                 {e && <div style={{ fontSize:11, color:'#64748b', textAlign:'right' }}>{fish.minSizeCm}~{fish.maxSizeCm}cm</div>}
               </div>
@@ -468,7 +516,42 @@ export function FishingScreen() {
         </div>
       )}
 
-      {/* ─── 称号/実績タブ ─── */}
+      {/* ─── Fish Coin交換所タブ ─── */}
+      {tab === 'shop' && (
+        <div>
+          <div style={S.card}>
+            <div style={S.h2}>🐟 Fish Coin交換所</div>
+            <div style={{ fontSize:12, color:'#94a3b8' }}>所持 Fish Coin: <b style={{ color:'#fbbf24' }}>{(player.fishCoin ?? 0).toLocaleString()}</b></div>
+            <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>レア・エピック・伝説の魚を釣るとFish Coinを獲得できます。神秘の日・赤い月は獲得量UP！</div>
+          </div>
+          {FISH_COIN_SHOP.map(item => {
+            const can = (player.fishCoin ?? 0) >= item.cost;
+            return (
+              <div key={item.id} style={{ ...S.card, display:'flex', gap:10, alignItems:'center', opacity: can ? 1 : 0.6 }}>
+                <div style={{ fontSize:22 }}>{item.icon}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:'bold', color:'#e2e8f0', fontSize:13 }}>{item.name}</div>
+                  <div style={{ fontSize:11, color:'#94a3b8' }}>{item.description}</div>
+                </div>
+                <button
+                  onClick={() => {
+                    if (!spendFishCoin(item.cost)) return;
+                    addItems([{ itemId: item.grantItemId, amount: item.grantAmount }]);
+                    addNotification('success', `${item.icon} ${item.name} と交換した！`);
+                    savePlayer();
+                  }}
+                  disabled={!can}
+                  style={{ ...S.btn(), background: can ? '#0ea5e9' : '#374151', cursor: can ? 'pointer' : 'not-allowed' }}
+                >
+                  {item.cost} Coin
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+
       {tab === 'title' && (
         <div>
           <div style={S.card}>
@@ -505,15 +588,15 @@ export function FishingScreen() {
       {tab === 'rank' && (
         <div>
           <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
-            {(['level','size','weight','book'] as const).map(r => (
+            {(['level','size','weight','book','legendary','totalweight'] as const).map(r => (
               <button key={r} onClick={() => setRankTab(r)} style={{ ...S.btn(rankTab===r), flex:'1 1 auto', fontSize:11 }}>
-                {r==='level'?'🎣 釣りLv':r==='size'?'📏 最大サイズ':r==='weight'?'⚖️ 最大重量':'🐟 総釣果'}
+                {r==='level'?'🎣 釣りLv':r==='size'?'📏 最大サイズ':r==='weight'?'⚖️ 最大重量':r==='book'?'🐟 総釣果':r==='legendary'?'🌟 伝説魚数':'⚖️ 総重量'}
               </button>
             ))}
           </div>
           <div style={S.card}>
             <div style={S.h2}>
-              {rankTab==='level'?'🎣 釣りレベルランキング':rankTab==='size'?'📏 最大サイズランキング':rankTab==='weight'?'⚖️ 最大重量ランキング':'🐟 総釣果ランキング'}
+              {rankTab==='level'?'🎣 釣りレベルランキング':rankTab==='size'?'📏 最大サイズランキング':rankTab==='weight'?'⚖️ 最大重量ランキング':rankTab==='book'?'🐟 総釣果ランキング':rankTab==='legendary'?'🌟 伝説魚数ランキング':'⚖️ 総重量ランキング'}
             </div>
             {rankLoading ? (
               <div style={{ ...S.muted, textAlign:'center', padding:'20px 0' }}>読み込み中...</div>
@@ -525,7 +608,7 @@ export function FishingScreen() {
                   <span style={{ fontSize:16, width:28, textAlign:'center' }}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`}</span>
                   <span style={{ flex:1, color:'#e2e8f0', fontSize:13 }}>{r.name}</span>
                   <span style={{ color:'#fbbf24', fontWeight:'bold', fontSize:13 }}>
-                    {rankTab==='level'?`Lv${r.val}`:rankTab==='size'?`${r.val}cm`:rankTab==='weight'?`${r.val}kg`:`${r.val.toLocaleString()}匹`}
+                    {rankTab==='level'?`Lv${r.val}`:rankTab==='size'?`${r.val}cm`:rankTab==='weight'?`${r.val}kg`:rankTab==='legendary'?`${r.val}匹`:rankTab==='totalweight'?`${r.val.toLocaleString()}kg`:`${r.val.toLocaleString()}匹`}
                   </span>
                 </div>
               ))
@@ -540,6 +623,8 @@ export function FishingScreen() {
               <div>🐟 総数: <b style={{ color:'#e2e8f0' }}>{(player.fishingTotalCount ?? 0).toLocaleString()}</b></div>
               <div>📖 図鑑: <b style={{ color:'#e2e8f0' }}>{bookPct}%</b></div>
               <div>💰 総G: <b style={{ color:'#e2e8f0' }}>{(player.fishingTotalGoldEarned ?? 0).toLocaleString()}</b></div>
+              <div>🌟 伝説魚: <b style={{ color:'#fbbf24' }}>{(player.fishingLegendaryCount ?? 0)}匹</b></div>
+              <div>⚖️ 総重量: <b style={{ color:'#e2e8f0' }}>{(player.fishingTotalWeightKg ?? 0).toLocaleString()}kg</b></div>
             </div>
           </div>
         </div>
