@@ -96,6 +96,38 @@ export async function deleteBoardMessage(id: string): Promise<void> {
   await deleteDoc(doc(db, COLLECTIONS.BOARD, id));
 }
 
+// ─── 釣り: 世界初発見システム ────────────────────────────────
+/** 指定した魚の世界初発見者を記録する。初発見の場合は true を返す。 */
+export async function tryRecordWorldFirstFish(fishId: string, uid: string, displayName: string): Promise<boolean> {
+  try {
+    const ref = doc(db, 'fish_world_first', fishId);
+    const result = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (snap.exists()) return false;
+      tx.set(ref, { fishId, uid, displayName, caughtAt: Date.now() });
+      return true;
+    });
+    return result;
+  } catch { return false; }
+}
+
+export async function getWorldFirstFish(fishId: string): Promise<{ uid: string; displayName: string; caughtAt: number } | null> {
+  try {
+    const snap = await getDoc(doc(db, 'fish_world_first', fishId));
+    return snap.exists() ? (snap.data() as any) : null;
+  } catch { return null; }
+}
+
+export async function getAllWorldFirstFish(): Promise<Record<string, { uid: string; displayName: string; caughtAt: number }>> {
+  try {
+    const snap = await getDocs(collection(db, 'fish_world_first'));
+    const out: Record<string, any> = {};
+    snap.docs.forEach(d => { out[d.id] = d.data(); });
+    return out;
+  } catch { return {}; }
+}
+
+
 export async function addBoardReaction(id: string, emoji: string, uid: string): Promise<void> {
   const ref = doc(db, COLLECTIONS.BOARD, id);
   await updateDoc(ref, { [`reactions.${emoji}`]: arrayUnion(uid) });
