@@ -414,6 +414,55 @@ service cloud.firestore {
     // ============================================================
     // それ以外は全拒否
     // ============================================================
+    // ============================================================
+    // fish_world_first/{fishId} — 釣り世界初発見記録
+    // ============================================================
+    match /fish_world_first/{fishId} {
+      allow read: if isAuthed();
+      allow create: if isAuthed() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ============================================================
+    // 養殖・交配・水族館システム
+    // ============================================================
+    match /fish_farms/{uid} {
+      allow read: if isAuthed();
+      allow write: if isAuthed() && isOwner(uid);
+    }
+    match /fish_breeding/{uid} {
+      allow read: if isAuthed() && isOwner(uid);
+      allow write: if isAuthed() && isOwner(uid);
+    }
+    match /fish_breed_book/{uid} {
+      allow read: if isAuthed() && isOwner(uid);
+      allow write: if isAuthed() && isOwner(uid);
+    }
+    match /fish_individuals/{id} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+    match /aquariums/{uid} {
+      allow read: if isAuthed();
+      allow create: if isAuthed() && isOwner(uid);
+      allow update: if isAuthed();
+      allow delete: if isAuthed() && isOwner(uid);
+    }
+    match /world_first_fish/{id} {
+      allow read: if isAuthed();
+      allow create: if isAuthed();
+      allow update, delete: if false;
+    }
+    match /fish_shows/{id} {
+      allow read: if isAuthed();
+      allow create: if isAuthed();
+      allow update: if isAuthed();
+      allow delete: if isAdmin();
+    }
+    match /meta/fish_individual_counter {
+      allow read, write: if isAuthed();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
