@@ -476,17 +476,25 @@ function StatusBar() {
 }
 
 function TabNav({ activeTab, setTab }: { activeTab: TabId; setTab: (t: TabId) => void }) {
+  const isFishingLocked = useGameStore(s => s.isFishingLocked);
+  const locked = isFishingLocked && activeTab === 'fishing';
   return (
     <nav style={{ display:'flex', background:'#161b26', borderTop:'1px solid #2d3752', position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:900, zIndex:100 }}>
+      {locked && (
+        <div style={{ position:'absolute', inset:0, background:'rgba(13,15,20,0.55)', zIndex:10, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'all', cursor:'not-allowed' }}>
+          <span style={{ fontSize:'0.7rem', color:'#8a92b2', letterSpacing:1 }}>🎣 釣り中…</span>
+        </div>
+      )}
       {TABS.map(tab => (
         <button
           key={tab.id}
-          onClick={() => setTab(tab.id)}
+          onClick={() => { if (!locked) setTab(tab.id); }}
           style={{
             flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2, padding:'7px 2px',
             background:'transparent', color: activeTab === tab.id ? '#f0c060' : '#8a92b2',
             border:'none', borderTop:`2px solid ${activeTab === tab.id ? '#f0c060' : 'transparent'}`,
-            cursor:'pointer', fontSize:'0.6rem', transition:'all 0.2s',
+            cursor: locked ? 'not-allowed' : 'pointer', fontSize:'0.6rem', transition:'all 0.2s',
+            opacity: locked && tab.id !== 'fishing' ? 0.4 : 1,
           }}
         >
           <span style={{ display:'flex', alignItems:'center', justifyContent:'center' }}><GameIcon id={tab.icon} size={20} /></span>
