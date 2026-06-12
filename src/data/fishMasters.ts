@@ -8,6 +8,8 @@ export interface FishMaster {
   baseExp: number; minSizeCm: number; maxSizeCm: number; weightFactor: number;
   baseRate: number; sellPrice: number; icon: string; description: string;
   spots?: string[]; // 出現スポットID (未指定=全スポット)
+  season?: 'spring' | 'summer' | 'autumn' | 'winter'; // 季節限定
+  eventId?: string; // イベント限定
 }
 
 export const FISH_MASTER: Record<string, FishMaster> = {
@@ -51,6 +53,8 @@ export const FISH_MASTER: Record<string, FishMaster> = {
   infinity_fish:{ id:'infinity_fish',name:'∞魚',         rarity:'legendary', minLevel:100,baseExp:1000,minSizeCm:100, maxSizeCm:9999, weightFactor:0.0070, baseRate:0.002,sellPrice:1000,icon:'♾️', description:'無限の可能性を秘めた最強の魚。', spots:['sky_lake'] },
   god_koi:     { id:'god_koi',     name:'神コイ',        rarity:'legendary', minLevel:85, baseExp:1000,minSizeCm:300, maxSizeCm:800,  weightFactor:0.0055, baseRate:0.003,sellPrice:700, icon:'👑', description:'神に愛された究極のコイ。', spots:['sky_lake','pond'] },
 };
+import { EXTRA_FISH } from './fishMastersExtra';
+Object.assign(FISH_MASTER, EXTRA_FISH);
 export const FISH_IDS = Object.keys(FISH_MASTER);
 export const TOTAL_FISH = FISH_IDS.length;
 
