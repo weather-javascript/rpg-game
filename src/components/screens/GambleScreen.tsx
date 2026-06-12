@@ -21,6 +21,7 @@ import {
   subscribeGambleRanking, updateGambleRanking,
   subscribeActiveBattles, spectateGambleBattle, joinSpectate, leaveSpectate,
   subscribeStockPrices, tickStockPrices, STOCK_MASTERS, updateStockRanking, subscribeStockRanking, getTrendLabel, getVolatilityLabel,
+  STOCK_ID_LIST, getMarketStatus, MARKET_OPEN_HOUR, MARKET_CLOSE_HOUR,
 } from '../../services/multiplayer';
 import type { TreasureProbEntry, GambleRankingEntry, StockRankingEntry } from '../../services/multiplayer';
 import type { GambleResult, GambleMaster, PokerTable, BattleHistoryEntry as _BH, StockId, StockHolding, StockPricePoint, StockTrendData } from '../../types/game';
@@ -3493,7 +3494,9 @@ function ExchangePanel() {
 // ============================================================
 // 株式市場パネル（Wealth Exchange）
 // ============================================================
-const STOCK_ID_LIST: StockId[] = ['wealth_mining','wealth_fishery','wealth_casino','wealth_tech','wealth_energy','wealth_logistics','wealth_foods','wealth_finance'];
+const SECTOR_LABEL: Record<import('../../types/game').StockSector, string> = {
+  tech: 'テック', industry: '工業', finance: '金融', consumer: '消費財', entertainment: '娯楽', energy: 'エネルギー',
+};
 
 function StockMarketPanel() {
   const player = useGameStore(s => s.player);
@@ -3512,9 +3515,15 @@ function StockMarketPanel() {
   const [buyAmt, setBuyAmt] = useState(1);
   const [stockRanking, setStockRanking] = useState<StockRankingEntry[]>([]);
   const [rankTab, setRankTab] = useState<'profit' | 'assets'>('profit');
-  const [stockView, setStockView] = useState<'market' | 'detail' | 'portfolio' | 'analysis' | 'ranking'>('market');
+  const [stockView, setStockView] = useState<'overview' | 'market' | 'detail' | 'portfolio' | 'analysis' | 'ranking'>('overview');
   const [chartMode, setChartMode] = useState<'line' | 'candle'>('line');
   const [_prevPrices, setPrevPrices] = useState<Record<StockId, number>>({} as Record<StockId, number>);
+  const [clockNow, setClockNow] = useState(Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setClockNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     const unsub = subscribeStockPrices((p, h, t) => {
@@ -3543,7 +3552,7 @@ function StockMarketPanel() {
       if (!DEBUG_SKIP_MARKET_HOURS) {
         const now = new Date();
         const h = now.getHours();
-        if (h < 7 || h >= 22) return;
+        if (h < MARKET_OPEN_HOUR || h >= MARKET_CLOSE_HOUR) return;
       }
       tickStockPrices().then(({ news: newN }) => {
         if (newN.length > 0) setNews(prev => [...newN, ...prev].slice(0, 30));
@@ -3575,6 +3584,7 @@ function StockMarketPanel() {
 
   const handleBuy = () => {
     if (!player) return;
+    if (!getMarketStatus(clockNow).isOpen) { addNotification('error', '閉場中は取引できません'); return; }
     if (isHalted(selectedStock)) { addNotification('error', '本日の取引は停止しています'); return; }
     const price = getPrice(selectedStock);
     const total = price * buyAmt;
@@ -3593,6 +3603,7 @@ function StockMarketPanel() {
 
   const handleSell = (id: StockId) => {
     if (!player) return;
+    if (!getMarketStatus(clockNow).isOpen) { addNotification('error', '閉場中は取引できません'); return; }
     const h = holdings[id];
     if (!h || h.amount <= 0) return;
     if (h.purchasedAt && Date.now() - h.purchasedAt < 86_400_000) {
@@ -3719,12 +3730,117 @@ function StockMarketPanel() {
 
   return (
     <div>
+      {/* 開場/閉場ステータスバー */}
+      {(() => {
+        const status = getMarketStatus(clockNow);
+        const msLeft = status.msUntilChange;
+        const hh = Math.floor(msLeft / 3_600_000);
+        const mm = Math.floor((msLeft % 3_600_000) / 60_000);
+        const ss = Math.floor((msLeft % 60_000) / 1000);
+        return (
+          <div style={{
+            display:'flex', alignItems:'center', gap:8, flexWrap:'wrap',
+            background: status.isOpen ? 'rgba(76,175,135,0.08)' : 'rgba(224,85,85,0.08)',
+            border: `1px solid ${status.isOpen ? 'rgba(76,175,135,0.35)' : 'rgba(224,85,85,0.35)'}`,
+            borderRadius:8, padding:'8px 12px', marginBottom:10,
+          }}>
+            <span style={{fontWeight:700, fontSize:'0.82rem', color: status.isOpen ? '#4caf87' : '#e05555'}}>
+              {status.isOpen ? '🟢 開場中' : '🔴 閉場中'}
+            </span>
+            <span style={{fontSize:'0.7rem', color:'#8a92b2'}}>⏰ 開場時間 {MARKET_OPEN_HOUR}:00〜{MARKET_CLOSE_HOUR}:00</span>
+            <span style={{fontSize:'0.7rem', color:'#8a92b2', marginLeft:'auto'}}>
+              {status.isOpen ? '閉場まで' : '開場まで'} {hh}:{mm.toString().padStart(2,'0')}:{ss.toString().padStart(2,'0')}
+            </span>
+            {!status.isOpen && (
+              <span style={{fontSize:'0.68rem', color:'#e05555', width:'100%'}}>
+                ⚠️ 閉場中は売買・価格更新が停止されます（ニュースのみ低頻度で配信）
+              </span>
+            )}
+          </div>
+        );
+      })()}
+
       {/* メインタブ */}
       <div style={{display:'flex', gap:4, marginBottom:10, flexWrap:'wrap'}}>
-        {([['market','📈 市場'],['detail','🔍 詳細'],['portfolio','💼 保有'],['analysis','🧠 分析'],['ranking','🏆 ランク']] as const).map(([v, label]) => (
+        {([['overview','🏛️ 概要'],['market','📈 市場'],['detail','🔍 詳細'],['portfolio','💼 保有'],['analysis','🧠 分析'],['ranking','🏆 ランク']] as const).map(([v, label]) => (
           <button key={v} onClick={() => setStockView(v)} style={TAB_STYLE(stockView === v)}>{label}</button>
         ))}
       </div>
+
+      {/* ========== 概要タブ ========== */}
+      {stockView === 'overview' && (() => {
+        const status = getMarketStatus(clockNow);
+        const movers = STOCK_ID_LIST.map(id => {
+          const m = STOCK_MASTERS[id];
+          const p = getPrice(id);
+          const hist = history[id] ?? [];
+          const prevPrice = hist.length > 1 ? hist[hist.length-2].price : m.basePrice;
+          const change = prevPrice > 0 ? (p - prevPrice) / prevPrice * 100 : 0;
+          return { id, m, p, change, halted: isHalted(id) };
+        });
+        const up = movers.filter(s => s.change > 0.01).length;
+        const down = movers.filter(s => s.change < -0.01).length;
+        const flat = movers.length - up - down;
+        const overallChange = movers.reduce((sum, s) => sum + s.change, 0) / (movers.length || 1);
+        const topMovers = [...movers].sort((a,b) => Math.abs(b.change) - Math.abs(a.change)).slice(0, 5);
+        return (
+          <div>
+            <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'12px 14px', marginBottom:10}}>
+              <div style={{fontWeight:700, fontSize:'0.85rem', marginBottom:8}}>📊 市場サマリー</div>
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:8}}>
+                <div style={{textAlign:'center', background:'#161b26', borderRadius:6, padding:'8px 4px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>上昇</div>
+                  <div style={{fontSize:'1rem', fontWeight:700, color:'#4caf87'}}>▲ {up}</div>
+                </div>
+                <div style={{textAlign:'center', background:'#161b26', borderRadius:6, padding:'8px 4px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>横ばい</div>
+                  <div style={{fontSize:'1rem', fontWeight:700, color:'#8a92b2'}}>➡️ {flat}</div>
+                </div>
+                <div style={{textAlign:'center', background:'#161b26', borderRadius:6, padding:'8px 4px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>下落</div>
+                  <div style={{fontSize:'1rem', fontWeight:700, color:'#e05555'}}>▼ {down}</div>
+                </div>
+              </div>
+              <div style={{textAlign:'center', background:'#161b26', borderRadius:6, padding:'8px 4px'}}>
+                <div style={{fontSize:'0.65rem', color:'#4a5070'}}>市場全体騰落率（平均）</div>
+                <div style={{fontSize:'1.1rem', fontWeight:700, color: overallChange >= 0 ? '#4caf87' : '#e05555'}}>
+                  {overallChange >= 0 ? '▲' : '▼'} {Math.abs(overallChange).toFixed(2)}%
+                </div>
+              </div>
+            </div>
+
+            <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'12px 14px', marginBottom:10}}>
+              <div style={{fontWeight:700, fontSize:'0.85rem', marginBottom:6}}>🔥 急変動銘柄 TOP5</div>
+              {topMovers.map(s => (
+                <div key={s.id} onClick={() => { setSelectedStock(s.id); setStockView('detail'); }}
+                  style={{display:'flex', alignItems:'center', gap:8, padding:'5px 0', borderBottom:'1px solid #1a1f30', cursor:'pointer'}}>
+                  <span>{s.m.icon}</span>
+                  <span style={{flex:1, fontSize:'0.78rem', fontWeight:600}}>{s.m.name}</span>
+                  {s.halted && <span style={{fontSize:'0.6rem', color:'#e05555', border:'1px solid #e05555', borderRadius:3, padding:'0 4px'}}>🚫停止</span>}
+                  <span style={{fontSize:'0.78rem', color: s.change >= 0 ? '#4caf87' : '#e05555'}}>
+                    {s.change >= 0 ? '▲' : '▼'} {Math.abs(s.change).toFixed(2)}%
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{background:'rgba(240,192,96,0.08)', border:'1px solid rgba(240,192,96,0.25)', borderRadius:8, padding:'10px 14px', marginBottom:10, maxHeight:120, overflowY:'auto'}}>
+              <div style={{fontSize:'0.78rem', color:'#f0c060', fontWeight:700, marginBottom:4}}>📰 最新ニュース</div>
+              {news.length === 0 && <div style={{fontSize:'0.72rem', color:'#4a5070'}}>本日のニュースはまだありません</div>}
+              {news.slice(0,5).map((n,i) => <div key={i} style={{fontSize:'0.72rem', color:'#8a92b2', padding:'2px 0'}}>{n}</div>)}
+            </div>
+
+            <div style={{background: status.isOpen ? 'rgba(76,175,135,0.08)' : 'rgba(224,85,85,0.08)', border:`1px solid ${status.isOpen ? 'rgba(76,175,135,0.3)' : 'rgba(224,85,85,0.3)'}`, borderRadius:8, padding:'10px 14px'}}>
+              <div style={{fontSize:'0.78rem', fontWeight:700, color: status.isOpen ? '#4caf87' : '#e05555', marginBottom:4}}>
+                {status.isOpen ? '✅ 現在取引可能です' : '🚫 現在取引できません'}
+              </div>
+              <div style={{fontSize:'0.7rem', color:'#8a92b2'}}>
+                市場は毎日 {MARKET_OPEN_HOUR}:00〜{MARKET_CLOSE_HOUR}:00 の間に開場します。開場中は約30秒ごとに価格が更新され、1日あたり平均5件のニュースが配信されます。閉場中は価格が固定され、ニュースは1日1件程度に減少します。
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ========== 市場タブ ========== */}
       {stockView === 'market' && (
@@ -3757,6 +3873,7 @@ function StockMarketPanel() {
                   <div style={{flex:1, minWidth:0}}>
                     <div style={{fontSize:'0.78rem', fontWeight:600, display:'flex', alignItems:'center', gap:4}}>
                       {m.name}
+                      <span style={{fontSize:'0.58rem', color:'#4a5070', border:'1px solid #2d3752', borderRadius:3, padding:'0 4px'}}>{SECTOR_LABEL[m.sector]}</span>
                       {halted && <span style={{fontSize:'0.6rem', color:'#e05555', background:'rgba(224,85,85,0.15)', border:'1px solid #e05555', borderRadius:3, padding:'0 4px'}}>🚫 取引停止</span>}
                       {!halted && tl && <span style={{fontSize:'0.6rem', color: tl.color}}>{tl.icon}</span>}
                     </div>
@@ -3906,11 +4023,11 @@ function StockMarketPanel() {
                 style={{width:70, padding:'5px 8px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:5, fontSize:'0.8rem'}} />
               <span style={{fontSize:'0.75rem', color:'#8a92b2'}}>株</span>
               <span style={{fontSize:'0.8rem', color:'#4caf87', flex:1}}>{(selectedPrice * buyAmt).toLocaleString()}WC</span>
-              <button onClick={handleBuy} disabled={isHalted(selectedStock) || (player?.wealthCoin ?? 0) < selectedPrice * buyAmt}
-                style={{padding:'6px 14px', background: isHalted(selectedStock) ? '#2d3752' : 'linear-gradient(135deg,#4caf87,#2d8060)',
-                  color:'#fff', border:'none', borderRadius:6, cursor: isHalted(selectedStock) ? 'not-allowed' : 'pointer', fontWeight:700, fontSize:'0.8rem',
-                  opacity: isHalted(selectedStock) || (player?.wealthCoin ?? 0) < selectedPrice * buyAmt ? 0.5 : 1}}>
-                {isHalted(selectedStock) ? '🚫 停止中' : '📈 購入'}
+              <button onClick={handleBuy} disabled={isHalted(selectedStock) || !getMarketStatus(clockNow).isOpen || (player?.wealthCoin ?? 0) < selectedPrice * buyAmt}
+                style={{padding:'6px 14px', background: (isHalted(selectedStock) || !getMarketStatus(clockNow).isOpen) ? '#2d3752' : 'linear-gradient(135deg,#4caf87,#2d8060)',
+                  color:'#fff', border:'none', borderRadius:6, cursor: (isHalted(selectedStock) || !getMarketStatus(clockNow).isOpen) ? 'not-allowed' : 'pointer', fontWeight:700, fontSize:'0.8rem',
+                  opacity: isHalted(selectedStock) || !getMarketStatus(clockNow).isOpen || (player?.wealthCoin ?? 0) < selectedPrice * buyAmt ? 0.5 : 1}}>
+                {isHalted(selectedStock) ? '🚫 停止中' : !getMarketStatus(clockNow).isOpen ? '🔴 閉場中' : '📈 購入'}
               </button>
             </div>
           </div>
