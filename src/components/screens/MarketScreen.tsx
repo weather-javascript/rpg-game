@@ -56,6 +56,7 @@ export function MarketScreen() {
   const [tradeRecipes, setTradeRecipes] = useState<TradeRecipe[]>(DEFAULT_TRADE_RECIPES);
   const [sellSearch, setSellSearch] = useState('');
   const [sellCat, setSellCat] = useState('all');
+  const [buyQty, setBuyQty] = useState<Record<string, number>>({});
   const [npcQuests, setNpcQuests] = useState<NpcQuest[]>([]);
   const [questRanking, setQuestRanking] = useState<QuestRankingEntry[]>([]);
   const [questRankTab, setQuestRankTab] = useState<'count' | 'gold'>('count');
@@ -329,15 +330,46 @@ export function MarketScreen() {
           </div>
           {buyable.map(item => {
             const { buyPrice } = getEffectivePrice(item.id);
+            const qty = buyQty[item.id] ?? 1;
+            const total = buyPrice * qty;
+            const canAfford = (player?.gold ?? 0) >= total;
+            const QTY_BTNS = [1, 5, 10, 50];
             return (
-            <div key={item.id} style={ROW}>
-              <span style={{fontSize:'1.4rem'}}><GameIcon id={item.icon} size={28} /></span>
-              <div style={{flex:1}}>
-                <div style={{fontWeight:600, fontSize:'0.9rem'}}>{item.name}</div>
-                <div style={{fontSize:'0.72rem', color:'#8a92b2'}}>{item.description}</div>
+            <div key={item.id} style={{...ROW, flexDirection:'column', alignItems:'stretch', gap:6}}>
+              <div style={{display:'flex', alignItems:'center', gap:10}}>
+                <span style={{fontSize:'1.4rem'}}><GameIcon id={item.icon} size={28} /></span>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:600, fontSize:'0.9rem'}}>{item.name}</div>
+                  <div style={{fontSize:'0.72rem', color:'#8a92b2'}}>{item.description}</div>
+                </div>
+                <span style={{color:'#f0c060', fontSize:'0.85rem', whiteSpace:'nowrap'}}>{buyPrice}G/個</span>
               </div>
-              <span style={{color:'#f0c060', fontSize:'0.85rem', whiteSpace:'nowrap'}}>{buyPrice}G</span>
-              <button style={BTN('#5b8dee')} onClick={() => handleBuy(item.id, 1)} disabled={(player?.gold ?? 0) < buyPrice}>購入</button>
+              <div style={{display:'flex', alignItems:'center', gap:4}}>
+                <span style={{fontSize:'0.72rem', color:'#8a92b2', marginRight:2}}>個数:</span>
+                {QTY_BTNS.map(n => (
+                  <button key={n} onClick={() => setBuyQty(q => ({...q, [item.id]: n}))}
+                    style={{padding:'3px 8px', fontSize:'0.72rem', cursor:'pointer',
+                      background: qty===n ? 'rgba(91,141,238,0.3)' : '#161b26',
+                      border:`1px solid ${qty===n ? '#5b8dee' : '#2d3752'}`,
+                      color: qty===n ? '#e8e6ff' : '#8a92b2', borderRadius:4}}>
+                    ×{n}
+                  </button>
+                ))}
+                <button onClick={() => { const max = Math.floor((player?.gold ?? 0) / buyPrice); setBuyQty(q => ({...q, [item.id]: Math.max(1, max)})); }}
+                  style={{padding:'3px 8px', fontSize:'0.72rem', cursor:'pointer',
+                    background: '#161b26', border:'1px solid #2d3752', color:'#8a92b2', borderRadius:4}}>
+                  MAX
+                </button>
+                <span style={{flex:1}} />
+                <span style={{fontSize:'0.78rem', color: canAfford ? '#f0c060' : '#e05555', fontWeight:600}}>
+                  合計 {total.toLocaleString()}G
+                </span>
+                <button style={BTN(canAfford ? '#5b8dee' : '#2d3752')}
+                  onClick={() => handleBuy(item.id, qty)}
+                  disabled={!canAfford}>
+                  購入
+                </button>
+              </div>
             </div>
             );
           })}

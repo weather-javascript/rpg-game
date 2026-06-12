@@ -15,6 +15,8 @@ import {
 } from '../../data/fishMastersExtra';
 import type { WeatherEffect } from '../../data/fishMastersExtra';
 import { postBoardMessage, tryRecordWorldFirstFish, getAllWorldFirstFish, subscribeFishingCastTime } from '../../services/multiplayer';
+import { saveFishIndividual, nextIndividualId } from '../../services/fishAquaService';
+import type { AquaRarity } from '../../types/fishAqua';
 
 // ─── catch simulation ────────────────────────────────────────
 function tryCatch(
@@ -81,7 +83,7 @@ interface LogEntry { id: number; msg: string; color?: string; label?: string; }
 let logId = 0;
 
 // ─── tabs ────────────────────────────────────────────────────
-type Tab = 'fish' | 'book' | 'rod' | 'bait' | 'spot' | 'title' | 'rank' | 'shop';
+type Tab = 'fish' | 'book' | 'rod' | 'bait' | 'spot' | 'title' | 'rank' | 'shop' | 'roadmap';
 
 // ─── ranking (Firestore) ──────────────────────────────────────
 import { collection, getDocs, orderBy, query, limit } from 'firebase/firestore';
@@ -222,6 +224,21 @@ export function FishingScreen() {
         infinity_fish:'arowanna', god_koi:'arowanna',
       };
       addItems([{ itemId: itemMap[result.fish.id] ?? 'raw_cod', amount: 1 }]);
+      // 魚個体として保存（養殖・水族館システム連携）
+      if (player?.uid) {
+        const fishRar = result.fish.rarity;
+        const aquaRarity: AquaRarity = fishRar === 'legendary' ? 'legendary' : fishRar === 'epic' ? 'epic' : fishRar === 'rare' || fishRar === 'uncommon' ? 'rare' : 'normal';
+        nextIndividualId().then(indId => {
+          saveFishIndividual({
+            individualId: indId, fishId: result.fish.id, name: result.fish.name,
+            ownerUid: player.uid, ownerName: player.displayName,
+            rarity: aquaRarity, growthStage: 'adult',
+            sizeCm: result.sizeCm, weightKg: result.weightKg,
+            bornAt: Date.now(), lastGrowthAt: Date.now(),
+            icon: result.fish.icon, caughtAt: Date.now(),
+          });
+        }).catch(() => {});
+      }
       const sizeLabel  = result.sizeCm >= result.fish.maxSizeCm * 0.95 ? ' 🏆最大級!' : '';
       const newLabel   = result.isNew ? ' ✨初図鑑!' : result.isRecord ? ' 📏記録更新!' : '';
       addLog(
@@ -334,9 +351,9 @@ export function FishingScreen() {
 
       {/* tabs */}
       <div style={{ display:'flex', gap:3, marginBottom:10, flexWrap:'wrap' }}>
-        {(['fish','book','rod','bait','spot','shop','title','rank'] as Tab[]).map(t => (
+        {(['fish','book','rod','bait','spot','shop','title','rank','roadmap'] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{ ...S.btn(tab===t), flex:'1 1 auto', padding:'6px 4px', fontSize:11 }}>
-            {t==='fish'?'🎣釣り':t==='book'?'📖図鑑':t==='rod'?'🎣竿':t==='bait'?'🪱餌':t==='spot'?'📍場所':t==='shop'?'🐟交換所':t==='title'?'⭐称号':'🏆ランク'}
+            {t==='fish'?'🎣釣り':t==='book'?'📖図鑑':t==='rod'?'🎣竿':t==='bait'?'🪱餌':t==='spot'?'📍場所':t==='shop'?'🐟交換所':t==='title'?'⭐称号':t==='roadmap'?'🗺️攻略':'🏆ランク'}
           </button>
         ))}
       </div>
@@ -543,28 +560,59 @@ export function FishingScreen() {
             <div style={S.h2}>🐟 Fish Coin交換所</div>
             <div style={{ fontSize:12, color:'#94a3b8' }}>所持 Fish Coin: <b style={{ color:'#fbbf24' }}>{(player.fishCoin ?? 0).toLocaleString()}</b></div>
             <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>レア・エピック・伝説の魚を釣るとFish Coinを獲得できます。神秘の日・赤い月は獲得量UP！</div>
+            <div style={{ marginTop:8, background:'rgba(14,165,233,0.08)', borderRadius:6, padding:'6px 10px', fontSize:11, color:'#7dd3fc' }}>
+              💡 Fish Coinの獲得方法: レア魚=1枚、エピック魚=3枚、伝説魚=10枚。天候イベント中は最大2倍獲得！
+            </div>
           </div>
           {FISH_COIN_SHOP.map(item => {
             const can = (player.fishCoin ?? 0) >= item.cost;
+            // 竿アイテムかどうか
+            const isRod = ['fc_all_rod_x','fc_master_rod_z','fc_sky_rod'].includes(item.id);
+            // 餌アイテムの詳細効果を取得
+            const baitDef = BAIT_MASTER[item.grantItemId];
+            const effectLines: string[] = [];
+            if (baitDef) {
+              if (baitDef.rarityBonus > 0) effectLines.push(`レア率+${Math.round(baitDef.rarityBonus*100)}%`);
+              if (baitDef.sizeBonus > 0) effectLines.push(`サイズ+${Math.round(baitDef.sizeBonus*100)}%`);
+              if (baitDef.weightBonus > 0) effectLines.push(`重量+${Math.round(baitDef.weightBonus*100)}%`);
+              if (baitDef.expBonus > 0) effectLines.push(`EXP+${Math.round(baitDef.expBonus*100)}%`);
+              if (baitDef.id === 'infinity_bait') effectLines.push('♾️ 消費なし（無限使用）');
+            }
+            if (isRod) {
+              const rodDef = ROD_MASTER[item.grantItemId];
+              if (rodDef) {
+                effectLines.push(`レア+${Math.round(rodDef.rarityBonus*100)}% 大型+${Math.round(rodDef.largeFishBonus*100)}% EXP×${rodDef.expMult.toFixed(2)}`);
+                effectLines.push(`Lv${rodDef.minLevel}以上で使用可`);
+              }
+            }
             return (
-              <div key={item.id} style={{ ...S.card, display:'flex', gap:10, alignItems:'center', opacity: can ? 1 : 0.6 }}>
-                <div style={{ fontSize:22 }}>{item.icon}</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontWeight:'bold', color:'#e2e8f0', fontSize:13 }}>{item.name}</div>
-                  <div style={{ fontSize:11, color:'#94a3b8' }}>{item.description}</div>
+              <div key={item.id} style={{ ...S.card, border:`1px solid ${can ? '#1e3a5f' : '#1e293b'}`, opacity: can ? 1 : 0.6 }}>
+                <div style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
+                  <div style={{ fontSize:22 }}>{item.icon}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontWeight:'bold', color:'#e2e8f0', fontSize:13 }}>{item.name}</div>
+                    <div style={{ fontSize:11, color:'#94a3b8', marginTop:2 }}>{item.description}</div>
+                    {effectLines.length > 0 && (
+                      <div style={{ marginTop:4, background:'rgba(99,102,241,0.1)', borderRadius:5, padding:'4px 8px', display:'flex', flexWrap:'wrap', gap:'4px 10px' }}>
+                        {effectLines.map((l,i) => (
+                          <span key={i} style={{ fontSize:10, color:'#a5b4fc', fontWeight:'bold' }}>✦ {l}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (!spendFishCoin(item.cost)) return;
+                      addItems([{ itemId: item.grantItemId, amount: item.grantAmount }]);
+                      addNotification('success', `${item.icon} ${item.name} と交換した！`);
+                      savePlayer();
+                    }}
+                    disabled={!can}
+                    style={{ ...S.btn(), background: can ? '#0ea5e9' : '#374151', cursor: can ? 'pointer' : 'not-allowed', whiteSpace:'nowrap' as const }}
+                  >
+                    {item.cost} Coin
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    if (!spendFishCoin(item.cost)) return;
-                    addItems([{ itemId: item.grantItemId, amount: item.grantAmount }]);
-                    addNotification('success', `${item.icon} ${item.name} と交換した！`);
-                    savePlayer();
-                  }}
-                  disabled={!can}
-                  style={{ ...S.btn(), background: can ? '#0ea5e9' : '#374151', cursor: can ? 'pointer' : 'not-allowed' }}
-                >
-                  {item.cost} Coin
-                </button>
               </div>
             );
           })}
@@ -604,7 +652,160 @@ export function FishingScreen() {
         </div>
       )}
 
-      {/* ─── ランキングタブ ─── */}
+      {/* ─── ロードマップタブ ─── */}
+      {tab === 'roadmap' && (
+        <div>
+          {/* 現在状況サマリー */}
+          <div style={{ background:'linear-gradient(135deg,#0f3055,#1a4a7a)', borderRadius:10, padding:'10px 14px', marginBottom:10 }}>
+            <div style={{ fontSize:13, fontWeight:'bold', color:'#7dd3fc', marginBottom:6 }}>📊 現在の状況</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, fontSize:12, color:'#94a3b8' }}>
+              <div>🎣 釣りLv: <b style={{color:'#e2e8f0'}}>{fishingLevel}</b></div>
+              <div>📖 図鑑: <b style={{color:'#e2e8f0'}}>{bookCount}/{TOTAL_FISH}</b></div>
+              <div>🎣 竿: <b style={{color:'#e2e8f0'}}>{rod.name}{enhLv>0?` +${enhLv}`:''}</b></div>
+              <div>📍 スポット: <b style={{color:'#e2e8f0'}}>{spot.name}</b></div>
+              <div>🪱 餌: <b style={{color:'#e2e8f0'}}>{bait ? bait.name : 'なし'}</b></div>
+              <div>🐟 FC: <b style={{color:'#fbbf24'}}>{(player.fishCoin ?? 0).toLocaleString()}</b></div>
+            </div>
+          </div>
+
+          {/* 釣り竿の強化 */}
+          <div style={S.card}>
+            <div style={{ fontSize:13, fontWeight:'bold', color:'#fbbf24', marginBottom:6 }}>⚡ 釣り竿の入手・強化</div>
+            <div style={{ fontSize:11, color:'#94a3b8', marginBottom:8, lineHeight:1.6 }}>
+              竿は「竿タブ」で装備・強化できます。強化するたびに確率でレベルアップし、最大+20まで強化可能。失敗することもあります。
+            </div>
+            <div style={{ fontSize:11, color:'#64748b', marginBottom:6, fontWeight:'bold' }}>入手方法:</div>
+            {[
+              { icon:'🪵', name:'木の釣り竿', how:'竿タブ →「強化」ボタン（初期段階）', lv:1 },
+              { icon:'🎣', name:'銀・水晶の竿', how:'謎の箱・クラフトで入手', lv:5 },
+              { icon:'🎣', name:'オールロッドX', how:'🐟 交換所 400 Fish Coin', lv:10 },
+              { icon:'🎣', name:'マスターロッドZ', how:'🐟 交換所 800 Fish Coin', lv:30 },
+              { icon:'☁️', name:'天空竿', how:'🐟 交換所 1500 Fish Coin', lv:60 },
+              { icon:'🐉', name:'龍の釣り竿', how:'釣りLv70 + 龍神討伐後クラフト', lv:70 },
+              { icon:'✨', name:'神竿', how:'釣りLv90達成で解放', lv:90 },
+              { icon:'♾️', name:'∞竿', how:'釣りLv100 + 図鑑100%コンプリート', lv:100 },
+            ].map(r => (
+              <div key={r.name} style={{ display:'flex', alignItems:'center', gap:8, padding:'4px 0', borderBottom:'1px solid #1e293b', opacity: fishingLevel >= r.lv ? 1 : 0.5 }}>
+                <span style={{ fontSize:16, width:20 }}>{r.icon}</span>
+                <div style={{ flex:1 }}>
+                  <span style={{ fontSize:12, color: fishingLevel >= r.lv ? '#e2e8f0' : '#64748b', fontWeight:'bold' }}>{r.name}</span>
+                  <div style={{ fontSize:10, color:'#475569' }}>{r.how}</div>
+                </div>
+                <span style={{ fontSize:10, color: fishingLevel >= r.lv ? '#4ade80' : '#f59e0b' }}>{fishingLevel >= r.lv ? '✅' : `Lv${r.lv}～`}</span>
+              </div>
+            ))}
+            <div style={{ marginTop:8, background:'rgba(251,191,36,0.08)', borderRadius:5, padding:'6px 8px', fontSize:11, color:'#fbbf24' }}>
+              💡 強化のコツ: +10以降は成功率が下がります。失敗してもレベルは下がりません。
+            </div>
+          </div>
+
+          {/* 餌の入手 */}
+          <div style={S.card}>
+            <div style={{ fontSize:13, fontWeight:'bold', color:'#4ade80', marginBottom:6 }}>🪱 餌の入手方法</div>
+            <div style={{ fontSize:11, color:'#94a3b8', marginBottom:8, lineHeight:1.6 }}>
+              餌を使うと釣り1回ごとに1個消費。∞の餌は例外で消費なし（無限使用可）。
+            </div>
+            {[
+              { tier:'common', label:'初級餌', color:'#94a3b8', items:[
+                { icon:'🪱', name:'ミミズ', how:'市場で購入（10G）' },
+                { icon:'🦐', name:'小エビ', how:'市場で購入（15G）' },
+                { icon:'🌽', name:'コーン', how:'市場で購入（10G）' },
+              ]},
+              { tier:'uncommon', label:'中級餌', color:'#4ade80', items:[
+                { icon:'🦀', name:'カニの爪', how:'市場で購入（40G）' },
+                { icon:'🪁', name:'基本ルアー', how:'市場で購入（50G）' },
+                { icon:'🍤', name:'特製エビ', how:'市場で購入（70G）' },
+              ]},
+              { tier:'rare', label:'上級餌', color:'#60a5fa', items:[
+                { icon:'✨', name:'光るミミズ', how:'🐟 交換所 20 Fish Coin' },
+                { icon:'✨', name:'黄金の餌', how:'🐟 交換所 50 Fish Coin' },
+                { icon:'🎯', name:'高級ルアー', how:'🐟 交換所 90 Fish Coin' },
+              ]},
+              { tier:'epic', label:'エピック餌', color:'#c084fc', items:[
+                { icon:'🐉', name:'龍の血', how:'🐟 交換所 140 Fish Coin' },
+              ]},
+              { tier:'legendary', label:'伝説餌', color:'#fbbf24', items:[
+                { icon:'🌟', name:'神の餌', how:'🐟 交換所 200 Fish Coin' },
+                { icon:'🕳️', name:'虚空の餌', how:'🐟 交換所 220 Fish Coin' },
+                { icon:'♾️', name:'∞の餌 ★消費なし', how:'🐟 交換所 300 Fish Coin ← 最終目標！' },
+              ]},
+            ].map(tier => (
+              <div key={tier.tier} style={{ marginBottom:8 }}>
+                <div style={{ fontSize:10, color:tier.color, fontWeight:'bold', marginBottom:3 }}>▸ {tier.label}</div>
+                {tier.items.map(it => (
+                  <div key={it.name} style={{ display:'flex', alignItems:'center', gap:6, padding:'2px 0', paddingLeft:8 }}>
+                    <span style={{ fontSize:14 }}>{it.icon}</span>
+                    <span style={{ fontSize:11, color:'#e2e8f0', flex:1 }}>{it.name}</span>
+                    <span style={{ fontSize:10, color:'#64748b' }}>{it.how}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {/* スポット解放 */}
+          <div style={S.card}>
+            <div style={{ fontSize:13, fontWeight:'bold', color:'#38bdf8', marginBottom:6 }}>📍 釣りスポットの解放</div>
+            <div style={{ fontSize:11, color:'#94a3b8', marginBottom:8 }}>
+              釣りレベルが上がると自動で新スポットが解放されます。スポットタブで選択してください。
+            </div>
+            {[
+              { lv:1,  icon:'🏞️', name:'近所の池 / 清流の川', desc:'基本スポット。序盤はここで稼ぐ。' },
+              { lv:8,  icon:'🌊', name:'静寂の湖', desc:'大型淡水魚が出現。EXP効率UP。' },
+              { lv:10, icon:'🌅', name:'浜辺の海', desc:'海水魚が登場。種類が一気に増える。' },
+              { lv:12, icon:'🌿', name:'霧の沼地', desc:'ピラニアなど珍しい魚が出現。' },
+              { lv:20, icon:'⛵', name:'沖合', desc:'マグロ・サメなど大型魚が狙える。' },
+              { lv:35, icon:'🕳️', name:'水中洞窟', desc:'洞窟固有の希少魚が生息。' },
+              { lv:40, icon:'🌑', name:'深海', desc:'ダイオウイカ・深淵クジラなど登場。' },
+              { lv:45, icon:'🧊', name:'氷河の海', desc:'極寒の海に適応した魚。' },
+              { lv:50, icon:'🌋', name:'火山湖', desc:'炎のルアーが有効。高レアリティ。' },
+              { lv:55, icon:'🏛️', name:'古代の川', desc:'古代魚が出現。' },
+              { lv:60, icon:'☁️', name:'天空湖', desc:'虹色コイ・黄金コイなど幻の魚。' },
+              { lv:65, icon:'🌈', name:'虹の滝', desc:'神秘的な滝壺。' },
+              { lv:70, icon:'✨', name:'黄金の川', desc:'EXP×3・レア×3。本格的な後半。' },
+              { lv:75, icon:'💎', name:'水晶の海', desc:'透明な海でエピック魚多数。' },
+              { lv:80, icon:'⚫', name:'奈落', desc:'最強クラスの魚が潜む。' },
+              { lv:85, icon:'🌀', name:'混沌の海', desc:'何が出るか予測不能。' },
+              { lv:90, icon:'🌟', name:'天界の海', desc:'EXP×5・レア×5。終盤の聖地。' },
+            ].map(sp => (
+              <div key={sp.lv} style={{ display:'flex', alignItems:'center', gap:8, padding:'4px 0', borderBottom:'1px solid #0f172a', opacity: fishingLevel >= sp.lv ? 1 : 0.5 }}>
+                <span style={{ fontSize:16, width:20 }}>{sp.icon}</span>
+                <div style={{ flex:1 }}>
+                  <span style={{ fontSize:12, color: fishingLevel >= sp.lv ? '#e2e8f0' : '#475569', fontWeight:'bold' }}>{sp.name}</span>
+                  <div style={{ fontSize:10, color:'#475569' }}>{sp.desc}</div>
+                </div>
+                <span style={{ fontSize:10, color: fishingLevel >= sp.lv ? '#4ade80' : '#f59e0b', whiteSpace:'nowrap' as const }}>{fishingLevel >= sp.lv ? '✅解放済' : `Lv${sp.lv}で解放`}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Fish Coin攻略 */}
+          <div style={S.card}>
+            <div style={{ fontSize:13, fontWeight:'bold', color:'#fbbf24', marginBottom:6 }}>🐟 Fish Coin 効率的な稼ぎ方</div>
+            <div style={{ fontSize:11, color:'#94a3b8', lineHeight:1.7 }}>
+              <div>・レア魚 = 1枚 / エピック魚 = 3枚 / 伝説魚 = 10枚</div>
+              <div>・天候「神秘の日」「赤い月」のとき獲得量が2倍</div>
+              <div>・高レアリティスポット（天空湖・奈落・天界の海）で効率UP</div>
+              <div>・レア率を上げる竿・餌を組み合わせると◎</div>
+              <div style={{ marginTop:6, color:'#fbbf24', fontWeight:'bold' }}>目標: 300枚 → ∞の餌（消費なし！）を最優先で狙おう</div>
+            </div>
+          </div>
+
+          {/* レベル上げのコツ */}
+          <div style={S.card}>
+            <div style={{ fontSize:13, fontWeight:'bold', color:'#a78bfa', marginBottom:6 }}>⬆️ 釣りレベルの上げ方</div>
+            <div style={{ fontSize:11, color:'#94a3b8', lineHeight:1.7 }}>
+              <div>・魚を釣るたびにEXP獲得。レア・大型ほど多い</div>
+              <div>・EXP倍率の高い竿を使う（マスターロッドZ: ×1.55、神竿: ×2.5）</div>
+              <div>・EXP倍率の高いスポットを選ぶ（天界の海: ×5）</div>
+              <div>・EXPボーナス付きの餌を使う（∞の餌: +100%）</div>
+              <div>・自動釣りを活用してAFK放置が有効</div>
+              <div style={{ marginTop:6, color:'#c084fc', fontWeight:'bold' }}>Lv100 + 図鑑100% → ∞竿入手！釣りコンプリート！</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {tab === 'rank' && (
         <div>
           <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
