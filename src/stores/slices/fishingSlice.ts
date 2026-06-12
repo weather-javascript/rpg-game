@@ -170,6 +170,15 @@ export const createFishingSlice: StateCreator<GameState, [], [], FishingSlice> =
       if (!state.player) return state;
       const baitId = state.player.fishingEquippedBaitId;
       if (!baitId) return state;
+      // ∞の餌は消費しない（無限）
+      if (baitId === 'infinity_bait') {
+        return {
+          player: {
+            ...state.player,
+            fishingTotalBaitUsed: (state.player.fishingTotalBaitUsed ?? 0) + 1,
+          },
+        };
+      }
       const qty = state.player.inventory[baitId] ?? 0;
       if (qty <= 0) return { player: { ...state.player, fishingEquippedBaitId: '' } };
       const newInv = { ...state.player.inventory, [baitId]: qty - 1 };
