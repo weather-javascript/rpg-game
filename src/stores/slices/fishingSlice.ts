@@ -14,7 +14,9 @@ export interface FishingSlice {
   addBuff:            (buff: { id: string; name: string; durationMs: number; fishingBonus?: number; miningBonus?: number }) => void;
   getActiveBuffBonus: (type: 'fishing' | 'mining') => number;
   addFishingExp:      (exp: number) => void;
-  recordCatch:        (fishId: string, sizeCm: number, weightKg: number, goldEarned: number) => void;
+  recordCatch:        (fishId: string, sizeCm: number, weightKg: number, goldEarned: number, fishCoinEarned?: number) => void;
+  addFishCoin:        (amount: number) => void;
+  spendFishCoin:      (amount: number) => boolean;
   selectFishingSpot:  (spotId: string) => void;
   unlockFishingSpot:  (spotId: string) => void;
   equipBait:          (baitId: string) => void;
@@ -96,7 +98,7 @@ export const createFishingSlice: StateCreator<GameState, [], [], FishingSlice> =
     });
   },
 
-  recordCatch: (fishId, sizeCm, weightKg, goldEarned) => {
+  recordCatch: (fishId, sizeCm, weightKg, goldEarned, fishCoinEarned = 0) => {
     const fish = FISH_MASTER[fishId];
     if (!fish) return;
     set((state: any) => {
@@ -116,10 +118,28 @@ export const createFishingSlice: StateCreator<GameState, [], [], FishingSlice> =
           fishingTotalCount: (state.player.fishingTotalCount ?? 0) + 1,
           fishingMaxSizeCm: Math.max(state.player.fishingMaxSizeCm ?? 0, sizeCm),
           fishingMaxWeightKg: Math.max(state.player.fishingMaxWeightKg ?? 0, weightKg),
+          fishingTotalWeightKg: Math.round(((state.player.fishingTotalWeightKg ?? 0) + weightKg) * 100) / 100,
           fishingTotalGoldEarned: (state.player.fishingTotalGoldEarned ?? 0) + goldEarned,
+          fishingLegendaryCount: (state.player.fishingLegendaryCount ?? 0) + (fish.rarity === 'legendary' ? 1 : 0),
+          fishCoin: (state.player.fishCoin ?? 0) + fishCoinEarned,
         },
       };
     });
+  },
+
+  addFishCoin: (amount) => {
+    set((state: any) => state.player ? { player: { ...state.player, fishCoin: (state.player.fishCoin ?? 0) + amount } } : state);
+  },
+
+  spendFishCoin: (amount) => {
+    const { player, addNotification } = get();
+    if (!player) return false;
+    if ((player.fishCoin ?? 0) < amount) {
+      addNotification('error', 'Fish Coinが不足しています！');
+      return false;
+    }
+    set((state: any) => state.player ? { player: { ...state.player, fishCoin: (state.player.fishCoin ?? 0) - amount } } : state);
+    return true;
   },
 
   selectFishingSpot: (spotId) => {
