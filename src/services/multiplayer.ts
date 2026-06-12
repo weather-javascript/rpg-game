@@ -2003,59 +2003,151 @@ export function subscribeQuestRanking(cb: (entries: QuestRankingEntry[]) => void
 // ============================================================
 // 株式市場（Wealth Exchange）
 // ============================================================
-export const STOCK_MASTERS: Record<StockId, { id: StockId; name: string; icon: string; basePrice: number }> = {
-  wealth_mining:    { id: 'wealth_mining',    name: 'Wealth Mining',    icon: '⛏️', basePrice: 1000 },
-  wealth_fishery:   { id: 'wealth_fishery',   name: 'Wealth Fishery',   icon: '🎣', basePrice: 800 },
-  wealth_casino:    { id: 'wealth_casino',    name: 'Wealth Casino',    icon: '🎰', basePrice: 1200 },
-  wealth_tech:      { id: 'wealth_tech',      name: 'Wealth Tech',      icon: '💻', basePrice: 2000 },
-  wealth_energy:    { id: 'wealth_energy',    name: 'Wealth Energy',    icon: '⚡', basePrice: 900 },
-  wealth_logistics: { id: 'wealth_logistics', name: 'Wealth Logistics', icon: '🚚', basePrice: 700 },
-  wealth_foods:     { id: 'wealth_foods',     name: 'Wealth Foods',     icon: '🍖', basePrice: 600 },
-  wealth_finance:   { id: 'wealth_finance',   name: 'Wealth Finance',   icon: '💰', basePrice: 1500 },
+export const STOCK_MASTERS: Record<StockId, { id: StockId; name: string; icon: string; basePrice: number; sector: import('../types/game').StockSector }> = {
+  wealth_mining:    { id: 'wealth_mining',    name: 'Wealth Mining',    icon: '⛏️', basePrice: 1000, sector: 'industry' },
+  wealth_fishery:   { id: 'wealth_fishery',   name: 'Wealth Fishery',   icon: '🎣', basePrice: 800,  sector: 'consumer' },
+  wealth_casino:    { id: 'wealth_casino',    name: 'Wealth Casino',    icon: '🎰', basePrice: 1200, sector: 'entertainment' },
+  wealth_tech:      { id: 'wealth_tech',      name: 'Wealth Tech',      icon: '💻', basePrice: 2000, sector: 'tech' },
+  wealth_energy:    { id: 'wealth_energy',    name: 'Wealth Energy',    icon: '⚡', basePrice: 900,  sector: 'energy' },
+  wealth_logistics: { id: 'wealth_logistics', name: 'Wealth Logistics', icon: '🚚', basePrice: 700,  sector: 'industry' },
+  wealth_foods:     { id: 'wealth_foods',     name: 'Wealth Foods',     icon: '🍖', basePrice: 600,  sector: 'consumer' },
+  wealth_finance:   { id: 'wealth_finance',   name: 'Wealth Finance',   icon: '💰', basePrice: 1500, sector: 'finance' },
+  // ── 新規追加銘柄 (15種) ──
+  wealth_robotics:  { id: 'wealth_robotics',  name: 'Wealth Robotics',  icon: '🤖', basePrice: 2500, sector: 'tech' },
+  wealth_software:  { id: 'wealth_software',  name: 'Wealth Software',  icon: '🖥️', basePrice: 2200, sector: 'tech' },
+  wealth_chemical:  { id: 'wealth_chemical',  name: 'Wealth Chemical',  icon: '🧪', basePrice: 850,  sector: 'industry' },
+  wealth_steel:     { id: 'wealth_steel',     name: 'Wealth Steel',     icon: '🏗️', basePrice: 750,  sector: 'industry' },
+  wealth_realestate:{ id: 'wealth_realestate',name: 'Wealth Realestate',icon: '🏢', basePrice: 1800, sector: 'finance' },
+  wealth_insurance: { id: 'wealth_insurance', name: 'Wealth Insurance', icon: '🛡️', basePrice: 1300, sector: 'finance' },
+  wealth_retail:    { id: 'wealth_retail',    name: 'Wealth Retail',    icon: '🛒', basePrice: 650,  sector: 'consumer' },
+  wealth_apparel:   { id: 'wealth_apparel',   name: 'Wealth Apparel',   icon: '👕', basePrice: 550,  sector: 'consumer' },
+  wealth_media:     { id: 'wealth_media',     name: 'Wealth Media',     icon: '📺', basePrice: 1100, sector: 'entertainment' },
+  wealth_gaming:    { id: 'wealth_gaming',    name: 'Wealth Gaming',    icon: '🎮', basePrice: 1900, sector: 'entertainment' },
+  wealth_airlines:  { id: 'wealth_airlines',  name: 'Wealth Airlines',  icon: '✈️', basePrice: 500,  sector: 'industry' },
+  wealth_solar:     { id: 'wealth_solar',     name: 'Wealth Solar',     icon: '🌞', basePrice: 950,  sector: 'energy' },
+  wealth_oil:       { id: 'wealth_oil',       name: 'Wealth Oil',       icon: '🛢️', basePrice: 1050, sector: 'energy' },
+  wealth_pharma:    { id: 'wealth_pharma',    name: 'Wealth Pharma',    icon: '💊', basePrice: 1700, sector: 'tech' },
+  wealth_telecom:   { id: 'wealth_telecom',   name: 'Wealth Telecom',   icon: '📡', basePrice: 1000, sector: 'industry' },
 };
 
-const STOCK_IDS: StockId[] = ['wealth_mining','wealth_fishery','wealth_casino','wealth_tech','wealth_energy','wealth_logistics','wealth_foods','wealth_finance'];
+const STOCK_IDS: StockId[] = [
+  'wealth_mining','wealth_fishery','wealth_casino','wealth_tech','wealth_energy','wealth_logistics','wealth_foods','wealth_finance',
+  'wealth_robotics','wealth_software','wealth_chemical','wealth_steel','wealth_realestate','wealth_insurance','wealth_retail',
+  'wealth_apparel','wealth_media','wealth_gaming','wealth_airlines','wealth_solar','wealth_oil','wealth_pharma','wealth_telecom',
+];
+export const STOCK_ID_LIST = STOCK_IDS;
+
+// セクター別ボラティリティ特性
+const SECTOR_VOL_MULT: Record<import('../types/game').StockSector, number> = {
+  tech: 1.35, industry: 0.75, finance: 1.0, consumer: 0.9, entertainment: 1.15, energy: 1.1,
+};
+// セクター別トレンド慣性（高いほど一方向に動きやすい＝安定）
+const SECTOR_STABILITY_BASE: Record<import('../types/game').StockSector, number> = {
+  tech: 0.35, industry: 0.6, finance: 0.45, consumer: 0.55, entertainment: 0.4, energy: 0.45,
+};
+
+// 市場の開場時間（毎日 07:00〜22:00）
+export const MARKET_OPEN_HOUR = 7;
+export const MARKET_CLOSE_HOUR = 22;
+
+export interface MarketStatus {
+  isOpen: boolean;
+  nextChangeAt: number; // 次の開場/閉場切替時刻 (ms)
+  msUntilChange: number;
+}
+
+export function getMarketStatus(now: number = Date.now()): MarketStatus {
+  const d = new Date(now);
+  const h = d.getHours();
+  const isOpen = h >= MARKET_OPEN_HOUR && h < MARKET_CLOSE_HOUR;
+  const next = new Date(d);
+  if (isOpen) {
+    next.setHours(MARKET_CLOSE_HOUR, 0, 0, 0);
+  } else if (h < MARKET_OPEN_HOUR) {
+    next.setHours(MARKET_OPEN_HOUR, 0, 0, 0);
+  } else {
+    next.setDate(next.getDate() + 1);
+    next.setHours(MARKET_OPEN_HOUR, 0, 0, 0);
+  }
+  return { isOpen, nextChangeAt: next.getTime(), msUntilChange: next.getTime() - now };
+}
+
+export function isMarketOpen(now: number = Date.now()): boolean {
+  return getMarketStatus(now).isOpen;
+}
+
 
 // 30種類以上のマーケットイベント
 const MARKET_EVENTS: Array<{
   text: string;
   changePct: number;
   targets?: StockId[];
+  sectors?: import('../types/game').StockSector[];
   allMarket?: boolean;
 }> = [
-  { text: '🤖 AI革命！次世代AIチップが実用化', changePct: 0.18, targets: ['wealth_tech'] },
-  { text: '💻 大手テック企業が史上最高益を記録', changePct: 0.14, targets: ['wealth_tech'] },
-  { text: '🔒 サイバー攻撃多発でセキュリティ需要急増', changePct: 0.12, targets: ['wealth_tech'] },
-  { text: '⚡ 原油価格が急騰、エネルギー株に恩恵', changePct: 0.16, targets: ['wealth_energy'] },
-  { text: '🌞 再生可能エネルギー政策が強化', changePct: 0.13, targets: ['wealth_energy'] },
-  { text: '🛢️ 産油国が減産を決定', changePct: 0.10, targets: ['wealth_energy'] },
-  { text: '🍣 食品安全基準の見直しで食品株上昇', changePct: 0.11, targets: ['wealth_foods'] },
-  { text: '🌾 農作物の大豊作で食品業績改善', changePct: 0.09, targets: ['wealth_foods'] },
-  { text: '⛏️ 希少金属の新鉱床を発見', changePct: 0.17, targets: ['wealth_mining'] },
-  { text: '⛏️ 採掘コストが大幅に削減される新技術', changePct: 0.13, targets: ['wealth_mining'] },
-  { text: '🎣 水産資源保護法の緩和で漁業回復', changePct: 0.12, targets: ['wealth_fishery'] },
-  { text: '🚚 物流DX化で配送コスト30%削減', changePct: 0.14, targets: ['wealth_logistics'] },
-  { text: '🏦 金融緩和政策で投資マインド上昇', changePct: 0.12, targets: ['wealth_finance'] },
-  { text: '💰 大型M&Aで金融コングロマリット誕生', changePct: 0.15, targets: ['wealth_finance'] },
-  { text: '🎰 カジノライセンス新規発行で株価急騰', changePct: 0.16, targets: ['wealth_casino'] },
+  { text: '🤖 AI革命！次世代AIチップが実用化', changePct: 0.18, targets: ['wealth_tech'], sectors: ['tech'] },
+  { text: '💻 大手テック企業が史上最高益を記録', changePct: 0.14, targets: ['wealth_tech'], sectors: ['tech'] },
+  { text: '🔒 サイバー攻撃多発でセキュリティ需要急増', changePct: 0.12, targets: ['wealth_tech'], sectors: ['tech'] },
+  { text: '⚡ 原油価格が急騰、エネルギー株に恩恵', changePct: 0.16, targets: ['wealth_energy'], sectors: ['energy'] },
+  { text: '🌞 再生可能エネルギー政策が強化', changePct: 0.13, targets: ['wealth_energy'], sectors: ['energy'] },
+  { text: '🛢️ 産油国が減産を決定', changePct: 0.10, targets: ['wealth_energy'], sectors: ['energy'] },
+  { text: '🍣 食品安全基準の見直しで食品株上昇', changePct: 0.11, targets: ['wealth_foods'], sectors: ['consumer'] },
+  { text: '🌾 農作物の大豊作で食品業績改善', changePct: 0.09, targets: ['wealth_foods'], sectors: ['consumer'] },
+  { text: '⛏️ 希少金属の新鉱床を発見', changePct: 0.17, targets: ['wealth_mining'], sectors: ['industry'] },
+  { text: '⛏️ 採掘コストが大幅に削減される新技術', changePct: 0.13, targets: ['wealth_mining'], sectors: ['industry'] },
+  { text: '🎣 水産資源保護法の緩和で漁業回復', changePct: 0.12, targets: ['wealth_fishery'], sectors: ['consumer'] },
+  { text: '🚚 物流DX化で配送コスト30%削減', changePct: 0.14, targets: ['wealth_logistics'], sectors: ['industry'] },
+  { text: '🏦 金融緩和政策で投資マインド上昇', changePct: 0.12, targets: ['wealth_finance'], sectors: ['finance'] },
+  { text: '💰 大型M&Aで金融コングロマリット誕生', changePct: 0.15, targets: ['wealth_finance'], sectors: ['finance'] },
+  { text: '🎰 カジノライセンス新規発行で株価急騰', changePct: 0.16, targets: ['wealth_casino'], sectors: ['entertainment'] },
   { text: '🌍 世界同時株高！リスクオンムード', changePct: 0.08, allMarket: true },
   { text: '📈 外国人投資家の買い越しが続く', changePct: 0.07, allMarket: true },
+  // ── 新セクター用イベント ──
+  { text: '🤖 産業用ロボット需要が急拡大', changePct: 0.15, targets: ['wealth_robotics'], sectors: ['tech'] },
+  { text: '🖥️ クラウドサービス契約数が急増', changePct: 0.13, targets: ['wealth_software'], sectors: ['tech'] },
+  { text: '💊 新薬の臨床試験が成功', changePct: 0.17, targets: ['wealth_pharma'], sectors: ['tech'] },
+  { text: '🏢 不動産価格指数が大幅上昇', changePct: 0.11, targets: ['wealth_realestate'], sectors: ['finance'] },
+  { text: '🛡️ 保険料改定で増益見通し', changePct: 0.09, targets: ['wealth_insurance'], sectors: ['finance'] },
+  { text: '🛒 大型セールで小売売上が好調', changePct: 0.10, targets: ['wealth_retail'], sectors: ['consumer'] },
+  { text: '👕 新ブランドが世界的ヒット', changePct: 0.12, targets: ['wealth_apparel'], sectors: ['consumer'] },
+  { text: '📺 大型ヒット番組が視聴率record', changePct: 0.13, targets: ['wealth_media'], sectors: ['entertainment'] },
+  { text: '🎮 新作ゲームが世界的大ヒット', changePct: 0.18, targets: ['wealth_gaming'], sectors: ['entertainment'] },
+  { text: '✈️ 旅行需要が急回復', changePct: 0.14, targets: ['wealth_airlines'], sectors: ['industry'] },
+  { text: '🌞 太陽光パネルの新技術で発電効率向上', changePct: 0.15, targets: ['wealth_solar'], sectors: ['energy'] },
+  { text: '🛢️ 新油田が発見される', changePct: 0.13, targets: ['wealth_oil'], sectors: ['energy'] },
+  { text: '📡 5G通信網が全国展開完了', changePct: 0.11, targets: ['wealth_telecom'], sectors: ['industry'] },
+  { text: '🧪 新素材の量産化に成功', changePct: 0.12, targets: ['wealth_chemical'], sectors: ['industry'] },
+  { text: '🏗️ 大型建設プロジェクトが受注', changePct: 0.10, targets: ['wealth_steel'], sectors: ['industry'] },
   // 下落イベント
-  { text: '💻 大手テック企業が業績下方修正', changePct: -0.16, targets: ['wealth_tech'] },
-  { text: '🔌 半導体不足が深刻化', changePct: -0.13, targets: ['wealth_tech'] },
-  { text: '⚡ 電力価格の高騰でエネルギー株急落', changePct: -0.12, targets: ['wealth_energy'] },
-  { text: '🌊 大型台風で採掘施設が被害', changePct: -0.14, targets: ['wealth_mining'] },
-  { text: '🐟 漁業資源の枯渇問題が浮上', changePct: -0.11, targets: ['wealth_fishery'] },
-  { text: '🍔 食品偽装問題が発覚し信頼失墜', changePct: -0.18, targets: ['wealth_foods'] },
-  { text: '🚛 燃料費高騰で物流コスト急増', changePct: -0.13, targets: ['wealth_logistics'] },
-  { text: '🏦 金融不安が広がり銀行株急落', changePct: -0.15, targets: ['wealth_finance'] },
-  { text: '🎰 カジノ規制強化の法案が可決', changePct: -0.19, targets: ['wealth_casino'] },
+  { text: '💻 大手テック企業が業績下方修正', changePct: -0.16, targets: ['wealth_tech'], sectors: ['tech'] },
+  { text: '🔌 半導体不足が深刻化', changePct: -0.13, targets: ['wealth_tech'], sectors: ['tech'] },
+  { text: '⚡ 電力価格の高騰でエネルギー株急落', changePct: -0.12, targets: ['wealth_energy'], sectors: ['energy'] },
+  { text: '🌊 大型台風で採掘施設が被害', changePct: -0.14, targets: ['wealth_mining'], sectors: ['industry'] },
+  { text: '🐟 漁業資源の枯渇問題が浮上', changePct: -0.11, targets: ['wealth_fishery'], sectors: ['consumer'] },
+  { text: '🍔 食品偽装問題が発覚し信頼失墜', changePct: -0.18, targets: ['wealth_foods'], sectors: ['consumer'] },
+  { text: '🚛 燃料費高騰で物流コスト急増', changePct: -0.13, targets: ['wealth_logistics'], sectors: ['industry'] },
+  { text: '🏦 金融不安が広がり銀行株急落', changePct: -0.15, targets: ['wealth_finance'], sectors: ['finance'] },
+  { text: '🎰 カジノ規制強化の法案が可決', changePct: -0.19, targets: ['wealth_casino'], sectors: ['entertainment'] },
   { text: '📉 世界同時株安！リスクオフムード', changePct: -0.09, allMarket: true },
   { text: '🌐 地政学リスクが高まり全面安', changePct: -0.10, allMarket: true },
   { text: '💸 急激な円高で輸出関連株が下落', changePct: -0.07, allMarket: true },
   { text: '😱 著名投資家が大量売却を開始', changePct: -0.11, allMarket: true },
-  { text: '⚠️ 規制当局が独占禁止法違反で調査開始', changePct: -0.12, targets: ['wealth_tech', 'wealth_finance'] },
-  { text: '🌋 天災により複数セクターで操業停止', changePct: -0.10, targets: ['wealth_mining', 'wealth_energy'] },
+  { text: '⚠️ 規制当局が独占禁止法違反で調査開始', changePct: -0.12, targets: ['wealth_tech', 'wealth_finance'], sectors: ['tech','finance'] },
+  { text: '🌋 天災により複数セクターで操業停止', changePct: -0.10, targets: ['wealth_mining', 'wealth_energy'], sectors: ['industry','energy'] },
+  // ── 新セクター用イベント (下落) ──
+  { text: '🤖 ロボット工場で大規模リコール', changePct: -0.14, targets: ['wealth_robotics'], sectors: ['tech'] },
+  { text: '🖥️ 大規模システム障害が発生', changePct: -0.13, targets: ['wealth_software'], sectors: ['tech'] },
+  { text: '💊 新薬の副作用問題が発覚', changePct: -0.17, targets: ['wealth_pharma'], sectors: ['tech'] },
+  { text: '🏢 不動産バブル崩壊の懸念が拡大', changePct: -0.15, targets: ['wealth_realestate'], sectors: ['finance'] },
+  { text: '🛡️ 大規模災害で保険金支払いが急増', changePct: -0.12, targets: ['wealth_insurance'], sectors: ['finance'] },
+  { text: '🛒 消費低迷で小売業績が悪化', changePct: -0.10, targets: ['wealth_retail'], sectors: ['consumer'] },
+  { text: '👕 ブランドイメージ悪化で不振', changePct: -0.11, targets: ['wealth_apparel'], sectors: ['consumer'] },
+  { text: '📺 視聴率低迷で広告収入が減少', changePct: -0.12, targets: ['wealth_media'], sectors: ['entertainment'] },
+  { text: '🎮 大型タイトルの発売延期が発表', changePct: -0.15, targets: ['wealth_gaming'], sectors: ['entertainment'] },
+  { text: '✈️ 燃料費高騰で航空業界が打撃', changePct: -0.13, targets: ['wealth_airlines'], sectors: ['industry'] },
+  { text: '🌞 補助金縮小で太陽光需要が減少', changePct: -0.12, targets: ['wealth_solar'], sectors: ['energy'] },
+  { text: '🛢️ 原油価格が急落', changePct: -0.14, targets: ['wealth_oil'], sectors: ['energy'] },
+  { text: '📡 通信障害で大規模な信頼低下', changePct: -0.11, targets: ['wealth_telecom'], sectors: ['industry'] },
 ];
 
 // トレンドラベル変換
@@ -2119,6 +2211,8 @@ export function subscribeStockPrices(
 // 30秒tick × 120ticks/hour × 15hours(7-22) = 1800 ticks/day → 5/1800 ≈ 0.0028
 // ただしイベント自体はtick毎に複数銘柄を評価するので、全体発生率を0.003程度に
 const NEWS_PER_TICK_PROB = 0.003;
+// 閉場中: 1日あたり約1件ペース（15h分のtick数に対し約1/15のニュース確率）
+const NEWS_PER_TICK_PROB_CLOSED = NEWS_PER_TICK_PROB / 15;
 
 export async function tickStockPrices(): Promise<{
   prices: Record<StockId, number>;
@@ -2152,9 +2246,12 @@ export async function tickStockPrices(): Promise<{
       todayStart.setHours(0, 0, 0, 0);
       const todayStartMs = todayStart.getTime();
 
-      // ランダムイベント発生判定（1日5件ペース）
+      // 開場/閉場判定
+      const marketOpen = isMarketOpen(now);
+
+      // ランダムイベント発生判定（開場中は1日5件、閉場中は1日1件ペース）
       let eventForTick: typeof MARKET_EVENTS[number] | null = null;
-      if (Math.random() < NEWS_PER_TICK_PROB) {
+      if (Math.random() < (marketOpen ? NEWS_PER_TICK_PROB : NEWS_PER_TICK_PROB_CLOSED)) {
         eventForTick = MARKET_EVENTS[Math.floor(Math.random() * MARKET_EVENTS.length)];
       }
 
@@ -2165,10 +2262,19 @@ export async function tickStockPrices(): Promise<{
         const current: number = (data[id] as number) ?? STOCK_MASTERS[id].basePrice;
         let trendData: import('../types/game').StockTrendData = (data[`trend_${id}`] as import('../types/game').StockTrendData) ?? {
           trend: (Math.random() - 0.5) * 0.04,
-          volatility: 0.02 + Math.random() * 0.04,
-          stability: 0.3 + Math.random() * 0.5,
+          volatility: (0.02 + Math.random() * 0.04) * SECTOR_VOL_MULT[STOCK_MASTERS[id].sector],
+          stability: Math.min(0.9, (0.3 + Math.random() * 0.5) * SECTOR_STABILITY_BASE[STOCK_MASTERS[id].sector] / 0.5),
           consecutiveTicks: 0,
         };
+
+        // 閉場中は価格更新を停止（トレンド・ボラティリティもそのまま維持）
+        if (!marketOpen) {
+          prices[id] = current;
+          trends[id] = trendData;
+          newData[id] = current;
+          newData[`trend_${id}`] = trendData;
+          continue;
+        }
 
         // ストップ高/安チェック: その日の取引停止
         const haltedAt = trendData.haltedAt;
@@ -2223,11 +2329,16 @@ export async function tickStockPrices(): Promise<{
           newsText = `🚀 【バブル発生！】${STOCK_MASTERS[id].name} が急騰中！`;
           trendData = { ...trendData, trend: 0.05, volatility: Math.min(0.1, newVol * 1.5), consecutiveTicks: 0 };
         } else if (eventForTick) {
-          // マーケットイベント
+          // マーケットイベント（個別銘柄 or セクター単位で影響）
           const affects = eventForTick.allMarket ||
-            (eventForTick.targets && eventForTick.targets.includes(id));
+            (eventForTick.targets && eventForTick.targets.includes(id)) ||
+            (eventForTick.sectors && eventForTick.sectors.includes(STOCK_MASTERS[id].sector));
           if (affects) {
-            changePct = eventForTick.changePct + noise * 0.3;
+            // ニュースの方向と価格変動の方向を一致させる（ノイズは小さく抑える）
+            changePct = eventForTick.changePct + noise * 0.2;
+            if (Math.sign(changePct) !== Math.sign(eventForTick.changePct) && eventForTick.changePct !== 0) {
+              changePct = eventForTick.changePct; // 逆転を防止
+            }
             newsText = `📰 ${eventForTick.text}（${changePct > 0 ? '+' : ''}${(changePct * 100).toFixed(1)}%）`;
             trendData = {
               ...trendData,
