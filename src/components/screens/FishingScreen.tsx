@@ -114,6 +114,7 @@ export function FishingScreen() {
   const enhanceRod        = useGameStore((s: any) => s.enhanceRod);
   const spendFishCoin     = useGameStore((s: any) => s.spendFishCoin);
   const checkFishingAchievements = useGameStore((s: any) => s.checkFishingAchievements);
+  const setFishingLocked  = useGameStore((s: any) => s.setFishingLocked);
 
   const weather = getCurrentWeather();
   const season  = getCurrentSeason();
@@ -157,6 +158,17 @@ export function FishingScreen() {
   const bookPct   = Math.floor(bookCount / TOTAL_FISH * 100);
   const staminaCost = spot.staminaCost;
   const cdMs    = castTimeOverride !== null ? castTimeOverride : spot.cooldownMs;
+
+  // 釣り中はタブ移動をロック
+  useEffect(() => {
+    setFishingLocked(autoFish || casting);
+  }, [autoFish, casting, setFishingLocked]);
+
+  // アンマウント時にロック解除
+  useEffect(() => {
+    return () => setFishingLocked(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 管理者設定のキャスト時間をSubscribe
   useEffect(() => {

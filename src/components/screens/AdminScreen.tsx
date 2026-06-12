@@ -19,6 +19,7 @@ import {
 } from '../../services/multiplayer';
 import type { TreasureProbEntry, TradeRecipe, MonsterOverride, DungeonOverride, TabMaintenanceConfig, MaintainableTab } from '../../services/multiplayer';
 import { GAMBLE_MASTER, DUNGEON_MASTER, ITEM_MASTER, MONSTER_MASTER, CRAFT_RECIPES } from '../../data/masters';
+import { ROD_MASTER, ROD_IDS, BAIT_MASTER, BAIT_IDS, SPOT_MASTER, SPOT_IDS, FISHING_TITLES, FISHING_ACHIEVEMENTS } from '../../data/fishMasters';
 import type { CraftRecipe } from '../../types/game';
 import { useGameStore } from '../../stores/gameStore';
 import { PlayerEditor } from '../admin/PlayerEditor';
@@ -30,7 +31,7 @@ import { EventManager } from '../admin/EventManager';
 import { AnalyticsPanel } from '../admin/AnalyticsPanel';
 import { filterPlayersAdmin } from '../../services/multiplayer';
 
-type SubTab = 'players' | 'gamble' | 'items' | 'announce' | 'stats' | 'system' | 'recipes' | 'proposals' | 'trade' | 'dungeon' | 'console';
+type SubTab = 'players' | 'gamble' | 'items' | 'announce' | 'stats' | 'system' | 'recipes' | 'proposals' | 'trade' | 'dungeon' | 'console' | 'fishing_admin';
 
 export function AdminScreen() {
   const player = useGameStore(s => s.player);
@@ -95,6 +96,20 @@ export function AdminScreen() {
   const [tabMaintConfig, setTabMaintConfig] = useState<TabMaintenanceConfig>({});
   const [tabMaintMessages, setTabMaintMessages] = useState<Partial<Record<MaintainableTab, string>>>({});
   const [tabMaintEstimates, setTabMaintEstimates] = useState<Partial<Record<MaintainableTab, string>>>({});
+  // 釣りデータ管理
+  const [fishingAdminFilter, setFishingAdminFilter] = useState('');
+  const [fishingAdminPlayer, setFishingAdminPlayer] = useState<any | null>(null);
+  const [faFishCoin, setFaFishCoin] = useState('');
+  const [faFishingLevel, setFaFishingLevel] = useState('');
+  const [faFishingExp, setFaFishingExp] = useState('');
+  const [faEquippedRodId, setFaEquippedRodId] = useState('');
+  const [faEquippedBaitId, setFaEquippedBaitId] = useState('');
+  const [faUnlockedSpots, setFaUnlockedSpots] = useState<string[]>([]);
+  const [faRodEnhance, setFaRodEnhance] = useState<Record<string, string>>({});
+  const [faFishingAchievements, setFaFishingAchievements] = useState<string[]>([]);
+  const [faFishingTitles, setFaFishingTitles] = useState<string[]>([]);
+  const [faFishBookCount, setFaFishBookCount] = useState(0);
+  const [faSaving, setFaSaving] = useState(false);
   // 運営コンソール
   const [consoleSection, setConsoleSection] = useState<'editor' | 'commands' | 'history' | 'logs' | 'master' | 'event' | 'analytics'>('editor');
   const [searchName, setSearchName] = useState('');
@@ -311,6 +326,7 @@ export function AdminScreen() {
     { id: 'dungeon',   label: 'ダンジョン', icon: '⚔️' },
     { id: 'proposals', label: '提案',       icon: '💡' },
     { id: 'announce',  label: 'お知らせ',   icon: '📢' },
+    { id: 'fishing_admin', label: '釣りデータ', icon: '🎣' },
     { id: 'system',    label: 'システム',   icon: '⚙️' },
     { id: 'stats',     label: '統計',       icon: '📊' },
   ];
@@ -536,6 +552,176 @@ export function AdminScreen() {
           </div>
         </div>
       )}
+
+      {/* ===== 釣りデータ管理 ===== */}
+      {subTab === 'fishing_admin' && (() => {
+        const filteredFishingPlayers = filterPlayersAdmin(players, {
+          name: fishingAdminFilter || undefined,
+          id: fishingAdminFilter || undefined,
+        });
+        const loadFishingPlayer = (p: any) => {
+          setFishingAdminPlayer(p);
+          setFaFishCoin(String(p.fishCoin ?? 0));
+          setFaFishingLevel(String(p.fishingLevel ?? 1));
+          setFaFishingExp(String(p.fishingExp ?? 0));
+          setFaEquippedRodId(p.equippedRodId ?? 'basic_rod');
+          setFaEquippedBaitId(p.fishingEquippedBaitId ?? '');
+          setFaUnlockedSpots(p.fishingUnlockedSpots ?? ['pond', 'river']);
+          const enhance = p.fishingRodEnhance ?? {};
+          const enhStr: Record<string, string> = {};
+          ROD_IDS.forEach(rid => { enhStr[rid] = String(enhance[rid] ?? 0); });
+          setFaRodEnhance(enhStr);
+          setFaFishingAchievements(p.fishingAchievements ?? []);
+          setFaFishingTitles(p.fishingUnlockedTitles ?? []);
+          setFaFishBookCount(Object.keys(p.fishBook ?? {}).length);
+        };
+        const saveFishingData = async () => {
+          if (!fishingAdminPlayer) return;
+          setFaSaving(true);
+          try {
+            const rodEnhance: Record<string, number> = {};
+            ROD_IDS.forEach(rid => { const v = Number(faRodEnhance[rid] ?? 0); if (v > 0) rodEnhance[rid] = v; });
+            await updatePlayerAdmin(fishingAdminPlayer.id, {
+              fishCoin: Number(faFishCoin),
+              fishingLevel: Number(faFishingLevel),
+              fishingExp: Number(faFishingExp),
+              equippedRodId: faEquippedRodId,
+              fishingEquippedBaitId: faEquippedBaitId || undefined,
+              fishingUnlockedSpots: faUnlockedSpots,
+              fishingRodEnhance: rodEnhance,
+              fishingAchievements: faFishingAchievements,
+              fishingUnlockedTitles: faFishingTitles,
+            } as any);
+            addNotification('success', `${fishingAdminPlayer.displayName} の釣りデータを更新しました`);
+          } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
+          setFaSaving(false);
+        };
+        const S2 = { label: { fontSize:'0.72rem', color:'#8a92b2', marginBottom:3 }, input: { width:'100%', padding:'6px 8px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', boxSizing:'border-box' as const } };
+        return (
+          <div>
+            <div style={{marginBottom:10}}>
+              <input value={fishingAdminFilter} onChange={e => setFishingAdminFilter(e.target.value)}
+                placeholder="名前・UIDで検索..." style={{width:'100%', padding:'7px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', boxSizing:'border-box'}} />
+            </div>
+            <div style={{display:'flex', flexDirection:'column', gap:4, marginBottom:14, maxHeight:180, overflowY:'auto'}}>
+              {filteredFishingPlayers.slice(0,30).map(p => (
+                <button key={p.id} onClick={() => loadFishingPlayer(p)}
+                  style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 10px', background: fishingAdminPlayer?.id === p.id ? 'rgba(14,165,233,0.15)' : '#1c2235', border:`1px solid ${fishingAdminPlayer?.id === p.id ? '#0ea5e9' : '#2d3752'}`, borderRadius:6, cursor:'pointer', color:'#e8e6ff', fontSize:'0.82rem', textAlign:'left'}}>
+                  <span>🎣 {p.displayName ?? '名無し'} (Lv.{p.stats?.level ?? 1})</span>
+                  <span style={{color:'#0ea5e9', fontSize:'0.75rem'}}>釣Lv.{(p as any).fishingLevel ?? 1} 🪙{((p as any).fishCoin ?? 0).toLocaleString()}</span>
+                </button>
+              ))}
+            </div>
+
+            {fishingAdminPlayer && (
+              <div style={{background:'#1c2235', border:'2px solid #0ea5e9', borderRadius:10, padding:14}}>
+                <div style={{color:'#0ea5e9', fontWeight:700, fontSize:'0.92rem', marginBottom:12}}>🎣 {fishingAdminPlayer.displayName} の釣りデータ編集</div>
+
+                {/* 基本数値 */}
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:12}}>
+                  {[
+                    { label:'🪙 釣りコイン', val:faFishCoin, set:setFaFishCoin },
+                    { label:'⭐ 釣りLv', val:faFishingLevel, set:setFaFishingLevel },
+                    { label:'✨ 釣りEXP', val:faFishingExp, set:setFaFishingExp },
+                  ].map(f => (
+                    <div key={f.label}>
+                      <div style={S2.label}>{f.label}</div>
+                      <input type="number" min="0" value={f.val} onChange={e => f.set(e.target.value)} style={S2.input} />
+                    </div>
+                  ))}
+                </div>
+
+                {/* 装備竿 */}
+                <div style={{marginBottom:10}}>
+                  <div style={S2.label}>🎣 装備竿</div>
+                  <select value={faEquippedRodId} onChange={e => setFaEquippedRodId(e.target.value)}
+                    style={{...S2.input, cursor:'pointer'}}>
+                    {ROD_IDS.map(rid => <option key={rid} value={rid}>{ROD_MASTER[rid].icon} {ROD_MASTER[rid].name}</option>)}
+                  </select>
+                </div>
+
+                {/* 装備餌 */}
+                <div style={{marginBottom:12}}>
+                  <div style={S2.label}>🪱 装備エサ</div>
+                  <select value={faEquippedBaitId} onChange={e => setFaEquippedBaitId(e.target.value)}
+                    style={{...S2.input, cursor:'pointer'}}>
+                    <option value="">なし</option>
+                    {BAIT_IDS.map(bid => <option key={bid} value={bid}>{BAIT_MASTER[bid].icon} {BAIT_MASTER[bid].name}</option>)}
+                  </select>
+                </div>
+
+                {/* 解放スポット */}
+                <div style={{marginBottom:12}}>
+                  <div style={{...S2.label, marginBottom:6}}>📍 解放済みスポット</div>
+                  <div style={{display:'flex', flexWrap:'wrap', gap:5}}>
+                    {SPOT_IDS.map(sid => {
+                      const on = faUnlockedSpots.includes(sid);
+                      return (
+                        <button key={sid} onClick={() => setFaUnlockedSpots(p => on ? p.filter(x => x !== sid) : [...p, sid])}
+                          style={{padding:'4px 8px', fontSize:'0.75rem', background: on ? 'rgba(14,165,233,0.2)' : '#161b26', border:`1px solid ${on ? '#0ea5e9' : '#2d3752'}`, color: on ? '#0ea5e9' : '#6a7290', borderRadius:5, cursor:'pointer'}}>
+                          {SPOT_MASTER[sid].icon} {SPOT_MASTER[sid].name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div style={{display:'flex', gap:6, marginTop:6}}>
+                    <button onClick={() => setFaUnlockedSpots(SPOT_IDS)} style={{padding:'4px 10px', fontSize:'0.75rem', background:'rgba(14,165,233,0.15)', border:'1px solid #0ea5e9', color:'#0ea5e9', borderRadius:5, cursor:'pointer'}}>全解放</button>
+                    <button onClick={() => setFaUnlockedSpots(['pond','river'])} style={{padding:'4px 10px', fontSize:'0.75rem', background:'rgba(224,85,85,0.1)', border:'1px solid #e05555', color:'#e05555', borderRadius:5, cursor:'pointer'}}>リセット</button>
+                  </div>
+                </div>
+
+                {/* 竿強化 */}
+                <div style={{marginBottom:12}}>
+                  <div style={{...S2.label, marginBottom:6}}>🔨 竿強化レベル</div>
+                  <div style={{maxHeight:140, overflowY:'auto', display:'flex', flexDirection:'column', gap:4}}>
+                    {ROD_IDS.filter(rid => Number(faRodEnhance[rid] ?? 0) > 0 || ['basic_rod','master_rod','god_rod','infinite_rod'].includes(rid)).map(rid => (
+                      <div key={rid} style={{display:'flex', alignItems:'center', gap:8}}>
+                        <span style={{flex:1, fontSize:'0.78rem', color:'#e8e6ff'}}>{ROD_MASTER[rid].icon} {ROD_MASTER[rid].name}</span>
+                        <input type="number" min="0" max="20" value={faRodEnhance[rid] ?? '0'}
+                          onChange={e => setFaRodEnhance(p => ({...p, [rid]: e.target.value}))}
+                          style={{width:56, padding:'4px 6px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:4, fontSize:'0.82rem', textAlign:'center'}} />
+                      </div>
+                    ))}
+                    <button onClick={() => {
+                      const all: Record<string, string> = {};
+                      ROD_IDS.forEach(rid => { all[rid] = faRodEnhance[rid] ?? '0'; });
+                      setFaRodEnhance(all);
+                    }} style={{fontSize:'0.72rem', padding:'3px 8px', background:'#2d3752', border:'1px solid #3d4762', color:'#8a92b2', borderRadius:4, cursor:'pointer', alignSelf:'flex-start'}}>全竿を表示</button>
+                  </div>
+                </div>
+
+                {/* 実績 */}
+                <div style={{marginBottom:10}}>
+                  <div style={{...S2.label, marginBottom:6}}>🏅 実績 ({faFishingAchievements.length}/{FISHING_ACHIEVEMENTS.length})</div>
+                  <div style={{display:'flex', gap:6}}>
+                    <button onClick={() => setFaFishingAchievements(FISHING_ACHIEVEMENTS.map(a => a.id))} style={{padding:'4px 10px', fontSize:'0.75rem', background:'rgba(14,165,233,0.15)', border:'1px solid #0ea5e9', color:'#0ea5e9', borderRadius:5, cursor:'pointer'}}>全付与</button>
+                    <button onClick={() => setFaFishingAchievements([])} style={{padding:'4px 10px', fontSize:'0.75rem', background:'rgba(224,85,85,0.1)', border:'1px solid #e05555', color:'#e05555', borderRadius:5, cursor:'pointer'}}>全リセット</button>
+                  </div>
+                </div>
+
+                {/* 称号 */}
+                <div style={{marginBottom:12}}>
+                  <div style={{...S2.label, marginBottom:6}}>⭐ 称号 ({faFishingTitles.length}/{FISHING_TITLES.length})</div>
+                  <div style={{display:'flex', gap:6}}>
+                    <button onClick={() => setFaFishingTitles(FISHING_TITLES.map(t => t.id))} style={{padding:'4px 10px', fontSize:'0.75rem', background:'rgba(14,165,233,0.15)', border:'1px solid #0ea5e9', color:'#0ea5e9', borderRadius:5, cursor:'pointer'}}>全付与</button>
+                    <button onClick={() => setFaFishingTitles([])} style={{padding:'4px 10px', fontSize:'0.75rem', background:'rgba(224,85,85,0.1)', border:'1px solid #e05555', color:'#e05555', borderRadius:5, cursor:'pointer'}}>全リセット</button>
+                  </div>
+                </div>
+
+                {/* 図鑑情報 */}
+                <div style={{marginBottom:14, padding:'8px 12px', background:'#161b26', borderRadius:6, border:'1px solid #2d3752'}}>
+                  <span style={{fontSize:'0.8rem', color:'#8a92b2'}}>📖 図鑑: <span style={{color:'#e8e6ff', fontWeight:700}}>{faFishBookCount}種</span> 登録済み（直接編集はアイテムタブから）</span>
+                </div>
+
+                <button onClick={saveFishingData} disabled={faSaving}
+                  style={{width:'100%', padding:'10px', background:'linear-gradient(135deg,#0ea5e9,#0284c7)', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontWeight:700, fontSize:'0.88rem'}}>
+                  {faSaving ? '保存中...' : '💾 釣りデータを保存'}
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ===== 運営コンソール ===== */}
       {subTab === 'console' && (() => {
