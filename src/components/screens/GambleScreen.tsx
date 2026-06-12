@@ -2521,11 +2521,6 @@ const GAME_NAMES_JP: Record<string, string> = {
 };
 
 // ============================================================
-const GAME_NAMES_JP: Record<string, string> = {
-  chohan: '丁半', chinchiro: 'チンチロリン', coin_flip: 'コイントス', slot_machine: 'スロット',
-};
-
-// ============================================================
 // ミニマインパネル
 // ============================================================
 function MinesPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
@@ -2724,7 +2719,6 @@ function RoulettePanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 
       const colorEmoji = landColor === 'red' ? '🔴' : landColor === 'black' ? '⚫' : '🟢';
       setLanded(colorEmoji);
       const win = choice === landColor;
-      const isTie = false;
       let mult = 0;
       if (win) mult = (landColor === 'green' ? 9.3 : 2.0) * multiplierBonus;
       const goldDelta = Math.floor(bet * mult) - bet;
@@ -2927,7 +2921,6 @@ function ScratchPanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }
       const chosen = newSelected.map(idx => grid[idx]);
       const counts: Record<string, number> = {};
       chosen.forEach(s => { counts[s] = (counts[s] ?? 0) + 1; });
-      const maxCount = Math.max(...Object.values(counts));
       const matchSymbol = Object.entries(counts).find(([, v]) => v >= 3)?.[0];
       let mult = 0, label = 'ハズレ';
       if (matchSymbol === '🌟') { mult = 10.0 * multiplierBonus; label = '🌟 大当たり！'; }
@@ -3009,7 +3002,6 @@ function RacePanel({ bet, onResult, onJackpotContrib, multiplierBonus = 1.0 }: {
       const goldDelta = Math.floor(bet * mult) - bet;
       const latestP = useGameStore.getState().player ?? player;
       if (mult > 0) setPlayer({ ...latestP, wealthCoin: (latestP.wealthCoin ?? 0) + Math.floor(bet * mult) });
-      const label = win ? `${def.emoji}${w}が勝った！` : `${def.emoji}${w}が勝った（外れ）`;
       onResult({ rewardLabel: win ? `${w}が勝った！` : '負け', multiplier: mult, goldDelta, itemRewards: [], symbols: [def.emoji] });
       setLoading(false);
       setChoice(null);

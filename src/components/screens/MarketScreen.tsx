@@ -7,7 +7,7 @@ import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
 import { subscribeItemPrices, subscribeTradeRecipes, subscribeNpcQuests, generateNpcQuests, deleteExpiredNpcQuests, completeNpcQuest, updateQuestRanking, subscribeQuestRanking } from '../../services/multiplayer';
 import type { TradeRecipe, QuestRankingEntry } from '../../services/multiplayer';
-import type { NpcQuest, QuestRank, QuestType } from '../../types/game';
+import type { NpcQuest, QuestRank } from '../../types/game';
 
 type ShopTab = 'sell' | 'buy' | 'satiety' | 'use' | 'trade' | 'quest';
 
