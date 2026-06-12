@@ -1848,7 +1848,6 @@ export async function generateNpcQuests(): Promise<void> {
   // ============================================================
   // 依頼1件を動的生成
   // ============================================================
-  type QuestType = NpcQuest['questType'] & string;
   function rand<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
 
   function generateOne(npc: NpcDef): Omit<NpcQuest, 'id' | 'createdAt' | 'expiresAt'> {
@@ -2639,7 +2638,7 @@ export interface PlayerSnapshot {
 export async function getPlayerSnapshots(uid: string): Promise<PlayerSnapshot[]> {
   const { collection: col, getDocs: gd, query: q, orderBy: ob } = await import('firebase/firestore');
   const snap = await gd(q(col(db, 'playerHistory', uid, 'snapshots'), ob('_snapshotAt', 'desc')));
-  return snap.docs.map(dd => ({ id: dd.id, ...(dd.data() as Omit<PlayerSnapshot, 'id'>) }));
+  return snap.docs.map(dd => ({ id: dd.id, ...dd.data() } as PlayerSnapshot));
 }
 
 export async function restorePlayerSnapshot(uid: string, snapshot: Record<string, unknown>, adminId: string): Promise<void> {
