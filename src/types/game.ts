@@ -244,6 +244,8 @@ export interface ToolMaster {
   staminaMultiplier: number;
   comboBonus: number;
   specialEffectId: string | null;
+  acquisitionTags?: string[];   // 入手経路タグ ('drop','craft','gacha','condition')
+  dropSources?: string[];       // ドロップソースID一覧
 }
 
 export interface GatherNodeMaster {
@@ -390,6 +392,16 @@ export interface PlayerData {
   equippedRodId: string;
   // 採取ツール装備（採掘・伐採）
   equippedTools?: { miningToolId: string; woodcuttingToolId: string };
+  // 採取ツール所持・解放
+  ownedToolIds?: string[];
+  unlockedToolIds?: string[]; // 条件解放済みグループID ('unlock_basic','unlock_combo',...)
+  toolAcquisitionStats?: {
+    totalGatherCount: number;
+    maxCombo: number;
+    nightGatherCount: number;
+    rainGatherCount: number;
+    dangerSuccessCount: number;
+  };
   // 釣りシステム v2
   fishingLevel?: number;
   fishingExp?: number;
