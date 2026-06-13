@@ -142,6 +142,7 @@ export function FishingScreen() {
   const [rankTab, setRankTab] = useState<'size'|'weight'|'level'|'book'|'legendary'|'totalweight'>('level');
   const [rankData, setRankData] = useState<RankEntry[]>([]);
   const [rankLoading, setRankLoading] = useState(false);
+  const [convertAmount, setConvertAmount] = useState('');
 
   const fishingLevel  = player?.fishingLevel  ?? 1;
   const fishingExp    = player?.fishingExp     ?? 0;
@@ -593,13 +594,32 @@ export function FishingScreen() {
             <div style={S.h2}>💵 FishMoney → G 変換</div>
             <div style={{ fontSize:12, color:'#94a3b8' }}>所持 FishMoney: <b style={{ color:'#34d399' }}>{(player.fishMoney ?? 0).toLocaleString()}</b></div>
             <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>60 FishMoney → 1 G に変換できます。</div>
-            <button
-              style={{ ...S.btn(true), marginTop:8 }}
-              disabled={(player.fishMoney ?? 0) < 60}
-              onClick={() => convertFishMoneyToGold()}
-            >
-              💱 全額をGに変換（{Math.floor((player.fishMoney ?? 0) / 60).toLocaleString()}G獲得）
-            </button>
+            <div style={{ display:'flex', gap:6, marginTop:8 }}>
+              <input
+                type="number" min="0" step="60"
+                placeholder="変換するFishMoney数"
+                value={convertAmount}
+                onChange={e => setConvertAmount(e.target.value)}
+                style={{ flex:1, padding:'8px 10px', background:'#0f172a', border:'1px solid #334155', color:'#e2e8f0', borderRadius:6, fontSize:12 }}
+              />
+              <button
+                style={{ ...S.btn(true) }}
+                disabled={!(Number(convertAmount) >= 60) || Number(convertAmount) > (player.fishMoney ?? 0)}
+                onClick={() => { const v = Math.floor(Number(convertAmount) / 60) * 60; if (convertFishMoneyToGold(v)) setConvertAmount(''); }}
+              >
+                💱 変換（{Math.floor(Number(convertAmount || 0) / 60).toLocaleString()}G獲得）
+              </button>
+            </div>
+            <div style={{ display:'flex', gap:6, marginTop:6 }}>
+              {[0.25, 0.5, 1].map(ratio => (
+                <button key={ratio}
+                  style={{ ...S.btn(false), flex:1, fontSize:11 }}
+                  onClick={() => setConvertAmount(String(Math.floor((player.fishMoney ?? 0) * ratio / 60) * 60))}
+                >
+                  {ratio === 1 ? '全額' : `${Math.round(ratio*100)}%`}
+                </button>
+              ))}
+            </div>
           </div>
           {FISH_COIN_SHOP.map(item => {
             const can = (player.fishCoin ?? 0) >= item.cost;
