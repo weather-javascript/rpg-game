@@ -156,7 +156,7 @@ export const createFishingSlice: StateCreator<GameState, [], [], FishingSlice> =
     return true;
   },
 
-  // FishMoney -> G 変換（60 FishMoney = 1 G）。amount未指定なら所持FishMoney全額。
+  // FishMoney -> G 変換（2 FishMoney = 1 G）。amount未指定なら所持FishMoney全額。
   convertFishMoneyToGold: (amount?: number) => {
     const { player, changeGold, addNotification } = get();
     if (!player) return false;
@@ -166,12 +166,12 @@ export const createFishingSlice: StateCreator<GameState, [], [], FishingSlice> =
       addNotification('error', 'FishMoneyが不足しています！');
       return false;
     }
-    const goldGain = Math.floor(useAmount / 60);
+    const goldGain = Math.floor(useAmount / 2);
     if (goldGain <= 0) {
-      addNotification('error', '変換には60FishMoney以上が必要です！');
+      addNotification('error', '変換には2FishMoney以上が必要です！');
       return false;
     }
-    const consumed = goldGain * 60;
+    const consumed = goldGain * 2;
     set((state: any) => state.player ? { player: { ...state.player, fishMoney: (state.player.fishMoney ?? 0) - consumed } } : state);
     changeGold(goldGain);
     addNotification('success', `💱 ${consumed}FishMoney → ${goldGain}G に変換しました！`);
