@@ -390,7 +390,7 @@ export interface PlayerData {
   fishingAchievements?: string[]; // achieved FA ids
   fishingUnlockedTitles?: string[]; // unlocked title ids
   fishCoin?: number; // 釣り専用通貨
-  fishMoney?: number; // 釣りで得る専用マネー（60FishMoney→1G）
+  fishMoney?: number; // 釣りで得る専用マネー（2FishMoney→1G）
   fishingLegendaryCount?: number; // 伝説魚累計捕獲数
   fishingTotalWeightKg?: number; // 総重量(累計)
   activeJob: string | null;
