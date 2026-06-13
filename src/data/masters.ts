@@ -763,32 +763,32 @@ export const GATHER_NODE_MASTER: Record<string, GatherNodeMaster> = {
   sleeping_d_vein:   { id:'sleeping_d_vein',    name:'Dカスタム採掘場（エンド）', description:'ルチルプラチナが眠るエンドの鉱脈。',          icon:'galaxy', requiredSkill:{skillId:'mining',minLevel:50}, cooldownMs:30000, staminaCost:35, drops:[{itemId:'rutile_platinum',baseRate:0.06,minAmount:1,maxAmount:1},{itemId:'end_stone',baseRate:0.8,minAmount:2,maxAmount:4}] },
   fishing_pond: {
     id:'fishing_pond', name:'釣り場（基本）', description:'バニラの魚が釣れる。', icon:'fishing_rod',
-    requiredSkill:{skillId:'fishing',minLevel:1}, cooldownMs:5000, staminaCost:4,
+    requiredSkill:{skillId:'fishing',minLevel:10}, cooldownMs:5000, staminaCost:4,
     drops:[{itemId:'raw_cod',baseRate:0.35,minAmount:1,maxAmount:1},{itemId:'raw_salmon',baseRate:0.30,minAmount:1,maxAmount:1},{itemId:'tropical_fish',baseRate:0.15,minAmount:1,maxAmount:1},{itemId:'pufferfish',baseRate:0.10,minAmount:1,maxAmount:1},{itemId:'stone',baseRate:0.20,minAmount:1,maxAmount:2},{itemId:'iron_ore',baseRate:0.05,minAmount:1,maxAmount:1}],
   },
   fishing_ore_pond: {
     id:'fishing_ore_pond', name:'釣り場（鉱石ロッド）', description:'鉱石も釣れる。', icon:'fishing_rod',
-    requiredSkill:{skillId:'fishing',minLevel:5}, cooldownMs:5000, staminaCost:5,
+    requiredSkill:{skillId:'fishing',minLevel:50}, cooldownMs:5000, staminaCost:5,
     drops:[{itemId:'raw_cod',baseRate:0.25,minAmount:1,maxAmount:1},{itemId:'raw_salmon',baseRate:0.20,minAmount:1,maxAmount:1},{itemId:'iron_ore',baseRate:0.25,minAmount:1,maxAmount:2,skillRateBonus:0.02},{itemId:'gold_ore',baseRate:0.08,minAmount:1,maxAmount:1},{itemId:'emerald',baseRate:0.04,minAmount:1,maxAmount:1},{itemId:'coal',baseRate:0.20,minAmount:1,maxAmount:2}],
   },
   fishing_ticket_pond: {
     id:'fishing_ticket_pond', name:'釣り場（チケット）', description:'釣りチケットが釣れる！', icon:'fishing_rod',
-    requiredSkill:{skillId:'fishing',minLevel:10}, cooldownMs:5000, staminaCost:5,
+    requiredSkill:{skillId:'fishing',minLevel:100}, cooldownMs:5000, staminaCost:5,
     drops:[{itemId:'fishing_ticket',baseRate:0.20,minAmount:1,maxAmount:2,skillRateBonus:0.01},{itemId:'raw_cod',baseRate:0.20,minAmount:1,maxAmount:1},{itemId:'iron_ore',baseRate:0.20,minAmount:1,maxAmount:2},{itemId:'gold_ore',baseRate:0.10,minAmount:1,maxAmount:1}],
   },
   fishing_master_pond: {
     id:'fishing_master_pond', name:'釣り場（マスターロッド）', description:'Yランダムボックスが釣れる！', icon:'fishing_rod',
-    requiredSkill:{skillId:'fishing',minLevel:20}, cooldownMs:5000, staminaCost:6,
+    requiredSkill:{skillId:'fishing',minLevel:200}, cooldownMs:5000, staminaCost:6,
     drops:[{itemId:'y_random_box',baseRate:0.08,minAmount:1,maxAmount:1},{itemId:'fishing_ticket',baseRate:0.25,minAmount:1,maxAmount:3},{itemId:'emerald',baseRate:0.15,minAmount:1,maxAmount:2},{itemId:'emerald_block',baseRate:0.02,minAmount:1,maxAmount:1}],
   },
   fishing_ffgg_pond: {
     id:'fishing_ffgg_pond', name:'FFGG釣り場', description:'FF小判・鱗・牙が釣れる！', icon:'fishing_rod',
-    requiredSkill:{skillId:'fishing',minLevel:15}, cooldownMs:4000, staminaCost:5,
+    requiredSkill:{skillId:'fishing',minLevel:150}, cooldownMs:4000, staminaCost:5,
     drops:[{itemId:'ff_coin_small',baseRate:0.40,minAmount:1,maxAmount:3,skillRateBonus:0.01},{itemId:'brilliant_salmon',baseRate:0.20,minAmount:1,maxAmount:1},{itemId:'hoshi_tuna',baseRate:0.15,minAmount:1,maxAmount:1},{itemId:'scale_low_1',baseRate:0.12,minAmount:1,maxAmount:1},{itemId:'scale_low_2',baseRate:0.12,minAmount:1,maxAmount:1},{itemId:'wolf_fang',baseRate:0.08,minAmount:1,maxAmount:1},{itemId:'scale_high_1',baseRate:0.03,minAmount:1,maxAmount:1},{itemId:'wolf_crystal',baseRate:0.02,minAmount:1,maxAmount:1},{itemId:'dragon_soul',baseRate:0.02,minAmount:1,maxAmount:1}],
   },
   fishing_ggr_pond: {
     id:'fishing_ggr_pond', name:'GGR釣り場', description:'クレートとお金が釣れる！', icon:'fishing_rod',
-    requiredSkill:{skillId:'fishing',minLevel:30}, cooldownMs:4000, staminaCost:6,
+    requiredSkill:{skillId:'fishing',minLevel:300}, cooldownMs:4000, staminaCost:6,
     drops:[{itemId:'crate_leather',baseRate:0.40,minAmount:1,maxAmount:1},{itemId:'crate_gold',baseRate:0.20,minAmount:1,maxAmount:1},{itemId:'crate_diamond',baseRate:0.08,minAmount:1,maxAmount:1},{itemId:'crate_enhanced',baseRate:0.02,minAmount:1,maxAmount:1},{itemId:'la_juice_high',baseRate:0.05,minAmount:1,maxAmount:1},{itemId:'ff_coin_large',baseRate:0.03,minAmount:1,maxAmount:1}],
   },
 };
@@ -1226,12 +1226,12 @@ export const GAMBLE_MASTER: Record<string, GambleMaster> = {
 export const FISHING_RODS: Record<string, {
   id: string; name: string; requiredFishingLv: number; unlocksNode: string; description: string;
 }> = {
-  basic_rod:   { id:'basic_rod',   name:'基本の釣り竿',    requiredFishingLv:1,  unlocksNode:'fishing_pond',         description:'最初から使える竿。' },
-  ore_rod:     { id:'ore_rod',     name:'鉱石ロッド',      requiredFishingLv:5,  unlocksNode:'fishing_ore_pond',     description:'鉱石も釣れる中級竿。' },
-  all_rod_x:   { id:'all_rod_x',   name:'オールロッドX',   requiredFishingLv:10, unlocksNode:'fishing_ticket_pond',  description:'釣りチケットが釣れる。' },
-  master_rod:  { id:'master_rod',  name:'マスターロッド',  requiredFishingLv:20, unlocksNode:'fishing_master_pond',  description:'Yランダムボックスが釣れる。' },
-  ffgg_rod_r6: { id:'ffgg_rod_r6', name:'FFGGロッドRank6', requiredFishingLv:15, unlocksNode:'fishing_ffgg_pond',    description:'FFGG専用。鱗・牙・小判が大量に。' },
-  ffggr_rod:   { id:'ffggr_rod',   name:'FFGGRロッド',     requiredFishingLv:30, unlocksNode:'fishing_ggr_pond',     description:'GGR専用。クレートとお金が釣れる。' },
+  basic_rod:   { id:'basic_rod',   name:'基本の釣り竿',    requiredFishingLv:10,  unlocksNode:'fishing_pond',         description:'最初から使える竿。' },
+  ore_rod:     { id:'ore_rod',     name:'鉱石ロッド',      requiredFishingLv:50,  unlocksNode:'fishing_ore_pond',     description:'鉱石も釣れる中級竿。' },
+  all_rod_x:   { id:'all_rod_x',   name:'オールロッドX',   requiredFishingLv:100, unlocksNode:'fishing_ticket_pond',  description:'釣りチケットが釣れる。' },
+  master_rod:  { id:'master_rod',  name:'マスターロッド',  requiredFishingLv:200, unlocksNode:'fishing_master_pond',  description:'Yランダムボックスが釣れる。' },
+  ffgg_rod_r6: { id:'ffgg_rod_r6', name:'FFGGロッドRank6', requiredFishingLv:150, unlocksNode:'fishing_ffgg_pond',    description:'FFGG専用。鱗・牙・小判が大量に。' },
+  ffggr_rod:   { id:'ffggr_rod',   name:'FFGGRロッド',     requiredFishingLv:300, unlocksNode:'fishing_ggr_pond',     description:'GGR専用。クレートとお金が釣れる。' },
 };
 
 // ============================================================

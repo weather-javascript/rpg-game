@@ -14,44 +14,44 @@ export interface FishMaster {
 
 export const FISH_MASTER: Record<string, FishMaster> = {
   // common
-  iwashi:      { id:'iwashi',      name:'イワシ',        rarity:'common',    minLevel:1,  baseExp:5,   minSizeCm:10,  maxSizeCm:25,   weightFactor:0.0004, baseRate:0.32, sellPrice:2,   icon:'🐟', description:'どこにでもいる小魚。', spots:['pond','river','lake','sea','offshore'] },
-  aji:         { id:'aji',         name:'アジ',          rarity:'common',    minLevel:1,  baseExp:7,   minSizeCm:15,  maxSizeCm:40,   weightFactor:0.0006, baseRate:0.28, sellPrice:3,   icon:'🐟', description:'定番の青魚。', spots:['river','lake','sea','offshore'] },
-  fugu:        { id:'fugu',        name:'フグ',          rarity:'common',    minLevel:3,  baseExp:10,  minSizeCm:20,  maxSizeCm:50,   weightFactor:0.0008, baseRate:0.18, sellPrice:5,   icon:'🐡', description:'毒があるが高値がつく。', spots:['sea','offshore','deepsea'] },
-  koi:         { id:'koi',         name:'コイ',          rarity:'common',    minLevel:1,  baseExp:8,   minSizeCm:20,  maxSizeCm:80,   weightFactor:0.0009, baseRate:0.25, sellPrice:3,   icon:'🐟', description:'池の定番。', spots:['pond','river','lake'] },
-  tai:         { id:'tai',         name:'タイ',          rarity:'common',    minLevel:5,  baseExp:12,  minSizeCm:30,  maxSizeCm:80,   weightFactor:0.0010, baseRate:0.15, sellPrice:4,   icon:'🐟', description:'めでたい魚。', spots:['sea','offshore'] },
-  unagi:       { id:'unagi',       name:'ウナギ',        rarity:'common',    minLevel:5,  baseExp:15,  minSizeCm:40,  maxSizeCm:100,  weightFactor:0.0007, baseRate:0.14, sellPrice:6,   icon:'🐍', description:'川に潜む長い魚。', spots:['river','lake'] },
-  tanago:      { id:'tanago',      name:'タナゴ',        rarity:'common',    minLevel:1,  baseExp:5,   minSizeCm:5,   maxSizeCm:15,   weightFactor:0.0003, baseRate:0.30, sellPrice:2,   icon:'🐟', description:'小さく鮮やかな淡水魚。', spots:['pond','river'] },
-  catfish:     { id:'catfish',     name:'ナマズ',        rarity:'common',    minLevel:4,  baseExp:14,  minSizeCm:30,  maxSizeCm:90,   weightFactor:0.0012, baseRate:0.14, sellPrice:5,   icon:'🐟', description:'ヒゲが特徴的な大型淡水魚。', spots:['river','lake','swamp'] },
+  iwashi:      { id:'iwashi',      name:'イワシ',        rarity:'common',    minLevel:10,  baseExp:5,   minSizeCm:10,  maxSizeCm:25,   weightFactor:0.0004, baseRate:0.32, sellPrice:2,   icon:'🐟', description:'どこにでもいる小魚。', spots:['pond','river','lake','sea','offshore'] },
+  aji:         { id:'aji',         name:'アジ',          rarity:'common',    minLevel:10,  baseExp:7,   minSizeCm:15,  maxSizeCm:40,   weightFactor:0.0006, baseRate:0.28, sellPrice:3,   icon:'🐟', description:'定番の青魚。', spots:['river','lake','sea','offshore'] },
+  fugu:        { id:'fugu',        name:'フグ',          rarity:'common',    minLevel:30,  baseExp:10,  minSizeCm:20,  maxSizeCm:50,   weightFactor:0.0008, baseRate:0.18, sellPrice:5,   icon:'🐡', description:'毒があるが高値がつく。', spots:['sea','offshore','deepsea'] },
+  koi:         { id:'koi',         name:'コイ',          rarity:'common',    minLevel:10,  baseExp:8,   minSizeCm:20,  maxSizeCm:80,   weightFactor:0.0009, baseRate:0.25, sellPrice:3,   icon:'🐟', description:'池の定番。', spots:['pond','river','lake'] },
+  tai:         { id:'tai',         name:'タイ',          rarity:'common',    minLevel:50,  baseExp:12,  minSizeCm:30,  maxSizeCm:80,   weightFactor:0.0010, baseRate:0.15, sellPrice:4,   icon:'🐟', description:'めでたい魚。', spots:['sea','offshore'] },
+  unagi:       { id:'unagi',       name:'ウナギ',        rarity:'common',    minLevel:50,  baseExp:15,  minSizeCm:40,  maxSizeCm:100,  weightFactor:0.0007, baseRate:0.14, sellPrice:6,   icon:'🐍', description:'川に潜む長い魚。', spots:['river','lake'] },
+  tanago:      { id:'tanago',      name:'タナゴ',        rarity:'common',    minLevel:10,  baseExp:5,   minSizeCm:5,   maxSizeCm:15,   weightFactor:0.0003, baseRate:0.30, sellPrice:2,   icon:'🐟', description:'小さく鮮やかな淡水魚。', spots:['pond','river'] },
+  catfish:     { id:'catfish',     name:'ナマズ',        rarity:'common',    minLevel:40,  baseExp:14,  minSizeCm:30,  maxSizeCm:90,   weightFactor:0.0012, baseRate:0.14, sellPrice:5,   icon:'🐟', description:'ヒゲが特徴的な大型淡水魚。', spots:['river','lake','swamp'] },
   // uncommon
-  sake:        { id:'sake',        name:'サケ',          rarity:'uncommon',  minLevel:8,  baseExp:20,  minSizeCm:50,  maxSizeCm:100,  weightFactor:0.0015, baseRate:0.12, sellPrice:8,   icon:'🐟', description:'川を遡る力強い魚。', spots:['river','lake','sea'] },
-  buri:        { id:'buri',        name:'ブリ',          rarity:'uncommon',  minLevel:10, baseExp:25,  minSizeCm:60,  maxSizeCm:120,  weightFactor:0.0018, baseRate:0.10, sellPrice:10,  icon:'🐟', description:'出世魚として知られる。', spots:['sea','offshore'] },
-  hirame:      { id:'hirame',      name:'ヒラメ',        rarity:'uncommon',  minLevel:12, baseExp:22,  minSizeCm:40,  maxSizeCm:90,   weightFactor:0.0020, baseRate:0.10, sellPrice:12,  icon:'🐠', description:'砂底に潜む白身魚。', spots:['sea','offshore','deepsea'] },
-  tako:        { id:'tako',        name:'タコ',          rarity:'uncommon',  minLevel:15, baseExp:30,  minSizeCm:30,  maxSizeCm:80,   weightFactor:0.0025, baseRate:0.08, sellPrice:15,  icon:'🐙', description:'足が8本ある。', spots:['sea','offshore'] },
-  ebi:         { id:'ebi',         name:'伊勢エビ',      rarity:'uncommon',  minLevel:12, baseExp:28,  minSizeCm:20,  maxSizeCm:60,   weightFactor:0.0030, baseRate:0.09, sellPrice:18,  icon:'🦐', description:'高級甲殻類。', spots:['sea','offshore'] },
-  kani:        { id:'kani',        name:'ズワイガニ',    rarity:'uncommon',  minLevel:15, baseExp:35,  minSizeCm:15,  maxSizeCm:45,   weightFactor:0.0035, baseRate:0.07, sellPrice:20,  icon:'🦀', description:'甲殻類の人気者。', spots:['sea','offshore','deepsea'] },
-  hotate:      { id:'hotate',      name:'ホタテ',        rarity:'uncommon',  minLevel:10, baseExp:18,  minSizeCm:10,  maxSizeCm:25,   weightFactor:0.0040, baseRate:0.11, sellPrice:10,  icon:'🐚', description:'貝柱が絶品。', spots:['sea','offshore'] },
-  piranha:     { id:'piranha',     name:'ピラニア',      rarity:'uncommon',  minLevel:18, baseExp:40,  minSizeCm:20,  maxSizeCm:50,   weightFactor:0.0022, baseRate:0.07, sellPrice:22,  icon:'🐟', description:'鋭い歯を持つ凶暴な魚。', spots:['swamp','volcano_lake'] },
+  sake:        { id:'sake',        name:'サケ',          rarity:'uncommon',  minLevel:80,  baseExp:20,  minSizeCm:50,  maxSizeCm:100,  weightFactor:0.0015, baseRate:0.12, sellPrice:8,   icon:'🐟', description:'川を遡る力強い魚。', spots:['river','lake','sea'] },
+  buri:        { id:'buri',        name:'ブリ',          rarity:'uncommon',  minLevel:100, baseExp:25,  minSizeCm:60,  maxSizeCm:120,  weightFactor:0.0018, baseRate:0.10, sellPrice:10,  icon:'🐟', description:'出世魚として知られる。', spots:['sea','offshore'] },
+  hirame:      { id:'hirame',      name:'ヒラメ',        rarity:'uncommon',  minLevel:120, baseExp:22,  minSizeCm:40,  maxSizeCm:90,   weightFactor:0.0020, baseRate:0.10, sellPrice:12,  icon:'🐠', description:'砂底に潜む白身魚。', spots:['sea','offshore','deepsea'] },
+  tako:        { id:'tako',        name:'タコ',          rarity:'uncommon',  minLevel:150, baseExp:30,  minSizeCm:30,  maxSizeCm:80,   weightFactor:0.0025, baseRate:0.08, sellPrice:15,  icon:'🐙', description:'足が8本ある。', spots:['sea','offshore'] },
+  ebi:         { id:'ebi',         name:'伊勢エビ',      rarity:'uncommon',  minLevel:120, baseExp:28,  minSizeCm:20,  maxSizeCm:60,   weightFactor:0.0030, baseRate:0.09, sellPrice:18,  icon:'🦐', description:'高級甲殻類。', spots:['sea','offshore'] },
+  kani:        { id:'kani',        name:'ズワイガニ',    rarity:'uncommon',  minLevel:150, baseExp:35,  minSizeCm:15,  maxSizeCm:45,   weightFactor:0.0035, baseRate:0.07, sellPrice:20,  icon:'🦀', description:'甲殻類の人気者。', spots:['sea','offshore','deepsea'] },
+  hotate:      { id:'hotate',      name:'ホタテ',        rarity:'uncommon',  minLevel:100, baseExp:18,  minSizeCm:10,  maxSizeCm:25,   weightFactor:0.0040, baseRate:0.11, sellPrice:10,  icon:'🐚', description:'貝柱が絶品。', spots:['sea','offshore'] },
+  piranha:     { id:'piranha',     name:'ピラニア',      rarity:'uncommon',  minLevel:180, baseExp:40,  minSizeCm:20,  maxSizeCm:50,   weightFactor:0.0022, baseRate:0.07, sellPrice:22,  icon:'🐟', description:'鋭い歯を持つ凶暴な魚。', spots:['swamp','volcano_lake'] },
   // rare
-  maguro:      { id:'maguro',      name:'マグロ',        rarity:'rare',      minLevel:20, baseExp:100, minSizeCm:80,  maxSizeCm:250,  weightFactor:0.0030, baseRate:0.05, sellPrice:25,  icon:'🐟', description:'海の王者。大型個体は価値が高い。', spots:['offshore','deepsea'] },
-  katsuo:      { id:'katsuo',      name:'カツオ',        rarity:'rare',      minLevel:20, baseExp:80,  minSizeCm:60,  maxSizeCm:120,  weightFactor:0.0022, baseRate:0.06, sellPrice:20,  icon:'🐟', description:'鮮度が命の赤身魚。', spots:['offshore','sea'] },
-  shark:       { id:'shark',       name:'コモンシャーク',rarity:'rare',      minLevel:30, baseExp:120, minSizeCm:100, maxSizeCm:300,  weightFactor:0.0035, baseRate:0.04, sellPrice:30,  icon:'🦈', description:'海の捕食者。', spots:['offshore','deepsea'] },
-  ika:         { id:'ika',         name:'ダイオウイカ',  rarity:'rare',      minLevel:35, baseExp:150, minSizeCm:150, maxSizeCm:400,  weightFactor:0.0010, baseRate:0.03, sellPrice:35,  icon:'🦑', description:'深海に潜む巨大イカ。', spots:['deepsea'] },
-  dragon_fish: { id:'dragon_fish', name:'ドラゴンフィッシュ', rarity:'rare', minLevel:40, baseExp:180, minSizeCm:80,  maxSizeCm:200,  weightFactor:0.0028, baseRate:0.03, sellPrice:45,  icon:'🐟', description:'炎のような鱗を持つ熱帯魚。', spots:['volcano_lake'] },
-  rainbow_koi: { id:'rainbow_koi', name:'虹色コイ',      rarity:'rare',      minLevel:30, baseExp:130, minSizeCm:40,  maxSizeCm:120,  weightFactor:0.0020, baseRate:0.04, sellPrice:40,  icon:'🌈', description:'七色に輝く幻のコイ。', spots:['sky_lake','lake'] },
-  abyssal_eel: { id:'abyssal_eel', name:'深淵ウミヘビ',  rarity:'rare',      minLevel:45, baseExp:160, minSizeCm:200, maxSizeCm:600,  weightFactor:0.0008, baseRate:0.025,sellPrice:50,  icon:'🐍', description:'深海の闇に潜む巨大ウミヘビ。', spots:['deepsea'] },
+  maguro:      { id:'maguro',      name:'マグロ',        rarity:'rare',      minLevel:200, baseExp:100, minSizeCm:80,  maxSizeCm:250,  weightFactor:0.0030, baseRate:0.05, sellPrice:25,  icon:'🐟', description:'海の王者。大型個体は価値が高い。', spots:['offshore','deepsea'] },
+  katsuo:      { id:'katsuo',      name:'カツオ',        rarity:'rare',      minLevel:200, baseExp:80,  minSizeCm:60,  maxSizeCm:120,  weightFactor:0.0022, baseRate:0.06, sellPrice:20,  icon:'🐟', description:'鮮度が命の赤身魚。', spots:['offshore','sea'] },
+  shark:       { id:'shark',       name:'コモンシャーク',rarity:'rare',      minLevel:300, baseExp:120, minSizeCm:100, maxSizeCm:300,  weightFactor:0.0035, baseRate:0.04, sellPrice:30,  icon:'🦈', description:'海の捕食者。', spots:['offshore','deepsea'] },
+  ika:         { id:'ika',         name:'ダイオウイカ',  rarity:'rare',      minLevel:350, baseExp:150, minSizeCm:150, maxSizeCm:400,  weightFactor:0.0010, baseRate:0.03, sellPrice:35,  icon:'🦑', description:'深海に潜む巨大イカ。', spots:['deepsea'] },
+  dragon_fish: { id:'dragon_fish', name:'ドラゴンフィッシュ', rarity:'rare', minLevel:400, baseExp:180, minSizeCm:80,  maxSizeCm:200,  weightFactor:0.0028, baseRate:0.03, sellPrice:45,  icon:'🐟', description:'炎のような鱗を持つ熱帯魚。', spots:['volcano_lake'] },
+  rainbow_koi: { id:'rainbow_koi', name:'虹色コイ',      rarity:'rare',      minLevel:300, baseExp:130, minSizeCm:40,  maxSizeCm:120,  weightFactor:0.0020, baseRate:0.04, sellPrice:40,  icon:'🌈', description:'七色に輝く幻のコイ。', spots:['sky_lake','lake'] },
+  abyssal_eel: { id:'abyssal_eel', name:'深淵ウミヘビ',  rarity:'rare',      minLevel:450, baseExp:160, minSizeCm:200, maxSizeCm:600,  weightFactor:0.0008, baseRate:0.025,sellPrice:50,  icon:'🐍', description:'深海の闇に潜む巨大ウミヘビ。', spots:['deepsea'] },
   // epic
-  ryujin_bass: { id:'ryujin_bass', name:'龍神スズキ',    rarity:'epic',      minLevel:40, baseExp:300, minSizeCm:80,  maxSizeCm:160,  weightFactor:0.0028, baseRate:0.02, sellPrice:80,  icon:'🐟', description:'龍の加護を受けた輝くスズキ。', spots:['sky_lake','volcano_lake'] },
-  golden_carp: { id:'golden_carp', name:'黄金コイ',      rarity:'epic',      minLevel:50, baseExp:400, minSizeCm:60,  maxSizeCm:150,  weightFactor:0.0032, baseRate:0.015,sellPrice:100, icon:'🐠', description:'金色に輝く幸運の魚。', spots:['sky_lake','lake'] },
-  deep_whale:  { id:'deep_whale',  name:'深淵クジラ',    rarity:'epic',      minLevel:60, baseExp:500, minSizeCm:300, maxSizeCm:800,  weightFactor:0.0040, baseRate:0.010,sellPrice:120, icon:'🐋', description:'深海から浮上する巨大クジラ。', spots:['deepsea'] },
-  lava_shark:  { id:'lava_shark',  name:'溶岩シャーク',  rarity:'epic',      minLevel:55, baseExp:450, minSizeCm:120, maxSizeCm:350,  weightFactor:0.0038, baseRate:0.012,sellPrice:110, icon:'🦈', description:'火山湖に潜む炎のサメ。', spots:['volcano_lake'] },
-  storm_tuna:  { id:'storm_tuna',  name:'嵐マグロ',      rarity:'epic',      minLevel:65, baseExp:550, minSizeCm:150, maxSizeCm:400,  weightFactor:0.0045, baseRate:0.008,sellPrice:150, icon:'⚡', description:'嵐の中にしか現れないマグロ。', spots:['offshore','deepsea'] },
-  crystal_fish:{ id:'crystal_fish',name:'水晶魚',        rarity:'epic',      minLevel:70, baseExp:600, minSizeCm:30,  maxSizeCm:90,   weightFactor:0.0050, baseRate:0.007,sellPrice:200, icon:'💎', description:'水晶のように透明な体を持つ幻魚。', spots:['sky_lake'] },
+  ryujin_bass: { id:'ryujin_bass', name:'龍神スズキ',    rarity:'epic',      minLevel:400, baseExp:300, minSizeCm:80,  maxSizeCm:160,  weightFactor:0.0028, baseRate:0.02, sellPrice:80,  icon:'🐟', description:'龍の加護を受けた輝くスズキ。', spots:['sky_lake','volcano_lake'] },
+  golden_carp: { id:'golden_carp', name:'黄金コイ',      rarity:'epic',      minLevel:500, baseExp:400, minSizeCm:60,  maxSizeCm:150,  weightFactor:0.0032, baseRate:0.015,sellPrice:100, icon:'🐠', description:'金色に輝く幸運の魚。', spots:['sky_lake','lake'] },
+  deep_whale:  { id:'deep_whale',  name:'深淵クジラ',    rarity:'epic',      minLevel:600, baseExp:500, minSizeCm:300, maxSizeCm:800,  weightFactor:0.0040, baseRate:0.010,sellPrice:120, icon:'🐋', description:'深海から浮上する巨大クジラ。', spots:['deepsea'] },
+  lava_shark:  { id:'lava_shark',  name:'溶岩シャーク',  rarity:'epic',      minLevel:550, baseExp:450, minSizeCm:120, maxSizeCm:350,  weightFactor:0.0038, baseRate:0.012,sellPrice:110, icon:'🦈', description:'火山湖に潜む炎のサメ。', spots:['volcano_lake'] },
+  storm_tuna:  { id:'storm_tuna',  name:'嵐マグロ',      rarity:'epic',      minLevel:650, baseExp:550, minSizeCm:150, maxSizeCm:400,  weightFactor:0.0045, baseRate:0.008,sellPrice:150, icon:'⚡', description:'嵐の中にしか現れないマグロ。', spots:['offshore','deepsea'] },
+  crystal_fish:{ id:'crystal_fish',name:'水晶魚',        rarity:'epic',      minLevel:700, baseExp:600, minSizeCm:30,  maxSizeCm:90,   weightFactor:0.0050, baseRate:0.007,sellPrice:200, icon:'💎', description:'水晶のように透明な体を持つ幻魚。', spots:['sky_lake'] },
   // legendary
-  ryujin:      { id:'ryujin',      name:'龍神',          rarity:'legendary', minLevel:70, baseExp:1000,minSizeCm:200, maxSizeCm:500,  weightFactor:0.0050, baseRate:0.005,sellPrice:500, icon:'🐉', description:'伝説の龍の化身。', spots:['sky_lake','volcano_lake'] },
-  phantom_tuna:{ id:'phantom_tuna',name:'幻のマグロ',    rarity:'legendary', minLevel:80, baseExp:1000,minSizeCm:250, maxSizeCm:600,  weightFactor:0.0055, baseRate:0.004,sellPrice:600, icon:'🐟', description:'幻と呼ばれる最大級のマグロ。', spots:['deepsea','offshore'] },
-  sea_god:     { id:'sea_god',     name:'海神',          rarity:'legendary', minLevel:90, baseExp:1000,minSizeCm:400, maxSizeCm:1000, weightFactor:0.0060, baseRate:0.003,sellPrice:800, icon:'🌊', description:'海の神が宿る魚。', spots:['deepsea'] },
-  infinity_fish:{ id:'infinity_fish',name:'∞魚',         rarity:'legendary', minLevel:100,baseExp:1000,minSizeCm:100, maxSizeCm:9999, weightFactor:0.0070, baseRate:0.002,sellPrice:1000,icon:'♾️', description:'無限の可能性を秘めた最強の魚。', spots:['sky_lake'] },
-  god_koi:     { id:'god_koi',     name:'神コイ',        rarity:'legendary', minLevel:85, baseExp:1000,minSizeCm:300, maxSizeCm:800,  weightFactor:0.0055, baseRate:0.003,sellPrice:700, icon:'👑', description:'神に愛された究極のコイ。', spots:['sky_lake','pond'] },
+  ryujin:      { id:'ryujin',      name:'龍神',          rarity:'legendary', minLevel:700, baseExp:1000,minSizeCm:200, maxSizeCm:500,  weightFactor:0.0050, baseRate:0.005,sellPrice:500, icon:'🐉', description:'伝説の龍の化身。', spots:['sky_lake','volcano_lake'] },
+  phantom_tuna:{ id:'phantom_tuna',name:'幻のマグロ',    rarity:'legendary', minLevel:800, baseExp:1000,minSizeCm:250, maxSizeCm:600,  weightFactor:0.0055, baseRate:0.004,sellPrice:600, icon:'🐟', description:'幻と呼ばれる最大級のマグロ。', spots:['deepsea','offshore'] },
+  sea_god:     { id:'sea_god',     name:'海神',          rarity:'legendary', minLevel:900, baseExp:1000,minSizeCm:400, maxSizeCm:1000, weightFactor:0.0060, baseRate:0.003,sellPrice:800, icon:'🌊', description:'海の神が宿る魚。', spots:['deepsea'] },
+  infinity_fish:{ id:'infinity_fish',name:'∞魚',         rarity:'legendary', minLevel:1000,baseExp:1000,minSizeCm:100, maxSizeCm:9999, weightFactor:0.0070, baseRate:0.002,sellPrice:1000,icon:'♾️', description:'無限の可能性を秘めた最強の魚。', spots:['sky_lake'] },
+  god_koi:     { id:'god_koi',     name:'神コイ',        rarity:'legendary', minLevel:850, baseExp:1000,minSizeCm:300, maxSizeCm:800,  weightFactor:0.0055, baseRate:0.003,sellPrice:700, icon:'👑', description:'神に愛された究極のコイ。', spots:['sky_lake','pond'] },
 };
 import { EXTRA_FISH } from './fishMastersExtra';
 Object.assign(FISH_MASTER, EXTRA_FISH);
@@ -66,26 +66,26 @@ export interface SpotMaster {
   largeFishMult: number; staminaCost: number; cooldownMs: number;
 }
 export const SPOT_MASTER: Record<string, SpotMaster> = {
-  pond:         { id:'pond',         name:'近所の池',        icon:'🏞️', description:'初心者向けの静かな池。',         minLevel:1,  rarityMult:1.0, expMult:1.0, largeFishMult:1.0, staminaCost:3, cooldownMs:4000 },
-  river:        { id:'river',        name:'清流の川',        icon:'🏞️', description:'淡水魚が豊富な川。',           minLevel:3,  rarityMult:1.1, expMult:1.1, largeFishMult:1.0, staminaCost:3, cooldownMs:4000 },
-  lake:         { id:'lake',         name:'静寂の湖',        icon:'🌊', description:'大型淡水魚が潜む湖。',         minLevel:8,  rarityMult:1.2, expMult:1.2, largeFishMult:1.2, staminaCost:4, cooldownMs:4500 },
-  swamp:        { id:'swamp',        name:'霧の沼地',        icon:'🌿', description:'珍しい魚が生息する沼地。',     minLevel:12, rarityMult:1.3, expMult:1.2, largeFishMult:1.1, staminaCost:4, cooldownMs:4500 },
-  sea:          { id:'sea',          name:'浜辺の海',        icon:'🌅', description:'海水魚が集まる浜辺。',         minLevel:10, rarityMult:1.2, expMult:1.2, largeFishMult:1.1, staminaCost:4, cooldownMs:4000 },
-  offshore:     { id:'offshore',     name:'沖合',            icon:'⛵', description:'大型海水魚が現れる沖合。',     minLevel:20, rarityMult:1.4, expMult:1.4, largeFishMult:1.3, staminaCost:5, cooldownMs:5000 },
-  coral_reef:   { id:'coral_reef',   name:'珊瑚礁',          icon:'🪸', description:'色鮮やかな熱帯魚の楽園。',   minLevel:25, rarityMult:1.5, expMult:1.4, largeFishMult:1.2, staminaCost:5, cooldownMs:4500 },
-  deepsea:      { id:'deepsea',      name:'深海',            icon:'🌑', description:'未知の生物が潜む深海。',       minLevel:40, rarityMult:1.8, expMult:1.8, largeFishMult:1.5, staminaCost:7, cooldownMs:6000, unlockCond:'level_40' },
-  underwater_cave:{ id:'underwater_cave',name:'水中洞窟',    icon:'🕳️', description:'洞窟に潜む希少魚。',         minLevel:35, rarityMult:1.6, expMult:1.5, largeFishMult:1.4, staminaCost:6, cooldownMs:5500, unlockCond:'level_35' },
-  volcano_lake: { id:'volcano_lake', name:'火山湖',          icon:'🌋', description:'炎の魚が生息する火山湖。',     minLevel:50, rarityMult:2.0, expMult:2.0, largeFishMult:1.8, staminaCost:8, cooldownMs:6500, unlockCond:'level_50' },
-  glacier_sea:  { id:'glacier_sea',  name:'氷河の海',        icon:'🧊', description:'極寒の海に適応した魚。',       minLevel:45, rarityMult:1.9, expMult:1.7, largeFishMult:1.6, staminaCost:7, cooldownMs:6000, unlockCond:'level_45' },
-  sky_lake:     { id:'sky_lake',     name:'天空湖',          icon:'☁️', description:'雲の上に浮かぶ伝説の湖。',   minLevel:60, rarityMult:2.5, expMult:2.5, largeFishMult:2.0, staminaCost:10,cooldownMs:7000, unlockCond:'level_60' },
-  ancient_river:{ id:'ancient_river',name:'古代の川',        icon:'🏛️', description:'古代魚が泳ぐ神秘の川。',     minLevel:55, rarityMult:2.2, expMult:2.0, largeFishMult:1.9, staminaCost:8, cooldownMs:6500, unlockCond:'level_55' },
-  moonlit_pond: { id:'moonlit_pond', name:'月光の池',        icon:'🌙', description:'満月の夜だけ現れる神秘の池。',minLevel:30, rarityMult:1.7, expMult:1.6, largeFishMult:1.5, staminaCost:5, cooldownMs:5000 },
-  golden_river: { id:'golden_river', name:'黄金の川',        icon:'✨', description:'黄金色に輝く伝説の川。',       minLevel:70, rarityMult:3.0, expMult:3.0, largeFishMult:2.5, staminaCost:12,cooldownMs:8000, unlockCond:'level_70' },
-  abyss:        { id:'abyss',        name:'奈落',            icon:'⚫', description:'底なしの暗黒。最強の魚が潜む。',minLevel:80, rarityMult:4.0, expMult:4.0, largeFishMult:3.0, staminaCost:15,cooldownMs:9000, unlockCond:'level_80' },
-  heaven:       { id:'heaven',       name:'天界の海',        icon:'🌟', description:'神々が泳ぐ究極の漁場。',       minLevel:90, rarityMult:5.0, expMult:5.0, largeFishMult:4.0, staminaCost:18,cooldownMs:10000,unlockCond:'level_90' },
-  rainbow_falls:{ id:'rainbow_falls',name:'虹の滝',          icon:'🌈', description:'虹の根元にある神秘の滝壺。',  minLevel:65, rarityMult:2.8, expMult:2.6, largeFishMult:2.2, staminaCost:11,cooldownMs:7500, unlockCond:'level_65' },
-  crystal_sea:  { id:'crystal_sea',  name:'水晶の海',        icon:'💎', description:'透明な水晶の海。',             minLevel:75, rarityMult:3.5, expMult:3.2, largeFishMult:2.8, staminaCost:13,cooldownMs:8500, unlockCond:'level_75' },
-  chaos_sea:    { id:'chaos_sea',    name:'混沌の海',        icon:'🌀', description:'何が現れるか全く予測不能。',   minLevel:85, rarityMult:4.5, expMult:4.0, largeFishMult:3.5, staminaCost:16,cooldownMs:9500, unlockCond:'level_85' },
+  pond:         { id:'pond',         name:'近所の池',        icon:'🏞️', description:'初心者向けの静かな池。',         minLevel:10,  rarityMult:1.0, expMult:1.0, largeFishMult:1.0, staminaCost:3, cooldownMs:4000 },
+  river:        { id:'river',        name:'清流の川',        icon:'🏞️', description:'淡水魚が豊富な川。',           minLevel:30,  rarityMult:1.1, expMult:1.1, largeFishMult:1.0, staminaCost:3, cooldownMs:4000 },
+  lake:         { id:'lake',         name:'静寂の湖',        icon:'🌊', description:'大型淡水魚が潜む湖。',         minLevel:80,  rarityMult:1.2, expMult:1.2, largeFishMult:1.2, staminaCost:4, cooldownMs:4500 },
+  swamp:        { id:'swamp',        name:'霧の沼地',        icon:'🌿', description:'珍しい魚が生息する沼地。',     minLevel:120, rarityMult:1.3, expMult:1.2, largeFishMult:1.1, staminaCost:4, cooldownMs:4500 },
+  sea:          { id:'sea',          name:'浜辺の海',        icon:'🌅', description:'海水魚が集まる浜辺。',         minLevel:100, rarityMult:1.2, expMult:1.2, largeFishMult:1.1, staminaCost:4, cooldownMs:4000 },
+  offshore:     { id:'offshore',     name:'沖合',            icon:'⛵', description:'大型海水魚が現れる沖合。',     minLevel:200, rarityMult:1.4, expMult:1.4, largeFishMult:1.3, staminaCost:5, cooldownMs:5000 },
+  coral_reef:   { id:'coral_reef',   name:'珊瑚礁',          icon:'🪸', description:'色鮮やかな熱帯魚の楽園。',   minLevel:250, rarityMult:1.5, expMult:1.4, largeFishMult:1.2, staminaCost:5, cooldownMs:4500 },
+  deepsea:      { id:'deepsea',      name:'深海',            icon:'🌑', description:'未知の生物が潜む深海。',       minLevel:400, rarityMult:1.8, expMult:1.8, largeFishMult:1.5, staminaCost:7, cooldownMs:6000, unlockCond:'level_400' },
+  underwater_cave:{ id:'underwater_cave',name:'水中洞窟',    icon:'🕳️', description:'洞窟に潜む希少魚。',         minLevel:350, rarityMult:1.6, expMult:1.5, largeFishMult:1.4, staminaCost:6, cooldownMs:5500, unlockCond:'level_350' },
+  volcano_lake: { id:'volcano_lake', name:'火山湖',          icon:'🌋', description:'炎の魚が生息する火山湖。',     minLevel:500, rarityMult:2.0, expMult:2.0, largeFishMult:1.8, staminaCost:8, cooldownMs:6500, unlockCond:'level_500' },
+  glacier_sea:  { id:'glacier_sea',  name:'氷河の海',        icon:'🧊', description:'極寒の海に適応した魚。',       minLevel:450, rarityMult:1.9, expMult:1.7, largeFishMult:1.6, staminaCost:7, cooldownMs:6000, unlockCond:'level_450' },
+  sky_lake:     { id:'sky_lake',     name:'天空湖',          icon:'☁️', description:'雲の上に浮かぶ伝説の湖。',   minLevel:600, rarityMult:2.5, expMult:2.5, largeFishMult:2.0, staminaCost:10,cooldownMs:7000, unlockCond:'level_600' },
+  ancient_river:{ id:'ancient_river',name:'古代の川',        icon:'🏛️', description:'古代魚が泳ぐ神秘の川。',     minLevel:550, rarityMult:2.2, expMult:2.0, largeFishMult:1.9, staminaCost:8, cooldownMs:6500, unlockCond:'level_550' },
+  moonlit_pond: { id:'moonlit_pond', name:'月光の池',        icon:'🌙', description:'満月の夜だけ現れる神秘の池。',minLevel:300, rarityMult:1.7, expMult:1.6, largeFishMult:1.5, staminaCost:5, cooldownMs:5000 },
+  golden_river: { id:'golden_river', name:'黄金の川',        icon:'✨', description:'黄金色に輝く伝説の川。',       minLevel:700, rarityMult:3.0, expMult:3.0, largeFishMult:2.5, staminaCost:12,cooldownMs:8000, unlockCond:'level_700' },
+  abyss:        { id:'abyss',        name:'奈落',            icon:'⚫', description:'底なしの暗黒。最強の魚が潜む。',minLevel:800, rarityMult:4.0, expMult:4.0, largeFishMult:3.0, staminaCost:15,cooldownMs:9000, unlockCond:'level_800' },
+  heaven:       { id:'heaven',       name:'天界の海',        icon:'🌟', description:'神々が泳ぐ究極の漁場。',       minLevel:900, rarityMult:5.0, expMult:5.0, largeFishMult:4.0, staminaCost:18,cooldownMs:10000,unlockCond:'level_900' },
+  rainbow_falls:{ id:'rainbow_falls',name:'虹の滝',          icon:'🌈', description:'虹の根元にある神秘の滝壺。',  minLevel:650, rarityMult:2.8, expMult:2.6, largeFishMult:2.2, staminaCost:11,cooldownMs:7500, unlockCond:'level_650' },
+  crystal_sea:  { id:'crystal_sea',  name:'水晶の海',        icon:'💎', description:'透明な水晶の海。',             minLevel:750, rarityMult:3.5, expMult:3.2, largeFishMult:2.8, staminaCost:13,cooldownMs:8500, unlockCond:'level_750' },
+  chaos_sea:    { id:'chaos_sea',    name:'混沌の海',        icon:'🌀', description:'何が現れるか全く予測不能。',   minLevel:850, rarityMult:4.5, expMult:4.0, largeFishMult:3.5, staminaCost:16,cooldownMs:9500, unlockCond:'level_850' },
 };
 export const SPOT_IDS = Object.keys(SPOT_MASTER);
 
@@ -106,7 +106,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv1〜 【序盤・入門】EXP効率が唯一の強み。すぐ乗り換える竿
   // ──────────────────────────────────────────────────────────
   wood_rod: {
-    id:'wood_rod', name:'木の釣り竿', icon:'🪵', rarity:'common', minLevel:1,
+    id:'wood_rod', name:'木の釣り竿', icon:'🪵', rarity:'common', minLevel:10,
     rarityBonus:0, largeFishBonus:0, expMult:1.2, maxDurability:40, buyPrice:100,
     fishCoinMult:1.0,
     role:'🌱 EXP特化（序盤）',
@@ -117,7 +117,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv1〜 【汎用・初期装備】最初から持っている。全方位平均的
   // ──────────────────────────────────────────────────────────
   basic_rod: {
-    id:'basic_rod', name:'鉄の釣り竿', icon:'🎣', rarity:'common', minLevel:1,
+    id:'basic_rod', name:'鉄の釣り竿', icon:'🎣', rarity:'common', minLevel:10,
     rarityBonus:0.02, largeFishBonus:0.02, expMult:1.0, maxDurability:80, buyPrice:300,
     fishCoinMult:1.0,
     role:'⚖️ バランス（初期）',
@@ -128,7 +128,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv3〜 【大型魚特化・序盤】large特化。大きいサイズを狙う
   // ──────────────────────────────────────────────────────────
   copper_rod: {
-    id:'copper_rod', name:'銅の釣り竿', icon:'🎣', rarity:'common', minLevel:3,
+    id:'copper_rod', name:'銅の釣り竿', icon:'🎣', rarity:'common', minLevel:30,
     rarityBonus:0, largeFishBonus:0.12, expMult:0.9, maxDurability:70, buyPrice:200,
     fishCoinMult:1.0,
     role:'📏 大型魚特化（序盤）',
@@ -139,7 +139,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv5〜 【レア特化・中盤前半】レア率に全振り。EXPは犠牲
   // ──────────────────────────────────────────────────────────
   ore_rod: {
-    id:'ore_rod', name:'銀の釣り竿', icon:'🎣', rarity:'uncommon', minLevel:5,
+    id:'ore_rod', name:'銀の釣り竿', icon:'🎣', rarity:'uncommon', minLevel:50,
     rarityBonus:0.10, largeFishBonus:0, expMult:0.85, maxDurability:100,
     fishCoinMult:1.2,
     role:'✨ レア特化（中盤前半）',
@@ -150,7 +150,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv10〜 【Fish Coin稼ぎ特化】コイン倍率2倍。レア率も中程度
   // ──────────────────────────────────────────────────────────
   all_rod_x: {
-    id:'all_rod_x', name:'オールロッドX', icon:'🎣', rarity:'rare', minLevel:10,
+    id:'all_rod_x', name:'オールロッドX', icon:'🎣', rarity:'rare', minLevel:100,
     rarityBonus:0.06, largeFishBonus:0.04, expMult:1.1, maxDurability:110,
     fishCoinMult:2.0,
     role:'🐟 Fish Coin×2（中盤）',
@@ -161,7 +161,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv15〜 【EXP周回特化】expMultが圧倒的に高い。レベル上げ専用
   // ──────────────────────────────────────────────────────────
   crystal_rod: {
-    id:'crystal_rod', name:'水晶の釣り竿', icon:'💠', rarity:'rare', minLevel:15,
+    id:'crystal_rod', name:'水晶の釣り竿', icon:'💠', rarity:'rare', minLevel:150,
     rarityBonus:0.04, largeFishBonus:0, expMult:1.8, maxDurability:120,
     fishCoinMult:1.0,
     role:'⬆️ EXP周回特化（中盤）',
@@ -172,7 +172,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv20〜 【大型魚+レア バランス型】中盤後半の主力
   // ──────────────────────────────────────────────────────────
   golden_rod: {
-    id:'golden_rod', name:'黄金の釣り竿', icon:'🏆', rarity:'rare', minLevel:20,
+    id:'golden_rod', name:'黄金の釣り竿', icon:'🏆', rarity:'rare', minLevel:200,
     rarityBonus:0.10, largeFishBonus:0.15, expMult:1.2, maxDurability:130,
     fishCoinMult:1.5,
     role:'⚖️ 大型×レア バランス（中盤後半）',
@@ -183,7 +183,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv20〜 【汎用エピック】Yランダムボックスで入手できる強竿
   // ──────────────────────────────────────────────────────────
   master_rod: {
-    id:'master_rod', name:'マスターロッド', icon:'🎣', rarity:'epic', minLevel:20,
+    id:'master_rod', name:'マスターロッド', icon:'🎣', rarity:'epic', minLevel:200,
     rarityBonus:0.14, largeFishBonus:0.10, expMult:1.4, maxDurability:150,
     fishCoinMult:1.3,
     role:'🎯 汎用エピック（中盤〜後半）',
@@ -194,7 +194,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv30〜 【Fish Coin×3特化】コイン稼ぎの最強候補
   // ──────────────────────────────────────────────────────────
   master_rod_z: {
-    id:'master_rod_z', name:'マスターロッドZ', icon:'⚡', rarity:'epic', minLevel:30,
+    id:'master_rod_z', name:'マスターロッドZ', icon:'⚡', rarity:'epic', minLevel:300,
     rarityBonus:0.08, largeFishBonus:0.06, expMult:1.55, maxDurability:170,
     fishCoinMult:3.0,
     role:'🐟 Fish Coin×3（後半序盤）',
@@ -205,7 +205,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv35〜 【深海+水中洞窟スポット特化】深海専用の圧力対応竿
   // ──────────────────────────────────────────────────────────
   deep_sea_rod: {
-    id:'deep_sea_rod', name:'深海竿', icon:'🌑', rarity:'epic', minLevel:35,
+    id:'deep_sea_rod', name:'深海竿', icon:'🌑', rarity:'epic', minLevel:350,
     rarityBonus:0.15, largeFishBonus:0.20, expMult:1.3, maxDurability:160,
     fishCoinMult:1.5,
     spotBonus: { deepsea:0.25, underwater_cave:0.15, abyss:0.20 },
@@ -217,7 +217,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv40〜 【FFGG限定・レア+EXP複合型】イベント/コミュニティ限定
   // ──────────────────────────────────────────────────────────
   ffgg_rod_r1: {
-    id:'ffgg_rod_r1', name:'FFGGロッドR1', icon:'🎣', rarity:'epic', minLevel:15,
+    id:'ffgg_rod_r1', name:'FFGGロッドR1', icon:'🎣', rarity:'epic', minLevel:150,
     rarityBonus:0.12, largeFishBonus:0.08, expMult:1.6, maxDurability:160,
     fishCoinMult:1.8,
     role:'🎪 コミュニティ限定（中盤）',
@@ -228,7 +228,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv45〜 【火山湖+溶岩スポット特化】炎系魚を大量狙い
   // ──────────────────────────────────────────────────────────
   lava_rod: {
-    id:'lava_rod', name:'溶岩竿', icon:'🌋', rarity:'epic', minLevel:45,
+    id:'lava_rod', name:'溶岩竿', icon:'🌋', rarity:'epic', minLevel:450,
     rarityBonus:0.12, largeFishBonus:0.25, expMult:1.5, maxDurability:180,
     fishCoinMult:1.5,
     spotBonus: { volcano_lake:0.30, deepsea:0.10 },
@@ -240,7 +240,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv25〜 【FFGG中堅・大型特化】大型魚に偏った性能
   // ──────────────────────────────────────────────────────────
   ffgg_rod_r3: {
-    id:'ffgg_rod_r3', name:'FFGGロッドR3', icon:'🎣', rarity:'epic', minLevel:25,
+    id:'ffgg_rod_r3', name:'FFGGロッドR3', icon:'🎣', rarity:'epic', minLevel:250,
     rarityBonus:0.08, largeFishBonus:0.30, expMult:1.4, maxDurability:185,
     fishCoinMult:2.0,
     role:'📏 大型魚特化（コミュニティ上位）',
@@ -251,7 +251,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv60〜 【天空湖+虹滝スポット特化】幻魚・伝説へのアクセス
   // ──────────────────────────────────────────────────────────
   sky_rod: {
-    id:'sky_rod', name:'天空竿', icon:'☁️', rarity:'legendary', minLevel:60,
+    id:'sky_rod', name:'天空竿', icon:'☁️', rarity:'legendary', minLevel:600,
     rarityBonus:0.20, largeFishBonus:0.15, expMult:1.8, maxDurability:220,
     fishCoinMult:2.0,
     spotBonus: { sky_lake:0.40, rainbow_falls:0.25, moonlit_pond:0.20 },
@@ -264,7 +264,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv40〜 【FFGG上位・Fish Coin×4】稼ぎに全振り
   // ──────────────────────────────────────────────────────────
   ffgg_rod_r6: {
-    id:'ffgg_rod_r6', name:'FFGGロッドR6', icon:'🎣', rarity:'legendary', minLevel:40,
+    id:'ffgg_rod_r6', name:'FFGGロッドR6', icon:'🎣', rarity:'legendary', minLevel:400,
     rarityBonus:0.18, largeFishBonus:0.15, expMult:1.7, maxDurability:230,
     fishCoinMult:4.0,
     role:'🐟 Fish Coin×4（コミュニティ最上位）',
@@ -275,7 +275,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv50〜 【FFGGR・全方位最強コミュニティ竿】
   // ──────────────────────────────────────────────────────────
   ffggr_rod: {
-    id:'ffggr_rod', name:'FFGGRロッド', icon:'🌟', rarity:'legendary', minLevel:50,
+    id:'ffggr_rod', name:'FFGGRロッド', icon:'🌟', rarity:'legendary', minLevel:500,
     rarityBonus:0.25, largeFishBonus:0.20, expMult:2.1, maxDurability:270,
     fishCoinMult:3.5,
     role:'🌟 GGR全方位強化',
@@ -286,7 +286,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv70〜 【伝説魚+深海+天空 複合特化】後半の最強竿候補
   // ──────────────────────────────────────────────────────────
   dragon_rod: {
-    id:'dragon_rod', name:'龍の釣り竿', icon:'🐉', rarity:'legendary', minLevel:70,
+    id:'dragon_rod', name:'龍の釣り竿', icon:'🐉', rarity:'legendary', minLevel:700,
     rarityBonus:0.22, largeFishBonus:0.35, expMult:2.0, maxDurability:250,
     fishCoinMult:2.5,
     spotBonus: { sky_lake:0.20, volcano_lake:0.20, golden_river:0.25, abyss:0.15 },
@@ -299,7 +299,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv90〜 【EXP+レア+伝説 極致の竿】到達者だけが使える
   // ──────────────────────────────────────────────────────────
   god_rod: {
-    id:'god_rod', name:'神竿', icon:'✨', rarity:'legendary', minLevel:90,
+    id:'god_rod', name:'神竿', icon:'✨', rarity:'legendary', minLevel:900,
     rarityBonus:0.35, largeFishBonus:0.30, expMult:2.5, maxDurability:999,
     fishCoinMult:3.0,
     spotBonus: { heaven:0.50, abyss:0.30, chaos_sea:0.30, crystal_sea:0.20 },
@@ -312,7 +312,7 @@ export const ROD_MASTER: Record<string, RodMaster> = {
   // Lv100〜 【∞竿 図鑑100%コンプ報酬】ゲームの最終到達点
   // ──────────────────────────────────────────────────────────
   infinite_rod: {
-    id:'infinite_rod', name:'∞竿', icon:'♾️', rarity:'legendary', minLevel:100,
+    id:'infinite_rod', name:'∞竿', icon:'♾️', rarity:'legendary', minLevel:1000,
     rarityBonus:0.50, largeFishBonus:0.50, expMult:3.0, maxDurability:9999,
     fishCoinMult:5.0,
     spotBonus: { heaven:0.80, abyss:0.60, chaos_sea:0.60, sky_lake:0.50, golden_river:0.50 },
@@ -370,22 +370,19 @@ export interface FishingLevelBonus {
   rarityBonus?: number; largeFishBonus?: number; legendaryBonus?: number;
 }
 export const FISHING_LEVEL_BONUSES: FishingLevelBonus[] = [
-  { level: 10,    description: 'レア率+5%',        rarityBonus: 0.05 },
-  { level: 20,    description: 'レア率+10%',        rarityBonus: 0.10 },
-  { level: 30,    description: '大型魚出現率+10%',  largeFishBonus: 0.10 },
-  { level: 50,    description: '大型魚出現率+20%',  largeFishBonus: 0.20 },
-  { level: 70,    description: 'レア率+15%',        rarityBonus: 0.15 },
-  { level: 100,   description: '伝説魚率+50%',      legendaryBonus: 0.50 },
+  { level: 100,    description: 'レア率+5%',        rarityBonus: 0.05 },
+  { level: 200,    description: 'レア率+10%',        rarityBonus: 0.10 },
+  { level: 300,    description: '大型魚出現率+10%',  largeFishBonus: 0.10 },
+  { level: 500,    description: '大型魚出現率+20%',  largeFishBonus: 0.20 },
+  { level: 700,    description: 'レア率+15%',        rarityBonus: 0.15 },
+  { level: 1000,   description: '伝説魚率+50%',      legendaryBonus: 0.50 },
   // Lv100以降の長期ボーナス
-  { level: 200,   description: 'レア率+5%',         rarityBonus: 0.05 },
-  { level: 500,   description: '伝説魚率+20%',      legendaryBonus: 0.20 },
-  { level: 1000,  description: 'レア率+10%',        rarityBonus: 0.10 },
-  { level: 2000,  description: '大型魚出現率+10%',  largeFishBonus: 0.10 },
-  { level: 5000,  description: '伝説魚率+30%',      legendaryBonus: 0.30 },
-  { level: 10000, description: 'レア率+15%',        rarityBonus: 0.15 },
-  { level: 20000, description: '大型魚出現率+15%',  largeFishBonus: 0.15 },
-  { level: 50000, description: '伝説魚率+50%',      legendaryBonus: 0.50 },
-  { level: 100000,description: 'すべての率+30%・伝説+100%', rarityBonus: 0.30, largeFishBonus: 0.30, legendaryBonus: 1.0 },
+  { level: 2000,   description: 'レア率+5%',         rarityBonus: 0.05 },
+  { level: 5000,   description: '伝説魚率+20%',      legendaryBonus: 0.20 },
+  { level: 10000,  description: 'レア率+10%',        rarityBonus: 0.10 },
+  { level: 20000,  description: '大型魚出現率+10%',  largeFishBonus: 0.10 },
+  { level: 50000,  description: '伝説魚率+30%',      legendaryBonus: 0.30 },
+  { level: 100000, description: 'レア率+15%',        rarityBonus: 0.15 },
 ];
 export function getFishingBonuses(lv: number) {
   let rarityBonus = 0, largeFishBonus = 0, legendaryBonus = 0;
@@ -447,28 +444,25 @@ export interface FishingTitleContext {
   unlockedFishingAchievements: string[];
 }
 export const FISHING_TITLES: FishingTitle[] = [
-  { id:'ft_beginner',   label:'🌱 釣り見習い',     condition: c => c.fishingLevel >= 1 },
-  { id:'ft_novice',     label:'🎣 釣り初心者',     condition: c => c.fishingLevel >= 5 },
-  { id:'ft_angler',     label:'🐟 アングラー',     condition: c => c.fishingLevel >= 10 },
-  { id:'ft_fisherman',  label:'⚓ 漁師',           condition: c => c.fishingLevel >= 20 },
-  { id:'ft_veteran',    label:'🏆 ベテラン漁師',   condition: c => c.fishingLevel >= 30 },
-  { id:'ft_expert',     label:'💎 釣りエキスパート',condition: c => c.fishingLevel >= 40 },
-  { id:'ft_master',     label:'👑 釣りマスター',   condition: c => c.fishingLevel >= 50 },
-  { id:'ft_grandmaster',label:'🌟 グランドマスター',condition: c => c.fishingLevel >= 60 },
-  { id:'ft_legend',     label:'🐉 釣り伝説',       condition: c => c.fishingLevel >= 70 },
-  { id:'ft_hero',       label:'⚡ 釣り英雄',       condition: c => c.fishingLevel >= 80 },
-  { id:'ft_god',        label:'✨ 釣りの神',       condition: c => c.fishingLevel >= 90 },
-  { id:'ft_infinity',   label:'♾️ 釣り∞',         condition: c => c.fishingLevel >= 100 },
+  { id:'ft_beginner',   label:'🌱 釣り見習い',     condition: c => c.fishingLevel >= 10 },
+  { id:'ft_novice',     label:'🎣 釣り初心者',     condition: c => c.fishingLevel >= 50 },
+  { id:'ft_angler',     label:'🐟 アングラー',     condition: c => c.fishingLevel >= 100 },
+  { id:'ft_fisherman',  label:'⚓ 漁師',           condition: c => c.fishingLevel >= 200 },
+  { id:'ft_veteran',    label:'🏆 ベテラン漁師',   condition: c => c.fishingLevel >= 300 },
+  { id:'ft_expert',     label:'💎 釣りエキスパート',condition: c => c.fishingLevel >= 400 },
+  { id:'ft_master',     label:'👑 釣りマスター',   condition: c => c.fishingLevel >= 500 },
+  { id:'ft_grandmaster',label:'🌟 グランドマスター',condition: c => c.fishingLevel >= 600 },
+  { id:'ft_legend',     label:'🐉 釣り伝説',       condition: c => c.fishingLevel >= 700 },
+  { id:'ft_hero',       label:'⚡ 釣り英雄',       condition: c => c.fishingLevel >= 800 },
+  { id:'ft_god',        label:'✨ 釣りの神',       condition: c => c.fishingLevel >= 900 },
+  { id:'ft_infinity',   label:'♾️ 釣り∞',         condition: c => c.fishingLevel >= 1000 },
   // Lv100以降の長期称号
-  { id:'ft_lv200',      label:'🌙 Lv200 月の釣り師',       condition: c => c.fishingLevel >= 200 },
-  { id:'ft_lv500',      label:'⭐ Lv500 星の釣り師',       condition: c => c.fishingLevel >= 500 },
-  { id:'ft_lv1000',     label:'💫 Lv1000 伝説の釣り人',    condition: c => c.fishingLevel >= 1000 },
-  { id:'ft_lv2000',     label:'🌠 Lv2000 神話の釣り人',    condition: c => c.fishingLevel >= 2000 },
-  { id:'ft_lv5000',     label:'🌌 Lv5000 宇宙の釣り師',    condition: c => c.fishingLevel >= 5000 },
-  { id:'ft_lv10000',    label:'🐉 Lv10000 龍帝の釣り師',   condition: c => c.fishingLevel >= 10000 },
-  { id:'ft_lv20000',    label:'👑 Lv20000 覇王の釣り師',   condition: c => c.fishingLevel >= 20000 },
-  { id:'ft_lv50000',    label:'✨ Lv50000 神々の釣り師',   condition: c => c.fishingLevel >= 50000 },
-  { id:'ft_lv100000',   label:'♾️ Lv100000 究極釣り師',   condition: c => c.fishingLevel >= 100000 },
+  { id:'ft_lv200',      label:'🌙 Lv200 月の釣り師',       condition: c => c.fishingLevel >= 2000 },
+  { id:'ft_lv500',      label:'⭐ Lv500 星の釣り師',       condition: c => c.fishingLevel >= 5000 },
+  { id:'ft_lv1000',     label:'💫 Lv1000 伝説の釣り人',    condition: c => c.fishingLevel >= 10000 },
+  { id:'ft_lv2000',     label:'🌠 Lv2000 神話の釣り人',    condition: c => c.fishingLevel >= 20000 },
+  { id:'ft_lv5000',     label:'🌌 Lv5000 宇宙の釣り師',    condition: c => c.fishingLevel >= 50000 },
+  { id:'ft_lv10000',    label:'🐉 Lv10000 龍帝の釣り師',   condition: c => c.fishingLevel >= 100000 },
   { id:'ft_catch10',    label:'🐟 初釣り師',       condition: c => c.totalCount >= 10 },
   { id:'ft_catch100',   label:'🐟 百匹釣り',       condition: c => c.totalCount >= 100 },
   { id:'ft_catch500',   label:'🐠 五百釣果',       condition: c => c.totalCount >= 500 },
@@ -523,13 +517,13 @@ export const FISHING_TITLES: FishingTitle[] = [
   { id:'ft_first_legend',label:'🌟 初・伝説魚',   condition: c => ['ryujin','phantom_tuna','sea_god','infinity_fish','god_koi'].some(id => (c.fishBook[id]?.totalCaught ?? 0) >= 1) },
   { id:'ft_catch50000', label:'🌊 五万釣果',       condition: c => c.totalCount >= 50000 },
   { id:'ft_book15',     label:'📗 図鑑15種',       condition: c => c.bookCount >= 15 },
-  { id:'ft_lv25',       label:'🥈 Lv25',           condition: c => c.fishingLevel >= 25 },
-  { id:'ft_lv45',       label:'🥇 Lv45',           condition: c => c.fishingLevel >= 45 },
-  { id:'ft_lv55',       label:'💠 Lv55',           condition: c => c.fishingLevel >= 55 },
-  { id:'ft_lv65',       label:'🔷 Lv65',           condition: c => c.fishingLevel >= 65 },
-  { id:'ft_lv75',       label:'🔶 Lv75',           condition: c => c.fishingLevel >= 75 },
-  { id:'ft_lv85',       label:'🟡 Lv85',           condition: c => c.fishingLevel >= 85 },
-  { id:'ft_lv95',       label:'🟠 Lv95',           condition: c => c.fishingLevel >= 95 },
+  { id:'ft_lv25',       label:'🥈 Lv25',           condition: c => c.fishingLevel >= 250 },
+  { id:'ft_lv45',       label:'🥇 Lv45',           condition: c => c.fishingLevel >= 450 },
+  { id:'ft_lv55',       label:'💠 Lv55',           condition: c => c.fishingLevel >= 550 },
+  { id:'ft_lv65',       label:'🔷 Lv65',           condition: c => c.fishingLevel >= 650 },
+  { id:'ft_lv75',       label:'🔶 Lv75',           condition: c => c.fishingLevel >= 750 },
+  { id:'ft_lv85',       label:'🟡 Lv85',           condition: c => c.fishingLevel >= 850 },
+  { id:'ft_lv95',       label:'🟠 Lv95',           condition: c => c.fishingLevel >= 950 },
   { id:'ft_heavy500',   label:'⚖️ 500kg達成',      condition: c => c.maxWeightKg >= 500 },
   { id:'ft_book25',     label:'📘 図鑑25種',       condition: c => c.bookCount >= 25 },
   { id:'ft_god_koi',    label:'👑 神コイ召喚者',   condition: c => (c.fishBook['god_koi']?.totalCaught ?? 0) >= 1 },
@@ -574,20 +568,18 @@ export const FISHING_ACHIEVEMENTS: FishingAchievement[] = [
   { id:'fa_catch_10000',   name:'1万匹',           description:'合計10000匹釣った',                     icon:'🌊', checkFn: c => c.totalCount >= 10000 },
   { id:'fa_catch_50000',   name:'5万匹',           description:'合計50000匹釣った',                     icon:'🌊', checkFn: c => c.totalCount >= 50000 },
   { id:'fa_catch_100000',  name:'10万匹',          description:'合計10万匹釣った',                      icon:'🌊', checkFn: c => c.totalCount >= 100000 },
-  { id:'fa_lv10',          name:'釣りLv10',        description:'釣りレベルが10になった',                icon:'⭐', checkFn: c => c.fishingLevel >= 10 },
-  { id:'fa_lv20',          name:'釣りLv20',        description:'釣りレベルが20になった',                icon:'⭐', checkFn: c => c.fishingLevel >= 20 },
-  { id:'fa_lv30',          name:'釣りLv30',        description:'釣りレベルが30になった',                icon:'⭐', checkFn: c => c.fishingLevel >= 30 },
-  { id:'fa_lv50',          name:'釣りLv50',        description:'釣りレベルが50になった',                icon:'⭐', checkFn: c => c.fishingLevel >= 50 },
-  { id:'fa_lv70',          name:'釣りLv70',        description:'釣りレベルが70になった',                icon:'🌟', checkFn: c => c.fishingLevel >= 70 },
-  { id:'fa_lv100',         name:'釣りLv100',       description:'最大レベル到達！',                      icon:'👑', checkFn: c => c.fishingLevel >= 100 },
-  { id:'fa_lv200',         name:'釣りLv200',       description:'釣りLv200到達',                         icon:'🌙', checkFn: c => c.fishingLevel >= 200 },
-  { id:'fa_lv500',         name:'釣りLv500',       description:'釣りLv500到達',                         icon:'⭐', checkFn: c => c.fishingLevel >= 500 },
-  { id:'fa_lv1000',        name:'釣りLv1000',      description:'釣りLv1000到達',                        icon:'💫', checkFn: c => c.fishingLevel >= 1000 },
-  { id:'fa_lv2000',        name:'釣りLv2000',      description:'釣りLv2000到達',                        icon:'🌠', checkFn: c => c.fishingLevel >= 2000 },
-  { id:'fa_lv5000',        name:'釣りLv5000',      description:'釣りLv5000到達',                        icon:'🌌', checkFn: c => c.fishingLevel >= 5000 },
-  { id:'fa_lv10000',       name:'釣りLv10000',     description:'釣りLv10000到達',                       icon:'🐉', checkFn: c => c.fishingLevel >= 10000 },
-  { id:'fa_lv50000',       name:'釣りLv50000',     description:'釣りLv50000到達',                       icon:'✨', checkFn: c => c.fishingLevel >= 50000 },
-  { id:'fa_lv100000',      name:'釣りLv100000',    description:'究極の釣りLv100000到達！',               icon:'♾️', checkFn: c => c.fishingLevel >= 100000 },
+  { id:'fa_lv10',          name:'釣りLv10',        description:'釣りレベルが10になった',                icon:'⭐', checkFn: c => c.fishingLevel >= 100 },
+  { id:'fa_lv20',          name:'釣りLv20',        description:'釣りレベルが20になった',                icon:'⭐', checkFn: c => c.fishingLevel >= 200 },
+  { id:'fa_lv30',          name:'釣りLv30',        description:'釣りレベルが30になった',                icon:'⭐', checkFn: c => c.fishingLevel >= 300 },
+  { id:'fa_lv50',          name:'釣りLv50',        description:'釣りレベルが50になった',                icon:'⭐', checkFn: c => c.fishingLevel >= 500 },
+  { id:'fa_lv70',          name:'釣りLv70',        description:'釣りレベルが70になった',                icon:'🌟', checkFn: c => c.fishingLevel >= 700 },
+  { id:'fa_lv100',         name:'釣りLv100',       description:'最大レベル到達！',                      icon:'👑', checkFn: c => c.fishingLevel >= 1000 },
+  { id:'fa_lv200',         name:'釣りLv200',       description:'釣りLv200到達',                         icon:'🌙', checkFn: c => c.fishingLevel >= 2000 },
+  { id:'fa_lv500',         name:'釣りLv500',       description:'釣りLv500到達',                         icon:'⭐', checkFn: c => c.fishingLevel >= 5000 },
+  { id:'fa_lv1000',        name:'釣りLv1000',      description:'釣りLv1000到達',                        icon:'💫', checkFn: c => c.fishingLevel >= 10000 },
+  { id:'fa_lv2000',        name:'釣りLv2000',      description:'釣りLv2000到達',                        icon:'🌠', checkFn: c => c.fishingLevel >= 20000 },
+  { id:'fa_lv5000',        name:'釣りLv5000',      description:'釣りLv5000到達',                        icon:'🌌', checkFn: c => c.fishingLevel >= 50000 },
+  { id:'fa_lv10000',       name:'釣りLv10000',     description:'釣りLv10000到達',                       icon:'🐉', checkFn: c => c.fishingLevel >= 100000 },
   { id:'fa_book_5',        name:'図鑑5種',         description:'魚図鑑に5種登録した',                  icon:'📖', checkFn: c => c.bookCount >= 5 },
   { id:'fa_book_10',       name:'図鑑10種',        description:'魚図鑑に10種登録した',                  icon:'📚', checkFn: c => c.bookCount >= 10 },
   { id:'fa_book_20',       name:'図鑑20種',        description:'魚図鑑に20種登録した',                  icon:'📚', checkFn: c => c.bookCount >= 20 },
