@@ -230,7 +230,6 @@ export function FishingScreen() {
       addItems([{ itemId: itemMap[result.fish.id] ?? 'raw_cod', amount: 1 }]);
       // 魚個体として保存（養殖・水族館システム連携）- レジェンダリーのみ即時保存、それ以外はスキップ
       if (player?.uid && result.fish.rarity === 'legendary') {
-        const fishRar = result.fish.rarity;
         const aquaRarity: AquaRarity = 'legendary';
         nextIndividualId().then(indId => {
           saveFishIndividual({
