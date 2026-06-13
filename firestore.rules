@@ -16,7 +16,7 @@ service cloud.firestore {
     function isAdmin() {
       return request.auth != null
         && (request.auth.uid == 'jJ7BrZ0HhpeC5WYsdZbjRlQBRzK2'
-          || request.auth.uid == '49yFkciBJLhFbFq7YJrbg8dI8rf2');
+          || request.auth.uid == 'YRa6VJ23pYPG4tTJadosgyQyqjc2');
     }
 
     // ============================================================
