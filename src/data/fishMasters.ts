@@ -1,4 +1,5 @@
 // src/data/fishMasters.ts  –  釣りシステム v3
+import { randomIntRange } from '../utils/random';
 
 export type FishRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 
@@ -396,12 +397,12 @@ export function getFishingBonuses(lv: number) {
   return { rarityBonus, largeFishBonus, legendaryBonus };
 }
 
-// EXP計算（Lv100000対応・3段階スケール）
+// EXP計算（Lv1〜Lv20:200固定 / Lv21〜100 / Lv101〜200 / Lv201〜 の4段階スケール）
 export function fishingExpRequired(level: number): number {
-  if (level <= 100) return Math.floor(Math.pow(level, 1.8) * 12);
-  if (level <= 1000) return Math.floor(Math.pow(level, 1.9) * 16);
-  if (level <= 10000) return Math.floor(Math.pow(level, 2.0) * 20);
-  return Math.floor(Math.pow(level, 2.1) * 24);
+  if (level <= 20) return 200;
+  if (level <= 100) return 200 + (level - 20) * 6;
+  if (level <= 200) return Math.floor(600 + Math.pow(level - 100, 2) * 0.6);
+  return Math.floor(90000 + Math.pow(Math.abs(level - 500), 2.7));
 }
 
 // サイズ→重量
@@ -409,11 +410,18 @@ export function calcWeight(fish: FishMaster, sizeCm: number): number {
   return Math.round(Math.pow(sizeCm, 1.8) * fish.weightFactor * 10) / 10;
 }
 
-// 売値
-export function calcFishSellPrice(fish: FishMaster, sizeCm: number): number {
-  const sizeRatio = sizeCm / fish.maxSizeCm;
-  const rarityMult = { common:1, uncommon:2, rare:5, epic:15, legendary:100 }[fish.rarity];
-  return Math.floor(fish.sellPrice * (0.5 + sizeRatio) * rarityMult);
+// 売値（FishMoney）：レアリティ別ランダムレンジ
+const FISH_MONEY_RANGE: Record<FishRarity, [number, number]> = {
+  common:    [60, 200],
+  uncommon:  [200, 600],
+  rare:      [600, 3000],
+  epic:      [3000, 20000],
+  legendary: [20000, 120000],
+};
+
+export function calcFishSellPrice(fish: FishMaster, _sizeCm: number): number {
+  const [min, max] = FISH_MONEY_RANGE[fish.rarity];
+  return randomIntRange(min, max);
 }
 
 // 強化成功率（+0〜+20）
