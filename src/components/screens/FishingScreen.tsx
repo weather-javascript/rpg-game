@@ -119,6 +119,7 @@ export function FishingScreen() {
   const useBait           = useGameStore((s: any) => s.useBait);
   const enhanceRod        = useGameStore((s: any) => s.enhanceRod);
   const spendFishCoin     = useGameStore((s: any) => s.spendFishCoin);
+  const convertFishMoneyToGold = useGameStore((s: any) => s.convertFishMoneyToGold);
   const checkFishingAchievements = useGameStore((s: any) => s.checkFishingAchievements);
   const setFishingLocked  = useGameStore((s: any) => s.setFishingLocked);
 
@@ -214,7 +215,6 @@ export function FishingScreen() {
       addFishingExp(result.exp);
       const coinEarned = Math.floor(fishCoinReward(result.fish.rarity, weather) * (rod.fishCoinMult ?? 1.0));
       recordCatch(result.fish.id, result.sizeCm, result.weightKg, result.sellPrice, coinEarned);
-      changeGold(result.sellPrice);
       // map to inventory item
       const itemMap: Record<string, string> = {
         iwashi:'raw_cod', aji:'raw_cod', fugu:'pufferfish', koi:'raw_salmon', tai:'raw_salmon',
@@ -245,7 +245,7 @@ export function FishingScreen() {
       const sizeLabel  = result.sizeCm >= result.fish.maxSizeCm * 0.95 ? ' 🏆最大級!' : '';
       const newLabel   = result.isNew ? ' ✨初図鑑!' : result.isRecord ? ' 📏記録更新!' : '';
       addLog(
-        `${result.fish.icon} ${result.fish.name} ${result.sizeCm}cm/${result.weightKg}kg +${result.sellPrice}G +${result.exp}EXP${sizeLabel}${newLabel}`,
+        `${result.fish.icon} ${result.fish.name} ${result.sizeCm}cm/${result.weightKg}kg +${result.sellPrice}FishMoney +${result.exp}EXP${sizeLabel}${newLabel}`,
         RARITY_COLOR[result.fish.rarity], RARITY_LABEL[result.fish.rarity],
       );
       if (result.fish.rarity === 'legendary') {
@@ -355,6 +355,7 @@ export function FishingScreen() {
             return ev ? <span key={eid}>{ev.icon} {ev.name}</span> : null;
           })}
           <span>🐟 Fish Coin {(player.fishCoin ?? 0).toLocaleString()}</span>
+          <span>💵 FishMoney {(player.fishMoney ?? 0).toLocaleString()}</span>
         </div>
       </div>
 
@@ -581,6 +582,18 @@ export function FishingScreen() {
             <div style={{ marginTop:8, background:'rgba(14,165,233,0.08)', borderRadius:6, padding:'6px 10px', fontSize:11, color:'#7dd3fc' }}>
               💡 Fish Coinの獲得方法: レア魚=1枚、エピック魚=3枚、伝説魚=10枚。天候イベント中は最大2倍獲得！
             </div>
+          </div>
+          <div style={S.card}>
+            <div style={S.h2}>💵 FishMoney → G 変換</div>
+            <div style={{ fontSize:12, color:'#94a3b8' }}>所持 FishMoney: <b style={{ color:'#34d399' }}>{(player.fishMoney ?? 0).toLocaleString()}</b></div>
+            <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>60 FishMoney → 1 G に変換できます。</div>
+            <button
+              style={{ ...S.btn(true), marginTop:8 }}
+              disabled={(player.fishMoney ?? 0) < 60}
+              onClick={() => convertFishMoneyToGold()}
+            >
+              💱 全額をGに変換（{Math.floor((player.fishMoney ?? 0) / 60).toLocaleString()}G獲得）
+            </button>
           </div>
           {FISH_COIN_SHOP.map(item => {
             const can = (player.fishCoin ?? 0) >= item.cost;
