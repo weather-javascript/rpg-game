@@ -74,13 +74,25 @@ export const createFishingSlice: StateCreator<GameState, [], [], FishingSlice> =
   addFishingExp: (exp) => {
     set((state: any) => {
       if (!state.player) return state;
+      const MAX_LV = 100000;
       let lv = state.player.fishingLevel ?? 1;
       let cur = (state.player.fishingExp ?? 0) + exp;
-      while (lv < 100) {
+      while (lv < MAX_LV) {
         const req = fishingExpRequired(lv);
         if (cur >= req) { cur -= req; lv += 1; } else break;
       }
-      if (lv >= 100) cur = 0;
+      if (lv >= MAX_LV) cur = 0;
+      // Milestone rewards (Fish Coin grants at key levels)
+      const prevLv = state.player.fishingLevel ?? 1;
+      const milestoneFC: Record<number, number> = {
+        200:100, 500:300, 1000:500, 2000:800, 5000:2000,
+        10000:5000, 20000:8000, 50000:20000, 100000:100000,
+      };
+      let bonusFC = 0;
+      for (const [mlv, fc] of Object.entries(milestoneFC)) {
+        const m = Number(mlv);
+        if (prevLv < m && lv >= m) bonusFC += fc;
+      }
       // spot unlock based on level
       const unlockedSpots = [...(state.player.fishingUnlockedSpots ?? ['pond', 'river'])];
       for (const spot of Object.values(SPOT_MASTER)) {
@@ -94,7 +106,7 @@ export const createFishingSlice: StateCreator<GameState, [], [], FishingSlice> =
           unlockedSpots.push(spot.id);
         }
       }
-      return { player: { ...state.player, fishingLevel: lv, fishingExp: cur, fishingUnlockedSpots: unlockedSpots } };
+      return { player: { ...state.player, fishingLevel: lv, fishingExp: cur, fishingUnlockedSpots: unlockedSpots, fishCoin: (state.player.fishCoin ?? 0) + bonusFC } };
     });
   },
 
