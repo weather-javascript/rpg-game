@@ -567,8 +567,7 @@ export function AdminScreen() {
       {/* ===== 釣りデータ管理 ===== */}
       {subTab === 'fishing_admin' && (() => {
         const filteredFishingPlayers = filterPlayersAdmin(players, {
-          name: fishingAdminFilter || undefined,
-          id: fishingAdminFilter || undefined,
+          idOrName: fishingAdminFilter || undefined,
         });
         const loadFishingPlayer = (p: any) => {
           setFishingAdminPlayer(p);
@@ -807,8 +806,7 @@ export function AdminScreen() {
       {/* ===== 通貨編集 ===== */}
       {subTab === 'currency_admin' && (() => {
         const filteredCurrencyPlayers = filterPlayersAdmin(players, {
-          name: currencyAdminFilter || undefined,
-          id: currencyAdminFilter || undefined,
+          idOrName: currencyAdminFilter || undefined,
         });
         const loadCurrencyPlayer = (p: any) => {
           setCurrencyAdminPlayer(p);

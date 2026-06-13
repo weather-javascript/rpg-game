@@ -593,10 +593,10 @@ export function FishingScreen() {
           <div style={S.card}>
             <div style={S.h2}>💵 FishMoney → G 変換</div>
             <div style={{ fontSize:12, color:'#94a3b8' }}>所持 FishMoney: <b style={{ color:'#34d399' }}>{(player.fishMoney ?? 0).toLocaleString()}</b></div>
-            <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>60 FishMoney → 1 G に変換できます。</div>
+            <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>2 FishMoney → 1 G に変換できます。</div>
             <div style={{ display:'flex', gap:6, marginTop:8 }}>
               <input
-                type="number" min="0" step="60"
+                type="number" min="0" step="2"
                 placeholder="変換するFishMoney数"
                 value={convertAmount}
                 onChange={e => setConvertAmount(e.target.value)}
@@ -604,17 +604,17 @@ export function FishingScreen() {
               />
               <button
                 style={{ ...S.btn(true) }}
-                disabled={!(Number(convertAmount) >= 60) || Number(convertAmount) > (player.fishMoney ?? 0)}
-                onClick={() => { const v = Math.floor(Number(convertAmount) / 60) * 60; if (convertFishMoneyToGold(v)) setConvertAmount(''); }}
+                disabled={!(Number(convertAmount) >= 2) || Number(convertAmount) > (player.fishMoney ?? 0)}
+                onClick={() => { const v = Math.floor(Number(convertAmount) / 2) * 2; if (convertFishMoneyToGold(v)) setConvertAmount(''); }}
               >
-                💱 変換（{Math.floor(Number(convertAmount || 0) / 60).toLocaleString()}G獲得）
+                💱 変換（{Math.floor(Number(convertAmount || 0) / 2).toLocaleString()}G獲得）
               </button>
             </div>
             <div style={{ display:'flex', gap:6, marginTop:6 }}>
               {[0.25, 0.5, 1].map(ratio => (
                 <button key={ratio}
                   style={{ ...S.btn(false), flex:1, fontSize:11 }}
-                  onClick={() => setConvertAmount(String(Math.floor((player.fishMoney ?? 0) * ratio / 60) * 60))}
+                  onClick={() => setConvertAmount(String(Math.floor((player.fishMoney ?? 0) * ratio / 2) * 2))}
                 >
                   {ratio === 1 ? '全額' : `${Math.round(ratio*100)}%`}
                 </button>
