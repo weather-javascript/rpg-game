@@ -17,6 +17,7 @@ export interface FishingSlice {
   recordCatch:        (fishId: string, sizeCm: number, weightKg: number, goldEarned: number, fishCoinEarned?: number) => void;
   addFishCoin:        (amount: number) => void;
   spendFishCoin:      (amount: number) => boolean;
+  convertFishMoneyToGold: (amount?: number) => boolean;
   selectFishingSpot:  (spotId: string) => void;
   unlockFishingSpot:  (spotId: string) => void;
   equipBait:          (baitId: string) => void;
@@ -132,6 +133,7 @@ export const createFishingSlice: StateCreator<GameState, [], [], FishingSlice> =
           fishingMaxWeightKg: Math.max(state.player.fishingMaxWeightKg ?? 0, weightKg),
           fishingTotalWeightKg: Math.round(((state.player.fishingTotalWeightKg ?? 0) + weightKg) * 100) / 100,
           fishingTotalGoldEarned: (state.player.fishingTotalGoldEarned ?? 0) + goldEarned,
+          fishMoney: (state.player.fishMoney ?? 0) + goldEarned,
           fishingLegendaryCount: (state.player.fishingLegendaryCount ?? 0) + (fish.rarity === 'legendary' ? 1 : 0),
           fishCoin: (state.player.fishCoin ?? 0) + fishCoinEarned,
         },
@@ -151,6 +153,28 @@ export const createFishingSlice: StateCreator<GameState, [], [], FishingSlice> =
       return false;
     }
     set((state: any) => state.player ? { player: { ...state.player, fishCoin: (state.player.fishCoin ?? 0) - amount } } : state);
+    return true;
+  },
+
+  // FishMoney -> G 変換（60 FishMoney = 1 G）。amount未指定なら所持FishMoney全額。
+  convertFishMoneyToGold: (amount?: number) => {
+    const { player, changeGold, addNotification } = get();
+    if (!player) return false;
+    const have = player.fishMoney ?? 0;
+    const useAmount = amount ?? have;
+    if (useAmount <= 0 || useAmount > have) {
+      addNotification('error', 'FishMoneyが不足しています！');
+      return false;
+    }
+    const goldGain = Math.floor(useAmount / 60);
+    if (goldGain <= 0) {
+      addNotification('error', '変換には60FishMoney以上が必要です！');
+      return false;
+    }
+    const consumed = goldGain * 60;
+    set((state: any) => state.player ? { player: { ...state.player, fishMoney: (state.player.fishMoney ?? 0) - consumed } } : state);
+    changeGold(goldGain);
+    addNotification('success', `💱 ${consumed}FishMoney → ${goldGain}G に変換しました！`);
     return true;
   },
 
