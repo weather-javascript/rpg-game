@@ -95,27 +95,232 @@ export interface RodMaster {
   rarityBonus: number; largeFishBonus: number; expMult: number;
   maxDurability: number; minLevel: number; buyPrice?: number;
   obtainHint: string;
+  // 拡張フィールド（data駆動）
+  role: string;                          // 竿の役割ラベル（UI表示用）
+  fishCoinMult: number;                  // Fish Coin獲得倍率（1.0=通常）
+  spotBonus?: Partial<Record<string, number>>; // 特定スポットでのレア率追加ボーナス
+  legendaryBonus?: number;               // 伝説魚出現率ボーナス
 }
 export const ROD_MASTER: Record<string, RodMaster> = {
-  wood_rod:      { id:'wood_rod',      name:'木の釣り竿',      icon:'🪵', rarity:'common',    minLevel:1,  rarityBonus:0,    largeFishBonus:0,    expMult:1.0, maxDurability:50,  buyPrice:100,  description:'粗削りな木の竿。',                obtainHint:'ショップで購入' },
-  basic_rod:     { id:'basic_rod',     name:'鉄の釣り竿',      icon:'🎣', rarity:'common',    minLevel:1,  rarityBonus:0.01, largeFishBonus:0.01, expMult:1.0, maxDurability:80,  buyPrice:300,  description:'頑丈な鉄製の竿。',                obtainHint:'初期装備' },
-  ore_rod:       { id:'ore_rod',       name:'銀の釣り竿',      icon:'🎣', rarity:'uncommon',  minLevel:5,  rarityBonus:0.03, largeFishBonus:0.02, expMult:1.1, maxDurability:100, description:'銀の輝きを持つ竿。',              obtainHint:'謎の箱' },
-  copper_rod:    { id:'copper_rod',    name:'銅の釣り竿',      icon:'🎣', rarity:'common',    minLevel:3,  rarityBonus:0.02, largeFishBonus:0.01, expMult:1.05,maxDurability:70,  buyPrice:200,  description:'銅製で扱いやすい。',              obtainHint:'ショップで購入' },
-  crystal_rod:   { id:'crystal_rod',   name:'水晶の釣り竿',    icon:'💠', rarity:'rare',      minLevel:15, rarityBonus:0.06, largeFishBonus:0.04, expMult:1.2, maxDurability:120, description:'水晶のように澄んだ竿。',          obtainHint:'クラフト' },
-  all_rod_x:     { id:'all_rod_x',     name:'オールロッドX',   icon:'🎣', rarity:'rare',      minLevel:10, rarityBonus:0.05, largeFishBonus:0.03, expMult:1.15,maxDurability:110, description:'オールラウンドな名竿。',          obtainHint:'釣りチケット交換' },
-  golden_rod:    { id:'golden_rod',    name:'黄金の釣り竿',    icon:'🏆', rarity:'rare',      minLevel:20, rarityBonus:0.08, largeFishBonus:0.05, expMult:1.3, maxDurability:130, description:'黄金に輝く高級竿。',              obtainHint:'クラフト' },
-  master_rod:    { id:'master_rod',    name:'マスターロッド',  icon:'🎣', rarity:'epic',      minLevel:20, rarityBonus:0.10, largeFishBonus:0.08, expMult:1.4, maxDurability:150, description:'熟練者向けの竿。',                obtainHint:'Yランダムボックス' },
-  deep_sea_rod:  { id:'deep_sea_rod',  name:'深海竿',          icon:'🌑', rarity:'epic',      minLevel:35, rarityBonus:0.12, largeFishBonus:0.10, expMult:1.5, maxDurability:160, description:'深海特化の強力な竿。',            obtainHint:'クラフト（深海素材）' },
-  master_rod_z:  { id:'master_rod_z',  name:'マスターロッドZ', icon:'⚡', rarity:'epic',      minLevel:30, rarityBonus:0.13, largeFishBonus:0.12, expMult:1.55,maxDurability:170, description:'Z改良型マスターロッド。',         obtainHint:'上位チケット交換' },
-  lava_rod:      { id:'lava_rod',      name:'溶岩竿',          icon:'🌋', rarity:'epic',      minLevel:45, rarityBonus:0.15, largeFishBonus:0.14, expMult:1.6, maxDurability:180, description:'火山素材で作られた耐熱竿。',      obtainHint:'火山湖解放後クラフト' },
-  ffgg_rod_r1:   { id:'ffgg_rod_r1',   name:'FFGGロッドR1',    icon:'🎣', rarity:'epic',      minLevel:15, rarityBonus:0.12, largeFishBonus:0.10, expMult:1.45,maxDurability:160, description:'FFGG専用釣り竿。',                obtainHint:'FFGG限定' },
-  sky_rod:       { id:'sky_rod',       name:'天空竿',          icon:'☁️', rarity:'legendary', minLevel:60, rarityBonus:0.20, largeFishBonus:0.18, expMult:1.8, maxDurability:220, description:'天空湖専用の神秘の竿。',          obtainHint:'天空湖解放後クラフト' },
-  ffgg_rod_r3:   { id:'ffgg_rod_r3',   name:'FFGGロッドR3',    icon:'🎣', rarity:'epic',      minLevel:25, rarityBonus:0.16, largeFishBonus:0.14, expMult:1.6, maxDurability:185, description:'FFGG強化版。',                    obtainHint:'提案チケット交換' },
-  dragon_rod:    { id:'dragon_rod',    name:'龍の釣り竿',      icon:'🐉', rarity:'legendary', minLevel:70, rarityBonus:0.25, largeFishBonus:0.22, expMult:2.0, maxDurability:250, description:'龍の骨で作られた伝説の竿。',      obtainHint:'龍神討伐後クラフト' },
-  ffgg_rod_r6:   { id:'ffgg_rod_r6',   name:'FFGGロッドR6',    icon:'🎣', rarity:'legendary', minLevel:40, rarityBonus:0.22, largeFishBonus:0.20, expMult:1.9, maxDurability:230, description:'FFGG最強。',                      obtainHint:'FFGG最高ランク' },
-  ffggr_rod:     { id:'ffggr_rod',     name:'FFGGRロッド',     icon:'🌟', rarity:'legendary', minLevel:50, rarityBonus:0.27, largeFishBonus:0.25, expMult:2.1, maxDurability:270, description:'GGR釣り専用。',                  obtainHint:'GGRランク' },
-  god_rod:       { id:'god_rod',       name:'神竿',            icon:'✨', rarity:'legendary', minLevel:90, rarityBonus:0.35, largeFishBonus:0.35, expMult:2.5, maxDurability:999, description:'神に授かった釣り竿の極致。',      obtainHint:'釣りLv90達成' },
-  infinite_rod:  { id:'infinite_rod',  name:'∞竿',             icon:'♾️', rarity:'legendary', minLevel:100,rarityBonus:0.50, largeFishBonus:0.50, expMult:3.0, maxDurability:9999,description:'無限の力を持つ究極の竿。',        obtainHint:'釣りLv100 + 図鑑100%' },
+  // ──────────────────────────────────────────────────────────
+  // Lv1〜 【序盤・入門】EXP効率が唯一の強み。すぐ乗り換える竿
+  // ──────────────────────────────────────────────────────────
+  wood_rod: {
+    id:'wood_rod', name:'木の釣り竿', icon:'🪵', rarity:'common', minLevel:1,
+    rarityBonus:0, largeFishBonus:0, expMult:1.2, maxDurability:40, buyPrice:100,
+    fishCoinMult:1.0,
+    role:'🌱 EXP特化（序盤）',
+    description:'粗削りだがEXPが多め。序盤のレベル上げに使える。',
+    obtainHint:'ショップで購入（100G）',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv1〜 【汎用・初期装備】最初から持っている。全方位平均的
+  // ──────────────────────────────────────────────────────────
+  basic_rod: {
+    id:'basic_rod', name:'鉄の釣り竿', icon:'🎣', rarity:'common', minLevel:1,
+    rarityBonus:0.02, largeFishBonus:0.02, expMult:1.0, maxDurability:80, buyPrice:300,
+    fishCoinMult:1.0,
+    role:'⚖️ バランス（初期）',
+    description:'頑丈で扱いやすい標準的な竿。序盤〜中盤まで使える。',
+    obtainHint:'初期装備（最初から所持）',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv3〜 【大型魚特化・序盤】large特化。大きいサイズを狙う
+  // ──────────────────────────────────────────────────────────
+  copper_rod: {
+    id:'copper_rod', name:'銅の釣り竿', icon:'🎣', rarity:'common', minLevel:3,
+    rarityBonus:0, largeFishBonus:0.12, expMult:0.9, maxDurability:70, buyPrice:200,
+    fishCoinMult:1.0,
+    role:'📏 大型魚特化（序盤）',
+    description:'重心が低く大型魚を引き寄せやすい。EXPは少なめ。',
+    obtainHint:'ショップで購入（200G）',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv5〜 【レア特化・中盤前半】レア率に全振り。EXPは犠牲
+  // ──────────────────────────────────────────────────────────
+  ore_rod: {
+    id:'ore_rod', name:'銀の釣り竿', icon:'🎣', rarity:'uncommon', minLevel:5,
+    rarityBonus:0.10, largeFishBonus:0, expMult:0.85, maxDurability:100,
+    fishCoinMult:1.2,
+    role:'✨ レア特化（中盤前半）',
+    description:'希少な銀素材でできた竿。レア魚・Fish Coinが狙いやすいが EXP効率は低い。',
+    obtainHint:'謎の箱・ショップ（中盤解放）',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv10〜 【Fish Coin稼ぎ特化】コイン倍率2倍。レア率も中程度
+  // ──────────────────────────────────────────────────────────
+  all_rod_x: {
+    id:'all_rod_x', name:'オールロッドX', icon:'🎣', rarity:'rare', minLevel:10,
+    rarityBonus:0.06, largeFishBonus:0.04, expMult:1.1, maxDurability:110,
+    fishCoinMult:2.0,
+    role:'🐟 Fish Coin×2（中盤）',
+    description:'釣るたびにFish Coinを2倍獲得。交換所アイテムを早く集めたい人向け。',
+    obtainHint:'Fish Coin交換所（400枚）',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv15〜 【EXP周回特化】expMultが圧倒的に高い。レベル上げ専用
+  // ──────────────────────────────────────────────────────────
+  crystal_rod: {
+    id:'crystal_rod', name:'水晶の釣り竿', icon:'💠', rarity:'rare', minLevel:15,
+    rarityBonus:0.04, largeFishBonus:0, expMult:1.8, maxDurability:120,
+    fishCoinMult:1.0,
+    role:'⬆️ EXP周回特化（中盤）',
+    description:'水晶の共鳴でEXPが大幅増加。Lv上げ周回のメイン竿。レア率は平凡。',
+    obtainHint:'クラフト（水晶×5 + 鉄×10）',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv20〜 【大型魚+レア バランス型】中盤後半の主力
+  // ──────────────────────────────────────────────────────────
+  golden_rod: {
+    id:'golden_rod', name:'黄金の釣り竿', icon:'🏆', rarity:'rare', minLevel:20,
+    rarityBonus:0.10, largeFishBonus:0.15, expMult:1.2, maxDurability:130,
+    fishCoinMult:1.5,
+    role:'⚖️ 大型×レア バランス（中盤後半）',
+    description:'レア率と大型魚ボーナスの両立。Lv20〜35の主力として幅広く活躍。',
+    obtainHint:'クラフト（黄金の延べ棒×3）',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv20〜 【汎用エピック】Yランダムボックスで入手できる強竿
+  // ──────────────────────────────────────────────────────────
+  master_rod: {
+    id:'master_rod', name:'マスターロッド', icon:'🎣', rarity:'epic', minLevel:20,
+    rarityBonus:0.14, largeFishBonus:0.10, expMult:1.4, maxDurability:150,
+    fishCoinMult:1.3,
+    role:'🎯 汎用エピック（中盤〜後半）',
+    description:'全ステータスが高水準。入手できたら長く使える万能竿。',
+    obtainHint:'Yランダムボックス（ドロップ）',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv30〜 【Fish Coin×3特化】コイン稼ぎの最強候補
+  // ──────────────────────────────────────────────────────────
+  master_rod_z: {
+    id:'master_rod_z', name:'マスターロッドZ', icon:'⚡', rarity:'epic', minLevel:30,
+    rarityBonus:0.08, largeFishBonus:0.06, expMult:1.55, maxDurability:170,
+    fishCoinMult:3.0,
+    role:'🐟 Fish Coin×3（後半序盤）',
+    description:'Fish Coin獲得量が3倍。交換所の高価なアイテムを狙うならこれ。EXP効率も高い。',
+    obtainHint:'Fish Coin交換所（800枚）',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv35〜 【深海+水中洞窟スポット特化】深海専用の圧力対応竿
+  // ──────────────────────────────────────────────────────────
+  deep_sea_rod: {
+    id:'deep_sea_rod', name:'深海竿', icon:'🌑', rarity:'epic', minLevel:35,
+    rarityBonus:0.15, largeFishBonus:0.20, expMult:1.3, maxDurability:160,
+    fishCoinMult:1.5,
+    spotBonus: { deepsea:0.25, underwater_cave:0.15, abyss:0.20 },
+    role:'🌑 深海スポット特化',
+    description:'深海・水中洞窟・奈落でレア率が大幅UP。深海専用設計。地上スポットでは平凡。',
+    obtainHint:'クラフト（深海素材×5 + 鉄の延べ棒×5）',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv40〜 【FFGG限定・レア+EXP複合型】イベント/コミュニティ限定
+  // ──────────────────────────────────────────────────────────
+  ffgg_rod_r1: {
+    id:'ffgg_rod_r1', name:'FFGGロッドR1', icon:'🎣', rarity:'epic', minLevel:15,
+    rarityBonus:0.12, largeFishBonus:0.08, expMult:1.6, maxDurability:160,
+    fishCoinMult:1.8,
+    role:'🎪 コミュニティ限定（中盤）',
+    description:'FFGG限定の希少竿。レア率・EXP・Fish Coinすべて高め。通常入手不可。',
+    obtainHint:'FFGG限定イベント報酬',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv45〜 【火山湖+溶岩スポット特化】炎系魚を大量狙い
+  // ──────────────────────────────────────────────────────────
+  lava_rod: {
+    id:'lava_rod', name:'溶岩竿', icon:'🌋', rarity:'epic', minLevel:45,
+    rarityBonus:0.12, largeFishBonus:0.25, expMult:1.5, maxDurability:180,
+    fishCoinMult:1.5,
+    spotBonus: { volcano_lake:0.30, deepsea:0.10 },
+    role:'🌋 火山湖スポット特化',
+    description:'耐熱素材で作られ火山湖でのレア率が大幅UP。大型魚ボーナスも高い。他スポットでは普通。',
+    obtainHint:'火山湖解放後クラフト（溶岩石×5 + 龍の鱗×2）',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv25〜 【FFGG中堅・大型特化】大型魚に偏った性能
+  // ──────────────────────────────────────────────────────────
+  ffgg_rod_r3: {
+    id:'ffgg_rod_r3', name:'FFGGロッドR3', icon:'🎣', rarity:'epic', minLevel:25,
+    rarityBonus:0.08, largeFishBonus:0.30, expMult:1.4, maxDurability:185,
+    fishCoinMult:2.0,
+    role:'📏 大型魚特化（コミュニティ上位）',
+    description:'FFGG上位限定。大型魚ボーナスが際立って高い。サイズ記録を狙うのに最適。',
+    obtainHint:'FFGG Rank3以上イベント報酬',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv60〜 【天空湖+虹滝スポット特化】幻魚・伝説へのアクセス
+  // ──────────────────────────────────────────────────────────
+  sky_rod: {
+    id:'sky_rod', name:'天空竿', icon:'☁️', rarity:'legendary', minLevel:60,
+    rarityBonus:0.20, largeFishBonus:0.15, expMult:1.8, maxDurability:220,
+    fishCoinMult:2.0,
+    spotBonus: { sky_lake:0.40, rainbow_falls:0.25, moonlit_pond:0.20 },
+    legendaryBonus: 0.05,
+    role:'☁️ 天空スポット特化',
+    description:'天空湖・虹の滝でレア率が圧倒的にUP。神コイ・龍神など幻の魚に最も近づける。',
+    obtainHint:'Fish Coin交換所（1500枚）',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv40〜 【FFGG上位・Fish Coin×4】稼ぎに全振り
+  // ──────────────────────────────────────────────────────────
+  ffgg_rod_r6: {
+    id:'ffgg_rod_r6', name:'FFGGロッドR6', icon:'🎣', rarity:'legendary', minLevel:40,
+    rarityBonus:0.18, largeFishBonus:0.15, expMult:1.7, maxDurability:230,
+    fishCoinMult:4.0,
+    role:'🐟 Fish Coin×4（コミュニティ最上位）',
+    description:'FFGG最高位限定。Fish Coinが4倍で稼げる究極の稼ぎ竿。',
+    obtainHint:'FFGG Rank6以上イベント報酬',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv50〜 【FFGGR・全方位最強コミュニティ竿】
+  // ──────────────────────────────────────────────────────────
+  ffggr_rod: {
+    id:'ffggr_rod', name:'FFGGRロッド', icon:'🌟', rarity:'legendary', minLevel:50,
+    rarityBonus:0.25, largeFishBonus:0.20, expMult:2.1, maxDurability:270,
+    fishCoinMult:3.5,
+    role:'🌟 GGR全方位強化',
+    description:'GGR最高ランク限定。レア・大型・EXP・Fish Coinすべて高水準。通常竿の最高峰。',
+    obtainHint:'GGR最高ランク報酬',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv70〜 【伝説魚+深海+天空 複合特化】後半の最強竿候補
+  // ──────────────────────────────────────────────────────────
+  dragon_rod: {
+    id:'dragon_rod', name:'龍の釣り竿', icon:'🐉', rarity:'legendary', minLevel:70,
+    rarityBonus:0.22, largeFishBonus:0.35, expMult:2.0, maxDurability:250,
+    fishCoinMult:2.5,
+    spotBonus: { sky_lake:0.20, volcano_lake:0.20, golden_river:0.25, abyss:0.15 },
+    legendaryBonus: 0.10,
+    role:'🐉 伝説魚特化（後半）',
+    description:'龍の力で伝説魚出現率が大幅UP。大型魚ボーナスも最高クラス。後半スポットで真価を発揮。',
+    obtainHint:'釣りLv70達成 + 龍神討伐後クラフト（龍の骨×3 + 龍の鱗×5）',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv90〜 【EXP+レア+伝説 極致の竿】到達者だけが使える
+  // ──────────────────────────────────────────────────────────
+  god_rod: {
+    id:'god_rod', name:'神竿', icon:'✨', rarity:'legendary', minLevel:90,
+    rarityBonus:0.35, largeFishBonus:0.30, expMult:2.5, maxDurability:999,
+    fishCoinMult:3.0,
+    spotBonus: { heaven:0.50, abyss:0.30, chaos_sea:0.30, crystal_sea:0.20 },
+    legendaryBonus: 0.20,
+    role:'✨ 全スペック最上位（Lv90）',
+    description:'神が授かった竿。天界・奈落・混沌の海で全ステータスが極限まで上昇。Lv90到達証明。',
+    obtainHint:'釣りLv90達成で自動解放（要スキルツリー確認）',
+  },
+  // ──────────────────────────────────────────────────────────
+  // Lv100〜 【∞竿 図鑑100%コンプ報酬】ゲームの最終到達点
+  // ──────────────────────────────────────────────────────────
+  infinite_rod: {
+    id:'infinite_rod', name:'∞竿', icon:'♾️', rarity:'legendary', minLevel:100,
+    rarityBonus:0.50, largeFishBonus:0.50, expMult:3.0, maxDurability:9999,
+    fishCoinMult:5.0,
+    spotBonus: { heaven:0.80, abyss:0.60, chaos_sea:0.60, sky_lake:0.50, golden_river:0.50 },
+    legendaryBonus: 0.50,
+    role:'♾️ 究極・全ステ最大（Lv100+図鑑100%）',
+    description:'無限の力を持つ究極の竿。全スポット・全魚種に対して最大ボーナス。伝説魚が大幅に釣れやすくなる。',
+    obtainHint:'釣りLv100 + 魚図鑑100%コンプリートで入手',
+  },
 };
 export const ROD_IDS = Object.keys(ROD_MASTER);
 
@@ -201,12 +406,14 @@ export function calcFishSellPrice(fish: FishMaster, sizeCm: number): number {
   return Math.floor(fish.sellPrice * sizeCm * sizeRatio * rarityMult / 10);
 }
 
-// 強化成功率
+// 強化成功率（+0〜+20）
 export function rodEnhanceSuccessRate(currentLevel: number): number {
-  if (currentLevel <= 5)  return 0.90;
-  if (currentLevel <= 10) return 0.70;
-  if (currentLevel <= 15) return 0.45;
-  return 0.20;
+  if (currentLevel <= 3)  return 0.95;
+  if (currentLevel <= 6)  return 0.80;
+  if (currentLevel <= 10) return 0.60;
+  if (currentLevel <= 14) return 0.35;
+  if (currentLevel <= 17) return 0.20;
+  return 0.10;
 }
 
 export const RARITY_COLOR: Record<FishRarity, string> = {
