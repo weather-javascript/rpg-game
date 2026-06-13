@@ -398,10 +398,10 @@ export function getFishingBonuses(lv: number) {
 
 // EXP計算（Lv100000対応・3段階スケール）
 export function fishingExpRequired(level: number): number {
-  if (level <= 100) return Math.floor(Math.pow(level, 1.8) * 60);
-  if (level <= 1000) return Math.floor(Math.pow(level, 1.9) * 80);
-  if (level <= 10000) return Math.floor(Math.pow(level, 2.0) * 100);
-  return Math.floor(Math.pow(level, 2.1) * 120);
+  if (level <= 100) return Math.floor(Math.pow(level, 1.8) * 12);
+  if (level <= 1000) return Math.floor(Math.pow(level, 1.9) * 16);
+  if (level <= 10000) return Math.floor(Math.pow(level, 2.0) * 20);
+  return Math.floor(Math.pow(level, 2.1) * 24);
 }
 
 // サイズ→重量
