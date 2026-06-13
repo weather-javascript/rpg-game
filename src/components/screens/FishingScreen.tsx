@@ -159,7 +159,7 @@ export function FishingScreen() {
   const enhLv = rodEnhance[equippedRodId] ?? 0;
 
   const expReq  = fishingExpRequired(fishingLevel);
-  const expPct  = fishingLevel >= 100 ? 100 : Math.floor(fishingExp / expReq * 100);
+  const expPct  = fishingLevel >= 100000 ? 100 : Math.floor(fishingExp / expReq * 100);
   const bookCount = Object.keys(fishBook).length;
   const bookPct   = Math.floor(bookCount / TOTAL_FISH * 100);
   const staminaCost = spot.staminaCost;
@@ -270,9 +270,15 @@ export function FishingScreen() {
     setTimeout(() => {
       const newLv = useGameStore.getState().player?.fishingLevel ?? 1;
       if (newLv > oldLv) {
-        addNotification('success', `🎣 釣りLvUP! Lv${newLv}！`);
+        addNotification('success', `🎣 釣りLvUP! Lv${newLv.toLocaleString()}！`);
         const m = FISHING_LEVEL_BONUSES.find(b => b.level === newLv);
         if (m) addNotification('info', `🎁 特典: ${m.description}`);
+        // 節目FC報酬通知
+        const milestoneFC: Record<number,number> = {200:100,500:300,1000:500,2000:800,5000:2000,10000:5000,20000:8000,50000:20000,100000:100000};
+        if (milestoneFC[newLv]) addNotification('success', `🐟 節目報酬: Fish Coin +${milestoneFC[newLv].toLocaleString()}枚！`);
+        // 特定レベルで竿を自動プレゼント
+        if (newLv === 90) addItems([{ itemId:'god_rod', amount:1 }]);
+        if (newLv === 100) addItems([{ itemId:'crystal_rod', amount:1 }]);
       }
       checkFishingAchievements();
     }, 150);
@@ -329,11 +335,11 @@ export function FishingScreen() {
             {bait && <div style={{ fontSize:11, opacity:0.7 }}>{bait.icon} {bait.name}({player.inventory[equippedBaitId] ?? 0})</div>}
           </div>
           <div style={{ textAlign:'right' }}>
-            <div style={{ fontSize:22, fontWeight:'bold' }}>Lv {fishingLevel}</div>
-            <div style={{ fontSize:11, opacity:0.8 }}>{fishingLevel < 100 ? `${fishingExp}/${expReq} EXP` : 'MAX'}</div>
+            <div style={{ fontSize:22, fontWeight:'bold' }}>Lv {fishingLevel.toLocaleString()}</div>
+            <div style={{ fontSize:11, opacity:0.8 }}>{fishingLevel < 100000 ? `${fishingExp}/${expReq} EXP` : 'MAX Lv100000'}</div>
           </div>
         </div>
-        {fishingLevel < 100 && (
+        {fishingLevel < 100000 && (
           <div style={{ marginTop:6, background:'rgba(255,255,255,0.2)', borderRadius:5, height:6, overflow:'hidden' }}>
             <div style={{ width:`${expPct}%`, height:'100%', background:'#7dd3fc', transition:'width .3s' }} />
           </div>
@@ -813,14 +819,64 @@ export function FishingScreen() {
 
           {/* レベル上げのコツ */}
           <div style={S.card}>
-            <div style={{ fontSize:13, fontWeight:'bold', color:'#a78bfa', marginBottom:6 }}>⬆️ 釣りレベルの上げ方</div>
+            <div style={{ fontSize:13, fontWeight:'bold', color:'#a78bfa', marginBottom:6 }}>⬆️ 釣りレベルの上げ方・長期目標</div>
             <div style={{ fontSize:11, color:'#94a3b8', lineHeight:1.7 }}>
               <div>・魚を釣るたびにEXP獲得。レア・大型ほど多い</div>
               <div>・EXP倍率の高い竿を使う（マスターロッドZ: ×1.55、神竿: ×2.5）</div>
               <div>・EXP倍率の高いスポットを選ぶ（天界の海: ×5）</div>
               <div>・EXPボーナス付きの餌を使う（∞の餌: +100%）</div>
               <div>・自動釣りを活用してAFK放置が有効</div>
-              <div style={{ marginTop:6, color:'#c084fc', fontWeight:'bold' }}>Lv100 + 図鑑100% → ∞竿入手！釣りコンプリート！</div>
+              <div style={{ marginTop:6, color:'#c084fc', fontWeight:'bold' }}>Lv100 + 図鑑100% → ∞竿入手！その先もレベルは続く</div>
+            </div>
+
+            {/* 長期節目ロードマップ */}
+            <div style={{ marginTop:10, fontSize:12, fontWeight:'bold', color:'#fbbf24', marginBottom:6 }}>🗺️ Lv節目ロードマップ（Lv100000まで）</div>
+            {[
+              { lv:100,    phase:'【フェーズ1 完了】', reward:'∞竿＋伝説魚率+50%', color:'#fbbf24' },
+              { lv:200,    phase:'【フェーズ2 入門】', reward:'FC+100枚＋称号「月の釣り師」', color:'#94a3b8' },
+              { lv:500,    phase:'【フェーズ2 中盤】', reward:'FC+300枚＋称号「星の釣り師」＋伝説魚率+20%', color:'#94a3b8' },
+              { lv:1000,   phase:'【フェーズ2 完了】', reward:'FC+500枚＋称号「伝説の釣り人」＋レア率+10%', color:'#60a5fa' },
+              { lv:2000,   phase:'【フェーズ3 入門】', reward:'FC+800枚＋称号「神話の釣り人」＋大型魚+10%', color:'#60a5fa' },
+              { lv:5000,   phase:'【フェーズ3 中盤】', reward:'FC+2000枚＋称号「宇宙の釣り師」＋伝説魚率+30%', color:'#a78bfa' },
+              { lv:10000,  phase:'【フェーズ3 完了】', reward:'FC+5000枚＋称号「龍帝の釣り師」＋レア率+15%', color:'#a78bfa' },
+              { lv:20000,  phase:'【フェーズ4 入門】', reward:'FC+8000枚＋称号「覇王の釣り師」＋大型魚+15%', color:'#f472b6' },
+              { lv:50000,  phase:'【フェーズ4 中盤】', reward:'FC+20000枚＋称号「神々の釣り師」＋伝説魚率+50%', color:'#f472b6' },
+              { lv:100000, phase:'【フェーズ4 完了・究極】', reward:'FC+100000枚＋称号「究極釣り師」＋全ボーナス最大', color:'#fbbf24' },
+            ].map(m => {
+              const reached = fishingLevel >= m.lv;
+              const isCurrent = fishingLevel < m.lv && (
+                m.lv === 200 ? fishingLevel >= 100 :
+                m.lv === 500 ? fishingLevel >= 200 :
+                m.lv === 1000 ? fishingLevel >= 500 :
+                m.lv === 2000 ? fishingLevel >= 1000 :
+                m.lv === 5000 ? fishingLevel >= 2000 :
+                m.lv === 10000 ? fishingLevel >= 5000 :
+                m.lv === 20000 ? fishingLevel >= 10000 :
+                m.lv === 50000 ? fishingLevel >= 20000 :
+                m.lv === 100000 ? fishingLevel >= 50000 : false
+              );
+              return (
+                <div key={m.lv} style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'5px 0', borderBottom:'1px solid #0f172a', opacity: reached ? 0.7 : isCurrent ? 1 : 0.45 }}>
+                  <span style={{ fontSize:14, minWidth:20 }}>{reached ? '✅' : isCurrent ? '🎯' : '🔒'}</span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:11, color: m.color, fontWeight:'bold' }}>Lv{m.lv.toLocaleString()} {m.phase}</div>
+                    <div style={{ fontSize:10, color:'#64748b' }}>{m.reward}</div>
+                  </div>
+                </div>
+              );
+            })}
+            <div style={{ marginTop:8, background:'rgba(251,191,36,0.08)', borderRadius:5, padding:'6px 8px', fontSize:11, color:'#fbbf24' }}>
+              💡 現在 Lv{fishingLevel.toLocaleString()}。次の大きな節目: Lv{
+                fishingLevel < 200 ? 200 :
+                fishingLevel < 500 ? 500 :
+                fishingLevel < 1000 ? 1000 :
+                fishingLevel < 2000 ? 2000 :
+                fishingLevel < 5000 ? 5000 :
+                fishingLevel < 10000 ? 10000 :
+                fishingLevel < 20000 ? 20000 :
+                fishingLevel < 50000 ? 50000 :
+                fishingLevel < 100000 ? 100000 : '∞（Lv100000達成済み！）'
+              }
             </div>
           </div>
         </div>
