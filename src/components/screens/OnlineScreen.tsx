@@ -112,53 +112,40 @@ function WorldNewsPanel() {
           // rank5: super jackpot / sky_castle_ex / lv200
           if (rank >= 5) return (
             <div key={i} style={{
-              position:'relative', borderRadius:12, overflow:'hidden',
-              background:'linear-gradient(135deg, #1a1200 0%, #2a1800 40%, #1a0a00 100%)',
-              border:'2px solid #ffd700',
-              boxShadow:'0 0 18px rgba(255,215,0,0.45), 0 0 4px rgba(255,165,0,0.3)',
-              padding:'12px 14px',
+              position:'relative', borderRadius:8, overflow:'hidden',
+              background:'rgba(255,215,0,0.06)',
+              border:'1px solid #ffd700',
+              padding:'7px 10px',
+              display:'flex', alignItems:'center', gap:8,
             }}>
               {/* shimmer strip */}
               <div style={{position:'absolute',top:0,left:`${(tick*30)%160-40}%`,width:'40%',height:'100%',
-                background:'linear-gradient(90deg,transparent,rgba(255,215,0,0.12),transparent)',
+                background:'linear-gradient(90deg,transparent,rgba(255,215,0,0.15),transparent)',
                 pointerEvents:'none'}} />
-              <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:6}}>
-                <span style={{fontSize:'1.6rem'}}>{s.emoji}</span>
-                <div style={{
-                  fontSize:'0.65rem', fontWeight:800, letterSpacing:'0.12em',
-                  color:'#ffd700', textTransform:'uppercase',
-                  textShadow:'0 0 8px rgba(255,215,0,0.8)',
-                  background:'rgba(255,215,0,0.12)', borderRadius:4, padding:'2px 6px',
-                }}>⭐ LEGENDARY EVENT ⭐</div>
-                <span style={{marginLeft:'auto', fontSize:'0.62rem', color:'#7a6a30'}}>{timeLabel}</span>
+              <span style={{fontSize:'1.1rem'}}>{s.emoji}✨</span>
+              <div style={{flex:1, minWidth:0, wordBreak:'break-word', overflowWrap:'anywhere'}}>
+                <span style={{fontSize:'0.82rem', fontWeight:800, color:'#ffd700'}}>{e.displayName}</span>
+                <span style={{fontSize:'0.8rem', fontWeight:500, color:'#f0d880'}}>{e.message.replace(e.displayName,'')}</span>
               </div>
-              <div style={{fontSize:'0.92rem', fontWeight:800, color:'#ffd700',
-                textShadow:'0 0 12px rgba(255,215,0,0.7)', wordBreak:'break-word', overflowWrap:'anywhere', whiteSpace:'normal', lineHeight:1.4}}>
-                {e.displayName}
-                <span style={{fontSize:'0.85rem', fontWeight:500, color:'#f0d880'}}>{e.message.replace(e.displayName,'')}</span>
-              </div>
+              <span style={{fontSize:'0.62rem', color:'#7a6a30', whiteSpace:'nowrap'}}>{timeLabel}</span>
             </div>
           );
 
           // rank4: volcano/boss_kx/boss_rei/boss_ragnarok
           if (rank === 4) return (
             <div key={i} style={{
-              borderRadius:10, overflow:'hidden',
-              background:'linear-gradient(135deg, #1a0808 0%, #220e0e 100%)',
-              border:'1.5px solid', borderColor: s.color,
-              boxShadow:`0 0 10px ${s.color}55`,
-              padding:'10px 12px',
+              borderRadius:8,
+              background:'rgba(255,255,255,0.03)',
+              border:`1px solid ${s.color}88`,
+              padding:'7px 10px',
+              display:'flex', alignItems:'center', gap:8,
             }}>
-              <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:4}}>
-                <span style={{fontSize:'1.3rem'}}>{s.emoji}</span>
-                <span style={{fontSize:'0.62rem', fontWeight:700, color: s.color, letterSpacing:'0.08em',
-                  background:`${s.color}22`, borderRadius:4, padding:'1px 5px'}}>★ EPIC</span>
-                <span style={{marginLeft:'auto', fontSize:'0.62rem', color:'#4a5070'}}>{timeLabel}</span>
+              <span style={{fontSize:'1.05rem'}}>{s.emoji}</span>
+              <div style={{flex:1, minWidth:0, wordBreak:'break-word', overflowWrap:'anywhere'}}>
+                <span style={{fontSize:'0.82rem', fontWeight:700, color: s.color}}>{e.displayName}</span>
+                <span style={{fontSize:'0.8rem', color:'#c0bcd8'}}>{e.message.replace(e.displayName,'')}</span>
               </div>
-              <div style={{fontSize:'0.88rem', fontWeight:700, color: s.color, textShadow:`0 0 8px ${s.color}66`, wordBreak:'break-word', overflowWrap:'anywhere', whiteSpace:'normal', lineHeight:1.4}}>
-                {e.displayName}
-                <span style={{color:'#c0bcd8', fontWeight:400}}>{e.message.replace(e.displayName,'')}</span>
-              </div>
+              <span style={{fontSize:'0.62rem', color:'#4a5070', whiteSpace:'nowrap'}}>{timeLabel}</span>
             </div>
           );
 
