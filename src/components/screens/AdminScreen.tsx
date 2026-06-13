@@ -31,7 +31,7 @@ import { EventManager } from '../admin/EventManager';
 import { AnalyticsPanel } from '../admin/AnalyticsPanel';
 import { filterPlayersAdmin } from '../../services/multiplayer';
 
-type SubTab = 'players' | 'gamble' | 'items' | 'announce' | 'stats' | 'system' | 'recipes' | 'proposals' | 'trade' | 'dungeon' | 'console' | 'fishing_admin';
+type SubTab = 'players' | 'gamble' | 'items' | 'announce' | 'stats' | 'system' | 'recipes' | 'proposals' | 'trade' | 'dungeon' | 'console' | 'fishing_admin' | 'currency_admin';
 
 export function AdminScreen() {
   const player = useGameStore(s => s.player);
@@ -112,6 +112,14 @@ export function AdminScreen() {
   const [faSaving, setFaSaving] = useState(false);
   const [faResetAllConfirm, setFaResetAllConfirm] = useState(false);
   const [faResetAllRunning, setFaResetAllRunning] = useState(false);
+  // 通貨編集
+  const [currencyAdminFilter, setCurrencyAdminFilter] = useState('');
+  const [currencyAdminPlayer, setCurrencyAdminPlayer] = useState<any | null>(null);
+  const [caGold, setCaGold] = useState('');
+  const [caFishCoin, setCaFishCoin] = useState('');
+  const [caFishMoney, setCaFishMoney] = useState('');
+  const [caWealthCoin, setCaWealthCoin] = useState('');
+  const [caSaving, setCaSaving] = useState(false);
   // 運営コンソール
   const [consoleSection, setConsoleSection] = useState<'editor' | 'commands' | 'history' | 'logs' | 'master' | 'event' | 'analytics'>('editor');
   const [searchName, setSearchName] = useState('');
@@ -329,6 +337,7 @@ export function AdminScreen() {
     { id: 'proposals', label: '提案',       icon: '💡' },
     { id: 'announce',  label: 'お知らせ',   icon: '📢' },
     { id: 'fishing_admin', label: '釣りデータ', icon: '🎣' },
+    { id: 'currency_admin', label: '通貨編集', icon: '💰' },
     { id: 'system',    label: 'システム',   icon: '⚙️' },
     { id: 'stats',     label: '統計',       icon: '📊' },
   ];
@@ -795,7 +804,81 @@ export function AdminScreen() {
         );
       })()}
 
-      {/* ===== 運営コンソール ===== */}
+      {/* ===== 通貨編集 ===== */}
+      {subTab === 'currency_admin' && (() => {
+        const filteredCurrencyPlayers = filterPlayersAdmin(players, {
+          name: currencyAdminFilter || undefined,
+          id: currencyAdminFilter || undefined,
+        });
+        const loadCurrencyPlayer = (p: any) => {
+          setCurrencyAdminPlayer(p);
+          setCaGold(String(p.gold ?? 0));
+          setCaFishCoin(String(p.fishCoin ?? 0));
+          setCaFishMoney(String(p.fishMoney ?? 0));
+          setCaWealthCoin(String(p.wealthCoin ?? 0));
+        };
+        const saveCurrencyData = async () => {
+          if (!currencyAdminPlayer) return;
+          setCaSaving(true);
+          try {
+            const updates = {
+              gold: Number(caGold) || 0,
+              fishCoin: Number(caFishCoin) || 0,
+              fishMoney: Number(caFishMoney) || 0,
+              wealthCoin: Number(caWealthCoin) || 0,
+            };
+            await updatePlayerAdmin(currencyAdminPlayer.id, updates as any);
+            setPlayers(prev => prev.map(p => p.id === currencyAdminPlayer.id ? { ...p, ...updates } : p));
+            setCurrencyAdminPlayer((prev: any) => prev ? { ...prev, ...updates } : prev);
+            addNotification('success', `${currencyAdminPlayer.displayName} の通貨データを更新しました`);
+          } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
+          setCaSaving(false);
+        };
+        const S3 = { label: { fontSize:'0.72rem', color:'#8a92b2', marginBottom:3 }, input: { width:'100%', padding:'6px 8px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', boxSizing:'border-box' as const } };
+        return (
+          <div>
+            <div style={{marginBottom:10}}>
+              <input value={currencyAdminFilter} onChange={e => setCurrencyAdminFilter(e.target.value)}
+                placeholder="名前・UIDで検索..." style={{width:'100%', padding:'7px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', boxSizing:'border-box'}} />
+            </div>
+            <div style={{display:'flex', flexDirection:'column', gap:4, marginBottom:14, maxHeight:180, overflowY:'auto'}}>
+              {filteredCurrencyPlayers.slice(0,30).map(p => (
+                <button key={p.id} onClick={() => loadCurrencyPlayer(p)}
+                  style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 10px', background: currencyAdminPlayer?.id === p.id ? 'rgba(240,168,48,0.15)' : '#1c2235', border:`1px solid ${currencyAdminPlayer?.id === p.id ? '#f0a830' : '#2d3752'}`, borderRadius:6, cursor:'pointer', color:'#e8e6ff', fontSize:'0.82rem', textAlign:'left'}}>
+                  <span>💰 {p.displayName ?? '名無し'} (Lv.{p.stats?.level ?? 1})</span>
+                  <span style={{color:'#f0a830', fontSize:'0.75rem'}}>
+                    G{((p as any).gold ?? 0).toLocaleString()} / 🐟{((p as any).fishCoin ?? 0).toLocaleString()} / 💵{((p as any).fishMoney ?? 0).toLocaleString()} / 🎰{((p as any).wealthCoin ?? 0).toLocaleString()}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {currencyAdminPlayer && (
+              <div style={{background:'#1c2235', border:'2px solid #f0a830', borderRadius:10, padding:14}}>
+                <div style={{color:'#f0a830', fontWeight:700, fontSize:'0.92rem', marginBottom:12}}>💰 {currencyAdminPlayer.displayName} の通貨データ編集</div>
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:12}}>
+                  {[
+                    { label:'💰 Gold (G)', val:caGold, set:setCaGold },
+                    { label:'🐟 Fish Coin', val:caFishCoin, set:setCaFishCoin },
+                    { label:'💵 FishMoney', val:caFishMoney, set:setCaFishMoney },
+                    { label:'🎰 Wealth Coin', val:caWealthCoin, set:setCaWealthCoin },
+                  ].map(f => (
+                    <div key={f.label}>
+                      <div style={S3.label}>{f.label}</div>
+                      <input type="number" min="0" value={f.val} onChange={e => f.set(e.target.value)} style={S3.input} />
+                    </div>
+                  ))}
+                </div>
+                <button onClick={saveCurrencyData} disabled={caSaving}
+                  style={{width:'100%', padding:'10px', background:'linear-gradient(135deg,#f0a830,#c08020)', color:'#000', border:'none', borderRadius:7, cursor:'pointer', fontWeight:700, fontSize:'0.88rem'}}>
+                  {caSaving ? '保存中...' : '💾 通貨データを保存'}
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {subTab === 'console' && (() => {
         const filteredConsolePlayers = filterPlayersAdmin(players, {
           id: searchId || undefined,
