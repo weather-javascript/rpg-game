@@ -21,6 +21,9 @@ export interface PlayerSlice {
   changeDisplayName:  (name: string) => boolean;
   updateEquipment:    (equipment: EquipmentSlots) => void;
   setEquippedTool:    (category: 'mining' | 'woodcutting', toolId: string) => void;
+  addOwnedTool:       (toolId: string) => void;
+  addUnlockedToolGroup: (groupId: string) => void;
+  updateToolAcquisitionStats: (patch: Partial<{ totalGatherCount: number; maxCombo: number; nightGatherCount: number; rainGatherCount: number; dangerSuccessCount: number }>) => void;
 }
 
 export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (set, get) => ({
@@ -204,6 +207,36 @@ export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (
       if (category === 'mining') equippedTools.miningToolId = toolId;
       else equippedTools.woodcuttingToolId = toolId;
       return { player: { ...state.player, equippedTools } };
+    });
+  },
+
+  addOwnedTool: (toolId) => {
+    set((state) => {
+      if (!state.player) return state;
+      const owned = new Set(state.player.ownedToolIds ?? []);
+      if (owned.has(toolId)) return state;
+      owned.add(toolId);
+      return { player: { ...state.player, ownedToolIds: [...owned] } };
+    });
+  },
+
+  addUnlockedToolGroup: (groupId) => {
+    set((state) => {
+      if (!state.player) return state;
+      const unlocked = new Set(state.player.unlockedToolIds ?? []);
+      if (unlocked.has(groupId)) return state;
+      unlocked.add(groupId);
+      return { player: { ...state.player, unlockedToolIds: [...unlocked] } };
+    });
+  },
+
+  updateToolAcquisitionStats: (patch) => {
+    set((state) => {
+      if (!state.player) return state;
+      const prev = state.player.toolAcquisitionStats ?? {
+        totalGatherCount: 0, maxCombo: 0, nightGatherCount: 0, rainGatherCount: 0, dangerSuccessCount: 0,
+      };
+      return { player: { ...state.player, toolAcquisitionStats: { ...prev, ...patch } } };
     });
   },
 });
