@@ -18,6 +18,13 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   emerald_block:{ id:'emerald_block', name:'エメラルドブロック', description:'エメラルドの塊。', category:'material',  itemType:'Item',  rarity:'epic',      sellPrice:1800, buyPrice:0,    maxStack:99,  icon:'ore_green' },
   ancient_shard:{ id:'ancient_shard', name:'古代の欠片', description:'ダンジョンの深部に眠る謎の素材。', category:'material',  itemType:'Item', rarity:'epic', sellPrice:45000, buyPrice:0, maxStack:99, icon:'gem' },
   iron_ingot:  { id:'iron_ingot',  name:'鉄塊',      description:'精錬された鉄。各種製造に必要。', category:'material',  itemType:'Item', rarity:'uncommon', sellPrice:40, buyPrice:0, maxStack:-1, icon:'iron_ingot' },
+  mythril_ore: { id:'mythril_ore', name:'ミスリル鉱石', description:'深層でのみ採れる伝説の鉱石。', category:'material', itemType:'Item', rarity:'epic', sellPrice:3000, buyPrice:0, maxStack:-1, icon:'ancient_shard' },
+  rare_gem:    { id:'rare_gem',    name:'レアジェム', description:'ツールにレア性を付与する宝石。', category:'material', itemType:'Item', rarity:'rare', sellPrice:500, buyPrice:0, maxStack:-1, icon:'gem' },
+  combo_core:  { id:'combo_core',  name:'コンボコア', description:'連携を増幅するコア。', category:'material', itemType:'Item', rarity:'rare', sellPrice:450, buyPrice:0, maxStack:-1, icon:'star_glow' },
+  energy_core: { id:'energy_core', name:'エナジーコア', description:'消費を抑えるエネルギー結晶。', category:'material', itemType:'Item', rarity:'rare', sellPrice:400, buyPrice:0, maxStack:-1, icon:'crystal_ball' },
+  time_fragment:{ id:'time_fragment', name:'時の欠片', description:'時間を操る不思議な欠片。', category:'material', itemType:'Item', rarity:'epic', sellPrice:5000, buyPrice:0, maxStack:-1, icon:'sparkle' },
+  cursed_fragment:{ id:'cursed_fragment', name:'呪いの欠片', description:'禍々しい力を秘めた欠片。', category:'material', itemType:'Item', rarity:'epic', sellPrice:5000, buyPrice:0, maxStack:-1, icon:'ore_black' },
+  handle:      { id:'handle',      name:'道具の柄',  description:'採取ツールの柄。木材から作られる。', category:'material', itemType:'Item', rarity:'common', sellPrice:8, buyPrice:0, maxStack:-1, icon:'log' },
   plank:       { id:'plank',       name:'板材',      description:'木材を加工した板。製作に使用。', category:'material',  itemType:'Item', rarity:'common',   sellPrice:8,  buyPrice:0, maxStack:-1, icon:'log' },
   iron_sword:  { id:'iron_sword',  name:'鉄の剣',    description:'鉄塊から作れる武器。攻撃力+5。', category:'weapon',  itemType:'Weapon',   rarity:'uncommon', sellPrice:80, buyPrice:0, maxStack:1, icon:'iron_sword_png', useEffect:{attackBonus:5, message:'鉄の剣で斬りつけた！', attackType:'physical'} },
   iron_helmet: { id:'iron_helmet', name:'鉄のヘルメット', description:'鉄塊から作れる防具。防御力+3。', category:'armor',  itemType:'Armor', rarity:'uncommon', sellPrice:60, buyPrice:0, maxStack:1, icon:'helmet', armorSlot:'helmet' as const },
@@ -409,6 +416,17 @@ export const SKILL_MASTER: Record<string, SkillMaster> = {
 // クラフトレシピ
 // ============================================================
 export const CRAFT_RECIPES: CraftRecipe[] = [
+  {
+    id: 'handle_from_wood',
+    name: '道具の柄を作る',
+    description: '木材から採取ツール用の柄を作る。',
+    outputItemId: 'handle',
+    outputAmount: 2,
+    inputs: [{ itemId: 'wood', amount: 1 }],
+    shape: ['wood','','', '','','', '','',''],
+    requiredCraftingLevel: 1,
+    craftingExpGain: 3,
+  },
   {
     id: 'plank_from_wood',
     name: '板材を作る',
