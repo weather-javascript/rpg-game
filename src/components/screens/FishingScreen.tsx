@@ -277,8 +277,8 @@ export function FishingScreen() {
         const milestoneFC: Record<number,number> = {200:100,500:300,1000:500,2000:800,5000:2000,10000:5000,20000:8000,50000:20000,100000:100000};
         if (milestoneFC[newLv]) addNotification('success', `🐟 節目報酬: Fish Coin +${milestoneFC[newLv].toLocaleString()}枚！`);
         // 特定レベルで竿を自動プレゼント
-        if (newLv === 90) addItems([{ itemId:'god_rod', amount:1 }]);
-        if (newLv === 100) addItems([{ itemId:'crystal_rod', amount:1 }]);
+        if (newLv === 900) addItems([{ itemId:'god_rod', amount:1 }]);
+        if (newLv === 1000) addItems([{ itemId:'crystal_rod', amount:1 }]);
       }
       checkFishingAchievements();
     }, 150);
@@ -695,21 +695,21 @@ export function FishingScreen() {
             </div>
             <div style={{ fontSize:11, color:'#64748b', marginBottom:6, fontWeight:'bold' }}>入手方法:</div>
             {[
-              { icon:'🪵', name:'木の釣り竿', how:'ショップ購入（100G）| EXP+20%特化', lv:1 },
-              { icon:'🎣', name:'鉄の釣り竿', how:'初期装備 | バランス型', lv:1 },
-              { icon:'🎣', name:'銅の釣り竿', how:'ショップ購入（200G）| 大型魚特化', lv:3 },
-              { icon:'🎣', name:'銀の釣り竿', how:'謎の箱 | レア率特化・FC×1.2', lv:5 },
-              { icon:'🎣', name:'オールロッドX', how:'🐟 Fish Coin交換所 400枚 | FC×2倍', lv:10 },
-              { icon:'💠', name:'水晶の釣り竿', how:'クラフト | EXP周回専用（×1.8）', lv:15 },
-              { icon:'🏆', name:'黄金の釣り竿', how:'クラフト（黄金の延べ棒×3）| 大型×レアバランス', lv:20 },
-              { icon:'🎣', name:'マスターロッド', how:'Yランダムボックスドロップ | 汎用エピック', lv:20 },
-              { icon:'⚡', name:'マスターロッドZ', how:'🐟 Fish Coin交換所 800枚 | FC×3倍', lv:30 },
-              { icon:'🌑', name:'深海竿', how:'クラフト（深海素材）| 深海/洞窟/奈落特化', lv:35 },
-              { icon:'🌋', name:'溶岩竿', how:'クラフト（溶岩石・龍の鱗）| 火山湖特化', lv:45 },
-              { icon:'☁️', name:'天空竿', how:'🐟 Fish Coin交換所 1500枚 | 天空湖特化+伝説魚UP', lv:60 },
-              { icon:'🐉', name:'龍の釣り竿', how:'釣りLv70 + 龍神討伐後クラフト | 後半スポット+伝説魚特化', lv:70 },
-              { icon:'✨', name:'神竿', how:'釣りLv90達成で解放 | 天界・奈落・混沌の海特化', lv:90 },
-              { icon:'♾️', name:'∞竿', how:'釣りLv100 + 図鑑100%コンプリート | 全ステ最大', lv:100 },
+              { icon:'🪵', name:'木の釣り竿', how:'ショップ購入（100G）| EXP+20%特化', lv:10 },
+              { icon:'🎣', name:'鉄の釣り竿', how:'初期装備 | バランス型', lv:10 },
+              { icon:'🎣', name:'銅の釣り竿', how:'ショップ購入（200G）| 大型魚特化', lv:30 },
+              { icon:'🎣', name:'銀の釣り竿', how:'謎の箱 | レア率特化・FC×1.2', lv:50 },
+              { icon:'🎣', name:'オールロッドX', how:'🐟 Fish Coin交換所 400枚 | FC×2倍', lv:100 },
+              { icon:'💠', name:'水晶の釣り竿', how:'クラフト | EXP周回専用（×1.8）', lv:150 },
+              { icon:'🏆', name:'黄金の釣り竿', how:'クラフト（黄金の延べ棒×3）| 大型×レアバランス', lv:200 },
+              { icon:'🎣', name:'マスターロッド', how:'Yランダムボックスドロップ | 汎用エピック', lv:200 },
+              { icon:'⚡', name:'マスターロッドZ', how:'🐟 Fish Coin交換所 800枚 | FC×3倍', lv:300 },
+              { icon:'🌑', name:'深海竿', how:'クラフト（深海素材）| 深海/洞窟/奈落特化', lv:350 },
+              { icon:'🌋', name:'溶岩竿', how:'クラフト（溶岩石・龍の鱗）| 火山湖特化', lv:450 },
+              { icon:'☁️', name:'天空竿', how:'🐟 Fish Coin交換所 1500枚 | 天空湖特化+伝説魚UP', lv:600 },
+              { icon:'🐉', name:'龍の釣り竿', how:'釣りLv70 + 龍神討伐後クラフト | 後半スポット+伝説魚特化', lv:700 },
+              { icon:'✨', name:'神竿', how:'釣りLv90達成で解放 | 天界・奈落・混沌の海特化', lv:900 },
+              { icon:'♾️', name:'∞竿', how:'釣りLv100 + 図鑑100%コンプリート | 全ステ最大', lv:1000 },
             ].map(r => (
               <div key={r.name} style={{ display:'flex', alignItems:'center', gap:8, padding:'4px 0', borderBottom:'1px solid #1e293b', opacity: fishingLevel >= r.lv ? 1 : 0.5 }}>
                 <span style={{ fontSize:16, width:20 }}>{r.icon}</span>
@@ -776,23 +776,23 @@ export function FishingScreen() {
               釣りレベルが上がると自動で新スポットが解放されます。スポットタブで選択してください。
             </div>
             {[
-              { lv:1,  icon:'🏞️', name:'近所の池 / 清流の川', desc:'基本スポット。序盤はここで稼ぐ。' },
-              { lv:8,  icon:'🌊', name:'静寂の湖', desc:'大型淡水魚が出現。EXP効率UP。' },
-              { lv:10, icon:'🌅', name:'浜辺の海', desc:'海水魚が登場。種類が一気に増える。' },
-              { lv:12, icon:'🌿', name:'霧の沼地', desc:'ピラニアなど珍しい魚が出現。' },
-              { lv:20, icon:'⛵', name:'沖合', desc:'マグロ・サメなど大型魚が狙える。' },
-              { lv:35, icon:'🕳️', name:'水中洞窟', desc:'洞窟固有の希少魚が生息。' },
-              { lv:40, icon:'🌑', name:'深海', desc:'ダイオウイカ・深淵クジラなど登場。' },
-              { lv:45, icon:'🧊', name:'氷河の海', desc:'極寒の海に適応した魚。' },
-              { lv:50, icon:'🌋', name:'火山湖', desc:'炎のルアーが有効。高レアリティ。' },
-              { lv:55, icon:'🏛️', name:'古代の川', desc:'古代魚が出現。' },
-              { lv:60, icon:'☁️', name:'天空湖', desc:'虹色コイ・黄金コイなど幻の魚。' },
-              { lv:65, icon:'🌈', name:'虹の滝', desc:'神秘的な滝壺。' },
-              { lv:70, icon:'✨', name:'黄金の川', desc:'EXP×3・レア×3。本格的な後半。' },
-              { lv:75, icon:'💎', name:'水晶の海', desc:'透明な海でエピック魚多数。' },
-              { lv:80, icon:'⚫', name:'奈落', desc:'最強クラスの魚が潜む。' },
-              { lv:85, icon:'🌀', name:'混沌の海', desc:'何が出るか予測不能。' },
-              { lv:90, icon:'🌟', name:'天界の海', desc:'EXP×5・レア×5。終盤の聖地。' },
+              { lv:10,  icon:'🏞️', name:'近所の池 / 清流の川', desc:'基本スポット。序盤はここで稼ぐ。' },
+              { lv:80,  icon:'🌊', name:'静寂の湖', desc:'大型淡水魚が出現。EXP効率UP。' },
+              { lv:100, icon:'🌅', name:'浜辺の海', desc:'海水魚が登場。種類が一気に増える。' },
+              { lv:120, icon:'🌿', name:'霧の沼地', desc:'ピラニアなど珍しい魚が出現。' },
+              { lv:200, icon:'⛵', name:'沖合', desc:'マグロ・サメなど大型魚が狙える。' },
+              { lv:350, icon:'🕳️', name:'水中洞窟', desc:'洞窟固有の希少魚が生息。' },
+              { lv:400, icon:'🌑', name:'深海', desc:'ダイオウイカ・深淵クジラなど登場。' },
+              { lv:450, icon:'🧊', name:'氷河の海', desc:'極寒の海に適応した魚。' },
+              { lv:500, icon:'🌋', name:'火山湖', desc:'炎のルアーが有効。高レアリティ。' },
+              { lv:550, icon:'🏛️', name:'古代の川', desc:'古代魚が出現。' },
+              { lv:600, icon:'☁️', name:'天空湖', desc:'虹色コイ・黄金コイなど幻の魚。' },
+              { lv:650, icon:'🌈', name:'虹の滝', desc:'神秘的な滝壺。' },
+              { lv:700, icon:'✨', name:'黄金の川', desc:'EXP×3・レア×3。本格的な後半。' },
+              { lv:750, icon:'💎', name:'水晶の海', desc:'透明な海でエピック魚多数。' },
+              { lv:800, icon:'⚫', name:'奈落', desc:'最強クラスの魚が潜む。' },
+              { lv:850, icon:'🌀', name:'混沌の海', desc:'何が出るか予測不能。' },
+              { lv:900, icon:'🌟', name:'天界の海', desc:'EXP×5・レア×5。終盤の聖地。' },
             ].map(sp => (
               <div key={sp.lv} style={{ display:'flex', alignItems:'center', gap:8, padding:'4px 0', borderBottom:'1px solid #0f172a', opacity: fishingLevel >= sp.lv ? 1 : 0.5 }}>
                 <span style={{ fontSize:16, width:20 }}>{sp.icon}</span>
