@@ -7,6 +7,7 @@ import { savePlayer } from '../services/database';
 import { db } from '../services/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 import type { PlayerData } from '../types/game';
+import { startSaveBufferInterval, stopSaveBufferInterval, flushSaveBuffer } from '../services/saveBuffer';
 
 const AUTO_SAVE_INTERVAL_MS = 15 * 1000; // 15秒ごと
 const LS_KEY = 'rpg_backup';
@@ -38,6 +39,14 @@ export function useAutoSave() {
   const { player, addNotification } = useGameStore();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isSavingRef = useRef(false);
+
+  // saveBufferの15秒インターバルを開始・停止
+  useEffect(() => {
+    if (!player?.uid) return;
+    startSaveBufferInterval();
+    return () => stopSaveBufferInterval();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player?.uid]);
 
   // 保存処理（isSaving フラグ付き）
   const doSave = async (p: PlayerData, silent = true) => {
@@ -101,6 +110,8 @@ export function useAutoSave() {
     const handler = () => {
       const latest = useGameStore.getState().player;
       if (latest) backupToLocalStorage(latest); // 同期的にローカル保存
+      // バッファに溜まった釣りデータをFlush試行
+      flushSaveBuffer().catch(() => {});
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
