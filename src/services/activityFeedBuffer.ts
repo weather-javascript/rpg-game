@@ -19,7 +19,7 @@ import type { ActivityFeedEntry } from './multiplayer';
 const LS_KEY = 'activityFeedBuffer_v1';
 const FLUSH_INTERVAL_MS = 30_000;
 const FLUSH_THRESHOLD = 15;
-const FEED_MAX = 100;
+const FEED_MAX = 200;
 const FEED_REF = () => doc(db, 'shared', 'activity_feed');
 
 // ============================================================

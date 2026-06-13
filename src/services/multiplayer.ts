@@ -2921,9 +2921,16 @@ export function subscribeFishingCastTime(cb: (castTimeMs: number | null) => void
 // ---- プレイヤー検索強化（フロントフィルタ用ヘルパー） ----
 export function filterPlayersAdmin(
   players: AdminPlayerData[],
-  opts: { id?: string; name?: string; minLevel?: number; maxLevel?: number; minGold?: number; maxGold?: number }
+  opts: { id?: string; name?: string; idOrName?: string; minLevel?: number; maxLevel?: number; minGold?: number; maxGold?: number }
 ): AdminPlayerData[] {
   return players.filter(p => {
+    // idOrName: ID または 表示名のいずれかに部分一致すればOK（OR検索）
+    if (opts.idOrName) {
+      const q = opts.idOrName;
+      const idMatch = p.id.includes(q);
+      const nameMatch = (p.displayName ?? '').includes(q);
+      if (!idMatch && !nameMatch) return false;
+    }
     if (opts.id && !p.id.includes(opts.id)) return false;
     if (opts.name && !(p.displayName ?? '').includes(opts.name)) return false;
     const lvl = p.stats?.level ?? 1;
