@@ -231,6 +231,21 @@ export interface DropEntry {
   skillRateBonus?: number;
 }
 
+// 採取ツールマスタ（採掘・伐採共通：100種）
+export interface ToolMaster {
+  id: string;
+  name: string;
+  category: 'mining' | 'woodcutting';
+  material: 'wood' | 'stone' | 'iron' | 'gold' | 'mythril';
+  type: 'speed' | 'yield' | 'rare' | 'combo' | 'efficiency';
+  speedMultiplier: number;
+  yieldMultiplier: number;
+  rareMultiplier: number;
+  staminaMultiplier: number;
+  comboBonus: number;
+  specialEffectId: string | null;
+}
+
 export interface GatherNodeMaster {
   id: string;
   name: string;
@@ -373,6 +388,8 @@ export interface PlayerData {
   dungeonClearedCount: IdMap<number>;
   fishingScore: number;
   equippedRodId: string;
+  // 採取ツール装備（採掘・伐採）
+  equippedTools?: { miningToolId: string; woodcuttingToolId: string };
   // 釣りシステム v2
   fishingLevel?: number;
   fishingExp?: number;
