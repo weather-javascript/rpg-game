@@ -39,6 +39,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { GameIcon } from '../icons';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER, CRAFT_RECIPES, DUNGEON_MASTER, GATHER_NODE_MASTER } from '../../data/masters';
+import { TOOLS_MASTER } from '../../data/toolsMaster';
+import { TOOL_CRAFT_RECIPES, CRAFTING_ONLY_TOOL_IDS } from '../../data/toolAcquisition';
 import type { CraftRecipe } from '../../types/game';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { postActivityFeed } from '../../services/multiplayer';
@@ -126,13 +128,14 @@ export function CraftingScreen() {
   const addItems = useGameStore(s => s.addItems);
   const consumeItem = useGameStore(s => s.consumeItem);
   const addSkillExp = useGameStore(s => s.addSkillExp);
+  const addOwnedTool = useGameStore(s => s.addOwnedTool);
   const addNotification = useGameStore(s => s.addNotification);
 
   const [grid, setGrid] = useState<GridCell[]>(EMPTY_GRID.map(c => ({ ...c })));
   const [selected, setSelected] = useState<{ itemId: string } | null>(null); // インベントリ選択中アイテム
   const [customRecipes, setCustomRecipes] = useState<CraftRecipe[]>([]);
   const [deletedDefaultRecipeIds, setDeletedDefaultRecipeIds] = useState<string[]>([]);
-  const [tab, setTab] = useState<'craft' | 'recipes'>('craft');
+  const [tab, setTab] = useState<'craft' | 'recipes' | 'tool_recipes'>('craft');
 
   // Firestoreからカスタムレシピを購読
   useEffect(() => {
@@ -150,6 +153,25 @@ export function CraftingScreen() {
   const matchResult = matchRecipeWithCount(grid, allRecipes);
   const matchedRecipe = matchResult?.recipe ?? null;
   const craftTimes = matchResult?.times ?? 1;
+
+  // ツールクラフトレシピマッチング
+  const matchedToolRecipe = (() => {
+    const ownedSet = new Set(player?.ownedToolIds ?? []);
+    for (const tr of TOOL_CRAFT_RECIPES) {
+      if (tr.pattern.length !== 9) continue;
+      const match = tr.pattern.every((expected, i) => {
+        if (!expected) return !grid[i].itemId;
+        return grid[i].itemId === expected;
+      });
+      if (!match) continue;
+      // 素材が足りるか確認（最小amount=1ずつ）
+      const patternIndices = tr.pattern.map((s, i) => s ? i : -1).filter(i => i >= 0);
+      const times = patternIndices.length > 0 ? Math.min(...patternIndices.map(i => grid[i].amount)) : 1;
+      if (times < 1) continue;
+      return { toolRecipe: tr, times, alreadyOwned: ownedSet.has(tr.toolId) };
+    }
+    return null;
+  })();
 
   const craftingLevel = player?.skillLevels?.['crafting'] ?? 1;
 
@@ -193,7 +215,34 @@ export function CraftingScreen() {
 
   // クラフト実行
   const handleCraft = useCallback(() => {
-    if (!matchedRecipe || !player) return;
+    if (!player) return;
+
+    // ツールクラフト処理
+    if (!matchedRecipe && matchedToolRecipe) {
+      const { toolRecipe, alreadyOwned } = matchedToolRecipe;
+      if (alreadyOwned) {
+        addNotification('info', `このツールは既に所持しています。`);
+        return;
+      }
+      // 素材消費
+      const usedItems: Record<string, number> = {};
+      for (const slot of toolRecipe.pattern) {
+        if (slot) usedItems[slot] = (usedItems[slot] ?? 0) + 1;
+      }
+      for (const [itemId, amt] of Object.entries(usedItems)) {
+        const ok = consumeItem(itemId, amt);
+        if (!ok) { addNotification('error', `${ITEM_MASTER[itemId]?.name ?? itemId} が不足しています`); return; }
+      }
+      addOwnedTool(toolRecipe.toolId);
+      addSkillExp('crafting', 50);
+      const toolData = TOOLS_MASTER[toolRecipe.toolId];
+      addNotification('success', `🔧 ツール【${toolData?.name ?? toolRecipe.toolId}】を製作しました！`);
+      if (player) postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'crafting', message: `がツール「${toolData?.name ?? toolRecipe.toolId}」を製作しました！` }).catch(() => {});
+      clearGrid();
+      return;
+    }
+
+    if (!matchedRecipe) return;
     if (craftingLevel < matchedRecipe.requiredCraftingLevel) {
       addNotification('error', `製作スキルLv${matchedRecipe.requiredCraftingLevel}が必要です（現在Lv${craftingLevel}）`);
       return;
@@ -211,7 +260,7 @@ export function CraftingScreen() {
     addNotification('success', `✨ ${outItem?.name ?? matchedRecipe.outputItemId} ×${totalOutput}${craftTimes > 1 ? ` (${craftTimes}回分)` : ''} を製作しました！`);
     if (player) postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'crafting', message: `が${outItem?.name ?? matchedRecipe.outputItemId}×${totalOutput}を製作しました！` }).catch(() => {});
     clearGrid();
-  }, [matchedRecipe, craftTimes, player, craftingLevel, consumeItem, addItems, addSkillExp, addNotification, addRecentCrafted]);
+  }, [matchedRecipe, matchedToolRecipe, craftTimes, player, craftingLevel, consumeItem, addItems, addSkillExp, addOwnedTool, addNotification, addRecentCrafted]);
 
   if (!player) return null;
 
@@ -232,10 +281,10 @@ export function CraftingScreen() {
 
       {/* タブ */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        {(['craft', 'recipes'] as const).map(t => (
+        {(['craft', 'recipes', 'tool_recipes'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
             style={{ padding: '6px 14px', background: tab === t ? 'rgba(240,192,96,0.2)' : '#1c2235', border: `1px solid ${tab === t ? '#f0c060' : '#2d3752'}`, color: tab === t ? '#f0c060' : '#8a92b2', borderRadius: 6, cursor: 'pointer', fontSize: '0.82rem' }}>
-            {t === 'craft' ? '🔨 クラフト台' : '📖 レシピ一覧'}
+            {t === 'craft' ? '🔨 クラフト台' : t === 'recipes' ? '📖 レシピ一覧' : '🔧 ツールレシピ'}
           </button>
         ))}
         <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#8a92b2', lineHeight: '32px' }}>
@@ -280,11 +329,11 @@ export function CraftingScreen() {
 
             {/* 矢印 + 結果 */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, paddingTop: 24 }}>
-              <span style={{ fontSize: '1.5rem', color: matchedRecipe ? '#4caf87' : '#2d3752' }}>▶</span>
+              <span style={{ fontSize: '1.5rem', color: (matchedRecipe || matchedToolRecipe) ? '#4caf87' : '#2d3752' }}>▶</span>
               <div style={{
                 width: 70, height: 70,
-                background: matchedRecipe ? 'rgba(76,175,135,0.15)' : '#161b26',
-                border: `2px solid ${matchedRecipe ? '#4caf87' : '#2d3752'}`,
+                background: (matchedRecipe || matchedToolRecipe) ? 'rgba(76,175,135,0.15)' : '#161b26',
+                border: `2px solid ${(matchedRecipe || matchedToolRecipe) ? '#4caf87' : '#2d3752'}`,
                 borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 position: 'relative',
               }}>
@@ -295,6 +344,11 @@ export function CraftingScreen() {
                       ×{matchedRecipe.outputAmount * craftTimes}
                     </span>
                   </>
+                ) : matchedToolRecipe ? (
+                  <>
+                    <span style={{ fontSize: '1.4rem' }}>🔧</span>
+                    {matchedToolRecipe.alreadyOwned && <span style={{ fontSize: '0.55rem', color: '#e05555', position: 'absolute', bottom: 3, right: 3 }}>所持済</span>}
+                  </>
                 ) : (
                   <span style={{ color: '#2d3752', fontSize: '1.5rem' }}>?</span>
                 )}
@@ -304,13 +358,22 @@ export function CraftingScreen() {
                   {ITEM_MASTER[matchedRecipe.outputItemId]?.name}
                 </div>
               )}
-              <button onClick={handleCraft} disabled={!matchedRecipe}
+              {matchedToolRecipe && !matchedRecipe && (() => {
+                const td = TOOLS_MASTER[matchedToolRecipe.toolRecipe.toolId];
+                return (
+                  <div style={{ fontSize: '0.68rem', color: matchedToolRecipe.alreadyOwned ? '#e05555' : '#4caf87', textAlign: 'center', maxWidth: 90 }}>
+                    {td?.name ?? matchedToolRecipe.toolRecipe.toolId}
+                    {CRAFTING_ONLY_TOOL_IDS.has(matchedToolRecipe.toolRecipe.toolId) && <span style={{ color: '#c864ff', display: 'block' }}>クラフト専用</span>}
+                  </div>
+                );
+              })()}
+              <button onClick={handleCraft} disabled={!matchedRecipe && !matchedToolRecipe}
                 style={{
                   padding: '8px 12px',
-                  background: matchedRecipe && craftingLevel >= (matchedRecipe.requiredCraftingLevel ?? 1)
+                  background: (matchedRecipe && craftingLevel >= (matchedRecipe.requiredCraftingLevel ?? 1)) || (matchedToolRecipe && !matchedToolRecipe.alreadyOwned)
                     ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752',
-                  color: matchedRecipe ? '#fff' : '#4a5070',
-                  border: 'none', borderRadius: 6, cursor: matchedRecipe ? 'pointer' : 'not-allowed',
+                  color: (matchedRecipe || (matchedToolRecipe && !matchedToolRecipe.alreadyOwned)) ? '#fff' : '#4a5070',
+                  border: 'none', borderRadius: 6, cursor: (matchedRecipe || (matchedToolRecipe && !matchedToolRecipe.alreadyOwned)) ? 'pointer' : 'not-allowed',
                   fontWeight: 700, fontSize: '0.82rem',
                 }}>
                 ⚒️ 製作
@@ -328,6 +391,25 @@ export function CraftingScreen() {
               </div>
             </div>
           )}
+          {matchedToolRecipe && !matchedRecipe && (() => {
+            const td = TOOLS_MASTER[matchedToolRecipe.toolRecipe.toolId];
+            return (
+              <div style={{ background: 'rgba(76,175,135,0.1)', border: `1px solid ${matchedToolRecipe.alreadyOwned ? '#e05555' : '#4caf87'}`, borderRadius: 8, padding: '8px 12px', marginTop: 12, fontSize: '0.78rem' }}>
+                <div style={{ color: matchedToolRecipe.alreadyOwned ? '#e05555' : '#4caf87', fontWeight: 700, marginBottom: 4 }}>
+                  🔧 {td?.name ?? matchedToolRecipe.toolRecipe.toolId}
+                  {matchedToolRecipe.alreadyOwned && ' （所持済み）'}
+                </div>
+                <div style={{ color: '#8a92b2', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <span>素材:{td?.material}</span>
+                  <span>タイプ:{td?.type}</span>
+                  <span>速度×{td?.speedMultiplier}</span>
+                  <span>収穫×{td?.yieldMultiplier}</span>
+                  {CRAFTING_ONLY_TOOL_IDS.has(matchedToolRecipe.toolRecipe.toolId) && <span style={{ color: '#c864ff' }}>✨ クラフト専用</span>}
+                </div>
+                <div style={{ color: '#f0c060', marginTop: 4 }}>製作EXP: +50</div>
+              </div>
+            );
+          })()}
 
           {/* ヒント */}
           <div style={{ marginTop: 12, fontSize: '0.72rem', color: '#4a5070', lineHeight: 1.6 }}>
@@ -491,6 +573,70 @@ export function CraftingScreen() {
           })}
         </div>
       )}
+
+      {tab === 'tool_recipes' && (() => {
+        const ownedSet = new Set(player?.ownedToolIds ?? []);
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontSize: '0.72rem', color: '#8a92b2', marginBottom: 6 }}>
+              🔧 ツールレシピ一覧 — グリッドに素材を並べて製作できます。クラフト専用ツールはここでしか入手できません。
+            </div>
+            {TOOL_CRAFT_RECIPES.map(tr => {
+              const toolData = TOOLS_MASTER[tr.toolId];
+              if (!toolData) return null;
+              const isOwned = ownedSet.has(tr.toolId);
+              const isCraftOnly = CRAFTING_ONLY_TOOL_IDS.has(tr.toolId);
+              // 必要素材集計
+              const needed: Record<string, number> = {};
+              for (const s of tr.pattern) { if (s) needed[s] = (needed[s] ?? 0) + 1; }
+              const hasAll = Object.entries(needed).every(([k, n]) => (player?.inventory?.[k] ?? 0) >= n);
+              return (
+                <div key={tr.toolId} style={{ background: '#1c2235', border: `1px solid ${isOwned ? '#4caf87' : hasAll ? '#f0c060' : '#2d3752'}`, borderRadius: 8, padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <span style={{ fontSize: '1.4rem' }}>🔧</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: isOwned ? '#4caf87' : '#e8e6ff' }}>
+                        {isOwned ? '✅ ' : ''}{toolData.name}
+                        {isCraftOnly && <span style={{ fontSize: '0.65rem', color: '#c864ff', marginLeft: 6 }}>クラフト専用</span>}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: '#8a92b2' }}>
+                        {toolData.material} / {toolData.type} — 速{toolData.speedMultiplier} 収{toolData.yieldMultiplier} レ{toolData.rareMultiplier}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    {/* 3x3 pattern preview */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 22px)', gap: 2, flexShrink: 0 }}>
+                      {tr.pattern.map((cell, si) => {
+                        const ci = cell ? ITEM_MASTER[cell] : null;
+                        return (
+                          <div key={si} style={{ width: 22, height: 22, background: cell ? 'rgba(91,141,238,0.25)' : '#111827', border: `1px solid ${cell ? '#5b8dee' : '#1c2235'}`, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {ci && <GameIcon id={ci.icon} size={14} />}
+                            {cell && !ci && <span style={{ fontSize: '0.55rem', color: '#8a92b2' }}>{cell.slice(0,3)}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {Object.entries(needed).map(([itemId, amt]) => {
+                        const iitem = ITEM_MASTER[itemId];
+                        const have = player?.inventory?.[itemId] ?? 0;
+                        return (
+                          <span key={itemId} style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '2px 6px', background: have >= amt ? 'rgba(76,175,135,0.15)' : 'rgba(224,85,85,0.1)', border: `1px solid ${have >= amt ? '#4caf87' : '#e05555'}`, borderRadius: 4, fontSize: '0.7rem', color: have >= amt ? '#4caf87' : '#e05555' }}>
+                            {iitem ? <GameIcon id={iitem.icon} size={13} /> : null}
+                            {iitem?.name ?? itemId} ×{amt}
+                            <span style={{ color: '#8a92b2' }}>({have})</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }

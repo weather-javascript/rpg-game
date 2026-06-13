@@ -9,6 +9,8 @@ import type { EquipmentSlots } from '../../types/game';
 import { defaultEquipmentSlots } from '../../types/game';
 import { postActivityFeed, subscribeMonsterOverrides, subscribeDungeonOverrides, setPlayerActivity } from '../../services/multiplayer';
 import type { MonsterOverride, DungeonOverride } from '../../services/multiplayer';
+import { TOOLS_MASTER } from '../../data/toolsMaster';
+import { TOOL_GACHA_TABLE } from '../../data/toolAcquisition';
 
 // ============================================================
 // 戦闘ロジック（1ターン分）
@@ -1480,14 +1482,31 @@ function GachaPanel({ player, addItems, changeGold, addNotification }: {
   addNotification: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
 }) {
   const setPlayer = useGameStore(s => s.setPlayer);
+  const addOwnedTool = useGameStore(s => s.addOwnedTool);
   const coins = player.gachaCoins ?? 0;
   const loseTickets = player.inventory?.['gacha_lose_ticket'] ?? 0;
 
   const pullGacha = () => {
     if (coins < 1) { addNotification('warning', 'ガチャコインが足りません！ダンジョンをクリアして獲得しよう。'); return; }
-    // コイン消費
     setPlayer({ ...player, gachaCoins: coins - 1 });
-    // ガチャ抽選
+    // ツールガチャ判定（15%でツール）
+    const toolRoll = secureRandom();
+    if (toolRoll < 0.15) {
+      // ツールガチャ
+      let cumTool = 0;
+      let pickedTool = TOOL_GACHA_TABLE[TOOL_GACHA_TABLE.length - 1];
+      for (const entry of TOOL_GACHA_TABLE) {
+        cumTool += entry.rate;
+        if (toolRoll / 0.15 < cumTool) { pickedTool = entry; break; }
+      }
+      addOwnedTool(pickedTool.toolId);
+      const toolData = TOOLS_MASTER[pickedTool.toolId];
+      const rarityLabel = pickedTool.rarity === '特殊' ? '★★★' : pickedTool.rarity === 'レア' ? '★★' : '★';
+      addNotification(pickedTool.rarity === '特殊' ? 'success' : 'info',
+        `🔧 ${rarityLabel} ツール【${toolData?.name ?? pickedTool.toolId}】を入手！（ガチャ）`);
+      return;
+    }
+    // 既存ガチャ抽選
     const roll = secureRandom();
     let cumulative = 0;
     let result = GACHA_TABLE[GACHA_TABLE.length - 1];
@@ -1495,7 +1514,6 @@ function GachaPanel({ player, addItems, changeGold, addNotification }: {
       cumulative += entry.rate;
       if (roll < cumulative) { result = entry; break; }
     }
-    // アイテム付与
     if (result.id === 'revolution_armor_set') {
       addItems([
         { itemId: 'revolution_armor_helmet', amount: 1 },
@@ -1506,9 +1524,7 @@ function GachaPanel({ player, addItems, changeGold, addNotification }: {
     } else {
       addItems([{ itemId: result.id, amount: 1 }]);
     }
-    // ハズレチケット20枚交換チェック（addItemsで+1された後の枚数で判定）
     if (result.id === 'gacha_lose_ticket' && loseTickets + 1 >= 20) {
-      // 20枚分消費（removeItemsが無いためinventory直接操作）
       const newInv = { ...player.inventory, gacha_lose_ticket: (loseTickets + 1) - 20 };
       setPlayer({ ...player, gachaCoins: coins - 1, inventory: newInv });
       changeGold(200000);
@@ -1543,6 +1559,10 @@ function GachaPanel({ player, addItems, changeGold, addNotification }: {
       </div>
       <div style={{ background: '#161b26', border: '1px solid #2d3752', borderRadius: 10, padding: 12 }}>
         <div style={{ fontWeight: 700, color: '#c864ff', marginBottom: 8, fontSize: '0.85rem' }}>📋 排出確率</div>
+        <div style={{ padding: '5px 0', borderBottom: '1px solid #2d3752', display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#4caf87' }}>
+          <span>🔧 採取ツール（全種）</span>
+          <span style={{ fontWeight: 700 }}>15%</span>
+        </div>
         {GACHA_TABLE.map((e, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: i < GACHA_TABLE.length - 1 ? '1px solid #2d3752' : 'none' }}>
             <span style={{ fontSize: '0.8rem', color: e.rarity === '★★★' ? '#f0c060' : e.rarity === '★★' ? '#a0c0ff' : '#8a92b2' }}>
