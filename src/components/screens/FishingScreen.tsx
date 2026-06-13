@@ -36,12 +36,16 @@ function tryCatch(
   const rodRarityBonus = rod.rarityBonus + enhanceLv * 0.01;
   const rodLargeBonus  = rod.largeFishBonus + enhanceLv * 0.005;
   const rodExpMult     = rod.expMult + enhanceLv * 0.02;
+  // スポット適性ボーナス（竿のspotBonusフィールドを参照）
+  const rodSpotBonus   = (rod.spotBonus?.[spot.id] ?? 0);
+  // 伝説魚ボーナス（竿のlegendaryBonusフィールドを参照）
+  const rodLegendBonus = (rod.legendaryBonus ?? 0);
   const baitRarity  = bait?.rarityBonus  ?? 0;
   const baitSize    = bait?.sizeBonus    ?? 0;
   const baitExp     = bait?.expBonus     ?? 0;
-  const totalRarity = bonuses.rarityBonus + rodRarityBonus + baitRarity + weather.rarityBonus;
+  const totalRarity = bonuses.rarityBonus + rodRarityBonus + baitRarity + weather.rarityBonus + rodSpotBonus;
   const totalLarge  = bonuses.largeFishBonus + rodLargeBonus;
-  const totalLegend = bonuses.legendaryBonus;
+  const totalLegend = bonuses.legendaryBonus + rodLegendBonus;
 
   const spotFishIds = FISH_IDS.filter(id => {
     const f = FISH_MASTER[id];
@@ -208,7 +212,7 @@ export function FishingScreen() {
     const oldLv = fishingLevel;
     if (result) {
       addFishingExp(result.exp);
-      const coinEarned = fishCoinReward(result.fish.rarity, weather);
+      const coinEarned = Math.floor(fishCoinReward(result.fish.rarity, weather) * (rod.fishCoinMult ?? 1.0));
       recordCatch(result.fish.id, result.sizeCm, result.weightKg, result.sellPrice, coinEarned);
       changeGold(result.sellPrice);
       // map to inventory item
@@ -457,10 +461,19 @@ export function FishingScreen() {
                       <span style={{ fontSize:10, color:RARITY_COLOR[r.rarity] }}>{RARITY_LABEL[r.rarity]}</span>
                       {equipped && <span style={{ fontSize:10, color:'#7dd3fc' }}>装備中</span>}
                     </div>
+                    {r.role && <div style={{ fontSize:10, color:'#f59e0b', fontWeight:'bold', marginTop:1 }}>{r.role}</div>}
                     <div style={{ fontSize:11, color:'#94a3b8', marginTop:2 }}>
-                      レア+{Math.round((r.rarityBonus + eLv*0.01)*100)}% 大型+{Math.round((r.largeFishBonus + eLv*0.005)*100)}% EXP×{(r.expMult + eLv*0.02).toFixed(2)} Lv{r.minLevel}+
+                      レア+{Math.round((r.rarityBonus + eLv*0.01)*100)}% 大型+{Math.round((r.largeFishBonus + eLv*0.005)*100)}% EXP×{(r.expMult + eLv*0.02).toFixed(2)} FC×{r.fishCoinMult.toFixed(1)} Lv{r.minLevel}+
                     </div>
-                    <div style={{ fontSize:11, color:'#64748b' }}>{r.obtainHint}</div>
+                    {r.spotBonus && Object.keys(r.spotBonus).length > 0 && (
+                      <div style={{ fontSize:10, color:'#34d399', marginTop:1 }}>
+                        📍 得意: {Object.entries(r.spotBonus).map(([sid, v]) => `${SPOT_MASTER[sid]?.name ?? sid}(+${Math.round((v as number)*100)}%)`).join(' / ')}
+                      </div>
+                    )}
+                    {r.legendaryBonus != null && r.legendaryBonus > 0 && (
+                      <div style={{ fontSize:10, color:'#fbbf24', marginTop:1 }}>🌟 伝説魚+{Math.round(r.legendaryBonus*100)}%</div>
+                    )}
+                    <div style={{ fontSize:11, color:'#64748b', marginTop:1 }}>{r.obtainHint}</div>
                     {owned && eLv < 20 && (
                       <div style={{ fontSize:11, color:'#94a3b8', marginTop:2 }}>
                         次の強化成功率: {Math.round(successRate*100)}% (+{eLv}→+{eLv+1})
@@ -581,7 +594,8 @@ export function FishingScreen() {
             if (isRod) {
               const rodDef = ROD_MASTER[item.grantItemId];
               if (rodDef) {
-                effectLines.push(`レア+${Math.round(rodDef.rarityBonus*100)}% 大型+${Math.round(rodDef.largeFishBonus*100)}% EXP×${rodDef.expMult.toFixed(2)}`);
+                if (rodDef.role) effectLines.push(rodDef.role);
+                effectLines.push(`レア+${Math.round(rodDef.rarityBonus*100)}% 大型+${Math.round(rodDef.largeFishBonus*100)}% EXP×${rodDef.expMult.toFixed(2)} FC×${rodDef.fishCoinMult.toFixed(1)}`);
                 effectLines.push(`Lv${rodDef.minLevel}以上で使用可`);
               }
             }
@@ -676,14 +690,21 @@ export function FishingScreen() {
             </div>
             <div style={{ fontSize:11, color:'#64748b', marginBottom:6, fontWeight:'bold' }}>入手方法:</div>
             {[
-              { icon:'🪵', name:'木の釣り竿', how:'竿タブ →「強化」ボタン（初期段階）', lv:1 },
-              { icon:'🎣', name:'銀・水晶の竿', how:'謎の箱・クラフトで入手', lv:5 },
-              { icon:'🎣', name:'オールロッドX', how:'🐟 交換所 400 Fish Coin', lv:10 },
-              { icon:'🎣', name:'マスターロッドZ', how:'🐟 交換所 800 Fish Coin', lv:30 },
-              { icon:'☁️', name:'天空竿', how:'🐟 交換所 1500 Fish Coin', lv:60 },
-              { icon:'🐉', name:'龍の釣り竿', how:'釣りLv70 + 龍神討伐後クラフト', lv:70 },
-              { icon:'✨', name:'神竿', how:'釣りLv90達成で解放', lv:90 },
-              { icon:'♾️', name:'∞竿', how:'釣りLv100 + 図鑑100%コンプリート', lv:100 },
+              { icon:'🪵', name:'木の釣り竿', how:'ショップ購入（100G）| EXP+20%特化', lv:1 },
+              { icon:'🎣', name:'鉄の釣り竿', how:'初期装備 | バランス型', lv:1 },
+              { icon:'🎣', name:'銅の釣り竿', how:'ショップ購入（200G）| 大型魚特化', lv:3 },
+              { icon:'🎣', name:'銀の釣り竿', how:'謎の箱 | レア率特化・FC×1.2', lv:5 },
+              { icon:'🎣', name:'オールロッドX', how:'🐟 Fish Coin交換所 400枚 | FC×2倍', lv:10 },
+              { icon:'💠', name:'水晶の釣り竿', how:'クラフト | EXP周回専用（×1.8）', lv:15 },
+              { icon:'🏆', name:'黄金の釣り竿', how:'クラフト（黄金の延べ棒×3）| 大型×レアバランス', lv:20 },
+              { icon:'🎣', name:'マスターロッド', how:'Yランダムボックスドロップ | 汎用エピック', lv:20 },
+              { icon:'⚡', name:'マスターロッドZ', how:'🐟 Fish Coin交換所 800枚 | FC×3倍', lv:30 },
+              { icon:'🌑', name:'深海竿', how:'クラフト（深海素材）| 深海/洞窟/奈落特化', lv:35 },
+              { icon:'🌋', name:'溶岩竿', how:'クラフト（溶岩石・龍の鱗）| 火山湖特化', lv:45 },
+              { icon:'☁️', name:'天空竿', how:'🐟 Fish Coin交換所 1500枚 | 天空湖特化+伝説魚UP', lv:60 },
+              { icon:'🐉', name:'龍の釣り竿', how:'釣りLv70 + 龍神討伐後クラフト | 後半スポット+伝説魚特化', lv:70 },
+              { icon:'✨', name:'神竿', how:'釣りLv90達成で解放 | 天界・奈落・混沌の海特化', lv:90 },
+              { icon:'♾️', name:'∞竿', how:'釣りLv100 + 図鑑100%コンプリート | 全ステ最大', lv:100 },
             ].map(r => (
               <div key={r.name} style={{ display:'flex', alignItems:'center', gap:8, padding:'4px 0', borderBottom:'1px solid #1e293b', opacity: fishingLevel >= r.lv ? 1 : 0.5 }}>
                 <span style={{ fontSize:16, width:20 }}>{r.icon}</span>
