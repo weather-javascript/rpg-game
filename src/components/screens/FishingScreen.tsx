@@ -16,6 +16,7 @@ import {
 import type { WeatherEffect } from '../../data/fishMastersExtra';
 import { postBoardMessage, tryRecordWorldFirstFish, getAllWorldFirstFish, subscribeFishingCastTime } from '../../services/multiplayer';
 import { saveFishIndividual, nextIndividualId } from '../../services/fishAquaService';
+import { queueSave } from '../../services/saveBuffer';
 import type { AquaRarity } from '../../types/fishAqua';
 
 // ─── catch simulation ────────────────────────────────────────
@@ -109,7 +110,6 @@ export function FishingScreen() {
   const addFishingExp     = useGameStore((s: any) => s.addFishingExp);
   const recordCatch       = useGameStore((s: any) => s.recordCatch);
   const getActiveBuffBonus= useGameStore((s: any) => s.getActiveBuffBonus);
-  const savePlayer        = useGameStore((s: any) => s.savePlayer);
   const selectFishingSpot = useGameStore((s: any) => s.selectFishingSpot);
   const equipBait         = useGameStore((s: any) => s.equipBait);
   const useBait           = useGameStore((s: any) => s.useBait);
@@ -224,10 +224,10 @@ export function FishingScreen() {
         infinity_fish:'arowanna', god_koi:'arowanna',
       };
       addItems([{ itemId: itemMap[result.fish.id] ?? 'raw_cod', amount: 1 }]);
-      // 魚個体として保存（養殖・水族館システム連携）
-      if (player?.uid) {
+      // 魚個体として保存（養殖・水族館システム連携）- レジェンダリーのみ即時保存、それ以外はスキップ
+      if (player?.uid && result.fish.rarity === 'legendary') {
         const fishRar = result.fish.rarity;
-        const aquaRarity: AquaRarity = fishRar === 'legendary' ? 'legendary' : fishRar === 'epic' ? 'epic' : fishRar === 'rare' || fishRar === 'uncommon' ? 'rare' : 'normal';
+        const aquaRarity: AquaRarity = 'legendary';
         nextIndividualId().then(indId => {
           saveFishIndividual({
             individualId: indId, fishId: result.fish.id, name: result.fish.name,
@@ -274,9 +274,9 @@ export function FishingScreen() {
       checkFishingAchievements();
     }, 150);
 
-    savePlayer();
+    queueSave();
     setCooldown(cdMs);
-  }, [player, cooldown, casting, staminaCost, cdMs, rod, enhLv, bait, spot, equippedBaitId, fishingLevel, fishBook, getActiveBuffBonus, addFishingExp, recordCatch, addItems, changeGold, changeSatiety, addNotification, addLog, savePlayer, useBait, checkFishingAchievements, weather, season, activeEvents]);
+  }, [player, cooldown, casting, staminaCost, cdMs, rod, enhLv, bait, spot, equippedBaitId, fishingLevel, fishBook, getActiveBuffBonus, addFishingExp, recordCatch, addItems, changeGold, changeSatiety, addNotification, addLog, useBait, checkFishingAchievements, weather, season, activeEvents]);
 
   // auto fish
   useEffect(() => { autoRef.current = autoFish; }, [autoFish]);
@@ -470,7 +470,7 @@ export function FishingScreen() {
                   <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                     {owned && !equipped && <button onClick={() => equipRod(rid)} style={S.btn()}>装備</button>}
                     {owned && eLv < 20 && (
-                      <button onClick={() => { enhanceRod(rid); checkFishingAchievements(); savePlayer(); }} style={{ ...S.btn(), background:'#854d0e', fontSize:11 }}>
+                      <button onClick={() => { enhanceRod(rid); checkFishingAchievements(); queueSave(); }} style={{ ...S.btn(), background:'#854d0e', fontSize:11 }}>
                         強化
                       </button>
                     )}
@@ -545,7 +545,7 @@ export function FishingScreen() {
                     {!unlocked && <div style={{ fontSize:11, color:'#f59e0b', marginTop:1 }}>🔒 {sp.unlockCond?.startsWith('level_') ? `釣りLv${sp.unlockCond.replace('level_','')}で解放` : `Lv${sp.minLevel}+`}</div>}
                     {unlocked && <div style={{ fontSize:11, color:'#64748b' }}>{sp.description}</div>}
                   </div>
-                  {unlocked && !selected && <button onClick={() => { selectFishingSpot(sid); savePlayer(); }} style={S.btn()}>選択</button>}
+                  {unlocked && !selected && <button onClick={() => { selectFishingSpot(sid); queueSave(); }} style={S.btn()}>選択</button>}
                 </div>
               </div>
             );
@@ -605,7 +605,7 @@ export function FishingScreen() {
                       if (!spendFishCoin(item.cost)) return;
                       addItems([{ itemId: item.grantItemId, amount: item.grantAmount }]);
                       addNotification('success', `${item.icon} ${item.name} と交換した！`);
-                      savePlayer();
+                      queueSave();
                     }}
                     disabled={!can}
                     style={{ ...S.btn(), background: can ? '#0ea5e9' : '#374151', cursor: can ? 'pointer' : 'not-allowed', whiteSpace:'nowrap' as const }}
