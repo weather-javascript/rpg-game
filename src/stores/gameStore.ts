@@ -6,6 +6,7 @@ import type { PlayerData, Notification, TabId } from '../types/game';
 import { savePlayer } from '../services/database';
 import { randomInt } from '../utils/random';
 import { ITEM_MASTER } from '../data/masters';
+import { DEFAULT_MINING_TOOL_ID, DEFAULT_WOODCUTTING_TOOL_ID } from '../data/toolsMaster';
 import { createPlayerSlice, type PlayerSlice } from './slices/playerSlice';
 import { createDungeonSlice, type DungeonSlice } from './slices/dungeonSlice';
 import { createFishingSlice, type FishingSlice } from './slices/fishingSlice';
@@ -62,6 +63,7 @@ function ensureDefaults(player: PlayerData): PlayerData {
     dungeonClearedCount: player.dungeonClearedCount ?? {},
     fishingScore: player.fishingScore ?? 0,
     equippedRodId: player.equippedRodId ?? 'basic_rod',
+    equippedTools: player.equippedTools ?? { miningToolId: DEFAULT_MINING_TOOL_ID, woodcuttingToolId: DEFAULT_WOODCUTTING_TOOL_ID },
     activeJob: player.activeJob ?? null,
     activeBuffs: player.activeBuffs ?? [],
     reliefUsedCount: player.reliefUsedCount ?? 0,
