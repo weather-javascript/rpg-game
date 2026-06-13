@@ -14,13 +14,13 @@ export interface FishMaster {
 
 export const FISH_MASTER: Record<string, FishMaster> = {
   // common
-  iwashi:      { id:'iwashi',      name:'イワシ',        rarity:'common',    minLevel:10,  baseExp:5,   minSizeCm:10,  maxSizeCm:25,   weightFactor:0.0004, baseRate:0.32, sellPrice:2,   icon:'🐟', description:'どこにでもいる小魚。', spots:['pond','river','lake','sea','offshore'] },
-  aji:         { id:'aji',         name:'アジ',          rarity:'common',    minLevel:10,  baseExp:7,   minSizeCm:15,  maxSizeCm:40,   weightFactor:0.0006, baseRate:0.28, sellPrice:3,   icon:'🐟', description:'定番の青魚。', spots:['river','lake','sea','offshore'] },
+  iwashi:      { id:'iwashi',      name:'イワシ',        rarity:'common',    minLevel:1,  baseExp:5,   minSizeCm:10,  maxSizeCm:25,   weightFactor:0.0004, baseRate:0.32, sellPrice:2,   icon:'🐟', description:'どこにでもいる小魚。', spots:['pond','river','lake','sea','offshore'] },
+  aji:         { id:'aji',         name:'アジ',          rarity:'common',    minLevel:1,  baseExp:7,   minSizeCm:15,  maxSizeCm:40,   weightFactor:0.0006, baseRate:0.28, sellPrice:3,   icon:'🐟', description:'定番の青魚。', spots:['river','lake','sea','offshore'] },
   fugu:        { id:'fugu',        name:'フグ',          rarity:'common',    minLevel:30,  baseExp:10,  minSizeCm:20,  maxSizeCm:50,   weightFactor:0.0008, baseRate:0.18, sellPrice:5,   icon:'🐡', description:'毒があるが高値がつく。', spots:['sea','offshore','deepsea'] },
-  koi:         { id:'koi',         name:'コイ',          rarity:'common',    minLevel:10,  baseExp:8,   minSizeCm:20,  maxSizeCm:80,   weightFactor:0.0009, baseRate:0.25, sellPrice:3,   icon:'🐟', description:'池の定番。', spots:['pond','river','lake'] },
+  koi:         { id:'koi',         name:'コイ',          rarity:'common',    minLevel:1,  baseExp:8,   minSizeCm:20,  maxSizeCm:80,   weightFactor:0.0009, baseRate:0.25, sellPrice:3,   icon:'🐟', description:'池の定番。', spots:['pond','river','lake'] },
   tai:         { id:'tai',         name:'タイ',          rarity:'common',    minLevel:50,  baseExp:12,  minSizeCm:30,  maxSizeCm:80,   weightFactor:0.0010, baseRate:0.15, sellPrice:4,   icon:'🐟', description:'めでたい魚。', spots:['sea','offshore'] },
   unagi:       { id:'unagi',       name:'ウナギ',        rarity:'common',    minLevel:50,  baseExp:15,  minSizeCm:40,  maxSizeCm:100,  weightFactor:0.0007, baseRate:0.14, sellPrice:6,   icon:'🐍', description:'川に潜む長い魚。', spots:['river','lake'] },
-  tanago:      { id:'tanago',      name:'タナゴ',        rarity:'common',    minLevel:10,  baseExp:5,   minSizeCm:5,   maxSizeCm:15,   weightFactor:0.0003, baseRate:0.30, sellPrice:2,   icon:'🐟', description:'小さく鮮やかな淡水魚。', spots:['pond','river'] },
+  tanago:      { id:'tanago',      name:'タナゴ',        rarity:'common',    minLevel:1,  baseExp:5,   minSizeCm:5,   maxSizeCm:15,   weightFactor:0.0003, baseRate:0.30, sellPrice:2,   icon:'🐟', description:'小さく鮮やかな淡水魚。', spots:['pond','river'] },
   catfish:     { id:'catfish',     name:'ナマズ',        rarity:'common',    minLevel:40,  baseExp:14,  minSizeCm:30,  maxSizeCm:90,   weightFactor:0.0012, baseRate:0.14, sellPrice:5,   icon:'🐟', description:'ヒゲが特徴的な大型淡水魚。', spots:['river','lake','swamp'] },
   // uncommon
   sake:        { id:'sake',        name:'サケ',          rarity:'uncommon',  minLevel:80,  baseExp:20,  minSizeCm:50,  maxSizeCm:100,  weightFactor:0.0015, baseRate:0.12, sellPrice:8,   icon:'🐟', description:'川を遡る力強い魚。', spots:['river','lake','sea'] },
