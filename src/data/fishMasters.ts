@@ -370,12 +370,22 @@ export interface FishingLevelBonus {
   rarityBonus?: number; largeFishBonus?: number; legendaryBonus?: number;
 }
 export const FISHING_LEVEL_BONUSES: FishingLevelBonus[] = [
-  { level: 10,  description: 'レア率+5%',        rarityBonus: 0.05 },
-  { level: 20,  description: 'レア率+10%',        rarityBonus: 0.10 },
-  { level: 30,  description: '大型魚出現率+10%',  largeFishBonus: 0.10 },
-  { level: 50,  description: '大型魚出現率+20%',  largeFishBonus: 0.20 },
-  { level: 70,  description: 'レア率+15%',        rarityBonus: 0.15 },
-  { level: 100, description: '伝説魚率+50%',      legendaryBonus: 0.50 },
+  { level: 10,    description: 'レア率+5%',        rarityBonus: 0.05 },
+  { level: 20,    description: 'レア率+10%',        rarityBonus: 0.10 },
+  { level: 30,    description: '大型魚出現率+10%',  largeFishBonus: 0.10 },
+  { level: 50,    description: '大型魚出現率+20%',  largeFishBonus: 0.20 },
+  { level: 70,    description: 'レア率+15%',        rarityBonus: 0.15 },
+  { level: 100,   description: '伝説魚率+50%',      legendaryBonus: 0.50 },
+  // Lv100以降の長期ボーナス
+  { level: 200,   description: 'レア率+5%',         rarityBonus: 0.05 },
+  { level: 500,   description: '伝説魚率+20%',      legendaryBonus: 0.20 },
+  { level: 1000,  description: 'レア率+10%',        rarityBonus: 0.10 },
+  { level: 2000,  description: '大型魚出現率+10%',  largeFishBonus: 0.10 },
+  { level: 5000,  description: '伝説魚率+30%',      legendaryBonus: 0.30 },
+  { level: 10000, description: 'レア率+15%',        rarityBonus: 0.15 },
+  { level: 20000, description: '大型魚出現率+15%',  largeFishBonus: 0.15 },
+  { level: 50000, description: '伝説魚率+50%',      legendaryBonus: 0.50 },
+  { level: 100000,description: 'すべての率+30%・伝説+100%', rarityBonus: 0.30, largeFishBonus: 0.30, legendaryBonus: 1.0 },
 ];
 export function getFishingBonuses(lv: number) {
   let rarityBonus = 0, largeFishBonus = 0, legendaryBonus = 0;
@@ -389,9 +399,12 @@ export function getFishingBonuses(lv: number) {
   return { rarityBonus, largeFishBonus, legendaryBonus };
 }
 
-// EXP計算
+// EXP計算（Lv100000対応・3段階スケール）
 export function fishingExpRequired(level: number): number {
-  return Math.floor(Math.pow(level, 1.8) * 60);
+  if (level <= 100) return Math.floor(Math.pow(level, 1.8) * 60);
+  if (level <= 1000) return Math.floor(Math.pow(level, 1.9) * 80);
+  if (level <= 10000) return Math.floor(Math.pow(level, 2.0) * 100);
+  return Math.floor(Math.pow(level, 2.1) * 120);
 }
 
 // サイズ→重量
@@ -446,6 +459,16 @@ export const FISHING_TITLES: FishingTitle[] = [
   { id:'ft_hero',       label:'⚡ 釣り英雄',       condition: c => c.fishingLevel >= 80 },
   { id:'ft_god',        label:'✨ 釣りの神',       condition: c => c.fishingLevel >= 90 },
   { id:'ft_infinity',   label:'♾️ 釣り∞',         condition: c => c.fishingLevel >= 100 },
+  // Lv100以降の長期称号
+  { id:'ft_lv200',      label:'🌙 Lv200 月の釣り師',       condition: c => c.fishingLevel >= 200 },
+  { id:'ft_lv500',      label:'⭐ Lv500 星の釣り師',       condition: c => c.fishingLevel >= 500 },
+  { id:'ft_lv1000',     label:'💫 Lv1000 伝説の釣り人',    condition: c => c.fishingLevel >= 1000 },
+  { id:'ft_lv2000',     label:'🌠 Lv2000 神話の釣り人',    condition: c => c.fishingLevel >= 2000 },
+  { id:'ft_lv5000',     label:'🌌 Lv5000 宇宙の釣り師',    condition: c => c.fishingLevel >= 5000 },
+  { id:'ft_lv10000',    label:'🐉 Lv10000 龍帝の釣り師',   condition: c => c.fishingLevel >= 10000 },
+  { id:'ft_lv20000',    label:'👑 Lv20000 覇王の釣り師',   condition: c => c.fishingLevel >= 20000 },
+  { id:'ft_lv50000',    label:'✨ Lv50000 神々の釣り師',   condition: c => c.fishingLevel >= 50000 },
+  { id:'ft_lv100000',   label:'♾️ Lv100000 究極釣り師',   condition: c => c.fishingLevel >= 100000 },
   { id:'ft_catch10',    label:'🐟 初釣り師',       condition: c => c.totalCount >= 10 },
   { id:'ft_catch100',   label:'🐟 百匹釣り',       condition: c => c.totalCount >= 100 },
   { id:'ft_catch500',   label:'🐠 五百釣果',       condition: c => c.totalCount >= 500 },
@@ -557,6 +580,14 @@ export const FISHING_ACHIEVEMENTS: FishingAchievement[] = [
   { id:'fa_lv50',          name:'釣りLv50',        description:'釣りレベルが50になった',                icon:'⭐', checkFn: c => c.fishingLevel >= 50 },
   { id:'fa_lv70',          name:'釣りLv70',        description:'釣りレベルが70になった',                icon:'🌟', checkFn: c => c.fishingLevel >= 70 },
   { id:'fa_lv100',         name:'釣りLv100',       description:'最大レベル到達！',                      icon:'👑', checkFn: c => c.fishingLevel >= 100 },
+  { id:'fa_lv200',         name:'釣りLv200',       description:'釣りLv200到達',                         icon:'🌙', checkFn: c => c.fishingLevel >= 200 },
+  { id:'fa_lv500',         name:'釣りLv500',       description:'釣りLv500到達',                         icon:'⭐', checkFn: c => c.fishingLevel >= 500 },
+  { id:'fa_lv1000',        name:'釣りLv1000',      description:'釣りLv1000到達',                        icon:'💫', checkFn: c => c.fishingLevel >= 1000 },
+  { id:'fa_lv2000',        name:'釣りLv2000',      description:'釣りLv2000到達',                        icon:'🌠', checkFn: c => c.fishingLevel >= 2000 },
+  { id:'fa_lv5000',        name:'釣りLv5000',      description:'釣りLv5000到達',                        icon:'🌌', checkFn: c => c.fishingLevel >= 5000 },
+  { id:'fa_lv10000',       name:'釣りLv10000',     description:'釣りLv10000到達',                       icon:'🐉', checkFn: c => c.fishingLevel >= 10000 },
+  { id:'fa_lv50000',       name:'釣りLv50000',     description:'釣りLv50000到達',                       icon:'✨', checkFn: c => c.fishingLevel >= 50000 },
+  { id:'fa_lv100000',      name:'釣りLv100000',    description:'究極の釣りLv100000到達！',               icon:'♾️', checkFn: c => c.fishingLevel >= 100000 },
   { id:'fa_book_5',        name:'図鑑5種',         description:'魚図鑑に5種登録した',                  icon:'📖', checkFn: c => c.bookCount >= 5 },
   { id:'fa_book_10',       name:'図鑑10種',        description:'魚図鑑に10種登録した',                  icon:'📚', checkFn: c => c.bookCount >= 10 },
   { id:'fa_book_20',       name:'図鑑20種',        description:'魚図鑑に20種登録した',                  icon:'📚', checkFn: c => c.bookCount >= 20 },
