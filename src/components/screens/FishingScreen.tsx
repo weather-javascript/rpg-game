@@ -14,7 +14,7 @@ import {
   FISH_COIN_SHOP, SEASON_LABEL, EVENT_DEFS, LEGENDARY_FISH_IDS,
 } from '../../data/fishMastersExtra';
 import type { WeatherEffect } from '../../data/fishMastersExtra';
-import { postBoardMessage, tryRecordWorldFirstFish, getAllWorldFirstFish, subscribeFishingCastTime } from '../../services/multiplayer';
+import { postBoardMessage, postActivityFeed, tryRecordWorldFirstFish, getAllWorldFirstFish, subscribeFishingCastTime } from '../../services/multiplayer';
 import { saveFishIndividual, nextIndividualId } from '../../services/fishAquaService';
 import { queueSave } from '../../services/saveBuffer';
 import type { AquaRarity } from '../../types/fishAqua';
@@ -263,6 +263,12 @@ export function FishingScreen() {
       }
       else if (result.fish.rarity === 'epic') addNotification('success', `✨ エピック「${result.fish.name}」！`);
       if (result.isNew) addNotification('info', `📖 図鑑登録: ${result.fish.name}`);
+      if (['rare','epic','legendary'].includes(result.fish.rarity)) {
+        postActivityFeed({
+          uid: player.uid, displayName: player.displayName, type: 'fishing',
+          message: `が${RARITY_LABEL[result.fish.rarity]}「${result.fish.name}」(${result.sizeCm}cm/${result.weightKg}kg)を釣り上げました！`,
+        }).catch(() => {});
+      }
     } else {
       addLog('…ボーズ。', '#6b7280');
     }

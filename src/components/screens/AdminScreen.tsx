@@ -110,6 +110,8 @@ export function AdminScreen() {
   const [faFishingTitles, setFaFishingTitles] = useState<string[]>([]);
   const [faFishBookCount, setFaFishBookCount] = useState(0);
   const [faSaving, setFaSaving] = useState(false);
+  const [faResetAllConfirm, setFaResetAllConfirm] = useState(false);
+  const [faResetAllRunning, setFaResetAllRunning] = useState(false);
   // 運営コンソール
   const [consoleSection, setConsoleSection] = useState<'editor' | 'commands' | 'history' | 'logs' | 'master' | 'event' | 'analytics'>('editor');
   const [searchName, setSearchName] = useState('');
@@ -596,13 +598,83 @@ export function AdminScreen() {
           } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
           setFaSaving(false);
         };
+        const FISHING_RESET_FIELDS: Record<string, any> = {
+          fishingScore: 0,
+          equippedRodId: 'basic_rod',
+          fishingLevel: 1,
+          fishingExp: 0,
+          fishingTotalCount: 0,
+          fishingMaxSizeCm: 0,
+          fishingMaxWeightKg: 0,
+          fishBook: {},
+          fishingEquippedBaitId: '',
+          fishingSelectedSpotId: 'pond',
+          fishingUnlockedSpots: ['pond', 'river'],
+          fishingRodEnhance: {},
+          fishingRodDurability: {},
+          fishingTotalBaitUsed: 0,
+          fishingTotalGoldEarned: 0,
+          fishingAchievements: [],
+          fishingUnlockedTitles: [],
+          fishCoin: 0,
+          fishMoney: 0,
+          fishingLegendaryCount: 0,
+          fishingTotalWeightKg: 0,
+        };
+        const resetAllFishingData = async () => {
+          setFaResetAllRunning(true);
+          try {
+            for (const p of players) {
+              await updatePlayerAdmin(p.id, FISHING_RESET_FIELDS as any);
+            }
+            setPlayers(prev => prev.map(p => ({ ...p, ...FISHING_RESET_FIELDS })));
+            if (fishingAdminPlayer) {
+              setFishingAdminPlayer((prev: any) => prev ? { ...prev, ...FISHING_RESET_FIELDS } : prev);
+              setFaFishCoin('0'); setFaFishingLevel('1'); setFaFishingExp('0');
+              setFaEquippedRodId('basic_rod'); setFaEquippedBaitId('');
+              setFaUnlockedSpots(['pond', 'river']); setFaRodEnhance({});
+              setFaFishingAchievements([]); setFaFishingTitles([]); setFaFishBookCount(0);
+            }
+            addNotification('success', `全${players.length}人分の釣りデータをリセットしました`);
+          } catch (e: any) { addNotification('error', `失敗: ${e?.message ?? e}`); }
+          setFaResetAllRunning(false);
+          setFaResetAllConfirm(false);
+        };
+
         const S2 = { label: { fontSize:'0.72rem', color:'#8a92b2', marginBottom:3 }, input: { width:'100%', padding:'6px 8px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', boxSizing:'border-box' as const } };
+
         return (
           <div>
             <div style={{marginBottom:10}}>
               <input value={fishingAdminFilter} onChange={e => setFishingAdminFilter(e.target.value)}
                 placeholder="名前・UIDで検索..." style={{width:'100%', padding:'7px 10px', background:'#161b26', border:'1px solid #2d3752', color:'#e8e6ff', borderRadius:6, fontSize:'0.82rem', boxSizing:'border-box'}} />
             </div>
+
+            <div style={{marginBottom:14, padding:12, background:'rgba(224,85,85,0.08)', border:'1px solid #e05555', borderRadius:8}}>
+              <div style={{color:'#e05555', fontWeight:700, fontSize:'0.85rem', marginBottom:6}}>⚠️ 全プレイヤー釣りデータ一括リセット</div>
+              <div style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:8}}>
+                全{players.length}人分の釣りLv・EXP・釣りコイン・FishMoney・図鑑・竿強化・実績・称号・解放スポット等を初期状態に戻します。この操作は取り消せません。
+              </div>
+              {!faResetAllConfirm ? (
+                <button onClick={() => setFaResetAllConfirm(true)} disabled={faResetAllRunning}
+                  style={{padding:'8px 14px', background:'rgba(224,85,85,0.2)', color:'#e05555', border:'1px solid #e05555', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.82rem'}}>
+                  🗑️ 全プレイヤーの釣りデータをリセット
+                </button>
+              ) : (
+                <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                  <span style={{fontSize:'0.78rem', color:'#e05555', fontWeight:700}}>本当に実行しますか？</span>
+                  <button onClick={resetAllFishingData} disabled={faResetAllRunning}
+                    style={{padding:'7px 14px', background:'#e05555', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.82rem'}}>
+                    {faResetAllRunning ? '実行中...' : '✅ はい、リセットする'}
+                  </button>
+                  <button onClick={() => setFaResetAllConfirm(false)} disabled={faResetAllRunning}
+                    style={{padding:'7px 14px', background:'#2d3752', color:'#8a92b2', border:'1px solid #3d4762', borderRadius:6, cursor:'pointer', fontSize:'0.82rem'}}>
+                    キャンセル
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div style={{display:'flex', flexDirection:'column', gap:4, marginBottom:14, maxHeight:180, overflowY:'auto'}}>
               {filteredFishingPlayers.slice(0,30).map(p => (
                 <button key={p.id} onClick={() => loadFishingPlayer(p)}

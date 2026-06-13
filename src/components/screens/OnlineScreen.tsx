@@ -133,7 +133,7 @@ function WorldNewsPanel() {
                 <span style={{marginLeft:'auto', fontSize:'0.62rem', color:'#7a6a30'}}>{timeLabel}</span>
               </div>
               <div style={{fontSize:'0.92rem', fontWeight:800, color:'#ffd700',
-                textShadow:'0 0 12px rgba(255,215,0,0.7)'}}>
+                textShadow:'0 0 12px rgba(255,215,0,0.7)', wordBreak:'break-word', overflowWrap:'anywhere', whiteSpace:'normal', lineHeight:1.4}}>
                 {e.displayName}
                 <span style={{fontSize:'0.85rem', fontWeight:500, color:'#f0d880'}}>{e.message.replace(e.displayName,'')}</span>
               </div>
@@ -155,7 +155,7 @@ function WorldNewsPanel() {
                   background:`${s.color}22`, borderRadius:4, padding:'1px 5px'}}>★ EPIC</span>
                 <span style={{marginLeft:'auto', fontSize:'0.62rem', color:'#4a5070'}}>{timeLabel}</span>
               </div>
-              <div style={{fontSize:'0.88rem', fontWeight:700, color: s.color, textShadow:`0 0 8px ${s.color}66`}}>
+              <div style={{fontSize:'0.88rem', fontWeight:700, color: s.color, textShadow:`0 0 8px ${s.color}66`, wordBreak:'break-word', overflowWrap:'anywhere', whiteSpace:'normal', lineHeight:1.4}}>
                 {e.displayName}
                 <span style={{color:'#c0bcd8', fontWeight:400}}>{e.message.replace(e.displayName,'')}</span>
               </div>
@@ -173,7 +173,7 @@ function WorldNewsPanel() {
               display:'flex', alignItems:'center', gap:8,
             }}>
               <span style={{fontSize:'1.1rem'}}>{s.emoji}</span>
-              <div style={{flex:1}}>
+              <div style={{flex:1, minWidth:0, wordBreak:'break-word', overflowWrap:'anywhere'}}>
                 <span style={{fontSize:'0.82rem', fontWeight:700, color: s.color}}>{e.displayName}</span>
                 <span style={{fontSize:'0.8rem', color:'#c0bcd8'}}>{e.message.replace(e.displayName,'')}</span>
               </div>
@@ -191,7 +191,7 @@ function WorldNewsPanel() {
               display:'flex', alignItems:'center', gap:8,
             }}>
               <span style={{fontSize:'1rem'}}>{s.emoji}</span>
-              <div style={{flex:1}}>
+              <div style={{flex:1, minWidth:0, wordBreak:'break-word', overflowWrap:'anywhere'}}>
                 <span style={{fontSize:'0.8rem', fontWeight:600, color: s.color}}>{e.displayName}</span>
                 <span style={{fontSize:'0.78rem', color:'#8a92b2'}}>{e.message.replace(e.displayName,'')}</span>
               </div>
