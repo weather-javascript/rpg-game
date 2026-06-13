@@ -20,6 +20,7 @@ export interface PlayerSlice {
   useItem:            (itemId: string) => { success: boolean; message: string };
   changeDisplayName:  (name: string) => boolean;
   updateEquipment:    (equipment: EquipmentSlots) => void;
+  setEquippedTool:    (category: 'mining' | 'woodcutting', toolId: string) => void;
 }
 
 export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (set, get) => ({
@@ -194,5 +195,15 @@ export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (
 
   updateEquipment: (equipment: EquipmentSlots) => {
     set((state) => state.player ? { player: { ...state.player, equipment } } : state);
+  },
+
+  setEquippedTool: (category, toolId) => {
+    set((state) => {
+      if (!state.player) return state;
+      const equippedTools = { ...(state.player.equippedTools ?? { miningToolId: 'wood_yield_pickaxe', woodcuttingToolId: 'wood_yield_axe' }) };
+      if (category === 'mining') equippedTools.miningToolId = toolId;
+      else equippedTools.woodcuttingToolId = toolId;
+      return { player: { ...state.player, equippedTools } };
+    });
   },
 });
