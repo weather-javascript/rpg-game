@@ -194,26 +194,22 @@ export function GatheringScreen() {
       });
     }
 
-    // 採取後はlocalStorageのみバックアップ
-    const latestPlayer = useGameStore.getState().player;
-    if (latestPlayer) {
-      try { localStorage.setItem('rpg_backup', JSON.stringify({ data: latestPlayer, savedAt: Date.now() })); } catch { /* ignore */ }
-    }
+    // saveBufferに保存をキューイング（localStorage直書きはsaveBuffer側に任せる）
+    import('../../services/saveBuffer').then(({ queueSave }) => queueSave());
 
-    // クールダウン
+    // クールダウン（200msポーリングでRe-render頻度を抑制）
     const cooldownMs = result.cooldownMs;
+    const endTime = Date.now() + cooldownMs;
     setCooldowns(prev => ({ ...prev, [nodeId]: cooldownMs }));
-    const start = Date.now();
-    const tick = () => {
-      const rem = cooldownMs - (Date.now() - start);
+    const timer = setInterval(() => {
+      const rem = endTime - Date.now();
       if (rem <= 0) {
+        clearInterval(timer);
         setCooldowns(prev => { const n = { ...prev }; delete n[nodeId]; return n; });
       } else {
         setCooldowns(prev => ({ ...prev, [nodeId]: rem }));
-        requestAnimationFrame(tick);
       }
-    };
-    requestAnimationFrame(tick);
+    }, 200);
   }, [player, addItems, changeSatiety, changeHp, addSkillExp, addNotification, combo, addOwnedTool, addUnlockedToolGroup, updateToolAcquisitionStats]);
 
   const nodes = Object.values(GATHER_NODE_MASTER);
