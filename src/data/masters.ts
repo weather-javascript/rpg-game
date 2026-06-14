@@ -1286,6 +1286,14 @@ export const DEFAULT_PLAYER_STATS = {
 // ============================================================
 export const VERSION_PATCHES = [
   {
+    version: '2.16.0',
+    date: '2026-06-14',
+    changes: [
+      '🔧 Firestore読み書き回数を大幅削減（採取クールダウンのrAFループを200msポーリングに変更、管理者監視・メンテナンス監視をonSnapshot→5分ポーリングに切り替え）',
+      '🖼️ 武器・防具アイコンの背景が黒くなる不具合を修正（base64データをJPEGからPNGに正しく変換）',
+    ],
+  },
+  {
     version: '2.15.0',
     date: '2026-06-13',
     changes: [
