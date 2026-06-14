@@ -5,7 +5,7 @@ import { useEffect, useRef } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { savePlayer } from '../services/database';
 import { db } from '../services/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
 import type { PlayerData } from '../types/game';
 import { startSaveBufferInterval, stopSaveBufferInterval, flushSaveBuffer } from '../services/saveBuffer';
 
@@ -86,21 +86,29 @@ export function useAutoSave() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player?.uid]);
 
-  // 管理者によるFirestore上書きをリアルタイムで検知してローカルstateに反映
+  // 管理者によるFirestore上書きをポーリングで検知してローカルstateに反映（5分に1回）
   useEffect(() => {
     if (!player?.uid) return;
     const ref = doc(db, 'players', player.uid);
-    const unsub = onSnapshot(ref, (snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data() as PlayerData & { adminOverrideAt?: number };
-      if (!data.adminOverrideAt) return;
-      const latest = useGameStore.getState().player;
-      const localOverride = (latest as PlayerData & { adminOverrideAt?: number })?.adminOverrideAt ?? 0;
-      if (data.adminOverrideAt > localOverride) {
-        useGameStore.setState({ player: { ...(latest ?? {}), ...data } as PlayerData });
-      }
-    });
-    return unsub;
+    let stopped = false;
+    const check = async () => {
+      if (stopped) return;
+      try {
+        const { getDoc } = await import('firebase/firestore');
+        const snap = await getDoc(ref);
+        if (!snap.exists() || stopped) return;
+        const data = snap.data() as PlayerData & { adminOverrideAt?: number };
+        if (!data.adminOverrideAt) return;
+        const latest = useGameStore.getState().player;
+        const localOverride = (latest as PlayerData & { adminOverrideAt?: number })?.adminOverrideAt ?? 0;
+        if (data.adminOverrideAt > localOverride) {
+          useGameStore.setState({ player: { ...(latest ?? {}), ...data } as PlayerData });
+        }
+      } catch { /* ignore */ }
+    };
+    check();
+    const timer = setInterval(check, 5 * 60 * 1000); // 5分ポーリング
+    return () => { stopped = true; clearInterval(timer); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player?.uid]);
 
