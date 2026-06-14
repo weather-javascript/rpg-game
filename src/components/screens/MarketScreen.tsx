@@ -28,6 +28,14 @@ const DEFAULT_TRADE_RECIPES: TradeRecipe[] = [
     outputItemId: 'cave_staff2',
     outputAmount: 1,
   },
+  {
+    id: 'trade_goliath_shield',
+    name: '魔造壊盾=Goliath=と交換',
+    description: '鋼鉄インゴット32個、強固な骨64個、超合金メイプル16個を納めると魔造壊盾=Goliath=と交換してもらえる。',
+    inputs: [{ itemId: 'steel_ingot', amount: 32 }, { itemId: 'solid_bone', amount: 64 }, { itemId: 'super_alloy_maple', amount: 16 }],
+    outputItemId: 'goliath_shield',
+    outputAmount: 1,
+  },
 ];
 
 // 満腹度上限購入価格: 600 * 1.3^n

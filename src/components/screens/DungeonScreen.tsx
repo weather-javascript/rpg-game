@@ -69,6 +69,10 @@ interface TurnBattleState {
   pendingAction: null | { type: 'attack' | 'weapon' | 'ultimate'; itemId?: string };
   // KXモード用（省略可）
   kx?: KxState;
+  // Goliathシールド：残りターン数（0=無効）
+  goliathShieldTurns: number;
+  // Goliathシールド：次フェーズ攻撃不可の敵インデックス（-1=なし）
+  goliathStunnedEnemyIdx: number;
 }
 
 // KXボス戦専用状態
@@ -379,6 +383,8 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         awakeMaxHp: AWAKE_MAX_HP,
         burnTurns: 0,
       } : undefined,
+      goliathShieldTurns: 0,
+      goliathStunnedEnemyIdx: -1,
     };
   });
 
@@ -523,6 +529,18 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     }
     newBattle = { ...newBattle, buffs: remainBuffs };
 
+    // ===== Goliathシールドターン数デクリメント =====
+    let newGoliathTurns = newBattle.goliathShieldTurns;
+    if (newGoliathTurns > 0) {
+      newGoliathTurns--;
+      newBattle = { ...newBattle, goliathShieldTurns: newGoliathTurns };
+      if (newGoliathTurns === 0) {
+        newLog.push({ text: '🛡️ 魔造壊盾=Goliath=のシールド効果が切れた。', color: '#aaaaaa' });
+      } else {
+        newLog.push({ text: `🛡️ Goliathシールド有効（残${newGoliathTurns}ターン）`, color: '#00e5ff' });
+      }
+    }
+
     // 後方互換：poisonBuff（旧来の直接変数も処理）
     if (newBattle.poisonBuff > 0) {
       newBattle.enemies = newBattle.enemies.map(e =>
@@ -635,6 +653,15 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       const monster = getMergedMonster(enemy.monsterId);
       if (!monster) continue;
 
+      // Goliathシールドによるスタン：このターン攻撃不可
+      const enemyIdx = newBattle.enemies.findIndex(e => e === enemy || (e.monsterId === enemy.monsterId && e.hp === enemy.hp));
+      if (newBattle.goliathStunnedEnemyIdx >= 0 && enemyIdx === newBattle.goliathStunnedEnemyIdx) {
+        newLog.push({ text: `🛡️ ${monster.name}はGoliathの力で攻撃できない！`, color: '#00e5ff' });
+        // スタンリセット（1回のみ有効）
+        newBattle = { ...newBattle, goliathStunnedEnemyIdx: -1 };
+        continue;
+      }
+
       // デビルアーマー系スキル処理
       if (monster.id === 'devil_armor' || monster.id === 'dead_armor') {
         const warningInterval = monster.id === 'dead_armor' ? 5 : 10;
@@ -677,7 +704,22 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           mDmg = Math.max(1, Math.floor(mDmg * (1 - cut)));
         }
       }
+      // Goliathシールド：85%カット
+      if (newBattle.goliathShieldTurns > 0) {
+        mDmg = Math.max(1, Math.floor(mDmg * 0.15));
+      }
       const reducedDmg = newBattle.isDefending ? Math.floor(mDmg * 0.5) : mDmg;
+      // Goliathシールド：HP以上のダメージが来たらHP10残して耐える
+      const currentHp = player.stats.hp;
+      if (newBattle.goliathShieldTurns > 0 && reducedDmg >= currentHp && currentHp > 10) {
+        changeHp(-(currentHp - 10));
+        newLog.push({ text: `🛡️ Goliathが致命打を受けた！HP10で耐えた！`, color: '#00e5ff' });
+        newLog.push(isSpecial
+          ? { text: `💥 ${monster.name}の特殊攻撃！ しかしGoliathが守った！`, color: '#e05555' }
+          : { text: `🐉 ${monster.name}の攻撃！ Goliathが守った！${newBattle.isDefending ? '（防御中）' : ''}`, color: '#e05555' }
+        );
+        continue;
+      }
       changeHp(-reducedDmg);
       const newPlayerHp = Math.max(0, player.stats.hp - reducedDmg);
       newLog.push(isSpecial
@@ -969,6 +1011,34 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     if (remainingCd > 0) { addNotification('warning', `${item.name}はクールダウン中です（残り${remainingCd}ターン）`); return; }
 
     if (item.itemType === 'Weapon') {
+      // Goliathシールド特別処理：攻撃ではなくシールド発動
+      const goliathSkill = item.weaponSkills?.find(s => s.type === 'goliath_shield') as import('../../types/game').WeaponGoliathSkill | undefined;
+      if (goliathSkill) {
+        const randomAliveIdx = battle.enemies.reduce<number[]>((acc, e, i) => e.hp > 0 ? [...acc, i] : acc, []);
+        const finalStunIdx = randomAliveIdx.length > 0
+          ? randomAliveIdx[Math.floor(Math.random() * randomAliveIdx.length)]
+          : -1;
+        const newCooldowns = { ...battle.itemCooldowns, [itemId]: goliathSkill.cooldownTurns };
+        const logMsg = item.useEffect?.message ?? '魔造壊盾=Goliath=を発動！';
+        const stunMonName = finalStunIdx >= 0 ? (getMergedMonster(battle.enemies[finalStunIdx].monsterId)?.name ?? '敵') : '';
+        const stunnedMsg = finalStunIdx >= 0 ? ` ${stunMonName}は次のフェーズ攻撃不可！` : '';
+        const afterGoliath: TurnBattleState = {
+          ...battle,
+          log: [...battle.log,
+            { text: `🛡️ ${logMsg}`, color: '#00e5ff' },
+            { text: `🛡️ 3ターン間ダメージ85%カット！${stunnedMsg}`, color: '#00e5ff' },
+          ],
+          turn: 'monster',
+          isDefending: false,
+          goliathShieldTurns: goliathSkill.shieldTurns,
+          goliathStunnedEnemyIdx: finalStunIdx,
+          itemCooldowns: newCooldowns,
+          equippedWeaponId: itemId,
+        };
+        setBattle(afterGoliath);
+        setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+        return;
+      }
       const isArea = !!item.isAreaWeapon;
       const alive = battle.enemies.filter(e => e.hp > 0);
       // equippedWeaponId を更新してから executeAttack に委譲
