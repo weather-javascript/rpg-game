@@ -42,6 +42,18 @@ export interface WeaponShieldSkill {
   cutPercent: number;
 }
 /**
+ * goliath_shield: 発動後3ターン敵からのダメージを85%カット、
+ * 自分のHP以上の攻撃が来た場合HP10残して耐える、
+ * 出現している敵の1体を次のフェーズ攻撃不可にする
+ * 発動後7ターンはクールダウン
+ */
+export interface WeaponGoliathSkill {
+  type: 'goliath_shield';
+  cutPercent: number;      // 85
+  shieldTurns: number;     // 3
+  cooldownTurns: number;   // 7
+}
+/**
  * mana_charge: 毎ターン固定Mana獲得型（変幻など）
  * 共通Manaシステムを使用。manaMaxは武器固有。
  */
@@ -70,7 +82,7 @@ export interface WeaponManaPerTurnRandomSkill {
   manaMax: number;
   manaStep: number;
 }
-export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill;
+export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill | WeaponGoliathSkill;
 
 export interface WeaponUltimate {
   name: string;
