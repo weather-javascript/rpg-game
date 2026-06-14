@@ -703,9 +703,15 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatus | null> 
 }
 
 export function subscribeMaintenanceStatus(cb: (s: MaintenanceStatus | null) => void): Unsubscribe {
-  return onSnapshot(doc(db, 'admin', 'maintenance'), snap => {
+  const ref = doc(db, 'admin', 'maintenance');
+  let stopped = false;
+  const fetch = () => getDoc(ref).then(snap => {
+    if (stopped) return;
     cb(snap.exists() ? (snap.data() as MaintenanceStatus) : null);
-  });
+  }).catch(() => {});
+  fetch();
+  const timer = setInterval(fetch, 5 * 60 * 1000);
+  return () => { stopped = true; clearInterval(timer); };
 }
 
 export async function setMaintenanceStatus(status: MaintenanceStatus): Promise<void> {
@@ -2880,9 +2886,14 @@ export async function setTabMaintenanceEntry(tab: MaintainableTab, entry: TabMai
 }
 
 export function subscribeTabMaintenance(cb: (config: TabMaintenanceConfig) => void): Unsubscribe {
-  return onSnapshot(TAB_MAINT_REF(), snap => {
+  let stopped = false;
+  const fetch = () => getDoc(TAB_MAINT_REF()).then(snap => {
+    if (stopped) return;
     cb(snap.exists() ? ((snap.data() as { tabs: TabMaintenanceConfig }).tabs ?? {}) : {});
-  });
+  }).catch(() => {});
+  fetch();
+  const timer = setInterval(fetch, 5 * 60 * 1000);
+  return () => { stopped = true; clearInterval(timer); };
 }
 
 // ---- 釣りキャスト時間設定 ----

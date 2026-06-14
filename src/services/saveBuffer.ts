@@ -38,7 +38,7 @@ export async function flushSaveBuffer(): Promise<void> {
     backupToLocalStorage(player);
     await savePlayer(player);
     useGameStore.setState({ lastSaveTime: Date.now() });
-    useGameStore.getState().addNotification('success', '🎣 釣りデータを保存しました！');
+    // サイレント保存（通知なし）
   } catch (e) {
     console.error('[saveBuffer] Firestore保存失敗:', e);
     isDirty = true; // 失敗したら次回再試行
