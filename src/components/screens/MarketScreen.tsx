@@ -36,6 +36,26 @@ const DEFAULT_TRADE_RECIPES: TradeRecipe[] = [
     outputItemId: 'goliath_shield',
     outputAmount: 1,
   },
+  {
+    id: 'trade_almighty_staff_compress',
+    name: '万能杖を圧縮する',
+    description: '万能杖1本を万能杖圧縮1個と交換してもらえる。',
+    inputs: [{ itemId: 'almighty_staff', amount: 1 }],
+    outputItemId: 'almighty_staff_compressed',
+    outputAmount: 1,
+  },
+  {
+    id: 'trade_meteorite_exchange',
+    name: '隕石を分解する',
+    description: '隕石1個を鉄隕石の欠片64個と鉄ブロック20個に分解してもらえる。',
+    inputs: [{ itemId: 'meteorite', amount: 1 }],
+    outputItemId: 'iron_meteorite',
+    outputAmount: 64,
+    outputs: [
+      { itemId: 'iron_meteorite', amount: 64 },
+      { itemId: 'iron_block', amount: 20 },
+    ],
+  },
 ];
 
 // 満腹度上限購入価格: 600 * 1.3^n
@@ -490,7 +510,6 @@ export function MarketScreen() {
             🏪 素材を納めると特別なアイテムと交換してもらえます。
           </p>
           {tradeRecipes.map(recipe => {
-            const outputItem = ITEM_MASTER[recipe.outputItemId];
             const canTrade = recipe.inputs.every(inp => (player?.inventory[inp.itemId] ?? 0) >= inp.amount);
             return (
               <div key={recipe.id} style={{background:'#1c2235', border:`1px solid ${canTrade ? '#4caf87' : '#2d3752'}`, borderRadius:8, padding:'12px 14px', marginBottom:10}}>
@@ -515,11 +534,18 @@ export function MarketScreen() {
                   })}
                 </div>
                 {/* 交換先 */}
-                <div style={{display:'flex', alignItems:'center', gap:8, background:'rgba(240,192,96,0.07)', borderRadius:6, padding:'6px 10px', marginBottom:10}}>
+                <div style={{display:'flex', flexDirection:'column', gap:6, background:'rgba(240,192,96,0.07)', borderRadius:6, padding:'6px 10px', marginBottom:10}}>
                   <span style={{fontSize:'0.72rem', color:'#f0c060'}}>▶ 交換品</span>
-                  <GameIcon id={outputItem?.icon ?? 'gem'} size={22} />
-                  <span style={{fontSize:'0.85rem', fontWeight:700, color:'#f0c060'}}>{outputItem?.name ?? recipe.outputItemId}</span>
-                  {recipe.outputAmount > 1 && <span style={{fontSize:'0.75rem', color:'#8a92b2'}}>×{recipe.outputAmount}</span>}
+                  {(recipe.outputs ?? [{ itemId: recipe.outputItemId, amount: recipe.outputAmount }]).map(out => {
+                    const item = ITEM_MASTER[out.itemId];
+                    return (
+                      <div key={out.itemId} style={{display:'flex', alignItems:'center', gap:8}}>
+                        <GameIcon id={item?.icon ?? 'gem'} size={22} />
+                        <span style={{fontSize:'0.85rem', fontWeight:700, color:'#f0c060'}}>{item?.name ?? out.itemId}</span>
+                        {out.amount > 1 && <span style={{fontSize:'0.75rem', color:'#8a92b2'}}>×{out.amount}</span>}
+                      </div>
+                    );
+                  })}
                 </div>
                 <button
                   disabled={!canTrade}
@@ -531,8 +557,10 @@ export function MarketScreen() {
                         return;
                       }
                     }
-                    addItems([{ itemId: recipe.outputItemId, amount: recipe.outputAmount }]);
-                    addNotification('success', `🔄 ${outputItem?.name ?? recipe.outputItemId} と交換しました！`);
+                    const outs = recipe.outputs ?? [{ itemId: recipe.outputItemId, amount: recipe.outputAmount }];
+                    addItems(outs.map(out => ({ itemId: out.itemId, amount: out.amount })));
+                    const namesText = outs.map(out => ITEM_MASTER[out.itemId]?.name ?? out.itemId).join('、');
+                    addNotification('success', `🔄 ${namesText} と交換しました！`);
                   }}
                   style={{
                     width:'100%', padding:'8px', fontWeight:700, fontSize:'0.85rem',

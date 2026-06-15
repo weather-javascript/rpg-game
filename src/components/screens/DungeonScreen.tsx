@@ -1039,10 +1039,51 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
         return;
       }
+      // Silvers eye特別処理：マナを消費しながら連続発動
+      const silversSkill = item.weaponSkills?.find(s => s.type === 'silvers_eye') as import('../../types/game').WeaponSilversEyeSkill | undefined;
+      if (silversSkill) {
+        let mana = battle.weaponMana;
+        let enemies = battle.enemies.map(e => ({ ...e }));
+        const log: { text: string; color: string }[] = [...battle.log];
+        let activations = 0;
+        while (mana >= silversSkill.manaCost && enemies.some(e => e.hp > 0)) {
+          mana -= silversSkill.manaCost;
+          activations++;
+          enemies = enemies.map(e => {
+            if (e.hp <= 0) return e;
+            const mon = getMergedMonster(e.monsterId);
+            const dmg = calcDamage(silversSkill.attackDmg, mon?.defense ?? 0) + silversSkill.penetrateDmg;
+            return { ...e, hp: Math.max(0, e.hp - dmg) };
+          });
+        }
+        if (activations > 0) {
+          log.push({ text: `👁️ ${item.useEffect?.message ?? '=Silvers eye=が発動した！'}（${activations}回発動）`, color: '#c0c8ff' });
+        } else {
+          log.push({ text: `👁️ マナが足りず=Silvers eye=は発動しなかった！`, color: '#8a92b2' });
+        }
+        const finalMana = Math.min(mana + silversSkill.manaRestore, battle.weaponManaMax);
+        log.push({ text: `💠 =Silvers eye=の効果でマナが${silversSkill.manaRestore}回復した！（${finalMana}/${battle.weaponManaMax}）`, color: '#4fc3f7' });
+        const newCooldowns = { ...battle.itemCooldowns, [itemId]: silversSkill.cooldownTurns };
+        const afterSilvers: TurnBattleState = {
+          ...battle,
+          enemies,
+          log,
+          turn: 'monster',
+          isDefending: false,
+          weaponMana: finalMana,
+          itemCooldowns: newCooldowns,
+          equippedWeaponId: itemId,
+        };
+        setBattle(afterSilvers);
+        setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+        return;
+      }
+
       const isArea = !!item.isAreaWeapon;
       const alive = battle.enemies.filter(e => e.hp > 0);
       // equippedWeaponId を更新してから executeAttack に委譲
       setBattle(b => ({ ...b, equippedWeaponId: itemId }));
+
       if (!isArea && alive.length > 1 && !battle.kx?.isAwakened) {
         setBattle(b => ({ ...b, turn: 'select_target', pendingAction: { type: 'weapon', itemId }, equippedWeaponId: itemId }));
         return;
