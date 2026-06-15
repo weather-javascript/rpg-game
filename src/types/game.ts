@@ -82,7 +82,21 @@ export interface WeaponManaPerTurnRandomSkill {
   manaMax: number;
   manaStep: number;
 }
-export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill | WeaponGoliathSkill;
+/**
+ * silvers_eye: 連続発動型必殺技（=Silvers eye=）
+ * 発動するとマナをmanaCostずつ消費して物理attackDmg＋貫通penetrateDmgのダメージを与え、
+ * 出現している敵が全滅するかマナが尽きるまで連続発動する。
+ * 全て終わった時点でmanaRestoreだけマナを回復し、発動後cooldownTurnsターンは使用不可。
+ */
+export interface WeaponSilversEyeSkill {
+  type: 'silvers_eye';
+  manaCost: number;       // 1回の発動に必要なマナ
+  attackDmg: number;       // 物理ダメージ
+  penetrateDmg: number;    // 貫通ダメージ
+  manaRestore: number;     // 連続発動が終了した時に回復するマナ量
+  cooldownTurns: number;   // 発動後のクールダウンターン数
+}
+export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill | WeaponGoliathSkill | WeaponSilversEyeSkill;
 
 export interface WeaponUltimate {
   name: string;
