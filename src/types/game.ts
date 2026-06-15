@@ -2,7 +2,7 @@
 
 export type IdMap<T> = Record<string, T>;
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-export type ItemCategory = 'material' | 'tool' | 'consumable' | 'weapon' | 'armor' | 'treasure' | 'food' | 'potion' | 'bait';
+export type ItemCategory = 'material' | 'tool' | 'consumable' | 'weapon' | 'armor' | 'treasure' | 'food' | 'potion';
 export type ItemType = 'Weapon' | 'Armor' | 'Item' | 'Heal';
 export type SkillId = 'mining' | 'woodcutting' | 'combat' | 'fishing' | 'crafting';
 
@@ -42,18 +42,6 @@ export interface WeaponShieldSkill {
   cutPercent: number;
 }
 /**
- * goliath_shield: 発動後3ターン敵からのダメージを85%カット、
- * 自分のHP以上の攻撃が来た場合HP10残して耐える、
- * 出現している敵の1体を次のフェーズ攻撃不可にする
- * 発動後7ターンはクールダウン
- */
-export interface WeaponGoliathSkill {
-  type: 'goliath_shield';
-  cutPercent: number;      // 85
-  shieldTurns: number;     // 3
-  cooldownTurns: number;   // 7
-}
-/**
  * mana_charge: 毎ターン固定Mana獲得型（変幻など）
  * 共通Manaシステムを使用。manaMaxは武器固有。
  */
@@ -82,36 +70,7 @@ export interface WeaponManaPerTurnRandomSkill {
   manaMax: number;
   manaStep: number;
 }
-/**
- * silvers_eye: 連続発動型必殺技（=Silvers eye=）
- * 発動するとマナをmanaCostずつ消費して物理attackDmg＋貫通penetrateDmgのダメージを与え、
- * 出現している敵が全滅するかマナが尽きるまで連続発動する。
- * 全て終わった時点でmanaRestoreだけマナを回復し、発動後cooldownTurnsターンは使用不可。
- */
-export interface WeaponSilversEyeSkill {
-  type: 'silvers_eye';
-  manaCost: number;       // 1回の発動に必要なマナ
-  attackDmg: number;       // 物理ダメージ
-  penetrateDmg: number;    // 貫通ダメージ
-  manaRestore: number;     // 連続発動が終了した時に回復するマナ量
-  cooldownTurns: number;   // 発動後のクールダウンターン数
-}
-/**
- * frostbite_self_damage: 攻撃時に自分自身が凍傷ダメージを受ける（=冷海の覇魚=など）
- */
-export interface WeaponFrostbiteSelfDamageSkill {
-  type: 'frostbite_self_damage';
-  selfDamage: number;
-}
-/**
- * penetrate_on_use_chance: 使用時に一定確率で敵に貫通ダメージを与える（=冷海の覇魚=など）
- */
-export interface WeaponPenetrateOnUseChanceSkill {
-  type: 'penetrate_on_use_chance';
-  chance: number;          // 0.0〜1.0
-  penetrateDamage: number;
-}
-export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill | WeaponGoliathSkill | WeaponSilversEyeSkill | WeaponFrostbiteSelfDamageSkill | WeaponPenetrateOnUseChanceSkill;
+export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill;
 
 export interface WeaponUltimate {
   name: string;
@@ -125,9 +84,8 @@ export interface WeaponUltimate {
   postBuffTurns?: number;
   postBuffPoisonDmg?: number;
 }
-export type TabId = 'gathering' | 'market' | 'dungeon' | 'gamble' | 'status' | 'online' | 'fishing' | 'admin' | 'crafting' | 'navi' | 'aquarium';
-export type GambleType = 'slot' | 'treasure_box' | 'coin_flip' | 'chohan' | 'chinchiro' | 'jackpot' | 'poker' | 'highlow' | 'mines' | 'dice_race' | 'roulette' | 'blackjack' | 'scratch' | 'race';
-export type GambleGameCategory = 'instant' | 'choice' | 'step' | 'reveal' | 'card';
+export type TabId = 'gathering' | 'market' | 'dungeon' | 'gamble' | 'status' | 'online' | 'fishing' | 'admin' | 'crafting' | 'navi';
+export type GambleType = 'slot' | 'treasure_box' | 'coin_flip' | 'chohan' | 'chinchiro' | 'jackpot' | 'poker' | 'highlow';
 export type GambleRank = '見習い' | 'ギャンブラー' | '熟練ギャンブラー' | '賭博王' | 'レジェンド';
 
 export interface MissionDef {
@@ -149,24 +107,12 @@ export interface MissionProgress {
   dailyHighlowWins: number;
   dailyPokerWins: number;
   dailyGamblePlays: number;
-  dailyMinesWins: number;
-  dailyDiceRaceWins: number;
-  dailyRouletteWins: number;
-  dailyBlackjackWins: number;
-  dailyScratchWins: number;
-  dailyRaceWins: number;
   weeklySlotPlays: number;
   weeklyChohanWins: number;
   weeklyChinchiroWins: number;
   weeklyPokerWins: number;
   weeklyGamblePlays: number;
   weeklyHighlowMaxStreak: number;
-  weeklyMinesWins: number;
-  weeklyDiceRaceWins: number;
-  weeklyRouletteWins: number;
-  weeklyBlackjackWins: number;
-  weeklyScratchWins: number;
-  weeklyRaceWins: number;
   // all-time stats
   totalSlotPlays: number;
   totalChohanPlays: number;
@@ -181,18 +127,6 @@ export interface MissionProgress {
   totalHighlowWins: number;
   totalHighlowMaxStreak: number;
   totalJackpotWins: number;
-  totalMinesPlays: number;
-  totalMinesWins: number;
-  totalDiceRacePlays: number;
-  totalDiceRaceWins: number;
-  totalRoulettePlays: number;
-  totalRouletteWins: number;
-  totalBlackjackPlays: number;
-  totalBlackjackWins: number;
-  totalScratchPlays: number;
-  totalScratchWins: number;
-  totalRacePlays: number;
-  totalRaceWins: number;
   totalWagered: number;
   totalWinAmount: number;
   totalLoseCount: number;
@@ -228,11 +162,8 @@ export interface ItemMaster {
   weaponAtk?: number;       // 武器固有攻撃力（通常攻撃をこの値で上書き）
   isAreaWeapon?: boolean;   // 範囲攻撃武器（全体攻撃）
   areaPenetrate?: number;   // 範囲攻撃の貫通ダメージ（防御無視）
-  weaponDef?: number;       // 装備時防御ボーナス（防具）
+  weaponDef?: number;       // 装備時防御ボーナス
   weaponHpBonus?: number;   // 装備時最大HP増加
-  armorToughness?: number;  // 防具強度（ダメージ軽減計算に使用）
-  epf?: number;             // 装備時EPF（ダメージ軽減Ⅱ等によるダメージ軽減ポイント）
-  moveSpeedPct?: number;    // 装備時移動速度変化（%、負の値で低下）
   // 武器スキル（複数可）
   weaponSkills?: WeaponSkill[];
   weaponUltimate?: WeaponUltimate;
@@ -273,23 +204,6 @@ export interface DropEntry {
   minAmount: number;
   maxAmount: number;
   skillRateBonus?: number;
-}
-
-// 採取ツールマスタ（採掘・伐採共通：100種）
-export interface ToolMaster {
-  id: string;
-  name: string;
-  category: 'mining' | 'woodcutting';
-  material: 'wood' | 'stone' | 'iron' | 'gold' | 'mythril';
-  type: 'speed' | 'yield' | 'rare' | 'combo' | 'efficiency';
-  speedMultiplier: number;
-  yieldMultiplier: number;
-  rareMultiplier: number;
-  staminaMultiplier: number;
-  comboBonus: number;
-  specialEffectId: string | null;
-  acquisitionTags?: string[];   // 入手経路タグ ('drop','craft','gacha','condition')
-  dropSources?: string[];       // ドロップソースID一覧
 }
 
 export interface GatherNodeMaster {
@@ -412,15 +326,6 @@ export function defaultEquipmentSlots(): EquipmentSlots {
   return { hotbar: Array(9).fill(null), helmet: null, chestplate: null, leggings: null, boots: null, offhand: null };
 }
 
-// 魚図鑑エントリ
-export interface FishBookEntry {
-  fishId: string;
-  firstCaughtAt: number;
-  totalCaught: number;
-  maxSizeCm: number;
-  maxWeightKg: number;
-}
-
 export interface PlayerData {
   uid: string;
   displayName: string;
@@ -434,38 +339,6 @@ export interface PlayerData {
   dungeonClearedCount: IdMap<number>;
   fishingScore: number;
   equippedRodId: string;
-  // 採取ツール装備（採掘・伐採）
-  equippedTools?: { miningToolId: string; woodcuttingToolId: string };
-  // 採取ツール所持・解放
-  ownedToolIds?: string[];
-  unlockedToolIds?: string[]; // 条件解放済みグループID ('unlock_basic','unlock_combo',...)
-  toolAcquisitionStats?: {
-    totalGatherCount: number;
-    maxCombo: number;
-    nightGatherCount: number;
-    rainGatherCount: number;
-    dangerSuccessCount: number;
-  };
-  // 釣りシステム v2
-  fishingLevel?: number;
-  fishingExp?: number;
-  fishingTotalCount?: number;
-  fishingMaxSizeCm?: number;
-  fishingMaxWeightKg?: number;
-  fishBook?: Record<string, FishBookEntry>; // key: fishId
-  fishingEquippedBaitId?: string;
-  fishingSelectedSpotId?: string;
-  fishingUnlockedSpots?: string[];
-  fishingRodEnhance?: Record<string, number>; // rodId -> enhance level (+0~+20)
-  fishingRodDurability?: Record<string, number>; // rodId -> current durability
-  fishingTotalBaitUsed?: number;
-  fishingTotalGoldEarned?: number;
-  fishingAchievements?: string[]; // achieved FA ids
-  fishingUnlockedTitles?: string[]; // unlocked title ids
-  fishCoin?: number; // 釣り専用通貨
-  fishMoney?: number; // 釣りで得る専用マネー（2FishMoney→1G）
-  fishingLegendaryCount?: number; // 伝説魚累計捕獲数
-  fishingTotalWeightKg?: number; // 総重量(累計)
   activeJob: string | null;
   activeBuffs: { id: string; name: string; expiry: number; fishingBonus?: number; miningBonus?: number }[];
   reliefUsedCount: number;
@@ -510,18 +383,6 @@ export interface PlayerData {
   // 送金統計
   totalGoldSent?: number;
   totalGoldReceived?: number;
-  // NPC依頼
-  npcQuestAcceptances?: QuestAcceptance[];
-  totalQuestCompleted?: number;
-  totalQuestRewardGold?: number;
-  // 株式保有
-  stockHoldings?: Record<string, StockHolding>; // key: StockId
-  totalStockProfit?: number;
-  // ナビ報酬受取済み
-  naviClaimed?: Record<string, boolean>;
-  // ギルド
-  guildId?: string | null;
-  guildName?: string | null;
   // プロフィール
   profile?: {
     icon: string;          // 絵文字アイコン
@@ -750,104 +611,6 @@ export interface PokerTable {
 }
 
 // ============================================================
-// NPC依頼システム型
-// ============================================================
-export type QuestRank = 'C' | 'B' | 'A' | 'S' | 'SS';
-
-export type QuestType = 'delivery' | 'bulk' | 'urgent' | 'select' | 'chain';
-
-export interface NpcQuest {
-  id: string;
-  npcName: string;
-  npcIcon: string;
-  rank: QuestRank;
-  title: string;
-  description: string;
-  requiredItemId: string;
-  requiredAmount: number;
-  rewardGold: number;
-  expiresAt: number;   // タイムスタンプ（定期更新）
-  createdAt: number;
-  // 拡張フィールド
-  questType?: QuestType;
-  alternateItemIds?: string[];   // select型：代替可能なアイテムID（報酬-20%）
-  urgentDeadlineMs?: number;     // urgent型：短縮期限（ms）
-  marketMultiplier?: number;     // 市場連動補正（0.7〜1.5）
-  difficultyMultiplier?: number; // 難易度係数
-  npcType?: 'villager' | 'blacksmith' | 'merchant' | 'noble' | 'alchemist' | 'adventurer' | 'fisherman';
-}
-
-export interface QuestAcceptance {
-  questId: string;
-  acceptedAt: number;
-  completedAt?: number;
-  rewardGold: number;
-}
-
-// ============================================================
-// 株式市場型
-// ============================================================
-export type StockSector = 'tech' | 'industry' | 'finance' | 'consumer' | 'entertainment' | 'energy';
-
-export type StockId =
-  | 'wealth_mining'
-  | 'wealth_fishery'
-  | 'wealth_casino'
-  | 'wealth_tech'
-  | 'wealth_energy'
-  | 'wealth_logistics'
-  | 'wealth_foods'
-  | 'wealth_finance'
-  | 'wealth_robotics'
-  | 'wealth_software'
-  | 'wealth_chemical'
-  | 'wealth_steel'
-  | 'wealth_realestate'
-  | 'wealth_insurance'
-  | 'wealth_retail'
-  | 'wealth_apparel'
-  | 'wealth_media'
-  | 'wealth_gaming'
-  | 'wealth_airlines'
-  | 'wealth_solar'
-  | 'wealth_oil'
-  | 'wealth_pharma'
-  | 'wealth_telecom';
-
-export interface StockMaster {
-  id: StockId;
-  name: string;
-  icon: string;
-  basePrice: number;
-  sector: StockSector;
-}
-
-export interface StockPricePoint {
-  timestamp: number;
-  price: number;
-  news?: string;
-  open?: number;
-  high?: number;
-  low?: number;
-  close?: number;
-}
-
-export interface StockTrendData {
-  trend: number;        // -0.05 ~ 0.05
-  volatility: number;  // 0.01 ~ 0.1
-  stability: number;   // 0 ~ 1
-  consecutiveTicks: number;
-  haltedAt?: number;   // ストップ高/安で取引停止した timestamp (ms), ない場合はundefined
-}
-
-export interface StockHolding {
-  stockId: StockId;
-  amount: number;
-  avgBuyPrice: number;   // 平均購入価格
-  purchasedAt: number;   // 最後の購入時刻（24h売却禁止用）
-}
-
-// ============================================================
 // UI 型
 // ============================================================
 export interface Notification {
@@ -863,79 +626,4 @@ export interface VersionPatch {
   version: string;
   date: string;
   changes: string[];
-}
-
-// ============================================================
-// ギルド型
-// ============================================================
-export interface GuildData {
-  id: string;
-  name: string;
-  description: string;
-  leaderUid: string;
-  leaderName: string;
-  memberUids: string[];
-  memberCount: number;
-  level: number;               // ギルドレベル (1〜10)
-  totalDonated: number;        // 累計寄付額 (ギルドEXP)
-  bankGold: number;            // ギルド銀行残高
-  warehouseItems: IdMap<number>; // ギルド倉庫
-  warehouseCapacity: number;   // 倉庫スロット数
-  maxMembers: number;          // 人数上限
-  totalAssets: number;         // 総資産（ランキング用）
-  totalKills: number;          // 総討伐数（ランキング用）
-  totalLevels: number;         // 総レベル（ランキング用）
-  createdAt: number;
-  updatedAt: number;
-}
-
-export interface GuildMember {
-  uid: string;
-  displayName: string;
-  level: number;
-  role: 'leader' | 'member';
-  joinedAt: number;
-  totalDonated: number;
-}
-
-export interface GuildChatMessage {
-  id: string;
-  uid: string;
-  displayName: string;
-  level: number;
-  text: string;
-  createdAt: number;
-}
-
-// ============================================================
-// フレンド型
-// ============================================================
-export interface FriendRequest {
-  id: string;
-  fromUid: string;
-  fromName: string;
-  fromLevel: number;
-  toUid: string;
-  status: 'pending' | 'accepted' | 'rejected';
-  createdAt: number;
-}
-
-export interface FriendEntry {
-  uid: string;
-  displayName: string;
-  level: number;
-  favorite: boolean;
-  addedAt: number;
-}
-
-export interface DirectMessage {
-  id: string;
-  fromUid: string;
-  fromName: string;
-  toUid: string;
-  text: string;
-  gift?: { itemId: string; amount: number };
-  goldAmount?: number;
-  read: boolean;
-  createdAt: number;
 }
