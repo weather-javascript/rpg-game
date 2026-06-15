@@ -5,11 +5,10 @@ import { useState, useEffect } from 'react';
 import { GameIcon } from '../icons';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
-import { subscribeItemPrices, subscribeTradeRecipes, subscribeNpcQuests, generateNpcQuests, deleteExpiredNpcQuests, completeNpcQuest, updateQuestRanking, subscribeQuestRanking } from '../../services/multiplayer';
-import type { TradeRecipe, QuestRankingEntry } from '../../services/multiplayer';
-import type { NpcQuest, QuestRank } from '../../types/game';
+import { subscribeItemPrices, subscribeTradeRecipes } from '../../services/multiplayer';
+import type { TradeRecipe } from '../../services/multiplayer';
 
-type ShopTab = 'sell' | 'buy' | 'satiety' | 'use' | 'trade' | 'quest';
+type ShopTab = 'sell' | 'buy' | 'satiety' | 'use' | 'trade';
 
 const DEFAULT_TRADE_RECIPES: TradeRecipe[] = [
   {
@@ -27,34 +26,6 @@ const DEFAULT_TRADE_RECIPES: TradeRecipe[] = [
     inputs: [{ itemId: 'cave_staff', amount: 1 }, { itemId: 'mole_claw', amount: 4 }],
     outputItemId: 'cave_staff2',
     outputAmount: 1,
-  },
-  {
-    id: 'trade_goliath_shield',
-    name: '魔造壊盾=Goliath=と交換',
-    description: '鋼鉄インゴット32個、強固な骨64個、超合金メイプル16個を納めると魔造壊盾=Goliath=と交換してもらえる。',
-    inputs: [{ itemId: 'steel_ingot', amount: 32 }, { itemId: 'solid_bone', amount: 64 }, { itemId: 'super_alloy_maple', amount: 16 }],
-    outputItemId: 'goliath_shield',
-    outputAmount: 1,
-  },
-  {
-    id: 'trade_almighty_staff_compress',
-    name: '万能杖を圧縮する',
-    description: '万能杖1本を万能杖圧縮1個と交換してもらえる。',
-    inputs: [{ itemId: 'almighty_staff', amount: 1 }],
-    outputItemId: 'almighty_staff_compressed',
-    outputAmount: 1,
-  },
-  {
-    id: 'trade_meteorite_exchange',
-    name: '隕石を分解する',
-    description: '隕石1個を鉄隕石の欠片64個と鉄ブロック20個に分解してもらえる。',
-    inputs: [{ itemId: 'meteorite', amount: 1 }],
-    outputItemId: 'iron_meteorite',
-    outputAmount: 64,
-    outputs: [
-      { itemId: 'iron_meteorite', amount: 64 },
-      { itemId: 'iron_block', amount: 20 },
-    ],
   },
 ];
 
@@ -84,10 +55,6 @@ export function MarketScreen() {
   const [tradeRecipes, setTradeRecipes] = useState<TradeRecipe[]>(DEFAULT_TRADE_RECIPES);
   const [sellSearch, setSellSearch] = useState('');
   const [sellCat, setSellCat] = useState('all');
-  const [buyQty, setBuyQty] = useState<Record<string, number>>({});
-  const [npcQuests, setNpcQuests] = useState<NpcQuest[]>([]);
-  const [questRanking, setQuestRanking] = useState<QuestRankingEntry[]>([]);
-  const [questRankTab, setQuestRankTab] = useState<'count' | 'gold'>('count');
 
   useEffect(() => {
     const unsub = subscribeItemPrices(p => setPriceOverrides(p));
@@ -99,27 +66,6 @@ export function MarketScreen() {
       if (r && r.length > 0) setTradeRecipes(r);
     });
     return unsub;
-  }, []);
-
-  // NPC依頼
-  useEffect(() => {
-    const unsub = subscribeNpcQuests(quests => setNpcQuests(quests));
-    return unsub;
-  }, []);
-
-  useEffect(() => {
-    const unsub = subscribeQuestRanking(entries => setQuestRanking(entries));
-    return unsub;
-  }, []);
-
-  // 起動時に期限切れ依頼を削除し、依頼が0件なら生成
-  useEffect(() => {
-    deleteExpiredNpcQuests().then(() => {
-      // 依頼がなければ生成
-      setTimeout(() => {
-        if (npcQuests.length === 0) generateNpcQuests().catch(() => {});
-      }, 2000);
-    }).catch(() => {});
   }, []);
 
   // 実効価格を取得（Firestoreオーバーライドが優先）
@@ -248,45 +194,14 @@ export function MarketScreen() {
   const nextHpPrice = hpUpgradePrice(hpCount);
   const currentMaxHp = player?.stats.maxHp ?? 100;
 
-  const QUEST_RANK_COLOR: Record<QuestRank, string> = { C: '#8a92b2', B: '#4caf87', A: '#5b8dee', S: '#f0c060', SS: '#e060e0' };
-
   const ROW = { display:'flex', alignItems:'center', gap:10, background:'#1c2235', border:'1px solid #2d3752', borderRadius:6, padding:'8px 12px', marginBottom:4 } as const;
   const BTN = (bg: string) => ({ padding:'5px 12px', background:bg, color:'#fff', border:'none', borderRadius:4, cursor:'pointer', fontSize:'0.8rem', whiteSpace:'nowrap' as const });
-
-  const handleQuestComplete = async (quest: NpcQuest) => {
-    if (!player) return;
-    // 代替素材対応：メイン→代替の順で納品可能なものを探す
-    const allIds = [quest.requiredItemId, ...(quest.alternateItemIds ?? [])];
-    const usableId = allIds.find(id => (player.inventory[id] ?? 0) >= quest.requiredAmount);
-    if (!usableId) {
-      addNotification('error', `素材が足りません (${allIds.map(id => ITEM_MASTER[id]?.name ?? id).join('/')} × ${quest.requiredAmount})`);
-      return;
-    }
-    if (!consumeItem(usableId, quest.requiredAmount)) return;
-    changeGold(quest.rewardGold);
-    await completeNpcQuest(quest.id);
-    await updateQuestRanking(player.uid, player.displayName, quest.rewardGold);
-    // playerData更新
-    const latest = useGameStore.getState().player;
-    if (latest) {
-      useGameStore.setState({
-        player: {
-          ...latest,
-          totalQuestCompleted: (latest.totalQuestCompleted ?? 0) + 1,
-          totalQuestRewardGold: (latest.totalQuestRewardGold ?? 0) + quest.rewardGold,
-        }
-      });
-    }
-    addNotification('success', `✅ 依頼達成！ ${quest.rewardGold.toLocaleString()}G を獲得しました`);
-  };
-
   const TABS_DEF: { id: ShopTab; label: string }[] = [
     { id:'sell',    label:'💰 売却' },
     { id:'buy',     label:'🛒 購入' },
     { id:'satiety', label:'📊 ステータス' },
     { id:'use',     label:'🧪 使用' },
     { id:'trade',   label:'🔄 取引' },
-    { id:'quest',   label:'📜 NPC依頼' },
   ];
 
   return (
@@ -358,46 +273,15 @@ export function MarketScreen() {
           </div>
           {buyable.map(item => {
             const { buyPrice } = getEffectivePrice(item.id);
-            const qty = buyQty[item.id] ?? 1;
-            const total = buyPrice * qty;
-            const canAfford = (player?.gold ?? 0) >= total;
-            const QTY_BTNS = [1, 5, 10, 50];
             return (
-            <div key={item.id} style={{...ROW, flexDirection:'column', alignItems:'stretch', gap:6}}>
-              <div style={{display:'flex', alignItems:'center', gap:10}}>
-                <span style={{fontSize:'1.4rem'}}><GameIcon id={item.icon} size={28} /></span>
-                <div style={{flex:1}}>
-                  <div style={{fontWeight:600, fontSize:'0.9rem'}}>{item.name}</div>
-                  <div style={{fontSize:'0.72rem', color:'#8a92b2'}}>{item.description}</div>
-                </div>
-                <span style={{color:'#f0c060', fontSize:'0.85rem', whiteSpace:'nowrap'}}>{buyPrice}G/個</span>
+            <div key={item.id} style={ROW}>
+              <span style={{fontSize:'1.4rem'}}><GameIcon id={item.icon} size={28} /></span>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:600, fontSize:'0.9rem'}}>{item.name}</div>
+                <div style={{fontSize:'0.72rem', color:'#8a92b2'}}>{item.description}</div>
               </div>
-              <div style={{display:'flex', alignItems:'center', gap:4}}>
-                <span style={{fontSize:'0.72rem', color:'#8a92b2', marginRight:2}}>個数:</span>
-                {QTY_BTNS.map(n => (
-                  <button key={n} onClick={() => setBuyQty(q => ({...q, [item.id]: n}))}
-                    style={{padding:'3px 8px', fontSize:'0.72rem', cursor:'pointer',
-                      background: qty===n ? 'rgba(91,141,238,0.3)' : '#161b26',
-                      border:`1px solid ${qty===n ? '#5b8dee' : '#2d3752'}`,
-                      color: qty===n ? '#e8e6ff' : '#8a92b2', borderRadius:4}}>
-                    ×{n}
-                  </button>
-                ))}
-                <button onClick={() => { const max = Math.floor((player?.gold ?? 0) / buyPrice); setBuyQty(q => ({...q, [item.id]: Math.max(1, max)})); }}
-                  style={{padding:'3px 8px', fontSize:'0.72rem', cursor:'pointer',
-                    background: '#161b26', border:'1px solid #2d3752', color:'#8a92b2', borderRadius:4}}>
-                  MAX
-                </button>
-                <span style={{flex:1}} />
-                <span style={{fontSize:'0.78rem', color: canAfford ? '#f0c060' : '#e05555', fontWeight:600}}>
-                  合計 {total.toLocaleString()}G
-                </span>
-                <button style={BTN(canAfford ? '#5b8dee' : '#2d3752')}
-                  onClick={() => handleBuy(item.id, qty)}
-                  disabled={!canAfford}>
-                  購入
-                </button>
-              </div>
+              <span style={{color:'#f0c060', fontSize:'0.85rem', whiteSpace:'nowrap'}}>{buyPrice}G</span>
+              <button style={BTN('#5b8dee')} onClick={() => handleBuy(item.id, 1)} disabled={(player?.gold ?? 0) < buyPrice}>購入</button>
             </div>
             );
           })}
@@ -510,6 +394,7 @@ export function MarketScreen() {
             🏪 素材を納めると特別なアイテムと交換してもらえます。
           </p>
           {tradeRecipes.map(recipe => {
+            const outputItem = ITEM_MASTER[recipe.outputItemId];
             const canTrade = recipe.inputs.every(inp => (player?.inventory[inp.itemId] ?? 0) >= inp.amount);
             return (
               <div key={recipe.id} style={{background:'#1c2235', border:`1px solid ${canTrade ? '#4caf87' : '#2d3752'}`, borderRadius:8, padding:'12px 14px', marginBottom:10}}>
@@ -534,18 +419,11 @@ export function MarketScreen() {
                   })}
                 </div>
                 {/* 交換先 */}
-                <div style={{display:'flex', flexDirection:'column', gap:6, background:'rgba(240,192,96,0.07)', borderRadius:6, padding:'6px 10px', marginBottom:10}}>
+                <div style={{display:'flex', alignItems:'center', gap:8, background:'rgba(240,192,96,0.07)', borderRadius:6, padding:'6px 10px', marginBottom:10}}>
                   <span style={{fontSize:'0.72rem', color:'#f0c060'}}>▶ 交換品</span>
-                  {(recipe.outputs ?? [{ itemId: recipe.outputItemId, amount: recipe.outputAmount }]).map(out => {
-                    const item = ITEM_MASTER[out.itemId];
-                    return (
-                      <div key={out.itemId} style={{display:'flex', alignItems:'center', gap:8}}>
-                        <GameIcon id={item?.icon ?? 'gem'} size={22} />
-                        <span style={{fontSize:'0.85rem', fontWeight:700, color:'#f0c060'}}>{item?.name ?? out.itemId}</span>
-                        {out.amount > 1 && <span style={{fontSize:'0.75rem', color:'#8a92b2'}}>×{out.amount}</span>}
-                      </div>
-                    );
-                  })}
+                  <GameIcon id={outputItem?.icon ?? 'gem'} size={22} />
+                  <span style={{fontSize:'0.85rem', fontWeight:700, color:'#f0c060'}}>{outputItem?.name ?? recipe.outputItemId}</span>
+                  {recipe.outputAmount > 1 && <span style={{fontSize:'0.75rem', color:'#8a92b2'}}>×{recipe.outputAmount}</span>}
                 </div>
                 <button
                   disabled={!canTrade}
@@ -557,10 +435,8 @@ export function MarketScreen() {
                         return;
                       }
                     }
-                    const outs = recipe.outputs ?? [{ itemId: recipe.outputItemId, amount: recipe.outputAmount }];
-                    addItems(outs.map(out => ({ itemId: out.itemId, amount: out.amount })));
-                    const namesText = outs.map(out => ITEM_MASTER[out.itemId]?.name ?? out.itemId).join('、');
-                    addNotification('success', `🔄 ${namesText} と交換しました！`);
+                    addItems([{ itemId: recipe.outputItemId, amount: recipe.outputAmount }]);
+                    addNotification('success', `🔄 ${outputItem?.name ?? recipe.outputItemId} と交換しました！`);
                   }}
                   style={{
                     width:'100%', padding:'8px', fontWeight:700, fontSize:'0.85rem',
@@ -574,101 +450,6 @@ export function MarketScreen() {
             );
           })}
         </>
-      )}
-
-      {shopTab === 'quest' && (
-        <div>
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}}>
-            <div style={{fontSize:'0.82rem', color:'#8a92b2'}}>NPCからの依頼を達成してゴールドを獲得しよう</div>
-            <button onClick={() => generateNpcQuests().catch(()=>{})}
-              style={{padding:'4px 10px', background:'#1c2235', border:'1px solid #2d3752', color:'#8a92b2', borderRadius:5, cursor:'pointer', fontSize:'0.72rem'}}>
-              🔄 更新
-            </button>
-          </div>
-
-          {npcQuests.length === 0 && (
-            <p style={{color:'#4a5070', textAlign:'center', padding:20}}>依頼がありません（しばらくお待ちください）</p>
-          )}
-
-          {npcQuests.map(quest => {
-            const reqItem = ITEM_MASTER[quest.requiredItemId];
-            const allCandidates = [quest.requiredItemId, ...(quest.alternateItemIds ?? [])];
-            const have = player?.inventory[quest.requiredItemId] ?? 0;
-            const canComplete = allCandidates.some(id => (player?.inventory[id] ?? 0) >= quest.requiredAmount);
-            const timeLeft = Math.max(0, quest.expiresAt - Date.now());
-            const hours = Math.floor(timeLeft / 3600000);
-            const mins = Math.floor((timeLeft % 3600000) / 60000);
-            const rankColor = QUEST_RANK_COLOR[quest.rank];
-            const QUEST_TYPE_LABEL: Record<string, string> = {
-              delivery: '📦 納品', bulk: '📦📦 大量', urgent: '⚡ 至急',
-              select: '🔀 代替可', chain: '🔗 連続',
-            };
-            const questTypeBadge = quest.questType ? QUEST_TYPE_LABEL[quest.questType] ?? '' : '';
-            const mMarket = quest.marketMultiplier;
-            return (
-              <div key={quest.id} style={{background:'#1c2235', border:`1px solid ${rankColor}44`, borderRadius:8, padding:'12px 14px', marginBottom:10}}>
-                <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:6}}>
-                  <span style={{fontSize:'1.2rem'}}>{quest.npcIcon}</span>
-                  <span style={{fontSize:'0.8rem', color:'#8a92b2'}}>{quest.npcName}</span>
-                  <div style={{display:'flex', gap:4, marginLeft:'auto', alignItems:'center'}}>
-                    {questTypeBadge && <span style={{padding:'2px 6px', background:'rgba(91,141,238,0.15)', border:'1px solid #5b8dee44', borderRadius:4, fontSize:'0.65rem', color:'#5b8dee'}}>{questTypeBadge}</span>}
-                    {mMarket && mMarket > 1.1 && <span style={{padding:'2px 6px', background:'rgba(76,175,135,0.15)', border:'1px solid #4caf8744', borderRadius:4, fontSize:'0.65rem', color:'#4caf87'}}>📈 ×{mMarket.toFixed(2)}</span>}
-                    {mMarket && mMarket < 0.9 && <span style={{padding:'2px 6px', background:'rgba(224,85,85,0.15)', border:'1px solid #e0555544', borderRadius:4, fontSize:'0.65rem', color:'#e05555'}}>📉 ×{mMarket.toFixed(2)}</span>}
-                    <span style={{padding:'2px 8px', background:`${rankColor}22`, border:`1px solid ${rankColor}`, borderRadius:4, fontSize:'0.7rem', fontWeight:700, color:rankColor}}>{quest.rank}ランク</span>
-                  </div>
-                </div>
-                <div style={{fontWeight:700, fontSize:'0.92rem', color:'#e8e6ff', marginBottom:4}}>{quest.title}</div>
-                <div style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:8}}>{quest.description}</div>
-                <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:8, background:'rgba(240,192,96,0.06)', borderRadius:6, padding:'6px 10px'}}>
-                  <GameIcon id={reqItem?.icon ?? 'stone'} size={20} />
-                  <span style={{fontSize:'0.82rem', flex:1}}>{reqItem?.name ?? quest.requiredItemId}</span>
-                  <span style={{fontSize:'0.82rem', color: canComplete ? '#4caf87' : '#e05555', fontWeight:700}}>
-                    {have}/{quest.requiredAmount}
-                  </span>
-                </div>
-                {quest.alternateItemIds && quest.alternateItemIds.length > 0 && (
-                  <div style={{fontSize:'0.7rem', color:'#8a92b2', marginBottom:6}}>
-                    🔀 代替可: {quest.alternateItemIds.map(id => ITEM_MASTER[id]?.name ?? id).join(' / ')} <span style={{color:'#e05555'}}>(報酬-20%)</span>
-                  </div>
-                )}
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                  <div>
-                    <span style={{color:'#f0c060', fontSize:'0.85rem', fontWeight:700}}>💰 {quest.rewardGold.toLocaleString()}G</span>
-                    <span style={{fontSize:'0.68rem', color:'#4a5070', marginLeft:8}}>⏰ {hours}h{mins}m</span>
-                  </div>
-                  <button onClick={() => handleQuestComplete(quest)} disabled={!canComplete}
-                    style={{padding:'6px 14px', background: canComplete ? 'linear-gradient(135deg,#4caf87,#2d8060)' : '#2d3752',
-                      color: canComplete ? '#fff' : '#4a5070', border:'none', borderRadius:6, cursor: canComplete ? 'pointer' : 'not-allowed', fontWeight:700, fontSize:'0.82rem'}}>
-                    {canComplete ? '✅ 納品' : '素材不足'}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-
-          {/* ランキング */}
-          <div style={{marginTop:16, background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'12px 14px'}}>
-            <div style={{fontWeight:700, color:'#f0c060', fontSize:'0.85rem', marginBottom:8}}>🏆 依頼ランキング</div>
-            <div style={{display:'flex', gap:6, marginBottom:10}}>
-              {[{id:'count' as const, label:'総達成数'},{id:'gold' as const, label:'総報酬額'}].map(t => (
-                <button key={t.id} onClick={() => setQuestRankTab(t.id)}
-                  style={{padding:'4px 10px', fontSize:'0.72rem', background: questRankTab===t.id ? 'rgba(91,141,238,0.2)' : '#161b26', border:`1px solid ${questRankTab===t.id ? '#5b8dee' : '#2d3752'}`, color: questRankTab===t.id ? '#e8e6ff' : '#8a92b2', borderRadius:5, cursor:'pointer'}}>
-                  {t.label}
-                </button>
-              ))}
-            </div>
-            {questRanking.length === 0 && <p style={{color:'#4a5070', fontSize:'0.8rem', textAlign:'center'}}>データなし</p>}
-            {[...questRanking].sort((a,b) => questRankTab==='count' ? b.totalCompleted-a.totalCompleted : b.totalRewardGold-a.totalRewardGold).slice(0,10).map((e,i) => (
-              <div key={e.uid} style={{display:'flex', alignItems:'center', gap:8, padding:'4px 0', borderBottom:'1px solid #2d3752'}}>
-                <span style={{color: i===0?'#f0c060':i===1?'#8a92b2':i===2?'#cd7f32':'#4a5070', fontSize:'0.78rem', width:20}}>{i+1}.</span>
-                <span style={{flex:1, fontSize:'0.82rem'}}>{e.displayName}</span>
-                <span style={{fontSize:'0.78rem', color:'#4caf87'}}>
-                  {questRankTab==='count' ? `${e.totalCompleted}件` : `${e.totalRewardGold.toLocaleString()}G`}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
       )}
     </div>
   );
