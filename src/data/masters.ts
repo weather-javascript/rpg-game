@@ -417,6 +417,25 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
     ],
     useEffect: { attackBonus: 0, message: '魔造壊盾=Goliath=を発動！3ターン間ダメージ85%カット！', attackType: 'physical' },
   },
+  // ============================================================
+  // =001 Silvers eye= 関連素材・武器
+  // ============================================================
+  meteorite: { id:'meteorite', name:'隕石', description:'空から落ちてきた謎の鉱石塊。クラフトの素材として使われる。', category:'material', itemType:'Item', rarity:'epic', sellPrice:0, buyPrice:0, maxStack:99, icon:'comet' },
+  almighty_staff_compressed: { id:'almighty_staff_compressed', name:'万能杖圧縮', description:'万能杖を圧縮した素材。=Silvers eye=のクラフトに使用する。', category:'material', itemType:'Item', rarity:'epic', sellPrice:0, buyPrice:0, maxStack:64, icon:'wand' },
+  silvers_eye: {
+    id: 'silvers_eye',
+    name: '=Silvers eye=',
+    description: '発動するとマナを50消費して物理5・貫通10のダメージを与える。出現している敵が全滅するかマナを使い切るまで連続発動し、終了後はマナを450回復する。発動後3ターンは使用不可。',
+    category: 'weapon', itemType: 'Weapon', rarity: 'legendary',
+    sellPrice: 0, buyPrice: 0, maxStack: 1, icon: 'silvers_eye_anim',
+    weaponAtk: 5,
+    cooldownTurns: 3,
+    nonconsumable: true,
+    weaponSkills: [
+      { type: 'silvers_eye' as const, manaCost: 50, attackDmg: 5, penetrateDmg: 10, manaRestore: 450, cooldownTurns: 3 },
+    ],
+    useEffect: { attackBonus: 5, message: '=Silvers eye=が発動した！', attackType: 'physical' },
+  },
 };
 
 // ============================================================
@@ -802,6 +821,30 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     shape: ['compressed_iron_block','compressed_iron_block','compressed_iron_block', 'compressed_iron_block','coal_block','compressed_iron_block', 'compressed_iron_block','compressed_iron_block','compressed_iron_block'],
     requiredCraftingLevel: 30,
     craftingExpGain: 2000,
+  },
+  {
+    id: 'silvers_eye_from_materials',
+    name: '=Silvers eye=を作る',
+    description: '鉄塊・金塊・彗星の欠片・古代の欠片・万能杖圧縮・アダマンタイト・ルチルプラチナ・隕石から=Silvers eye=を作る。',
+    outputItemId: 'silvers_eye',
+    outputAmount: 1,
+    inputs: [
+      { itemId: 'iron_ingot', amount: 64 },
+      { itemId: 'golden_bar', amount: 32 },
+      { itemId: 'comet_shard', amount: 32 },
+      { itemId: 'ancient_shard', amount: 1 },
+      { itemId: 'almighty_staff_compressed', amount: 64 },
+      { itemId: 'adamantite', amount: 32 },
+      { itemId: 'rutile_platinum', amount: 32 },
+      { itemId: 'meteorite', amount: 10 },
+    ],
+    shape: [
+      'iron_ingot','golden_bar','iron_ingot',
+      'comet_shard','ancient_shard','almighty_staff_compressed',
+      'adamantite','rutile_platinum','meteorite',
+    ],
+    requiredCraftingLevel: 30,
+    craftingExpGain: 5000,
   },
 ];
 
