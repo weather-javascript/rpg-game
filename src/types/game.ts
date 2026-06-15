@@ -228,8 +228,11 @@ export interface ItemMaster {
   weaponAtk?: number;       // 武器固有攻撃力（通常攻撃をこの値で上書き）
   isAreaWeapon?: boolean;   // 範囲攻撃武器（全体攻撃）
   areaPenetrate?: number;   // 範囲攻撃の貫通ダメージ（防御無視）
-  weaponDef?: number;       // 装備時防御ボーナス
+  weaponDef?: number;       // 装備時防御ボーナス（防具）
   weaponHpBonus?: number;   // 装備時最大HP増加
+  armorToughness?: number;  // 防具強度（ダメージ軽減計算に使用）
+  epf?: number;             // 装備時EPF（ダメージ軽減Ⅱ等によるダメージ軽減ポイント）
+  moveSpeedPct?: number;    // 装備時移動速度変化（%、負の値で低下）
   // 武器スキル（複数可）
   weaponSkills?: WeaponSkill[];
   weaponUltimate?: WeaponUltimate;
