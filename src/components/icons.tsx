@@ -1370,12 +1370,13 @@ export function GameIcon({ id, size = 24, className, style }: IconProps) {
     // 縦長(vertical)なら size x (frameCount*size)、横長(horizontal)なら (frameCount*size) x size にスケールする。
     const bgSizeW = direction === 'vertical' ? `${size}px` : `${frameCount * size}px`;
     const bgSizeH = direction === 'vertical' ? `${frameCount * size}px` : `${size}px`;
-    // steps(frameCount, jump-start) は各ステップの開始時点の値を採用するため、
-    // 0px から frameCount*size px まで動かすことで 0, -size, -2*size, ... -(frameCount-1)*size の
-    // ちょうど frameCount 個の整数フレーム位置を順に表示できる。
+    // steps(frameCount, jump-none) は補間なしでちょうど frameCount 個のフレームを均等表示する。
+    // from=0 to=-(frameCount-1)*size とすることで
+    // 0, -size, -2*size, ... -(frameCount-1)*size の全フレームが表示される。
+    const lastFrameOffset = (frameCount - 1) * size;
     const keyframeSteps = direction === 'vertical'
-      ? `from { background-position: 0 0; } to { background-position: 0 -${frameCount * size}px; }`
-      : `from { background-position: 0 0; } to { background-position: -${frameCount * size}px 0; }`;
+      ? `from { background-position: 0 0; } to { background-position: 0 -${lastFrameOffset}px; }`
+      : `from { background-position: 0 0; } to { background-position: -${lastFrameOffset}px 0; }`;
     return (
       <span
         className={className}
@@ -1390,7 +1391,7 @@ export function GameIcon({ id, size = 24, className, style }: IconProps) {
           backgroundRepeat: 'no-repeat',
           backgroundPosition: '0 0',
           imageRendering: 'pixelated',
-          animation: `${animationName} ${totalDuration}s steps(${frameCount}, jump-start) infinite`,
+          animation: `${animationName} ${totalDuration}s steps(${frameCount}, jump-none) infinite`,
           ...style,
         }}
         aria-hidden="true"
