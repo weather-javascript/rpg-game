@@ -617,9 +617,10 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     // === KXモード: KXのターン行動 ===
     if (newBattle.kx) {
       const kx = newBattle.kx;
-      // 覚醒KXは普通に攻撃
+      // 覚醒KXは普通に攻撃（防具で軽減可能な物理攻撃）
       if (kx.isAwakened) {
-        const dmg = 30 + Math.floor(secureRandom() * 40);
+        const rawDmg = 30 + Math.floor(secureRandom() * 40);
+        const dmg = newBattle.isDefending ? Math.floor(getArmorReducedDamage(rawDmg) * 0.5) : getArmorReducedDamage(rawDmg);
         changeHp(-dmg);
         newLog.push({ text: `⚡ KX-G21[ライフエナジー]の攻撃！${dmg}ダメージ！`, color: '#ff00ff' });
         if (player.stats.hp - dmg <= 0) {
@@ -639,23 +640,27 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       let extraEnemies: EnemyState[] = [];
 
       if (action === 'slash') {
-        dmg = 15 + Math.floor(secureRandom() * 20);
-        logText = `⚔️ 「貴様など叩き切ってくれるわ！」 KX-G21が貫通斬撃！${dmg}ダメ！`;
+        const rawDmg = 15 + Math.floor(secureRandom() * 20);
+        dmg = newBattle.isDefending ? Math.floor(getArmorReducedDamage(rawDmg) * 0.5) : getArmorReducedDamage(rawDmg);
+        logText = `⚔️ 「貴様など叩き切ってくれるわ！」 KX-G21の斬撃！${dmg}ダメ！`;
         changeHp(-dmg);
       } else if (action === 'chaos_flare') {
-        dmg = 20 + Math.floor(secureRandom() * 15);
+        const rawDmg = 20 + Math.floor(secureRandom() * 15);
+        dmg = newBattle.isDefending ? Math.floor(getArmorReducedDamage(rawDmg) * 0.5) : getArmorReducedDamage(rawDmg);
         newKxBurnTurns = 4;
         logText = `🔥 カオスフレア！${dmg}ダメ＋燃焼4ターン！`;
         changeHp(-dmg);
         logColor = '#ff6b00';
       } else if (action === 'lightning_bolt') {
-        dmg = 60 + Math.floor(secureRandom() * 40);
+        const rawDmg = 60 + Math.floor(secureRandom() * 40);
+        dmg = newBattle.isDefending ? Math.floor(getArmorReducedDamage(rawDmg) * 0.5) : getArmorReducedDamage(rawDmg);
         logText = `⚡ ライトニングボルト！超高火力${dmg}ダメ！`;
         changeHp(-dmg);
         logColor = '#f0f000';
       } else if (action === 'summon_tech_snipe') {
-        dmg = 10;
-        logText = `🎯 サモンテックスナイプ！貫通+10、エクス＆雷4体ずつ召喚！`;
+        const rawDmg = 10;
+        dmg = newBattle.isDefending ? Math.floor(getArmorReducedDamage(rawDmg) * 0.5) : getArmorReducedDamage(rawDmg);
+        logText = `🎯 サモンテックスナイプ！${dmg}ダメ＋エクス＆雷4体ずつ召喚！`;
         changeHp(-dmg);
         extraEnemies = [
           ...Array(4).fill(null).map(() => ({ monsterId: 'exs_minion', hp: 100, maxHp: 100 })),
@@ -720,12 +725,13 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         if (newSkillTurn % penetrateInterval === penetrateInterval - 1) {
           newLog.push({ text: `😨 ${monster.name}：「不穏な予感がする....」`, color: '#cc44ff' });
         }
-        // 貫通攻撃ターン
+        // 物理攻撃ターン（防具で軽減可能）
         if (newSkillTurn % penetrateInterval === 0 && newSkillTurn > 0) {
-          const penDmg = 10000;
+          const rawPenDmg = 10000;
+          const penDmg = newBattle.isDefending ? Math.floor(getArmorReducedDamage(rawPenDmg) * 0.5) : getArmorReducedDamage(rawPenDmg);
           changeHp(-penDmg);
           const newPlayerHp = Math.max(0, player.stats.hp - penDmg);
-          newLog.push({ text: `💀 ${monster.name}の貫通攻撃！ 防御無視で${penDmg}ダメージ！`, color: '#ff0055' });
+          newLog.push({ text: `💀 ${monster.name}の強力な一撃！ 防具ごと${penDmg}ダメージ！`, color: '#ff0055' });
           if (newPlayerHp <= 0) {
             return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
           }
@@ -1103,43 +1109,82 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
         return;
       }
-      // Silvers eye特別処理：マナを消費しながら連続発動
+      // Silvers eye特別処理：マナを消費しながら連続発動（0.2秒間隔のコンボ演出）
       const silversSkill = item.weaponSkills?.find(s => s.type === 'silvers_eye') as import('../../types/game').WeaponSilversEyeSkill | undefined;
       if (silversSkill) {
         let mana = battle.weaponMana;
         let enemies = battle.enemies.map(e => ({ ...e }));
-        const log: { text: string; color: string }[] = [...battle.log];
         let activations = 0;
+
+        // 事前に発動回数と各ヒットの結果を計算しておく
+        const hitResults: { enemies: typeof enemies; dmgList: { name: string; dmg: number }[] }[] = [];
         while (mana >= silversSkill.manaCost && enemies.some(e => e.hp > 0)) {
           mana -= silversSkill.manaCost;
           activations++;
+          const dmgList: { name: string; dmg: number }[] = [];
           enemies = enemies.map(e => {
             if (e.hp <= 0) return e;
             const mon = getMergedMonster(e.monsterId);
             const dmg = calcDamage(silversSkill.attackDmg, mon?.defense ?? 0) + silversSkill.penetrateDmg;
+            dmgList.push({ name: mon?.name ?? e.monsterId, dmg });
             return { ...e, hp: Math.max(0, e.hp - dmg) };
           });
+          hitResults.push({ enemies: enemies.map(e => ({ ...e })), dmgList });
         }
-        if (activations > 0) {
-          log.push({ text: `👁️ ${item.useEffect?.message ?? '=Silvers eye=が発動した！'}（${activations}回発動）`, color: '#c0c8ff' });
-        } else {
-          log.push({ text: `👁️ マナが足りず=Silvers eye=は発動しなかった！`, color: '#8a92b2' });
-        }
+
         const finalMana = Math.min(mana + silversSkill.manaRestore, battle.weaponManaMax);
-        log.push({ text: `💠 =Silvers eye=の効果でマナが${silversSkill.manaRestore}回復した！（${finalMana}/${battle.weaponManaMax}）`, color: '#4fc3f7' });
         const newCooldowns = { ...battle.itemCooldowns, [itemId]: silversSkill.cooldownTurns };
-        const afterSilvers: TurnBattleState = {
-          ...battle,
-          enemies,
-          log,
-          turn: 'monster',
-          isDefending: false,
-          weaponMana: finalMana,
-          itemCooldowns: newCooldowns,
-          equippedWeaponId: itemId,
+
+        if (activations === 0) {
+          const noManaLog = [...battle.log, { text: `👁️ マナが足りず=Silvers eye=は発動しなかった！`, color: '#8a92b2' }];
+          const noManaState: TurnBattleState = {
+            ...battle,
+            log: noManaLog,
+            turn: 'monster',
+            isDefending: false,
+            weaponMana: finalMana,
+            itemCooldowns: newCooldowns,
+            equippedWeaponId: itemId,
+          };
+          setBattle(noManaState);
+          setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+          return;
+        }
+
+        // 最初のヒットをすぐに表示
+        const applyHit = (hitIdx: number, prevState: TurnBattleState) => {
+          if (hitIdx >= hitResults.length) {
+            // 全ヒット完了 → マナ回復ログ追加してモンスターターンへ
+            setBattle(prev => {
+              const manaLog = [...prev.log, { text: `💠 =Silvers eye=の効果でマナが${silversSkill.manaRestore}回復した！（${finalMana}/${battle.weaponManaMax}）`, color: '#4fc3f7' }];
+              return {
+                ...prev,
+                log: manaLog,
+                weaponMana: finalMana,
+                itemCooldowns: newCooldowns,
+                equippedWeaponId: itemId,
+                turn: 'monster',
+                isDefending: false,
+              };
+            });
+            setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+            return;
+          }
+          const { enemies: hitEnemies } = hitResults[hitIdx];
+          const hitLog = [...prevState.log, {
+            text: `👁️ =Silvers eye= ${hitIdx + 1}撃目！（${hitIdx + 1}/${activations}）`,
+            color: '#c0c8ff',
+          }];
+          const nextState: TurnBattleState = {
+            ...prevState,
+            enemies: hitEnemies,
+            log: hitLog,
+          };
+          setBattle(nextState);
+          setTimeout(() => applyHit(hitIdx + 1, nextState), 200);
         };
-        setBattle(afterSilvers);
-        setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+
+        applyHit(0, { ...battle, equippedWeaponId: itemId });
         return;
       }
 
@@ -2410,7 +2455,7 @@ export function DungeonScreen() {
             <div style={{ background: '#161b26', border: '2px solid #cc44ff', borderRadius: 12, padding: 18, textAlign: 'center' }}>
               <div style={{ fontSize: '1.5rem', marginBottom: 6 }}>😈</div>
               <div style={{ color: '#cc44ff', fontWeight: 700, fontSize: '1rem', marginBottom: 4 }}>デビルアーマーが立ちはだかる！</div>
-              <div style={{ color: '#8a92b2', fontSize: '0.8rem', marginBottom: 4 }}>HP: ❤️×640 | 攻撃力: 30 | 10ターンに1回 貫通10000ダメージ</div>
+              <div style={{ color: '#8a92b2', fontSize: '0.8rem', marginBottom: 4 }}>HP: ❤️×640 | 攻撃力: 30 | 10ターンに1回 強力な物理攻撃（防具で軽減可）</div>
               <div style={{ color: '#8a92b2', fontSize: '0.75rem', marginBottom: 16 }}>天空城の道中でデビルアーマーに挑戦しますか？</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => {
