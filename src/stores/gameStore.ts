@@ -25,6 +25,7 @@ export interface GameState extends PlayerSlice, DungeonSlice, FishingSlice, Reli
   activeTab: TabId;
   notifications: Notification[];
   isFishingLocked: boolean;
+  isGatheringLocked: boolean;
 
   setUid: (uid: string | null) => void;
   setAuthLoading: (loading: boolean) => void;
@@ -32,6 +33,7 @@ export interface GameState extends PlayerSlice, DungeonSlice, FishingSlice, Reli
   saveGame: () => Promise<void>;
   setActiveTab: (tab: TabId) => void;
   setFishingLocked: (locked: boolean) => void;
+  setGatheringLocked: (locked: boolean) => void;
   addNotification: (type: Notification['type'], message: string) => void;
   removeNotification: (id: string) => void;
 }
@@ -118,6 +120,7 @@ export const useGameStore = create<GameState>((set, get, api) => ({
   activeTab: 'gathering',
   notifications: [],
   isFishingLocked: false,
+  isGatheringLocked: false,
 
   setUid: (uid) => set({ uid }),
   setAuthLoading: (loading) => set({ isAuthLoading: loading }),
@@ -125,6 +128,7 @@ export const useGameStore = create<GameState>((set, get, api) => ({
 
   setActiveTab: (tab) => set({ activeTab: tab }),
   setFishingLocked: (locked) => set({ isFishingLocked: locked }),
+  setGatheringLocked: (locked) => set({ isGatheringLocked: locked }),
 
   addNotification: (type, message) => {
     const id = `${Date.now()}-${randomInt(1000000)}`;
