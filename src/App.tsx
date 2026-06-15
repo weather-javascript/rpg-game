@@ -479,12 +479,14 @@ function StatusBar() {
 
 function TabNav({ activeTab, setTab }: { activeTab: TabId; setTab: (t: TabId) => void }) {
   const isFishingLocked = useGameStore(s => s.isFishingLocked);
-  const locked = isFishingLocked && activeTab === 'fishing';
+  const isGatheringLocked = useGameStore(s => s.isGatheringLocked);
+  const locked = (isFishingLocked && activeTab === 'fishing') || (isGatheringLocked && activeTab === 'gathering');
+  const lockLabel = isGatheringLocked && activeTab === 'gathering' ? '⛏️ 採掘中…' : '🎣 釣り中…';
   return (
     <nav style={{ display:'flex', background:'#161b26', borderTop:'1px solid #2d3752', position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:900, zIndex:100 }}>
       {locked && (
         <div style={{ position:'absolute', inset:0, background:'rgba(13,15,20,0.55)', zIndex:10, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'all', cursor:'not-allowed' }}>
-          <span style={{ fontSize:'0.7rem', color:'#8a92b2', letterSpacing:1 }}>🎣 釣り中…</span>
+          <span style={{ fontSize:'0.7rem', color:'#8a92b2', letterSpacing:1 }}>{lockLabel}</span>
         </div>
       )}
       {TABS.map(tab => (
