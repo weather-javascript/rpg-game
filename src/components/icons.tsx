@@ -1292,10 +1292,67 @@ const ICONS: Record<string, SvgDef> = {
 // ============================================================
 // GameIcon コンポーネント
 // ============================================================
+// アニメーションスプライトシートアイコン
+// 縦長スプライトシート（64x64フレーム x N）を一定間隔で切り替え表示
+// ============================================================
+interface AnimSheetDef {
+  src: string;       // base64データ
+  frameSize: number; // 1フレームのサイズ（px, 正方形）
+  frameCount: number; // フレーム数
+  intervalMs: number; // 切り替え間隔(ms)
+  direction?: 'vertical' | 'horizontal';
+}
+
+const ANIM_SHEET_ICONS: Record<string, AnimSheetDef> = {
+  silvers_eye_anim: {
+    src: ICON_ASSETS.silvers_eye_anim_png,
+    frameSize: 64,
+    frameCount: 8,
+    intervalMs: 200,
+    direction: 'vertical',
+  },
+};
+
+// ============================================================
 // PNG アイコンマップ（base64データを使用）
 const PNG_ICONS: Record<string, string> = ICON_ASSETS;
 
 export function GameIcon({ id, size = 24, className, style }: IconProps) {
+  // アニメーションスプライトシートアイコン
+  const animDef = ANIM_SHEET_ICONS[id];
+  if (animDef) {
+    const { src, frameCount, intervalMs, direction = 'vertical' } = animDef;
+    const totalDuration = (intervalMs * frameCount) / 1000;
+    const animationName = `anim-sheet-${id}`;
+    const bgSizeW = direction === 'vertical' ? '100%' : `${frameCount * 100}%`;
+    const bgSizeH = direction === 'vertical' ? `${frameCount * 100}%` : '100%';
+    const keyframeSteps = direction === 'vertical'
+      ? `from { background-position: 0 0; } to { background-position: 0 -${(frameCount - 1) * 100}%; }`
+      : `from { background-position: 0 0; } to { background-position: -${(frameCount - 1) * 100}% 0; }`;
+    return (
+      <span
+        className={className}
+        style={{
+          display: 'inline-block',
+          verticalAlign: 'middle',
+          flexShrink: 0,
+          width: size,
+          height: size,
+          backgroundImage: `url(${src})`,
+          backgroundSize: `${bgSizeW} ${bgSizeH}`,
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: '0 0',
+          imageRendering: 'pixelated',
+          animation: `${animationName} ${totalDuration}s steps(${frameCount}) infinite`,
+          ...style,
+        }}
+        aria-hidden="true"
+      >
+        <style>{`@keyframes ${animationName} { ${keyframeSteps} }`}</style>
+      </span>
+    );
+  }
+
   // PNGアイコンが定義されている場合はimgタグで表示
   if (PNG_ICONS[id]) {
     return (
