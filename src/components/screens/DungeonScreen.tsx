@@ -742,11 +742,25 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     const areaPen = weaponItem?.areaPenetrate ?? 0;
     const weaponMsg = weaponItem ? weaponItem.name : '素手';
 
+    // =冷海の覇魚=: 攻撃時凍傷ダメージ（自分） / 使用時15%で貫通300
+    const frostbiteSkill = weaponItem?.weaponSkills?.find(s => s.type === 'frostbite_self_damage') as import('../../types/game').WeaponFrostbiteSelfDamageSkill | undefined;
+    const penetrateChanceSkill = weaponItem?.weaponSkills?.find(s => s.type === 'penetrate_on_use_chance') as import('../../types/game').WeaponPenetrateOnUseChanceSkill | undefined;
+    const reitoumaguroExtra: { text: string; color: string }[] = [];
+    let reitoumaguroPenetrateDmg = 0;
+    if (frostbiteSkill) {
+      changeHp(-frostbiteSkill.selfDamage);
+      reitoumaguroExtra.push({ text: `🥶 =冷海の覇魚=の凍傷で自分に${frostbiteSkill.selfDamage}ダメージ！`, color: '#5b8dee' });
+    }
+    if (penetrateChanceSkill && secureRandom() < penetrateChanceSkill.chance) {
+      reitoumaguroPenetrateDmg = penetrateChanceSkill.penetrateDamage;
+      reitoumaguroExtra.push({ text: `❄️ =冷海の覇魚=が発動！ 貫通${reitoumaguroPenetrateDmg}ダメージ追加！`, color: '#9b6df0' });
+    }
+
     const newEnemies = battle.enemies.map((e, i) => {
       if (e.hp <= 0) return e;
       if (!isArea && i !== targetIdx) return e;
       const mon = getMergedMonster(e.monsterId);
-      const dmg = areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0);
+      const dmg = (areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0)) + reitoumaguroPenetrateDmg;
       return { ...e, hp: Math.max(0, e.hp - dmg) };
     });
 
@@ -754,13 +768,13 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       if (e.hp <= 0) return acc;
       if (!isArea && i !== targetIdx) return acc;
       const mon = getMergedMonster(e.monsterId);
-      return acc + (areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0));
+      return acc + (areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0)) + reitoumaguroPenetrateDmg;
     }, 0);
 
     const logMsg = isArea
       ? { text: `🌀 ${weaponMsg}で全体攻撃！ 合計${totalDmg}ダメージ！`, color: '#4caf87' }
       : { text: `⚔️ ${weaponMsg}で攻撃！ ${totalDmg}ダメージ！`, color: '#4caf87' };
-    let newLog = [...battle.log, logMsg];
+    let newLog = [...battle.log, logMsg, ...reitoumaguroExtra];
 
     // === KXモード: 眷属討伐でKXにダメージ ===
     if (battle.kx && !battle.kx.isAwakened) {
