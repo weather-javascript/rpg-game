@@ -436,6 +436,22 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
     ],
     useEffect: { attackBonus: 5, message: '=Silvers eye=が発動した！', attackType: 'physical' },
   },
+  reitoumaguro: {
+    id: 'reitoumaguro',
+    name: '=冷海の覇魚[REITOUMAGURO]=',
+    description: 'それは、海を制した魚...を冷凍したもの(?)。冷凍されても力は衰えず、所持者に海の加護を与えることだろう。後殴られるとめちゃくちゃ痛い。\nホットバーに持っている時：攻撃力+18、攻撃時に自身が凍傷ダメージ7を受ける、使用時15%の確率で相手に貫通300ダメージ。\nオフハンドに持った時：防御力+10、HP+30。',
+    category: 'weapon', itemType: 'Weapon', rarity: 'legendary',
+    sellPrice: 0, buyPrice: 0, maxStack: 1, icon: 'reitoumaguro_png',
+    weaponAtk: 18,
+    weaponDef: 10,
+    weaponHpBonus: 30,
+    nonconsumable: true,
+    weaponSkills: [
+      { type: 'frostbite_self_damage' as const, selfDamage: 7 },
+      { type: 'penetrate_on_use_chance' as const, chance: 0.15, penetrateDamage: 300 },
+    ],
+    useEffect: { attackBonus: 18, message: '=冷海の覇魚[REITOUMAGURO]=で攻撃！', attackType: 'physical' },
+  },
 };
 
 // ============================================================
