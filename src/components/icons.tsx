@@ -1350,7 +1350,7 @@ const ANIM_SHEET_ICONS: Record<string, AnimSheetDef> = {
     src: ICON_ASSETS.silvers_eye_anim_png,
     frameSize: 64,
     frameCount: 8,
-    intervalMs: 200,
+    intervalMs: 250,
     direction: 'vertical',
   },
 };
@@ -1366,11 +1366,16 @@ export function GameIcon({ id, size = 24, className, style }: IconProps) {
     const { src, frameCount, intervalMs, direction = 'vertical' } = animDef;
     const totalDuration = (intervalMs * frameCount) / 1000;
     const animationName = `anim-sheet-${id}`;
-    const bgSizeW = direction === 'vertical' ? '100%' : `${frameCount * 100}%`;
-    const bgSizeH = direction === 'vertical' ? `${frameCount * 100}%` : '100%';
+    // 1フレーム = size x size として表示する。スプライトシート全体は
+    // 縦長(vertical)なら size x (frameCount*size)、横長(horizontal)なら (frameCount*size) x size にスケールする。
+    const bgSizeW = direction === 'vertical' ? `${size}px` : `${frameCount * size}px`;
+    const bgSizeH = direction === 'vertical' ? `${frameCount * size}px` : `${size}px`;
+    // steps(frameCount, jump-start) は各ステップの開始時点の値を採用するため、
+    // 0px から frameCount*size px まで動かすことで 0, -size, -2*size, ... -(frameCount-1)*size の
+    // ちょうど frameCount 個の整数フレーム位置を順に表示できる。
     const keyframeSteps = direction === 'vertical'
-      ? `from { background-position: 0 0; } to { background-position: 0 -${(frameCount - 1) * 100}%; }`
-      : `from { background-position: 0 0; } to { background-position: -${(frameCount - 1) * 100}% 0; }`;
+      ? `from { background-position: 0 0; } to { background-position: 0 -${frameCount * size}px; }`
+      : `from { background-position: 0 0; } to { background-position: -${frameCount * size}px 0; }`;
     return (
       <span
         className={className}
@@ -1385,7 +1390,7 @@ export function GameIcon({ id, size = 24, className, style }: IconProps) {
           backgroundRepeat: 'no-repeat',
           backgroundPosition: '0 0',
           imageRendering: 'pixelated',
-          animation: `${animationName} ${totalDuration}s steps(${frameCount}) infinite`,
+          animation: `${animationName} ${totalDuration}s steps(${frameCount}, jump-start) infinite`,
           ...style,
         }}
         aria-hidden="true"
