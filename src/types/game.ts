@@ -588,6 +588,7 @@ export interface DungeonRunState {
   kxPhase?: number;       // KX形態（1-4）
   kxHp?: number;          // KX現在HP
   kxIsAwakened?: boolean; // KX覚醒状態
+  kxAwakened?: boolean;   // 覚醒KXを討伐してクリア（生命の超越）
 }
 
 export interface GambleResult {
