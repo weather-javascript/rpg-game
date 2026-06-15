@@ -20,6 +20,17 @@ function calcDamage(atk: number, def: number): number {
   return base + randomInt(Math.ceil(base * 0.2) + 1);
 }
 
+// ============================================================
+// 防具によるダメージ軽減（統一計算式）
+// 最終被ダメージ = 元のダメージ * (1 - 軽減ポイント/25) * (1 - 合計EPF/25)
+// 軽減ポイント = min(20, max(防御力/5, 防御力 - (4*元のダメージ)/(防具強度+8)))
+// ============================================================
+function calcArmorReducedDamage(rawDamage: number, totalDef: number, totalToughness: number, totalEpf: number): number {
+  const reductionPoint = Math.min(20, Math.max(totalDef / 5, totalDef - (4 * rawDamage) / (totalToughness + 8)));
+  const reduced = rawDamage * (1 - reductionPoint / 25) * (1 - totalEpf / 25);
+  return Math.max(1, Math.round(reduced));
+}
+
 function calcMonsterDrops(monster: MonsterMaster, combatLv: number) {
   return monster.drops.filter(d => {
     const rate = Math.min(1, d.baseRate + (d.skillRateBonus ?? 0) * combatLv * 0.01);
@@ -417,6 +428,45 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     return def;
   }, [player.stats.defense, localEquip]);
 
+  // 防具強度の合計（ダメージ軽減計算用）
+  const getPlayerArmorToughness = useCallback((equip: EquipmentSlots = localEquip) => {
+    let toughness = 0;
+    const allSlots: (string | null)[] = [
+      ...equip.hotbar,
+      equip.helmet, equip.chestplate, equip.leggings, equip.boots, equip.offhand,
+    ];
+    for (const itemId of allSlots) {
+      if (!itemId) continue;
+      const item = ITEM_MASTER[itemId];
+      if (item?.armorToughness) toughness += item.armorToughness;
+    }
+    return toughness;
+  }, [localEquip]);
+
+  // EPF（ダメージ軽減）の合計
+  const getPlayerEPF = useCallback((equip: EquipmentSlots = localEquip) => {
+    let epf = 0;
+    const allSlots: (string | null)[] = [
+      ...equip.hotbar,
+      equip.helmet, equip.chestplate, equip.leggings, equip.boots, equip.offhand,
+    ];
+    for (const itemId of allSlots) {
+      if (!itemId) continue;
+      const item = ITEM_MASTER[itemId];
+      if (item?.epf) epf += item.epf;
+    }
+    return epf;
+  }, [localEquip]);
+
+  // 防具のダメージ軽減を適用した最終被ダメージ（統一計算式）
+  const getArmorReducedDamage = useCallback((rawDamage: number, equip: EquipmentSlots = localEquip) => {
+    const totalDef = getPlayerDef(equip);
+    const totalToughness = getPlayerArmorToughness(equip);
+    const totalEpf = getPlayerEPF(equip);
+    return calcArmorReducedDamage(rawDamage, totalDef, totalToughness, totalEpf);
+  }, [getPlayerDef, getPlayerArmorToughness, getPlayerEPF, localEquip]);
+
+
   // 生存敵リスト（未使用だが将来用に保持）
   void battle.enemies.filter(e => e.hp > 0);
 
@@ -682,7 +732,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           continue;
         }
         // 通常攻撃
-        const mDmg = calcDamage(monster.attack, newBattle.isDefending ? getPlayerDef() * 2 : getPlayerDef());
+        const mDmg = getArmorReducedDamage(monster.attack);
         const reducedDmg = newBattle.isDefending ? Math.floor(mDmg * 0.5) : mDmg;
         changeHp(-reducedDmg);
         const newPlayerHp2 = Math.max(0, player.stats.hp - reducedDmg);
@@ -695,8 +745,8 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
 
       const isSpecial = monster.isBoss && randomChance(0.2);
       let mDmg = isSpecial
-        ? Math.floor(calcDamage(monster.attack, getPlayerDef()) * 1.5)
-        : calcDamage(monster.attack, newBattle.isDefending ? getPlayerDef() * 2 : getPlayerDef());
+        ? Math.floor(getArmorReducedDamage(monster.attack) * 1.5)
+        : getArmorReducedDamage(monster.attack);
       if (weaponItem?.weaponSkills) {
         const shield = weaponItem.weaponSkills.find(s => s.type === 'hotbar_shield') as WeaponShieldSkill | undefined;
         if (shield) {
@@ -731,7 +781,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       }
     }
     return { ...newBattle, log: newLog, turn: 'player', isDefending: false };
-  }, [player.stats, changeHp, changeSatiety, dungeon, combatLv, localEquip, getPlayerDef]);
+  }, [player.stats, changeHp, changeSatiety, dungeon, combatLv, localEquip, getPlayerDef, getArmorReducedDamage]);
 
 
   // 攻撃実行（範囲 or ターゲット選択後）
