@@ -1310,6 +1310,7 @@ export function subscribeTreasureProbs(cb: (entries: TreasureProbEntry[] | null)
 // 取引レシピ管理
 // ============================================================
 export interface TradeRecipeInput { itemId: string; amount: number; }
+export interface TradeRecipeOutput { itemId: string; amount: number; }
 export interface TradeRecipe {
   id: string;
   name: string;
@@ -1317,6 +1318,7 @@ export interface TradeRecipe {
   inputs: TradeRecipeInput[];
   outputItemId: string;
   outputAmount: number;
+  outputs?: TradeRecipeOutput[]; // 複数アイテムを交換で得る場合に使用（指定時はoutputItemId/outputAmountより優先）
 }
 
 export async function getTradeRecipes(): Promise<TradeRecipe[] | null> {
