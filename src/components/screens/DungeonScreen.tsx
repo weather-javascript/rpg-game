@@ -1130,11 +1130,12 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         let activations = 0;
 
         // 事前に発動回数と各ヒットの結果を計算しておく
-        const hitResults: { enemies: typeof enemies; dmgList: { name: string; dmg: number }[] }[] = [];
+        const hitResults: { enemies: typeof enemies; dmgList: { name: string; dmg: number }[]; prevEnemies: typeof enemies }[] = [];
         while (mana >= silversSkill.manaCost && enemies.some(e => e.hp > 0)) {
           mana -= silversSkill.manaCost;
           activations++;
           const dmgList: { name: string; dmg: number }[] = [];
+          const prevEnemies = enemies.map(e => ({ ...e }));
           enemies = enemies.map(e => {
             if (e.hp <= 0) return e;
             const mon = getMergedMonster(e.monsterId);
@@ -1142,7 +1143,42 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
             dmgList.push({ name: mon?.name ?? e.monsterId, dmg });
             return { ...e, hp: Math.max(0, e.hp - dmg) };
           });
-          hitResults.push({ enemies: enemies.map(e => ({ ...e })), dmgList });
+          hitResults.push({ enemies: enemies.map(e => ({ ...e })), dmgList, prevEnemies });
+        }
+
+        // KXモード: 全ヒット合算で眷属撃破によるKXダメージを計算
+        const silversKxLogs: { text: string; color: string }[] = [];
+        let silversNewKxHp = battle.kx && !battle.kx.isAwakened ? battle.kx.hp : -1;
+        let silversKxAwakened = false;
+        let silversKxWin = false;
+        if (battle.kx && !battle.kx.isAwakened && silversNewKxHp >= 0) {
+          const KX_MAX_HP = battle.kx.maxHp;
+          const MINION_DMG: Record<string, number> = {
+            roam_armor: Math.floor(KX_MAX_HP * 0.04),
+            death_armor: Math.floor(KX_MAX_HP * 0.08),
+          };
+          // 各ヒットで新たに死んだ眷属を集計
+          let runningEnemies = battle.enemies.map(e => ({ ...e }));
+          for (const hr of hitResults) {
+            for (let i = 0; i < hr.enemies.length; i++) {
+              if (runningEnemies[i].hp > 0 && hr.enemies[i].hp <= 0) {
+                const fd = MINION_DMG[runningEnemies[i].monsterId];
+                if (fd) {
+                  silversNewKxHp = Math.max(0, silversNewKxHp - fd);
+                  silversKxLogs.push({ text: `💥 ${getMergedMonster(runningEnemies[i].monsterId)?.name}撃破！KX-G21に${fd}ダメージ！(HP: ${silversNewKxHp}/${KX_MAX_HP})`, color: '#f0c060' });
+                }
+              }
+            }
+            runningEnemies = hr.enemies.map(e => ({ ...e }));
+          }
+          if (silversNewKxHp <= 0) {
+            if (secureRandom() < 0.2) {
+              silversKxAwakened = true;
+            } else {
+              silversKxWin = true;
+              addItems([{ itemId: 'super_spanner', amount: 10 }, { itemId: 'makai_bihin', amount: 10 }, { itemId: 'kx_mech_track', amount: 1 }]);
+            }
+          }
         }
 
         const finalMana = Math.min(mana + silversSkill.manaRestore, battle.weaponManaMax);
@@ -1167,9 +1203,16 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         // 最初のヒットをすぐに表示
         const applyHit = (hitIdx: number, prevState: TurnBattleState) => {
           if (hitIdx >= hitResults.length) {
-            // 全ヒット完了 → マナ回復ログ追加してモンスターターンへ
+            // 全ヒット完了 → KXダメージ適用 → マナ回復ログ追加してモンスターターンへ
             setBattle(prev => {
-              const manaLog = [...prev.log, { text: `💠 =Silvers eye=の効果でマナが${silversSkill.manaRestore}回復した！（${finalMana}/${battle.weaponManaMax}）`, color: '#4fc3f7' }];
+              const manaLog = [...prev.log, ...silversKxLogs, { text: `💠 =Silvers eye=の効果でマナが${silversSkill.manaRestore}回復した！（${finalMana}/${battle.weaponManaMax}）`, color: '#4fc3f7' }];
+              if (silversKxAwakened) {
+                return { ...prev, log: [...manaLog, { text: '「さぁ、延長戦の始まりだ！」 KX-G21が覚醒した！', color: '#ff00ff' }], enemies: [], turn: 'player', weaponMana: finalMana, itemCooldowns: newCooldowns, equippedWeaponId: itemId, kx: { ...prev.kx!, hp: 0, isAwakened: true, awakeHp: prev.kx!.awakeMaxHp, burnTurns: 0 } };
+              }
+              if (silversKxWin) {
+                return { ...prev, log: [...manaLog, { text: '🏆 KX-G21を討伐した！', color: '#f0c060' }], weaponMana: finalMana, itemCooldowns: newCooldowns, equippedWeaponId: itemId, turn: 'result', result: 'win', kx: { ...prev.kx!, hp: 0 } };
+              }
+              const updatedKx = prev.kx && silversNewKxHp >= 0 ? { ...prev.kx, hp: silversNewKxHp } : prev.kx;
               return {
                 ...prev,
                 log: manaLog,
@@ -1178,9 +1221,10 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
                 equippedWeaponId: itemId,
                 turn: 'monster',
                 isDefending: false,
+                kx: updatedKx,
               };
             });
-            setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+            if (!silversKxWin) setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
             return;
           }
           const { enemies: hitEnemies } = hitResults[hitIdx];
@@ -2051,6 +2095,7 @@ export function DungeonScreen() {
   const addSkillExp = useGameStore(s => s.addSkillExp);
   const changeSatiety = useGameStore(s => s.changeSatiety);
   const addNotification = useGameStore(s => s.addNotification);
+  const changeWealthCoin = useGameStore(s => s.changeWealthCoin);
   const recordDungeonClear = useGameStore(s => s.recordDungeonClear);
   const isDungeonUnlocked = useGameStore(s => s.isDungeonUnlocked);
 
@@ -2458,7 +2503,7 @@ export function DungeonScreen() {
           {runState.isComplete || runState.isFailed ? (
             <div style={{ textAlign: 'center' }}>
               <p style={{ color: runState.isComplete ? '#f0c060' : '#e05555', fontWeight: 700, marginBottom: 12 }}>
-                {runState.isComplete ? (runState.kxBossMode ? '🌟 裏超上級クリア！「生命の超越」を達成！' : '🎉 攻略完了！') : '💀 攻略失敗...'}
+                {runState.isComplete ? (runState.kxAwakened ? '🌟 裏超上級クリア！「生命の超越」を達成！' : runState.kxBossMode ? '🌟 裏超上級クリア！' : '🎉 攻略完了！') : '💀 攻略失敗...'}
               </p>
               <button onClick={escape} style={{ padding: '10px 32px', background: '#4caf87', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>
                 ダンジョン出口へ
@@ -2557,11 +2602,72 @@ export function DungeonScreen() {
                 initialHp: runState.kxHp ?? 38750,
                 initialPhase: runState.kxPhase ?? 1,
                 initialAwakened: runState.kxIsAwakened ?? false,
-                onVictory: (_isAwakened) => {
+                onVictory: (isAwakened) => {
                   setKxBossMode(false);
-                  addNotification('success', '🌟 裏超上級クリア！「生命の超越」を達成！');
-                  postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'dungeon_clear', message: `が「生命の超越」を達成しました！` }).catch(() => {});
-                  setRunState(prev => prev ? { ...prev, isComplete: true } : null);
+                  if (isAwakened) {
+                    // 覚醒KX討伐 → 生命の超越
+                    const awakeLines: { text: string; color: string }[] = [
+                      { text: '「馬鹿な...」', color: '#00e5ff' },
+                      { text: '「この力を持ってしてもまだ敵わないと言うのか..?」', color: '#00e5ff' },
+                    ];
+                    let delay = 0;
+                    awakeLines.forEach(({ text }) => {
+                      setTimeout(() => addNotification('info', text), delay);
+                      delay += 2000;
+                    });
+                    setTimeout(() => {
+                      addNotification('success', '🌟 裏超上級クリア！「生命の超越」を達成！');
+                      postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'dungeon_clear', message: `が「生命の超越」を達成しました！` }).catch(() => {});
+                      setRunState(prev => prev ? { ...prev, isComplete: true, kxAwakened: true } : null);
+                    }, delay);
+                  } else {
+                    // 通常KX討伐 → ダイアログ → 20%で覚醒チェック
+                    const normalLines: { text: string; color: string }[] = [
+                      { text: 'ｷﾞｷﾞｷﾞ....損傷率99%...LCSﾆﾖﾙ修復不可...', color: '#ff8c00' },
+                      { text: '再ﾘｽ...ﾎﾟｰﾝをｾｯﾃｲｼﾏ...ｼﾏｼﾀ', color: '#ff8c00' },
+                      { text: 'ｷﾞｷﾞｷﾞ...ｶﾂﾄﾞｳｦﾃｲｼｼﾏｽ...', color: '#ff8c00' },
+                      { text: '回線がショートしています。離れてください', color: '#ff8c00' },
+                      { text: '次こそはｶﾅﾗｽﾞ....ﾀｵ...', color: '#ff8c00' },
+                    ];
+                    let delay = 0;
+                    normalLines.forEach(({ text }) => {
+                      setTimeout(() => addNotification('warning', text), delay);
+                      delay += 2000;
+                    });
+                    // 覚醒抽選
+                    const willAwaken = Math.random() < 0.2;
+                    if (willAwaken) {
+                      const awakenLines: { text: string; color: string }[] = [
+                        { text: '....', color: '#ff8c00' },
+                        { text: 'ｲﾔ..ﾏﾃ..', color: '#ff8c00' },
+                        { text: 'ｺﾉ我が身 ﾊｲﾏﾆﾓ砕けｿｳﾀﾞｶﾞ...', color: '#ff8c00' },
+                        { text: 'ﾅﾆｶｶﾞﾜｷｱｶﾞｯﾃｸﾙ...', color: '#ff8c00' },
+                        { text: 'このチカラはﾓｼﾔ', color: '#ff8c00' },
+                        { text: 'ｶﾝｾｲしたのﾀﾞﾛｳｶ...?', color: '#ff8c00' },
+                        { text: 'この最後の最期にﾂｲﾆ....', color: '#ff8c00' },
+                        { text: '私の成し遂げられなかった「生命」の完成に', color: '#ff8c00' },
+                        { text: 'ハハ...我は蘇ったぞ', color: '#00e5ff' },
+                        { text: '新しく、そして貴様らと同じ「命」を持ってな', color: '#00e5ff' },
+                        { text: 'いざ決戦だ！！！！！！', color: '#00e5ff' },
+                      ];
+                      awakenLines.forEach(({ text }) => {
+                        setTimeout(() => addNotification('info', text), delay);
+                        delay += 2000;
+                      });
+                      setTimeout(() => {
+                        // 覚醒KX戦を開始
+                        setRunState(prev => prev ? { ...prev, dungeonId: 'sky_castle_ex', kxBossMode: true, kxPhase: 1, kxHp: 38750, kxIsAwakened: true, currentAreaIdx: 0 } : null);
+                        setKxBossMode(true);
+                      }, delay);
+                    } else {
+                      // 覚醒なし → コイン4つ付与してクリア
+                      setTimeout(() => {
+                        changeWealthCoin(4);
+                        addNotification('success', '🌟 裏超上級クリア！WCを4枚獲得！');
+                        setRunState(prev => prev ? { ...prev, isComplete: true } : null);
+                      }, delay);
+                    }
+                  }
                 },
                 onDefeat: () => {
                   setKxBossMode(false);

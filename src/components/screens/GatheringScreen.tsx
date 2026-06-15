@@ -1,7 +1,7 @@
 // src/components/screens/GatheringScreen.tsx
 // 採取画面：満腹度ペナルティ・スキルボーナス・採取ツール（100種）連動。
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { GameIcon } from '../icons';
 import { useGameStore } from '../../stores/gameStore';
 import { GATHER_NODE_MASTER, ITEM_MASTER } from '../../data/masters';
@@ -73,6 +73,7 @@ export function GatheringScreen() {
   const addOwnedTool = useGameStore(s => s.addOwnedTool);
   const addUnlockedToolGroup = useGameStore(s => s.addUnlockedToolGroup);
   const updateToolAcquisitionStats = useGameStore(s => s.updateToolAcquisitionStats);
+  const setGatheringLocked = useGameStore((s: any) => s.setGatheringLocked);
   const [cooldowns, setCooldowns] = useState<Record<string, number>>({});
   const [log, setLog] = useState<string[]>([]);
   const [combo, setCombo] = useState<Record<string, number>>({ mining: 0, woodcutting: 0 });
@@ -201,16 +202,18 @@ export function GatheringScreen() {
     const cooldownMs = result.cooldownMs;
     const endTime = Date.now() + cooldownMs;
     setCooldowns(prev => ({ ...prev, [nodeId]: cooldownMs }));
+    setGatheringLocked(true);
     const timer = setInterval(() => {
       const rem = endTime - Date.now();
       if (rem <= 0) {
         clearInterval(timer);
         setCooldowns(prev => { const n = { ...prev }; delete n[nodeId]; return n; });
+        setGatheringLocked(false);
       } else {
         setCooldowns(prev => ({ ...prev, [nodeId]: rem }));
       }
     }, 200);
-  }, [player, addItems, changeSatiety, changeHp, addSkillExp, addNotification, combo, addOwnedTool, addUnlockedToolGroup, updateToolAcquisitionStats]);
+  }, [player, addItems, changeSatiety, changeHp, addSkillExp, addNotification, combo, addOwnedTool, addUnlockedToolGroup, updateToolAcquisitionStats, setGatheringLocked]);
 
   const nodes = Object.values(GATHER_NODE_MASTER);
   const miningNodes = nodes.filter(n => n.requiredSkill.skillId === 'mining');
@@ -256,6 +259,10 @@ export function GatheringScreen() {
 
   // 条件解放の進捗表示
   const stats = player?.toolAcquisitionStats ?? { totalGatherCount:0, maxCombo:0, nightGatherCount:0, rainGatherCount:0, dangerSuccessCount:0 };
+
+  useEffect(() => {
+    return () => { setGatheringLocked(false); };
+  }, [setGatheringLocked]);
 
   return (
     <div style={{padding:'12px 8px'}}>
