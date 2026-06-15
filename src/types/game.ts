@@ -96,7 +96,22 @@ export interface WeaponSilversEyeSkill {
   manaRestore: number;     // 連続発動が終了した時に回復するマナ量
   cooldownTurns: number;   // 発動後のクールダウンターン数
 }
-export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill | WeaponGoliathSkill | WeaponSilversEyeSkill;
+/**
+ * frostbite_self_damage: 攻撃時に自分自身が凍傷ダメージを受ける（=冷海の覇魚=など）
+ */
+export interface WeaponFrostbiteSelfDamageSkill {
+  type: 'frostbite_self_damage';
+  selfDamage: number;
+}
+/**
+ * penetrate_on_use_chance: 使用時に一定確率で敵に貫通ダメージを与える（=冷海の覇魚=など）
+ */
+export interface WeaponPenetrateOnUseChanceSkill {
+  type: 'penetrate_on_use_chance';
+  chance: number;          // 0.0〜1.0
+  penetrateDamage: number;
+}
+export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill | WeaponGoliathSkill | WeaponSilversEyeSkill | WeaponFrostbiteSelfDamageSkill | WeaponPenetrateOnUseChanceSkill;
 
 export interface WeaponUltimate {
   name: string;
