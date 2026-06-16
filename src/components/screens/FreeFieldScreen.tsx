@@ -1,8 +1,7 @@
 // src/components/screens/FreeFieldScreen.tsx
-// フリーフィールド地図 UI（表示・選択フェーズ）
-// 敵・戦闘・採取・ドロップ・フィーバー発生は未実装
+// フリーフィールド地図 UI（ノードアクション表示・各システム接続フェーズ）
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   FREE_FIELD_WORLDS,
   FREE_FIELD_AREAS_ALL,
@@ -16,8 +15,26 @@ import type {
   FreeFieldArea,
   FreeFieldNode,
   FreeFieldNodeType,
+  FreeFieldNodeAction,
+  FreeFieldNodeActionType,
 } from '../../types/freefield';
 import { FFGG_ENCOUNTER_TABLE, FFGG_ALL_ENEMIES, FFGG_FEVER_DEFINITIONS } from '../../data/ffggMaster';
+import { useGameStore } from '../../stores/gameStore';
+
+// ────────────────────────────────────────────
+// アクション種別の表示設定
+// ────────────────────────────────────────────
+const ACTION_CFG: Record<FreeFieldNodeActionType, { emoji: string; color: string; label: string }> = {
+  battleTrigger: { emoji: '⚔️', color: '#e06050', label: '戦う' },
+  harvest:       { emoji: '🌿', color: '#40c080', label: '採取する' },
+  warp:          { emoji: '🌀', color: '#a060d0', label: 'ワープ' },
+  shop:          { emoji: '🛒', color: '#f0c060', label: 'ショップ' },
+  fishing:       { emoji: '🎣', color: '#40b0d0', label: '釣りをする' },
+  test:          { emoji: '🔬', color: '#8080a0', label: 'テスター' },
+  fever:         { emoji: '🔥', color: '#ff8020', label: 'フィーバー' },
+  landmark:      { emoji: '📍', color: '#80a0c0', label: '調べる' },
+  hidden:        { emoji: '🔒', color: '#606878', label: '隠し要素' },
+};
 
 // ────────────────────────────────────────────
 // ノード種別の表示設定
@@ -208,27 +225,18 @@ function MapView({
         overflow: 'hidden',
       }}
     >
-      {/* エリア色レイヤー（FFGG のみ） */}
       {world.id === 'ffgg' && (
         <>
-          {/* 森 上部中央 */}
           <div style={{ position: 'absolute', left: '35%', top: '5%', width: '28%', height: '35%', background: AREA_COLORS.ffgg_forest, borderRadius: '50%', filter: 'blur(18px)' }} />
-          {/* 平原 右上 */}
           <div style={{ position: 'absolute', left: '72%', top: '5%', width: '22%', height: '28%', background: AREA_COLORS.ffgg_plain, borderRadius: '50%', filter: 'blur(16px)' }} />
-          {/* 砂漠 中央下 */}
           <div style={{ position: 'absolute', left: '40%', top: '50%', width: '38%', height: '38%', background: AREA_COLORS.ffgg_desert, borderRadius: '50%', filter: 'blur(20px)' }} />
-          {/* 雪山 右中 */}
           <div style={{ position: 'absolute', left: '60%', top: '28%', width: '28%', height: '32%', background: AREA_COLORS.ffgg_snow, borderRadius: '50%', filter: 'blur(16px)' }} />
-          {/* サバンナ 左 */}
           <div style={{ position: 'absolute', left: '0%', top: '20%', width: '28%', height: '40%', background: AREA_COLORS.ffgg_savanna, borderRadius: '50%', filter: 'blur(18px)' }} />
-          {/* 海賊船 中央 */}
           <div style={{ position: 'absolute', left: '30%', top: '32%', width: '24%', height: '22%', background: AREA_COLORS.ffgg_pirate, borderRadius: '50%', filter: 'blur(14px)' }} />
-          {/* 特殊 左上 */}
           <div style={{ position: 'absolute', left: '5%', top: '5%', width: '32%', height: '30%', background: AREA_COLORS.ffgg_special, borderRadius: '50%', filter: 'blur(16px)' }} />
         </>
       )}
 
-      {/* グリッド */}
       <div style={{ position: 'absolute', inset: 0 }}>
         {[...Array(10)].map((_, i) => (
           <div key={`h${i}`} style={{ position: 'absolute', top: `${i * 10}%`, left: 0, right: 0, height: 1, background: 'rgba(255,255,255,0.025)' }} />
@@ -238,10 +246,8 @@ function MapView({
         ))}
       </div>
 
-      {/* 接続線 */}
       <ConnectionLines nodes={visibleNodes} />
 
-      {/* ノードピン */}
       {visibleNodes.map(node => (
         <NodePin
           key={node.id}
@@ -251,12 +257,10 @@ function MapView({
         />
       ))}
 
-      {/* ノードラベル */}
       {visibleNodes.map(node => (
         <NodeLabel key={`lbl-${node.id}`} node={node} selected={selectedNode?.id === node.id} />
       ))}
 
-      {/* 凡例 */}
       <div style={{
         position: 'absolute', bottom: 8, right: 6,
         background: 'rgba(8,12,22,0.90)', border: '1px solid #2d3752',
@@ -274,7 +278,6 @@ function MapView({
         })}
       </div>
 
-      {/* ワールド名バッジ */}
       <div style={{
         position: 'absolute', top: 6, left: 8,
         background: 'rgba(8,12,22,0.85)', border: '1px solid #3d4772',
@@ -331,17 +334,307 @@ function AreaSelector({
 }
 
 // ────────────────────────────────────────────
+// アクションボタン
+// ────────────────────────────────────────────
+function ActionButton({
+  action,
+  onExecute,
+}: {
+  action: FreeFieldNodeAction;
+  onExecute: (a: FreeFieldNodeAction) => void;
+}) {
+  const cfg = ACTION_CFG[action.type];
+  const hasUnlock = (action.unlockConditions ?? []).length > 0;
+  const isTodo = action.description?.includes('TODO') || action.label.includes('TODO');
+
+  return (
+    <div style={{
+      background: 'rgba(22,28,44,0.9)',
+      border: `1px solid ${action.hidden ? '#404860' : cfg.color}`,
+      borderRadius: 8,
+      padding: '8px 10px',
+      marginBottom: 6,
+      opacity: action.hidden ? 0.65 : 1,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: '1rem' }}>{cfg.emoji}</span>
+          <span style={{ fontSize: '0.80rem', fontWeight: 700, color: action.hidden ? '#606878' : cfg.color }}>
+            {action.label}
+          </span>
+          {action.hidden && (
+            <span style={{ fontSize: '0.60rem', color: '#606878', background: 'rgba(40,44,60,0.6)', borderRadius: 3, padding: '1px 4px' }}>
+              隠し
+            </span>
+          )}
+          {isTodo && (
+            <span style={{ fontSize: '0.58rem', color: '#806040', background: 'rgba(60,45,15,0.4)', borderRadius: 3, padding: '1px 4px' }}>
+              TODO
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => onExecute(action)}
+          disabled={isTodo}
+          style={{
+            padding: '3px 10px',
+            fontSize: '0.68rem',
+            borderRadius: 5,
+            cursor: isTodo ? 'not-allowed' : 'pointer',
+            background: isTodo ? 'rgba(40,44,60,0.4)' : `rgba(${cfg.color.replace(/[^,\d]/g, '')},0.15)`,
+            border: `1px solid ${isTodo ? '#3d4772' : cfg.color}`,
+            color: isTodo ? '#505870' : cfg.color,
+            fontWeight: 600,
+          }}
+        >
+          {isTodo ? '🚧未実装' : `${cfg.emoji} 実行`}
+        </button>
+      </div>
+
+      {action.description && (
+        <div style={{ fontSize: '0.70rem', color: '#8a92b2', marginBottom: 3, lineHeight: 1.45 }}>
+          {action.description}
+        </div>
+      )}
+
+      {/* アクション固有情報 */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        {action.triggerMode && (
+          <span style={{ fontSize: '0.60rem', color: action.triggerMode === 'auto' ? '#e06050' : '#6090c0', background: 'rgba(30,35,55,0.5)', borderRadius: 3, padding: '1px 5px' }}>
+            {action.triggerMode === 'auto' ? '⚡自動開始' : '🖐手動開始'}
+          </span>
+        )}
+        {action.harvestDanger != null && (
+          <span style={{ fontSize: '0.60rem', color: '#c06040', background: 'rgba(30,35,55,0.5)', borderRadius: 3, padding: '1px 5px' }}>
+            採取危険度: {'⭐'.repeat(action.harvestDanger)}
+          </span>
+        )}
+        {action.combatDuringHarvest && (
+          <span style={{ fontSize: '0.60rem', color: '#e06050', background: 'rgba(40,20,20,0.4)', borderRadius: 3, padding: '1px 5px' }}>
+            ⚔️採取中に戦闘発生あり
+          </span>
+        )}
+        {action.cooldownSeconds != null && action.cooldownSeconds > 0 && (
+          <span style={{ fontSize: '0.60rem', color: '#8090a0', background: 'rgba(30,35,55,0.5)', borderRadius: 3, padding: '1px 5px' }}>
+            ⏱ CD: {action.cooldownSeconds}s
+          </span>
+        )}
+        {action.onceOnly && (
+          <span style={{ fontSize: '0.60rem', color: '#a060a0', background: 'rgba(30,20,40,0.5)', borderRadius: 3, padding: '1px 5px' }}>
+            🔑一度限り
+          </span>
+        )}
+        {action.feverType && (
+          <span style={{ fontSize: '0.60rem', color: '#ff8020', background: 'rgba(40,20,10,0.4)', borderRadius: 3, padding: '1px 5px' }}>
+            🔥 {action.feverType === 'dragon' ? 'ドラゴンフィーバー' : action.feverType === 'red' ? 'レッドフィーバー' : 'ゴールドフィーバー'}
+          </span>
+        )}
+        {action.feverConditionText && (
+          <span style={{ fontSize: '0.60rem', color: '#c08040', background: 'rgba(40,25,10,0.4)', borderRadius: 3, padding: '1px 5px' }}>
+            条件: {action.feverConditionText}
+          </span>
+        )}
+        {(action.targetNodeId || action.targetWorldId) && (
+          <span style={{ fontSize: '0.60rem', color: '#a060d0', background: 'rgba(30,20,45,0.5)', borderRadius: 3, padding: '1px 5px' }}>
+            {action.targetWorldId
+              ? `→ ワールド: ${action.targetWorldId}`
+              : `→ ${FREE_FIELD_NODES_ALL[action.targetNodeId!]?.displayName ?? action.targetNodeId}`}
+          </span>
+        )}
+      </div>
+
+      {/* 解放条件 */}
+      {hasUnlock && (
+        <div style={{ marginTop: 4 }}>
+          {(action.unlockConditions ?? []).map((c, i) => (
+            <div key={i} style={{ fontSize: '0.60rem', color: '#806040', background: 'rgba(40,25,10,0.3)', borderRadius: 3, padding: '1px 6px', display: 'inline-block', marginRight: 3 }}>
+              🔒 {c.description ?? c.type}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 報酬ヒント */}
+      {(action.rewardHints ?? []).length > 0 && (
+        <div style={{ marginTop: 4 }}>
+          <div style={{ fontSize: '0.60rem', color: '#6a7290', marginBottom: 2 }}>💎 報酬ヒント</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {(action.rewardHints ?? []).map((rh, i) => (
+              <span key={i} style={{ fontSize: '0.58rem', color: '#70c090', background: 'rgba(20,40,25,0.4)', borderRadius: 3, padding: '1px 5px' }}>
+                {rh.description}{rh.dropRate ? ` (${rh.dropRate})` : ''}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
+// アクション実行ハンドラ（既存システム接続）
+// ────────────────────────────────────────────
+function useActionHandler() {
+  const setActiveTab = useGameStore(s => s.setActiveTab);
+
+  const handleAction = useCallback((action: FreeFieldNodeAction, _node: FreeFieldNode) => {
+    switch (action.type) {
+      case 'fishing':
+        // 既存釣り画面へ接続
+        setActiveTab('fishing');
+        break;
+      case 'harvest':
+        // 既存採取画面へ接続
+        setActiveTab('gathering');
+        break;
+      case 'shop':
+        // TODO: 既存ショップUIへの接続（shopId別に分岐）
+        // 現状はmarket画面へ
+        setActiveTab('market');
+        break;
+      case 'battleTrigger':
+        // TODO: 既存ダンジョン/戦闘システムへのフック
+        // DungeonScreenのダンジョン選択を経由する想定
+        setActiveTab('dungeon');
+        break;
+      case 'test':
+        // TODO: テスターUI（未実装）
+        // 現状はダンジョンタブへ
+        setActiveTab('dungeon');
+        break;
+      case 'warp':
+        // TODO: ノード間移動・ワープ処理（未実装）
+        // 現状はアラートのみ
+        if (action.targetWorldId) {
+          alert(`TODO: ワールド遷移 → ${action.targetWorldId}\n（遷移実装未定）`);
+        }
+        // ノード内移動はFreeFieldScreen側で処理
+        break;
+      case 'fever':
+        // TODO: フィーバー発生ロジック（未実装）
+        alert(`TODO: フィーバー発生\n条件: ${action.feverConditionText ?? '未確定'}`);
+        break;
+      case 'landmark':
+        // 地点情報表示（パネル内に表示済みのため何もしない）
+        break;
+      case 'hidden':
+        // TODO: 隠し要素の解放チェック（未実装）
+        alert('TODO: 隠し要素の解放条件チェックは未実装');
+        break;
+      default:
+        break;
+    }
+  }, [setActiveTab]);
+
+  return handleAction;
+}
+
+// ────────────────────────────────────────────
+// アクション一覧パネル
+// ────────────────────────────────────────────
+function NodeActionsPanel({
+  node,
+  onWarpToNode,
+}: {
+  node: FreeFieldNode;
+  onWarpToNode?: (nodeId: string) => void;
+}) {
+  const handleAction = useActionHandler();
+  const actions = node.actions ?? [];
+
+  // hidden アクションは条件未確定のものも含めて薄く表示
+  const visibleActions = actions.filter(a => !a.hidden || true); // 全部表示（TODOで薄く）
+
+  if (visibleActions.length === 0) return null;
+
+  // アクション種別サマリー（このノードでできること）
+  const typeSet = new Set(actions.map(a => a.type));
+  const hasBattle = typeSet.has('battleTrigger');
+  const hasHarvest = typeSet.has('harvest');
+  const hasFever = typeSet.has('fever');
+  const warpActions = actions.filter(a => a.type === 'warp');
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      {/* このノードでできること サマリー */}
+      <div style={{
+        background: 'rgba(20,26,42,0.8)',
+        border: '1px solid #2d3752',
+        borderRadius: 7,
+        padding: '7px 10px',
+        marginBottom: 8,
+      }}>
+        <div style={{ fontSize: '0.68rem', color: '#8a92b2', marginBottom: 5, fontWeight: 700 }}>
+          📋 このノードでできること
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {Array.from(typeSet).map(t => {
+            const cfg = ACTION_CFG[t];
+            return (
+              <span key={t} style={{
+                fontSize: '0.65rem',
+                color: cfg.color,
+                background: `rgba(${cfg.color.slice(1).match(/.{2}/g)!.map(x => parseInt(x,16)).join(',')}, 0.12)`,
+                border: `1px solid ${cfg.color}`,
+                borderRadius: 5,
+                padding: '2px 7px',
+              }}>
+                {cfg.emoji} {cfg.label}
+              </span>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6, fontSize: '0.62rem', color: '#6a7290' }}>
+          {hasBattle && <span>⚔️ 戦闘あり</span>}
+          {hasHarvest && <span>🌿 採取あり</span>}
+          {hasFever && <span style={{ color: '#ff8020' }}>🔥 フィーバー関連</span>}
+          {warpActions.length > 0 && (
+            <span style={{ color: '#a060d0' }}>
+              🌀 接続先: {warpActions.map(a =>
+                a.targetWorldId
+                  ? a.targetWorldId
+                  : (FREE_FIELD_NODES_ALL[a.targetNodeId ?? '']?.displayName ?? a.targetNodeId ?? '?')
+              ).join(' / ')}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* アクションボタン一覧 */}
+      <div style={{ fontSize: '0.68rem', color: '#8a92b2', marginBottom: 5, fontWeight: 700 }}>
+        🎮 アクション
+      </div>
+      {visibleActions.map((action, idx) => (
+        <ActionButton
+          key={idx}
+          action={action}
+          onExecute={(a) => {
+            if (a.type === 'warp' && a.targetNodeId && onWarpToNode) {
+              onWarpToNode(a.targetNodeId);
+            }
+            handleAction(a, node);
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
 // ノード詳細パネル
 // ────────────────────────────────────────────
 function NodeDetailPanel({
   node,
   onClose,
+  onWarpToNode,
 }: {
   node: FreeFieldNode;
   onClose: () => void;
+  onWarpToNode?: (nodeId: string) => void;
 }) {
   const cfg = NODE_CFG[node.type];
   const area = FREE_FIELD_AREAS_ALL[node.areaId];
+  const [showDetail, setShowDetail] = useState(false);
 
   const connectedNodes = node.connections
     .map(id => FREE_FIELD_NODES_ALL[id])
@@ -404,6 +697,38 @@ function NodeDetailPanel({
         </div>
       )}
 
+      {/* アクション一覧 ← メイン */}
+      <NodeActionsPanel node={node} onWarpToNode={onWarpToNode} />
+
+      {/* 接続先 */}
+      {connectedNodes.length > 0 && (
+        <div style={{ marginTop: 10, marginBottom: 8 }}>
+          <div style={{ fontSize: '0.65rem', color: '#8a92b2', marginBottom: 4 }}>🔗 接続先ノード</div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {connectedNodes.map(cn => {
+              const ccfg = NODE_CFG[cn.type];
+              return (
+                <button
+                  key={cn.id}
+                  onClick={() => onWarpToNode?.(cn.id)}
+                  style={{
+                    fontSize: '0.65rem',
+                    background: 'rgba(40,50,80,0.6)',
+                    border: `1px solid ${ccfg.color}`,
+                    borderRadius: 5,
+                    padding: '2px 7px',
+                    color: ccfg.color,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {ccfg.emoji} {cn.indexLabel && `${cn.indexLabel} `}{cn.displayName}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* タグ */}
       {node.tags && node.tags.length > 0 && (
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -415,112 +740,82 @@ function NodeDetailPanel({
         </div>
       )}
 
-      {/* 接続先 */}
-      {connectedNodes.length > 0 && (
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: '0.65rem', color: '#8a92b2', marginBottom: 4 }}>🔗 接続先ノード</div>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {connectedNodes.map(cn => {
-              const ccfg = NODE_CFG[cn.type];
-              return (
-                <span key={cn.id} style={{
-                  fontSize: '0.65rem',
-                  background: 'rgba(40,50,80,0.6)',
-                  border: `1px solid ${ccfg.color}`,
-                  borderRadius: 5,
-                  padding: '2px 7px',
-                  color: ccfg.color,
-                }}>
-                  {ccfg.emoji} {cn.indexLabel && `${cn.indexLabel} `}{cn.displayName}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ヒント群 */}
-      {(node.encounterHints ?? []).length > 0 && (
-        <div style={{ fontSize: '0.68rem', color: '#e06050', marginBottom: 4 }}>
-          ⚔️ 出現ヒント（未実装）: {node.encounterHints!.join(' / ')}
-        </div>
-      )}
-      {(node.resourceHints ?? []).length > 0 && (
-        <div style={{ fontSize: '0.68rem', color: '#60c080', marginBottom: 4 }}>
-          🌿 採取ヒント（未実装）: {node.resourceHints!.join(' / ')}
-        </div>
-      )}
-      {(node.eventHints ?? []).length > 0 && (
-        <div style={{ fontSize: '0.68rem', color: '#ff8020', marginBottom: 4 }}>
-          🔥 イベントヒント（未実装）: {node.eventHints!.join(' / ')}
-        </div>
-      )}
-
-      {/* エリア情報 */}
-      {area?.description && (
-        <div style={{ fontSize: '0.65rem', color: '#707890', marginBottom: 6, borderTop: '1px solid #2d3752', paddingTop: 6 }}>
-          📍 エリア説明: {area.description}
-        </div>
-      )}
-
-      {/* notes */}
-      {node.notes && (
-        <div style={{
-          fontSize: '0.63rem', color: '#606880',
-          background: 'rgba(30,35,55,0.5)', borderRadius: 5, padding: '5px 8px', marginBottom: 8,
-        }}>
-          📝 {node.notes}
-        </div>
-      )}
-
-
-      {/* FFGG エンカウンター情報パネル */}
-      {(() => {
-        const profile = FFGG_ENCOUNTER_TABLE[node.areaId];
-        if (!profile) return null;
-        const normalEnemies = (profile.normalEnemyIds ?? []).map(id => FFGG_ALL_ENEMIES[id]?.name).filter(Boolean);
-        const triggerEnemy = profile.triggerEnemyId ? FFGG_ALL_ENEMIES[profile.triggerEnemyId]?.name : null;
-        const boss = profile.bossId ? FFGG_ALL_ENEMIES[profile.bossId]?.name : null;
-        const midBoss = profile.midBossId ? FFGG_ALL_ENEMIES[profile.midBossId]?.name : null;
-        const feverChancePct = profile.feverChance ? Math.round(profile.feverChance * 100) : 0;
-        const dangerStars = '⭐'.repeat(profile.dangerLevel);
-        return (
-          <div style={{ fontSize: '0.68rem', borderTop: '1px solid #2d3752', paddingTop: 8, marginBottom: 8 }}>
-            <div style={{ color: '#f0c060', fontWeight: 700, marginBottom: 4 }}>⚔️ エンカウンター情報</div>
-            <div style={{ color: '#e06050', marginBottom: 2 }}>危険度: {dangerStars}</div>
-            {triggerEnemy && <div style={{ color: '#ff8060', marginBottom: 2 }}>🎯 戦闘トリガー: {triggerEnemy}（倒すと仲間が出現）</div>}
-            {normalEnemies.length > 0 && <div style={{ color: '#b0b8d0', marginBottom: 2 }}>👾 通常敵: {normalEnemies.slice(0, 5).join(' / ')}{normalEnemies.length > 5 ? ' ...' : ''}</div>}
-            {midBoss && <div style={{ color: '#c060c0', marginBottom: 2 }}>⚡ 中ボス: {midBoss}</div>}
-            {boss && <div style={{ color: '#e05555', marginBottom: 2 }}>💀 ボス: {boss}</div>}
-            {feverChancePct > 0 && <div style={{ color: '#ff8020', marginBottom: 2 }}>🔥 フィーバー発生率: {feverChancePct}%</div>}
-            <div style={{ color: '#6090c0', marginBottom: 2 }}>
-              🔥 フィーバー種別: {Object.values(FFGG_FEVER_DEFINITIONS).filter(f => {
-                if (node.areaId === 'ffgg_plain') return f.type === 'red' || f.type === 'dragon';
-                if (node.areaId === 'ffgg_savanna') return f.type === 'red' || f.type === 'dragon';
-                return f.type === 'gold';
-              }).map(f => f.displayName).join(' / ')}
-            </div>
-            {node.type === 'danger' || node.type === 'boss' ? null : (
-              <div style={{ color: '#60c080', marginTop: 4, fontSize: '0.62rem' }}>
-                💡 トリガーを無視すれば採取のみも可能
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* TODO: 移動確定ボタン（将来の移動処理のプレースホルダー） */}
+      {/* 詳細情報トグル */}
       <button
-        disabled
+        onClick={() => setShowDetail(v => !v)}
         style={{
-          width: '100%', padding: '7px 0', marginTop: 4,
-          background: 'rgba(50,50,70,0.4)', border: '1px dashed #3d4772',
-          borderRadius: 7, color: '#6a7290', fontSize: '0.75rem', cursor: 'not-allowed',
+          width: '100%', padding: '4px', marginTop: 4, marginBottom: showDetail ? 8 : 0,
+          background: 'rgba(30,36,55,0.5)', border: '1px solid #2d3752',
+          borderRadius: 5, color: '#6a7290', fontSize: '0.65rem', cursor: 'pointer',
         }}
-        title="TODO: 移動処理は未実装"
       >
-        🚧 このノードへ移動（未実装）
+        {showDetail ? '▲ 詳細情報を閉じる' : '▼ 詳細情報を見る（ヒント・メモ）'}
       </button>
+
+      {showDetail && (
+        <>
+          {(node.encounterHints ?? []).length > 0 && (
+            <div style={{ fontSize: '0.68rem', color: '#e06050', marginBottom: 4 }}>
+              ⚔️ 出現ヒント: {node.encounterHints!.join(' / ')}
+            </div>
+          )}
+          {(node.resourceHints ?? []).length > 0 && (
+            <div style={{ fontSize: '0.68rem', color: '#60c080', marginBottom: 4 }}>
+              🌿 素材ヒント: {node.resourceHints!.join(' / ')}
+            </div>
+          )}
+          {(node.eventHints ?? []).length > 0 && (
+            <div style={{ fontSize: '0.68rem', color: '#ff8020', marginBottom: 4 }}>
+              🔥 イベントヒント: {node.eventHints!.join(' / ')}
+            </div>
+          )}
+
+          {area?.description && (
+            <div style={{ fontSize: '0.65rem', color: '#707890', marginBottom: 6, borderTop: '1px solid #2d3752', paddingTop: 6 }}>
+              📍 エリア説明: {area.description}
+            </div>
+          )}
+
+          {node.notes && (
+            <div style={{
+              fontSize: '0.63rem', color: '#606880',
+              background: 'rgba(30,35,55,0.5)', borderRadius: 5, padding: '5px 8px', marginBottom: 8,
+            }}>
+              📝 {node.notes}
+            </div>
+          )}
+
+          {/* FFGG エンカウンター情報パネル */}
+          {(() => {
+            const profile = FFGG_ENCOUNTER_TABLE[node.areaId];
+            if (!profile) return null;
+            const normalEnemies = (profile.normalEnemyIds ?? []).map(id => FFGG_ALL_ENEMIES[id]?.name).filter(Boolean);
+            const triggerEnemy = profile.triggerEnemyId ? FFGG_ALL_ENEMIES[profile.triggerEnemyId]?.name : null;
+            const boss = profile.bossId ? FFGG_ALL_ENEMIES[profile.bossId]?.name : null;
+            const midBoss = profile.midBossId ? FFGG_ALL_ENEMIES[profile.midBossId]?.name : null;
+            const feverChancePct = profile.feverChance ? Math.round(profile.feverChance * 100) : 0;
+            const dangerStars = '⭐'.repeat(profile.dangerLevel);
+            return (
+              <div style={{ fontSize: '0.68rem', borderTop: '1px solid #2d3752', paddingTop: 8, marginBottom: 8 }}>
+                <div style={{ color: '#f0c060', fontWeight: 700, marginBottom: 4 }}>⚔️ エンカウンター情報</div>
+                <div style={{ color: '#e06050', marginBottom: 2 }}>危険度: {dangerStars}</div>
+                {triggerEnemy && <div style={{ color: '#ff8060', marginBottom: 2 }}>🎯 戦闘トリガー: {triggerEnemy}（倒すと仲間が出現）</div>}
+                {normalEnemies.length > 0 && <div style={{ color: '#b0b8d0', marginBottom: 2 }}>👾 通常敵: {normalEnemies.slice(0, 5).join(' / ')}{normalEnemies.length > 5 ? ' ...' : ''}</div>}
+                {midBoss && <div style={{ color: '#c060c0', marginBottom: 2 }}>⚡ 中ボス: {midBoss}</div>}
+                {boss && <div style={{ color: '#e05555', marginBottom: 2 }}>💀 ボス: {boss}</div>}
+                {feverChancePct > 0 && <div style={{ color: '#ff8020', marginBottom: 2 }}>🔥 フィーバー発生率: {feverChancePct}%</div>}
+                <div style={{ color: '#6090c0', marginBottom: 2 }}>
+                  🔥 フィーバー種別: {Object.values(FFGG_FEVER_DEFINITIONS).filter(f => {
+                    if (node.areaId === 'ffgg_plain') return f.type === 'red' || f.type === 'dragon';
+                    if (node.areaId === 'ffgg_savanna') return f.type === 'red' || f.type === 'dragon';
+                    return f.type === 'gold';
+                  }).map(f => f.displayName).join(' / ')}
+                </div>
+              </div>
+            );
+          })()}
+        </>
+      )}
     </div>
   );
 }
@@ -592,6 +887,18 @@ export function FreeFieldScreen() {
     setSelectedNode(prev => (prev?.id === node.id ? null : node));
   };
 
+  // ワープアクションからノードを選択
+  const handleWarpToNode = useCallback((nodeId: string) => {
+    const target = FREE_FIELD_NODES_ALL[nodeId];
+    if (target) {
+      setSelectedNode(target);
+      // 対象エリアに切り替え
+      if (target.areaId !== activeAreaId) {
+        setActiveAreaId(target.areaId);
+      }
+    }
+  }, [activeAreaId]);
+
   return (
     <div style={{ padding: '4px 0 80px' }}>
       <h2 style={{
@@ -660,11 +967,12 @@ export function FreeFieldScreen() {
         </div>
       )}
 
-      {/* ノード詳細パネル */}
+      {/* ノード詳細パネル（アクション含む） */}
       {selectedNode && (
         <NodeDetailPanel
           node={selectedNode}
           onClose={() => setSelectedNode(null)}
+          onWarpToNode={handleWarpToNode}
         />
       )}
 
@@ -676,14 +984,6 @@ export function FreeFieldScreen() {
           onSelectNode={handleSelectNode}
         />
       )}
-
-      {/* 未実装バナー */}
-      <div style={{
-        marginTop: 14, background: 'rgba(60,45,15,0.25)', border: '1px dashed #6a5030',
-        borderRadius: 8, padding: '7px 10px', fontSize: '0.65rem', color: '#806040',
-      }}>
-        ⚠️ フリーフィールドは地図表示フェーズです。戦闘・採取・ドロップ・フィーバー発生は今後追加予定。
-      </div>
     </div>
   );
 }
