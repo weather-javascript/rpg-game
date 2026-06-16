@@ -1,4 +1,5 @@
 // src/components/screens/DungeonScreen.tsx
+import { FreeFieldScreen } from './FreeFieldScreen';
 import { GameIcon } from '../icons';
 import { useState, useCallback, useEffect } from 'react';
 import { useGameStore } from '../../stores/gameStore';
@@ -2133,7 +2134,7 @@ export function DungeonScreen() {
   const [equipment, _setEquipment] = useState<EquipmentSlots>(() => player?.equipment ?? defaultEquipmentSlots());
   const [showUnlockGuide, setShowUnlockGuide] = useState(false);
   const [runLog, setRunLog] = useState<string[]>([]);
-  const [dungeonInnerTab, setDungeonInnerTab] = useState<'dungeon' | 'gacha' | 'trap'>('dungeon');
+  const [dungeonInnerTab, setDungeonInnerTab] = useState<'dungeon' | 'gacha' | 'trap' | 'freefield'>('dungeon');
   const [dungeonMana, setDungeonMana] = useState(0);
   const [showBossChoice, setShowBossChoice] = useState(false);
   const [kxBossMode, setKxBossMode] = useState(false);
@@ -2362,6 +2363,7 @@ export function DungeonScreen() {
   const dungeonTabActive = dungeonInnerTab === 'dungeon';
   const gachaTabActive = dungeonInnerTab === 'gacha';
   const trapTabActive = dungeonInnerTab === 'trap';
+  const freeFieldTabActive = dungeonInnerTab === 'freefield';
 
   return (
     <div style={{ padding: '12px 8px 80px' }}>
@@ -2379,11 +2381,16 @@ export function DungeonScreen() {
           style={{ flex: 1, padding: '8px', fontWeight: 700, fontSize: '0.85rem', background: trapTabActive ? 'rgba(255,100,100,0.15)' : '#1c2235', border: `1px solid ${trapTabActive ? '#ff6464' : '#2d3752'}`, color: trapTabActive ? '#ff6464' : '#8a92b2', borderRadius: 8, cursor: 'pointer' }}>
           🕷️ トラップ
         </button>
+        <button onClick={() => setDungeonInnerTab('freefield')}
+          style={{ flex: 1, padding: '8px', fontWeight: 700, fontSize: '0.85rem', background: freeFieldTabActive ? 'rgba(96,160,255,0.15)' : '#1c2235', border: `1px solid ${freeFieldTabActive ? '#60a0ff' : '#2d3752'}`, color: freeFieldTabActive ? '#60a0ff' : '#8a92b2', borderRadius: 8, cursor: 'pointer' }}>
+          🗺️ FF
+        </button>
       </div>
 
       {gachaTabActive && <GachaPanel player={player} addItems={addItems} changeGold={changeGold} addNotification={addNotification} />}
       {trapTabActive && <TrapWorldPanel player={player} addItems={addItems} addNotification={addNotification} />}
-      {!gachaTabActive && !trapTabActive && <>
+      {freeFieldTabActive && <FreeFieldScreen />}
+      {!gachaTabActive && !trapTabActive && !freeFieldTabActive && <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <h2 style={{ fontFamily: 'Cinzel,serif', color: '#f0c060', borderBottom: '1px solid #2d3752', paddingBottom: 8, flex: 1 }}>⚔️ ダンジョン</h2>
         {lockedDungeons.length > 0 && (
