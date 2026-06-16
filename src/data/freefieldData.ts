@@ -105,6 +105,30 @@ export const FFGG_NODES: Record<string, FreeFieldNode> = {
     description: 'FFGGへのショートカット入口。釣り堀とテスターを兼ねる複合地点。',
     notes: '釣り堀の詳細仕様・テスターの詳細仕様は未確定。TODO: 釣り実装時に fishing ノードとして分離するか検討。',
     isSafeZone: true,
+  
+    actions: [
+      {
+        type: 'warp',
+        label: 'ショートカット移動',
+        description: 'FFGG各エリアへのショートカット入口。',
+        triggerMode: 'manual',
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'fishing',
+        label: '釣りをする',
+        description: '釣り堀エリアで釣りができます。',
+        systemTargetId: 'fishing_screen',
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'test',
+        label: 'テスターを使う',
+        description: '装備・武器を試用できるテストエリア。ダメージ確認が可能。',
+        // TODO: テスター詳細UIは未実装
+        cooldownSeconds: 0,
+      },
+    ],
   },
 
   ffgg_node_02: {
@@ -118,10 +142,40 @@ export const FFGG_NODES: Record<string, FreeFieldNode> = {
     connections: ['ffgg_node_01', 'ffgg_node_09', 'ffgg_node_08', 'ffgg_node_10'],
     tags: ['forest', '緑竜', 'danger'],
     description: '木が生い茂る森地帯。緑竜の狩場。ホワイトバジル採取場所あり。',
-    resourceHints: ['ホワイトバジル採取（採取未実装）'],
-    encounterHints: ['緑竜（未実装）', '固有モブ（未実装）'],
+    resourceHints: ['ホワイトバジル（white_basil）採取', '緑輝石（green_gem_ore）採取', 'コスモニウム（cosmonium）極低確率採取', '緑鱗（green_scale）敵ドロップ', 'FF小判（ff_coin_small）ドロップ'],
+    encounterHints: ['グリド・グリド・アルファ→緑鱗', 'フォレストリッパー→緑鱗/コスモニウム（低確率）', 'ソールドロップ→スラムイ溶液'],
+    gatherNodeIds: ['ffgg_forest_herb'],
     dangerLevel: 3,
     notes: '大樹ノード(⑨)はこのエリアに属するランドマーク。',
+  
+    actions: [
+      {
+        type: 'battleTrigger',
+        label: '戦う（森地帯）',
+        description: 'グリド・フォレストリッパーなどが出現する危険地帯。',
+        triggerMode: 'manual',
+        rewardHints: [
+          { description: '緑鱗', dropRate: '通常' },
+          { description: 'コスモニウム', dropRate: '極低確率' },
+          { description: 'FF小判', dropRate: '低確率' },
+        ],
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'harvest',
+        label: '採取する（森）',
+        description: 'ホワイトバジル・緑輝石などを採取できます。',
+        systemTargetId: 'ffgg_forest_herb',
+        harvestDanger: 3,
+        combatDuringHarvest: true,
+        rewardHints: [
+          { description: 'ホワイトバジル', dropRate: '安定' },
+          { description: '緑輝石', dropRate: '普通' },
+          { description: 'コスモニウム', dropRate: '極低確率' },
+        ],
+        cooldownSeconds: 30,
+      },
+    ],
   },
 
   ffgg_node_03: {
@@ -135,9 +189,30 @@ export const FFGG_NODES: Record<string, FreeFieldNode> = {
     connections: ['ffgg_node_02', 'ffgg_node_05'],
     tags: ['plain', '赤竜'],
     description: '特段のオブジェクトや地形が少ない平原。赤竜の狩場。',
-    encounterHints: ['赤竜（未実装）'],
+    resourceHints: ['赤鱗（red_scale）敵ドロップ', '赤鱗（上位）（red_scale_high）上位敵ドロップ', 'ドラグ系→ドラゴンの鱗（低確率）'],
+    encounterHints: ['ドラグ・ドラグ強→赤鱗', 'ドラゴンフィーバー連動'],
     dangerLevel: 2,
     notes: '原文に「脳死で戦える」との記載あり。safe と danger の中間的な扱いを想定。',
+  
+    actions: [
+      {
+        type: 'battleTrigger',
+        label: '戦う（平原地帯）',
+        description: 'ドラグ・ドラグ強が出現する比較的安全な戦闘エリア。',
+        triggerMode: 'manual',
+        rewardHints: [
+          { description: '赤鱗', dropRate: '通常' },
+          { description: 'ドラゴンの鱗', dropRate: '低確率' },
+        ],
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'landmark',
+        label: 'エリア情報を見る',
+        description: '平原地帯の説明・ドラゴンフィーバー連動状況を確認。',
+        cooldownSeconds: 0,
+      },
+    ],
   },
 
   ffgg_node_04: {
@@ -151,9 +226,40 @@ export const FFGG_NODES: Record<string, FreeFieldNode> = {
     connections: ['ffgg_node_11', 'ffgg_node_12', 'ffgg_node_15'],
     tags: ['desert', '岩竜'],
     description: '一面砂だらけの広大な砂漠。岩竜の狩場。骨や砂岩の建物が点在する。',
-    encounterHints: ['岩竜（未実装）'],
+    resourceHints: ['岩鱗（rock_scale）ガドラ/エガルド系', '熱砂の琥珀（hot_sand_amber）採取/ガドラ改', 'ニトロトリン（nitrotrin）採取（危険）', '枯れた心（withered_heart）エガルドン（レア）', 'アンティークコイン（antique_coin）一部敵', 'マテラカイト（matelakaite）採取'],
+    encounterHints: ['ガドラ→岩鱗', 'ガドラ改→岩鱗/熱砂の琥珀', 'エガルド→岩鱗/枯れた心', 'エガルドン（ボス）→岩鱗上位/熱砂の琥珀/枯れた心'],
+    gatherNodeIds: ['ffgg_desert_gather'],
     dangerLevel: 3,
     notes: 'FFGG 内で最も広いエリアとされる。',
+  
+    actions: [
+      {
+        type: 'battleTrigger',
+        label: '戦う（砂漠地帯）',
+        description: 'ガドラ・エガルド系が出現する広大な危険地帯。',
+        triggerMode: 'manual',
+        rewardHints: [
+          { description: '岩鱗', dropRate: '通常' },
+          { description: '熱砂の琥珀', dropRate: '低確率' },
+          { description: '枯れた心', dropRate: 'エガルドンのみ' },
+        ],
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'harvest',
+        label: '採取する（砂漠）',
+        description: 'ニトロトリン・マテラカイトなどを採取できます（危険）。',
+        systemTargetId: 'ffgg_desert_gather',
+        harvestDanger: 4,
+        combatDuringHarvest: true,
+        rewardHints: [
+          { description: 'ニトロトリン', dropRate: '普通（採取中危険あり）' },
+          { description: 'マテラカイト', dropRate: '普通' },
+          { description: '熱砂の琥珀', dropRate: '低確率' },
+        ],
+        cooldownSeconds: 60,
+      },
+    ],
   },
 
   ffgg_node_05: {
@@ -168,10 +274,55 @@ export const FFGG_NODES: Record<string, FreeFieldNode> = {
     connections: ['ffgg_node_03', 'ffgg_node_13'],
     tags: ['snow', '水竜', '隠しSHOP'],
     description: '雪が多く高低差が激しいエリア。水竜の狩場。取れる君の強化場所や隠しSHOPがある。',
-    encounterHints: ['水竜（未実装）', '波狼（未実装）'],
-    resourceHints: ['取れる君の強化場所（詳細未確定）', '隠しSHOP（未実装）'],
+    encounterHints: ['アドーラ/アドーラ改→水鱗/海原の欠片', '牙狼→狼牙魔結晶/wolf_crystal', '波狼（ボス）→狼牙魔結晶/水鱗上位/海原のオーブ', 'Sea Memoria（ボス）→海原のオーブ/水鱗上位'],
+    resourceHints: ['水鱗（water_scale）アドーラ系', '狼牙魔結晶（wolf_magic_crystal）波狼/牙狼', '海原のオーブ（ocean_orb）Sea Memoriaボス', '海原の欠片（ocean_shard）採取/アドーラ改', '取れる君の強化場所（詳細未確定）', '隠しSHOP（未実装）'],
+    gatherNodeIds: ['ffgg_snow_gather'],
     dangerLevel: 3,
     notes: '原文内で「雪山」と「家っぽいとこ」の表記ゆれあり。aliasNames に両方保持。',
+  
+    actions: [
+      {
+        type: 'warp',
+        label: '線路（⑬）へ移動',
+        description: '線路（陰キャ）エリアへのショートカット。',
+        targetNodeId: 'ffgg_node_13',
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'shop',
+        label: '隠しSHOPを開く',
+        description: '雪山の隠しショップ。取れる君強化系のアイテムがある。',
+        hidden: true,
+        unlockConditions: [{ type: 'TODO', description: '隠しSHOP解放条件は未確定' }],
+        // TODO: 隠しSHOPのshopId・品揃えは未実装
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'harvest',
+        label: '採取する（雪山）',
+        description: '水鱗・海原の欠片などを採取できます。',
+        systemTargetId: 'ffgg_snow_gather',
+        harvestDanger: 3,
+        combatDuringHarvest: true,
+        rewardHints: [
+          { description: '水鱗', dropRate: '普通' },
+          { description: '海原の欠片', dropRate: '低確率' },
+        ],
+        cooldownSeconds: 30,
+      },
+      {
+        type: 'battleTrigger',
+        label: '戦う（水竜周辺）',
+        description: 'アドーラ・牙狼・Sea Memoriaが出現する危険地帯。',
+        triggerMode: 'manual',
+        rewardHints: [
+          { description: '水鱗', dropRate: '通常' },
+          { description: '狼牙魔結晶', dropRate: '普通' },
+          { description: '海原のオーブ', dropRate: 'Sea Memoriaボス' },
+        ],
+        cooldownSeconds: 0,
+      },
+    ],
   },
 
   ffgg_node_06: {
@@ -188,6 +339,26 @@ export const FFGG_NODES: Record<string, FreeFieldNode> = {
     encounterHints: ['屠る巨人（ミニボス・未実装）'],
     dangerLevel: 4,
     notes: 'Codex エントリ: giant_slayer 参照。ドロップ詳細は未実装。',
+  
+    actions: [
+      {
+        type: 'battleTrigger',
+        label: '屠る巨人と戦う',
+        description: 'ミニボス「屠る巨人」との戦闘。強敵のため注意。',
+        triggerMode: 'manual',
+        rewardHints: [
+          { description: '壊世賜杖レクイエム', dropRate: '低確率（TODO）' },
+          { description: 'シュヴァリエプレッジ', dropRate: '低確率（TODO）' },
+        ],
+        cooldownSeconds: 300,
+      },
+      {
+        type: 'landmark',
+        label: 'GGの木を調べる',
+        description: 'サバンナ地帯にそびえるGGの大木。屠る巨人の縄張り。',
+        cooldownSeconds: 0,
+      },
+    ],
   },
 
   ffgg_node_07: {
@@ -204,6 +375,26 @@ export const FFGG_NODES: Record<string, FreeFieldNode> = {
     encounterHints: ['マハドリュアス（ミニボス・未実装）'],
     dangerLevel: 4,
     notes: 'TODO: マハドリュアスの詳細仕様は原文から追加確認が必要。',
+  
+    actions: [
+      {
+        type: 'battleTrigger',
+        label: 'マハドリュアスと戦う',
+        description: 'ミニボス「マハドリュアス」との戦闘。',
+        triggerMode: 'manual',
+        rewardHints: [
+          // TODO: マハドリュアスのドロップ詳細は未確定
+          { description: 'レアドロップ（TODO）', dropRate: '低確率' },
+        ],
+        cooldownSeconds: 300,
+      },
+      {
+        type: 'landmark',
+        label: 'マハドリュアスの地点を確認',
+        description: 'サバンナ地帯のミニボス出現地点。',
+        cooldownSeconds: 0,
+      },
+    ],
   },
 
   ffgg_node_08: {
@@ -216,9 +407,41 @@ export const FFGG_NODES: Record<string, FreeFieldNode> = {
     position: { x: 0.49, y: 0.03 },
     connections: ['ffgg_node_02'],
     tags: ['transition', 'FF2', 'ff2'],
-    description: 'FFGG 内に存在する FF2 エリアへの遷移ポイント。',
+    description: 'FFGG 内に存在する FF2 エリアへの遷移ポイント。スラムイ系・海原系・銀の弾丸・レイド系素材の入手場所。',
+    resourceHints: ['スラムイ溶液（slamy_liquid）スラムイキング', 'ポイズンスフィア（poison_sphere）毒系敵', '銀の弾丸（silver_bullet）宝箱/ドロップ', '海原のオーブ（ocean_orb）ボスドロップ', '鯨油タンク（whale_oil_tank）大型魚型敵', 'ブラッドリィレイン（bloody_rain）暗黒系ボス（低確率）', '光輝トラス（light_trus）サバンナ/FF2強敵'],
     eventHints: ['FF2ワールドへの遷移（遷移実装未定）'],
     notes: 'FFGG 内に FF2 エリアが存在する。FF2 ワールドとの接続は別途実装。TODO: World 間遷移の実装方針が決まったら接続を更新する。',
+  
+    actions: [
+      {
+        type: 'warp',
+        label: 'FF2エリアへ遷移',
+        description: 'FF2ワールドへの遷移ポイント。（遷移実装未定）',
+        targetWorldId: 'ff2',
+        targetNodeId: 'ff2_node_entrance',
+        unlockConditions: [{ type: 'TODO', description: 'FF2エリア遷移条件は未確定' }],
+        // TODO: World間遷移の実装方針が決まったら接続を更新する
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'battleTrigger',
+        label: '戦う（FF2エリア内）',
+        description: 'スラムイキング・毒系敵などが出現。',
+        triggerMode: 'manual',
+        rewardHints: [
+          { description: 'スラムイ溶液', dropRate: 'スラムイキング50%' },
+          { description: '銀の弾丸', dropRate: '宝箱/ドロップ' },
+          { description: '海原のオーブ', dropRate: 'ボスドロップ' },
+        ],
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'landmark',
+        label: 'FF2エリア情報を見る',
+        description: 'FFGG内に存在するFF2エリアの情報を確認。',
+        cooldownSeconds: 0,
+      },
+    ],
   },
 
   ffgg_node_09: {
@@ -235,6 +458,38 @@ export const FFGG_NODES: Record<string, FreeFieldNode> = {
     encounterHints: ['巨大彗星（大樹の上に出現・未実装）'],
     dangerLevel: 5,
     notes: 'Codex エントリ: giant_comet 参照。巨大彗星は森地帯エリアのランドマーク扱い。',
+  
+    actions: [
+      {
+        type: 'battleTrigger',
+        label: '巨大彗星と戦う',
+        description: '大樹の頂上に出現するボス「巨大彗星」との戦闘。最高難度。',
+        triggerMode: 'manual',
+        rewardHints: [
+          // TODO: 巨大彗星のドロップは未確定
+          { description: '最高レアドロップ（TODO）', dropRate: '低確率' },
+        ],
+        cooldownSeconds: 600,
+      },
+      {
+        type: 'harvest',
+        label: '大樹の素材を採取',
+        description: '大樹周辺で素材を採取できます。',
+        harvestDanger: 5,
+        combatDuringHarvest: true,
+        rewardHints: [
+          { description: '大樹の木材（TODO）', dropRate: '普通' },
+        ],
+        cooldownSeconds: 120,
+        // TODO: 採取物の詳細は未確定
+      },
+      {
+        type: 'landmark',
+        label: '大樹を調べる',
+        description: 'FFGGの森地帯にそびえる大樹。頂上に巨大彗星がスポーンする。',
+        cooldownSeconds: 0,
+      },
+    ],
   },
 
   ffgg_node_10: {
@@ -247,10 +502,51 @@ export const FFGG_NODES: Record<string, FreeFieldNode> = {
     position: { x: 0.44, y: 0.40 },
     connections: ['ffgg_node_02', 'ffgg_node_11'],
     tags: ['pirate', '海賊', '大砲'],
-    description: '海賊が湧く海賊船。高火力の大砲がある。',
-    encounterHints: ['パイレーツ系（未実装）', 'パイレーツキャプテン（未実装）'],
-    resourceHints: ['アンティークコイン（未実装）', 'カリブの荒波（未実装）'],
+    description: '海賊が湧く海賊船。高火力の大砲がある。フィーバー時にカリブの荒波が入手可能。',
+    encounterHints: ['パイレーツ系→アンティークコイン/FF小判', '脳筋盗賊リーダー（ボス）→アンティークコイン/カリブの荒波/FF小判'],
+    resourceHints: ['アンティークコイン（antique_coin）パイレーツ系/ボス', 'カリブの荒波（carib_rough_wave）ボス/フィーバー限定', 'FF小判（ff_coin_small）大量ドロップ'],
     dangerLevel: 3,
+  
+    actions: [
+      {
+        type: 'battleTrigger',
+        label: '戦う（海賊船）',
+        description: 'パイレーツ系・脳筋盗賊リーダーが出現する海賊船。',
+        triggerMode: 'manual',
+        rewardHints: [
+          { description: 'アンティークコイン', dropRate: '通常' },
+          { description: 'カリブの荒波', dropRate: 'ボス20%（フィーバー時上昇）' },
+          { description: 'FF小判', dropRate: '大量' },
+        ],
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'harvest',
+        label: '海賊船で素材を集める',
+        description: '海賊船内の宝箱・素材を収集できます。',
+        harvestDanger: 3,
+        combatDuringHarvest: true,
+        rewardHints: [
+          { description: 'アンティークコイン', dropRate: '宝箱から' },
+        ],
+        cooldownSeconds: 60,
+      },
+      {
+        type: 'shop',
+        label: '交換所を開く（TODO）',
+        description: 'アンティークコインを使った交換所。',
+        hidden: false,
+        unlockConditions: [{ type: 'TODO', description: '交換所の品揃えは未確定' }],
+        // TODO: 交換所の実装は未確定
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'landmark',
+        label: '海賊船を調べる',
+        description: '大砲を備えた海賊船。フィーバー時にカリブの荒波入手率が上昇。',
+        cooldownSeconds: 0,
+      },
+    ],
   },
 
   ffgg_node_11: {
@@ -265,6 +561,35 @@ export const FFGG_NODES: Record<string, FreeFieldNode> = {
     tags: ['desert', 'landmark', '骨'],
     description: '砂漠地帯に存在する骨のランドマーク。',
     notes: 'TODO: 骨の具体的な役割・仕様は未確定。採取か戦闘か不明。',
+  
+    actions: [
+      {
+        type: 'harvest',
+        label: '骨を採取する（TODO）',
+        description: '砂漠の骨から素材を採取できます（詳細未確定）。',
+        harvestDanger: 2,
+        rewardHints: [
+          // TODO: 骨の採取物は未確定
+          { description: '骨素材（TODO）', dropRate: '普通' },
+        ],
+        cooldownSeconds: 60,
+        unlockConditions: [{ type: 'TODO', description: '骨エリアの解放条件は未確定' }],
+      },
+      {
+        type: 'hidden',
+        label: '隠し要素を調べる（TODO）',
+        description: '骨エリアの隠し要素。詳細は未確定。',
+        hidden: true,
+        unlockConditions: [{ type: 'TODO', description: '隠し要素の解放条件は未確定' }],
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'landmark',
+        label: '骨を調べる',
+        description: '砂漠地帯に存在する骨のランドマーク。',
+        cooldownSeconds: 0,
+      },
+    ],
   },
 
   ffgg_node_12: {
@@ -279,6 +604,43 @@ export const FFGG_NODES: Record<string, FreeFieldNode> = {
     tags: ['desert', 'landmark', 'ピラミッド', '砂岩'],
     description: '砂漠地帯にある砂岩のピラミッド状建造物。',
     notes: 'TODO: ピラミッド内部の詳細仕様は未確定。',
+  
+    actions: [
+      {
+        type: 'battleTrigger',
+        label: '戦う（ピラミッド内）',
+        description: 'ピラミッド内部の戦闘。詳細は未確定。',
+        triggerMode: 'manual',
+        rewardHints: [
+          // TODO: ピラミッドのドロップは未確定
+          { description: '砂漠レアドロップ（TODO）', dropRate: '低確率' },
+        ],
+        cooldownSeconds: 0,
+        unlockConditions: [{ type: 'TODO', description: 'ピラミッド内部の解放条件は未確定' }],
+      },
+      {
+        type: 'harvest',
+        label: 'ピラミッドで採取する',
+        description: 'ピラミッド内の素材を採取できます（詳細未確定）。',
+        harvestDanger: 3,
+        cooldownSeconds: 90,
+        unlockConditions: [{ type: 'TODO', description: 'ピラミッド内部の採取詳細は未確定' }],
+      },
+      {
+        type: 'hidden',
+        label: '秘密の部屋を探す（TODO）',
+        description: 'ピラミッド内の隠し要素。詳細は未確定。',
+        hidden: true,
+        unlockConditions: [{ type: 'TODO', description: 'ピラミッドの隠し要素解放条件は未確定' }],
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'landmark',
+        label: 'ピラミッドを調べる',
+        description: '砂漠地帯にある砂岩のピラミッド状建造物。',
+        cooldownSeconds: 0,
+      },
+    ],
   },
 
   ffgg_node_13: {
@@ -293,6 +655,46 @@ export const FFGG_NODES: Record<string, FreeFieldNode> = {
     tags: ['snow', 'landmark', '線路'],
     description: '雪山エリアにある線路地帯（通称: 陰キャ）。',
     notes: '「陰キャ」という通称の意味・背景は原文から不明。TODO: 詳細仕様未確定。',
+  
+    actions: [
+      {
+        type: 'warp',
+        label: '雪山（⑤）へ戻る',
+        description: '家っぽいとこ（雪山）へのショートカット。',
+        targetNodeId: 'ffgg_node_05',
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'warp',
+        label: '線路ショートカットを使う',
+        description: '線路を使ったエリア内ショートカット移動。（詳細TODO）',
+        triggerMode: 'manual',
+        unlockConditions: [{ type: 'TODO', description: 'ショートカット先・条件は未確定' }],
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'shop',
+        label: 'ショップを開く（TODO）',
+        description: '線路沿いのショップ。詳細は未確定。',
+        hidden: false,
+        unlockConditions: [{ type: 'TODO', description: '線路ショップの品揃えは未確定' }],
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'hidden',
+        label: '陰キャの隠し要素（TODO）',
+        description: '線路エリアの隠し要素。詳細は未確定。',
+        hidden: true,
+        unlockConditions: [{ type: 'TODO', description: '線路隠し要素の解放条件は未確定' }],
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'landmark',
+        label: '線路を調べる',
+        description: '雪山エリアにある線路地帯（通称: 陰キャ）。',
+        cooldownSeconds: 0,
+      },
+    ],
   },
 
   ffgg_node_14: {
@@ -309,6 +711,39 @@ export const FFGG_NODES: Record<string, FreeFieldNode> = {
     eventHints: ['ドラゴンフィーバー（fever_dragon 参照・発生ロジック未実装）'],
     dangerLevel: 5,
     notes: 'フィーバー発生ロジックは未実装。FreeFieldFever: fever_dragon を参照。',
+  
+    actions: [
+      {
+        type: 'fever',
+        label: 'ドラゴンフィーバーを開始',
+        description: 'ドラゴンソール30000達成でドラゴンフィーバーが発生するイベント会場。',
+        feverType: 'dragon',
+        feverConditionText: 'ドラゴンソール累積30000達成でフィーバー発生',
+        unlockConditions: [{ type: 'dragonSoul', value: 30000, description: 'ドラゴンソール30000必要' }],
+        rewardHints: [
+          { description: 'フィーバー中ボス（TODO）', dropRate: '低確率' },
+          { description: 'カリブの荒波（フィーバー時）', dropRate: '上昇' },
+        ],
+        cooldownSeconds: 0,
+        // TODO: フィーバー発生ロジック・継続時間は未実装
+      },
+      {
+        type: 'battleTrigger',
+        label: '戦う（フィーバー会場）',
+        description: 'ドラゴンフィーバー中の戦闘。通常より強敵が出現する。',
+        triggerMode: 'manual',
+        rewardHints: [
+          { description: 'フィーバー限定ドロップ（TODO）', dropRate: '低確率' },
+        ],
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'landmark',
+        label: 'ドラゴンフィーバー会場を確認',
+        description: 'ドラゴンフィーバーの発生条件・状況を確認できます。',
+        cooldownSeconds: 0,
+      },
+    ],
   },
 
   ffgg_node_15: {
@@ -325,6 +760,34 @@ export const FFGG_NODES: Record<string, FreeFieldNode> = {
     encounterHints: ['βテストボス（未実装）'],
     dangerLevel: 5,
     notes: 'FFGGR への接続地点に近い。TODO: βテストボスの詳細仕様は原文から追加確認が必要。',
+  
+    actions: [
+      {
+        type: 'battleTrigger',
+        label: 'βテストボスと戦う',
+        description: 'FF高原のβテストボスとの戦闘。最高難度のテストコンテンツ。',
+        triggerMode: 'manual',
+        rewardHints: [
+          // TODO: βテストボスのドロップは未確定
+          { description: 'βテスト限定ドロップ（TODO）', dropRate: '低確率' },
+        ],
+        cooldownSeconds: 600,
+        unlockConditions: [{ type: 'TODO', description: 'βテストボス解放条件は未確定' }],
+      },
+      {
+        type: 'test',
+        label: 'テスターとして試す',
+        description: 'FF高原のテストエリアで装備・武器を試せます。',
+        // TODO: テスター詳細UIは未実装
+        cooldownSeconds: 0,
+      },
+      {
+        type: 'landmark',
+        label: 'FF高原を調べる',
+        description: 'FF高原のβテストボス地点。FFGGRへの接続が見込まれる。',
+        cooldownSeconds: 0,
+      },
+    ],
   },
 };
 
@@ -605,7 +1068,125 @@ export const FREEFIELD_CODEX: Record<string, FreeFieldCodexEntry> = {
 };
 
 // ============================================================
-// 統合参照テーブル（UI・将来の処理から参照しやすくするため）
+// FFGG 素材ガイド（図鑑・入手導線・用途のまとめ）
+// ============================================================
+
+export type FFGGItemGuide = {
+  itemId: string;
+  name: string;
+  category: 'scale' | 'plant' | 'gem' | 'combat' | 'special' | 'coin';
+  obtainFrom: string[];   // 入手元の説明
+  usedFor: string[];      // 主な用途
+  areaHint: string;       // どのエリアで集めるか
+  beginnerTip?: string;   // 初心者向けヒント
+  upgradesTo?: string[];  // 上位素材への変換先
+};
+
+export const FFGG_ITEM_GUIDE: Record<string, FFGGItemGuide> = {
+  // ── 鱗系 ──
+  green_scale: {
+    itemId: 'green_scale', name: '緑鱗', category: 'scale',
+    obtainFrom: ['森地帯②グリド/グリド・アルファ/フォレストリッパードロップ'],
+    usedFor: ['緑竜刃（クラフト）', '鱗系上位装備素材'],
+    areaHint: '森地帯②が主な入手場所。グリドを倒しながら周回するのが効率的。',
+    beginnerTip: 'グリドは群れで来るので範囲攻撃があると集めやすい。',
+    upgradesTo: ['green_scale_high（上位敵/フィーバー）'],
+  },
+  red_scale: {
+    itemId: 'red_scale', name: '赤鱗', category: 'scale',
+    obtainFrom: ['平原地帯③のドラグ/ドラグ強ドロップ'],
+    usedFor: ['赤竜刃（クラフト）', '攻撃系装備素材'],
+    areaHint: '平原地帯③が主な入手場所。比較的安全で周回しやすい。',
+    beginnerTip: 'FFGGの入門エリア。赤鱗を集めながら慣れよう。',
+    upgradesTo: ['red_scale_high（上位敵/ドラゴンフィーバー）'],
+  },
+  rock_scale: {
+    itemId: 'rock_scale', name: '岩鱗', category: 'scale',
+    obtainFrom: ['砂漠地帯④ガドラ/ガドラ改/エガルドドロップ', '砂漠採取ノード（ffgg_desert_gather）'],
+    usedFor: ['岩鱗の鎧（クラフト）', '防御系装備素材'],
+    areaHint: '砂漠地帯④。ガドラ系を倒しながら集める。採取でも入手可能。',
+    beginnerTip: '砂漠は広いので迷いやすい。まず④の中心部を目指そう。',
+    upgradesTo: ['rock_scale_high（エガルドンボス）'],
+  },
+  water_scale: {
+    itemId: 'water_scale', name: '水鱗', category: 'scale',
+    obtainFrom: ['雪山⑤アドーラ/アドーラ改ドロップ', '雪山採取ノード（ffgg_snow_gather）'],
+    usedFor: ['水系装備素材', '杖系クラフト素材'],
+    areaHint: '雪山⑤が主な入手場所。アドーラ系を倒しながら周回。',
+    beginnerTip: '連続攻撃が特徴のアドーラに注意。回復アイテムを多めに持とう。',
+    upgradesTo: ['water_scale_high（波狼/Sea Memoriaボス）'],
+  },
+  // ── 宝石・鉱石 ──
+  aurora_spinel: {
+    itemId: 'aurora_spinel', name: 'オーロラスピネル', category: 'gem',
+    obtainFrom: ['洞窟系採取ノード（ffgg_cave_gem_vein）', '洞窟系ボスドロップ'],
+    usedFor: ['岩窟の杖クラフト', '上位魔装素材'],
+    areaHint: '洞窟系ダンジョン深部の採取ノード。採掘Lv50以上推奨。',
+    beginnerTip: '洞窟系は難度が高い。岩窟の杖を目指すなら最低20個は集めよう。',
+    upgradesTo: [],
+  },
+  cosmonium: {
+    itemId: 'cosmonium', name: 'コスモニウム', category: 'gem',
+    obtainFrom: ['森地帯②採取（ffgg_forest_herb）極低確率', 'フォレストリッパードロップ（低確率）'],
+    usedFor: ['最終強化素材（TODO: レシピ確定後に追加）'],
+    areaHint: '森地帯②の採取ノードで稀に入手。フォレストリッパーも落とす。',
+    beginnerTip: 'とにかく希少。見かけたら逃さずに拾うこと。',
+    upgradesTo: [],
+  },
+  antique_coin: {
+    itemId: 'antique_coin', name: 'アンティークコイン', category: 'coin',
+    obtainFrom: ['海賊船⑩脳筋盗賊リーダーボスドロップ', 'パイレーツ系低確率', '砂漠④一部敵'],
+    usedFor: ['売却（2000G）', '交換素材（TODO）'],
+    areaHint: '海賊船⑩が最も効率的。ボスを繰り返し討伐しよう。',
+    beginnerTip: '売却価値が高い。序盤の資金稼ぎにも使える。',
+    upgradesTo: [],
+  },
+  // ── 植物 ──
+  white_basil: {
+    itemId: 'white_basil', name: 'ホワイトバジル', category: 'plant',
+    obtainFrom: ['森地帯②採取ノード（ffgg_forest_herb）'],
+    usedFor: ['バジルエリクサー（クラフト）', 'スラムイ特殊ポーション（クラフト）', '上位ポーション素材'],
+    areaHint: '森地帯②の採取ノードで安定入手。採掘Lv20以上推奨。',
+    beginnerTip: '採取ノードは敵の出る危険エリア内にある。戦力を整えてから向かおう。',
+    upgradesTo: [],
+  },
+  // ── 戦闘ドロップ系 ──
+  ocean_orb: {
+    itemId: 'ocean_orb', name: '海原のオーブ', category: 'combat',
+    obtainFrom: ['Sea Memoria（雪山⑤ボス）30%', '雪山⑤アドーラ改（低確率）'],
+    usedFor: ['海原の杖クラフト', '海系最上位装備'],
+    areaHint: '雪山⑤のボス Sea Memoria が主なドロップ源。水鱗も同時に集まる。',
+    beginnerTip: '反撃型ボスなので攻撃しすぎに注意。遠距離から少しずつ削ろう。',
+    upgradesTo: [],
+  },
+  slamy_liquid: {
+    itemId: 'slamy_liquid', name: 'スラムイ溶液', category: 'combat',
+    obtainFrom: ['森地帯②ソールドロップ（8%）', 'スラムイキング（サバンナ）50%'],
+    usedFor: ['スラムイ特殊ポーション（クラフト）', '特殊武器素材'],
+    areaHint: 'サバンナのスラムイキングが最効率。ソールドロップからも少量入手可能。',
+    beginnerTip: 'サバンナは高難度エリア。まずは森地帯でソールドロップから集めよう。',
+    upgradesTo: [],
+  },
+  // ── コイン系 ──
+  ff_coin_small: {
+    itemId: 'ff_coin_small', name: 'FF小判', category: 'coin',
+    obtainFrom: ['FFGG全エリア敵ドロップ', '森地帯②採取ノード', 'GGR釣り場'],
+    usedFor: ['FF大判（9枚→1枚クラフト）に変換して売却（500,000G）'],
+    areaHint: 'FFGG全体で入手できる。海賊船⑩のボス討伐が最多ドロップ。',
+    beginnerTip: '9枚集めてFF大判に変換すると一気に高値になる。まず9枚を目標に。',
+    upgradesTo: ['ff_coin_large（クラフト変換）'],
+  },
+  carib_rough_wave: {
+    itemId: 'carib_rough_wave', name: 'カリブの荒波', category: 'special',
+    obtainFrom: ['海賊船⑩脳筋盗賊リーダーボスドロップ（20%）', 'フィーバー時ドロップ率上昇'],
+    usedFor: ['海賊系最上位装備素材（TODO: レシピ確定後追加）'],
+    areaHint: '海賊船⑩専用。ボスを繰り返し倒すのが基本。フィーバー中は確率上昇。',
+    beginnerTip: 'フィーバーが発生したら積極的に参加しよう。',
+    upgradesTo: [],
+  },
+};
+
+// ============================================================
 // ============================================================
 
 /** 全ワールド一覧（表示順） */
