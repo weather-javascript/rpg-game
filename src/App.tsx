@@ -49,43 +49,338 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 ];
 
 const LOADING_HINTS = [
-  '⚔️ ダンジョンを生成しています...',
-  '🪨 鉱脈を配置しています...',
-  '🐉 モンスターを召喚しています...',
-  '🎣 釣り場に魚を放流しています...',
-  '💰 宝箱を配置しています...',
-  '🌲 森を育てています...',
-  '🔥 炎を灯しています...',
-  '⚗️ 魔法陣を描いています...',
-  '🗝️ 扉を開いています...',
-  '🌟 星を配置しています...',
+  '⚔️ ダンジョンを生成しています',
+  '🪨 鉱脈を配置しています',
+  '🐉 モンスターを召喚しています',
+  '🎣 釣り場に魚を放流しています',
+  '💰 宝箱を配置しています',
+  '🌲 森を育てています',
+  '🔥 炎を灯しています',
+  '⚗️ 魔法陣を描いています',
+  '🗝️ 扉を開いています',
+  '🌟 星を配置しています',
 ];
 
-function LoadingScreen() {
-  const [hint, setHint] = useState(() => LOADING_HINTS[Math.floor(Date.now() % LOADING_HINTS.length)]);
-  const [dots, setDots] = useState('');
-  const [progress, setProgress] = useState(0);
+const LOADING_SCREEN_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap');
 
+  @keyframes rpg-flicker {
+    0%,100% { opacity:1; text-shadow: 0 0 20px #ff6a00, 0 0 40px #ff6a00, 0 0 80px #ffae00, 0 0 120px #ffae00; }
+    25%      { opacity:.92; text-shadow: 0 0 15px #ff4500, 0 0 35px #ff6a00, 0 0 70px #ffae00, 0 0 100px #ffae00; }
+    50%      { opacity:.97; text-shadow: 0 0 25px #ff6a00, 0 0 50px #ffae00, 0 0 90px #ffae00, 0 0 140px #ff6a00; }
+    75%      { opacity:.88; text-shadow: 0 0 10px #ff4500, 0 0 30px #ff6a00, 0 0 60px #ffae00, 0 0 90px #ff4500; }
+  }
+  @keyframes rpg-pulse-ring {
+    0%   { transform:scale(0.85); opacity:0.7; }
+    50%  { transform:scale(1.12); opacity:0.3; }
+    100% { transform:scale(0.85); opacity:0.7; }
+  }
+  @keyframes rpg-rotate-rune {
+    from { transform:rotate(0deg); }
+    to   { transform:rotate(360deg); }
+  }
+  @keyframes rpg-rotate-rune-rev {
+    from { transform:rotate(360deg); }
+    to   { transform:rotate(0deg); }
+  }
+  @keyframes rpg-sword-glow {
+    0%,100% { filter: drop-shadow(0 0 12px #ff6a00) drop-shadow(0 0 30px #ffae00); }
+    50%     { filter: drop-shadow(0 0 25px #ff4500) drop-shadow(0 0 60px #f0c060) drop-shadow(0 0 90px #ff6a00); }
+  }
+  @keyframes rpg-float {
+    0%,100% { transform:translateY(0px) rotate(-5deg); }
+    50%     { transform:translateY(-12px) rotate(5deg); }
+  }
+  @keyframes rpg-ember {
+    0%   { transform:translateY(0) translateX(0) scale(1); opacity:1; }
+    100% { transform:translateY(-120px) translateX(var(--dx,10px)) scale(0.3); opacity:0; }
+  }
+  @keyframes rpg-bar-shimmer {
+    0%   { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
+  @keyframes rpg-hint-fade {
+    0%   { opacity:0; transform:translateY(6px); }
+    15%  { opacity:1; transform:translateY(0); }
+    85%  { opacity:1; transform:translateY(0); }
+    100% { opacity:0; transform:translateY(-6px); }
+  }
+  @keyframes rpg-particle-orbit {
+    from { transform: rotate(var(--start-deg)) translateX(var(--r)) rotate(calc(var(--start-deg) * -1)); }
+    to   { transform: rotate(calc(var(--start-deg) + 360deg)) translateX(var(--r)) rotate(calc((var(--start-deg) + 360deg) * -1)); }
+  }
+  @keyframes rpg-rules-in {
+    0%   { opacity:0; transform:scale(0.92) translateY(20px); }
+    100% { opacity:1; transform:scale(1) translateY(0); }
+  }
+  @keyframes rpg-countdown-pulse {
+    0%,100% { transform:scale(1); color:#f0c060; }
+    50%     { transform:scale(1.15); color:#ff6a00; }
+  }
+  @keyframes rpg-border-flow {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+`;
+
+function LoadingScreen({ authReady = false, onDone }: { authReady?: boolean; onDone?: () => void }) {
+  const [hintIdx, setHintIdx] = useState(() => Math.floor(Date.now() % LOADING_HINTS.length));
+  const [progress, setProgress] = useState(0);
+  const [phase, setPhase] = useState<'loading' | 'rules'>('loading');
+  const [countdown, setCountdown] = useState(5);
+  const [hintKey, setHintKey] = useState(0);
+  const [embers, setEmbers] = useState<Array<{id:number,x:number,size:number,delay:number,dx:number}>>([]);
+  const authReadyRef = useRef(authReady);
+  useEffect(() => { authReadyRef.current = authReady; }, [authReady]);
+
+  // embers
   useEffect(() => {
-    const hintTimer = setInterval(() => {
-      setHint(LOADING_HINTS[Math.floor(Date.now() % LOADING_HINTS.length)]);
-    }, 1800);
-    const dotTimer = setInterval(() => setDots(d => d.length >= 3 ? '' : d + '.'), 400);
-    const progTimer = setInterval(() => setProgress(p => Math.min(95, p + Math.random() * 12 + 2)), 300);
-    return () => { clearInterval(hintTimer); clearInterval(dotTimer); clearInterval(progTimer); };
+    const arr = Array.from({length:18}, (_,i) => ({
+      id: i,
+      x: 10 + Math.random()*80,
+      size: 3 + Math.random()*5,
+      delay: Math.random()*3,
+      dx: (Math.random()-0.5)*40,
+    }));
+    setEmbers(arr);
   }, []);
 
+  // loading phase: 認証完了 AND 最低5秒経過後にrulesへ
+  useEffect(() => {
+    if (phase !== 'loading') return;
+    const start = Date.now();
+    const MIN_DURATION = 5000;
+    let rafId: number;
+    const tick = () => {
+      const elapsed = Date.now() - start;
+      const ready = authReadyRef.current;
+      // 最低5秒かつ認証完了でゲージ100%
+      const p = ready
+        ? Math.min(100, (elapsed / MIN_DURATION) * 100)
+        : Math.min(90, (elapsed / MIN_DURATION) * 90);
+      setProgress(p);
+      if (p >= 100) { setTimeout(() => setPhase('rules'), 200); return; }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [phase]);
+
+  // hint rotation
+  useEffect(() => {
+    if (phase !== 'loading') return;
+    const t = setInterval(() => {
+      setHintIdx(i => (i + 1) % LOADING_HINTS.length);
+      setHintKey(k => k + 1);
+    }, 1500);
+    return () => clearInterval(t);
+  }, [phase]);
+
+  // rules countdown → onDone
+  useEffect(() => {
+    if (phase !== 'rules') return;
+    const t = setInterval(() => {
+      setCountdown(c => {
+        if (c <= 1) { clearInterval(t); onDone?.(); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [phase]);
+
+  const barColor = `linear-gradient(90deg, #7f0000 0%, #bf3000 20%, #ff6a00 45%, #ffae00 60%, #fff3a0 75%, #ffae00 85%, #ff6a00 100%)`;
+
   return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', flexDirection:'column', gap:20, background:'#0e1118' }}>
-      <div style={{ fontSize:'3.5rem', filter:'drop-shadow(0 0 20px rgba(240,192,96,0.6))', animation:'none' }}>⚔️</div>
-      <h1 style={{ fontFamily:'Cinzel,serif', fontSize:'2rem', color:'#f0c060', letterSpacing:'0.2em', margin:0, textShadow:'0 0 30px rgba(240,192,96,0.4)' }}>RPG LIFE</h1>
-      <div style={{ width:260, display:'flex', flexDirection:'column', gap:8 }}>
-        <div style={{ height:4, background:'#1c2235', borderRadius:2, overflow:'hidden' }}>
-          <div style={{ height:'100%', background:'linear-gradient(90deg,#5b8dee,#f0c060)', width:`${progress}%`, transition:'width 0.3s ease', borderRadius:2 }} />
-        </div>
-        <p style={{ color:'#8a92b2', fontSize:'0.82rem', margin:0, textAlign:'center', minHeight:20 }}>{hint}{dots}</p>
+    <>
+      <style>{LOADING_SCREEN_CSS}</style>
+      <div style={{
+        position:'fixed', inset:0, zIndex:9999,
+        background:'radial-gradient(ellipse at 50% 60%, #1a0a00 0%, #0a0500 50%, #000 100%)',
+        display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+        overflow:'hidden',
+      }}>
+
+        {/* embers */}
+        {embers.map(e => (
+          <div key={e.id} style={{
+            position:'absolute',
+            left:`${e.x}%`, bottom:0,
+            width:e.size, height:e.size,
+            borderRadius:'50%',
+            background:`radial-gradient(circle, #fff 0%, #ffae00 40%, #ff4500 100%)`,
+            boxShadow:`0 0 ${e.size*2}px #ff6a00`,
+            animation:`rpg-ember ${2.5+Math.random()*2}s ease-out ${e.delay}s infinite`,
+            ['--dx' as any]: `${e.dx}px`,
+            pointerEvents:'none',
+          }} />
+        ))}
+
+        {/* 背景グリッド（魔法陣風） */}
+        <div style={{
+          position:'absolute', inset:0, pointerEvents:'none',
+          backgroundImage:`
+            linear-gradient(rgba(255,106,0,0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,106,0,0.03) 1px, transparent 1px)
+          `,
+          backgroundSize:'40px 40px',
+        }} />
+
+        {phase === 'loading' && (
+          <>
+            {/* 魔法陣リング 外側 */}
+            <div style={{
+              position:'absolute',
+              width:340, height:340,
+              borderRadius:'50%',
+              border:'1px solid rgba(255,106,0,0.15)',
+              animation:'rpg-rotate-rune 18s linear infinite',
+              backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 340 340'%3E%3Ccircle cx='170' cy='170' r='168' fill='none' stroke='rgba(255,106,0,0.2)' stroke-width='1' stroke-dasharray='8 16'/%3E%3C/svg%3E")`,
+            }} />
+            <div style={{
+              position:'absolute',
+              width:260, height:260,
+              borderRadius:'50%',
+              border:'1px solid rgba(255,174,0,0.12)',
+              animation:'rpg-rotate-rune-rev 12s linear infinite',
+            }} />
+            <div style={{
+              position:'absolute',
+              width:200, height:200,
+              borderRadius:'50%',
+              border:'2px solid rgba(255,106,0,0.25)',
+              animation:'rpg-pulse-ring 3s ease-in-out infinite',
+            }} />
+
+            {/* 剣アイコン */}
+            <div style={{ fontSize:'5rem', animation:'rpg-sword-glow 2s ease-in-out infinite, rpg-float 3.5s ease-in-out infinite', zIndex:1, marginBottom:8 }}>⚔️</div>
+
+            {/* タイトル */}
+            <h1 style={{
+              fontFamily:'Cinzel,serif',
+              fontSize:'clamp(1.6rem,5vw,2.4rem)',
+              color:'#ffae00',
+              letterSpacing:'0.25em',
+              margin:'0 0 4px',
+              animation:'rpg-flicker 2.5s ease-in-out infinite',
+              zIndex:1,
+              whiteSpace:'nowrap',
+            }}>RPG LIFE</h1>
+            <p style={{ color:'rgba(255,174,0,0.5)', fontSize:'0.7rem', letterSpacing:'0.4em', margin:'0 0 28px', fontFamily:'Cinzel,serif', zIndex:1 }}>LEGEND OF THE REALM</p>
+
+            {/* ローディングバー */}
+            <div style={{ width:'min(320px,80vw)', zIndex:1, display:'flex', flexDirection:'column', gap:10 }}>
+              {/* バー外枠（金属光沢） */}
+              <div style={{
+                padding:3,
+                borderRadius:10,
+                background:'linear-gradient(180deg, #4a3000 0%, #1a0a00 50%, #4a3000 100%)',
+                boxShadow:'0 0 15px rgba(255,106,0,0.3), inset 0 0 8px rgba(0,0,0,0.8)',
+                position:'relative',
+              }}>
+                {/* バー内枠 */}
+                <div style={{ height:18, borderRadius:7, background:'#0d0500', overflow:'hidden', position:'relative' }}>
+                  {/* 炎ゲージ */}
+                  <div style={{
+                    position:'absolute', inset:0, right:`${100-progress}%`,
+                    background: barColor,
+                    backgroundSize:'200% 100%',
+                    animation:'rpg-bar-shimmer 1.5s linear infinite',
+                    transition:'right 0.1s linear',
+                    borderRadius:7,
+                  }} />
+                  {/* 光沢レイヤー */}
+                  <div style={{
+                    position:'absolute', inset:0,
+                    background:'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 60%)',
+                    pointerEvents:'none',
+                  }} />
+                  {/* %テキスト */}
+                  <div style={{
+                    position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
+                    color:'rgba(255,255,255,0.9)', fontSize:'0.72rem', fontFamily:'Cinzel,serif', fontWeight:700,
+                    letterSpacing:'0.1em', textShadow:'0 1px 3px rgba(0,0,0,0.9)',
+                  }}>
+                    {Math.floor(progress)}%
+                  </div>
+                </div>
+              </div>
+
+              {/* ヒント */}
+              <div style={{ height:22, overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <p key={hintKey} style={{
+                  color:'rgba(255,174,0,0.7)', fontSize:'0.78rem', margin:0, textAlign:'center',
+                  animation:'rpg-hint-fade 1.5s ease forwards',
+                  fontFamily:'sans-serif',
+                }}>
+                  {LOADING_HINTS[hintIdx]}
+                </p>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ===== 注意事項フェーズ ===== */}
+        {phase === 'rules' && (
+          <div style={{
+            animation:'rpg-rules-in 0.5s cubic-bezier(0.16,1,0.3,1) forwards',
+            zIndex:1,
+            display:'flex', flexDirection:'column', alignItems:'center', gap:20,
+            padding:'0 16px', width:'100%', maxWidth:480,
+          }}>
+            <div style={{ fontSize:'2.4rem', animation:'rpg-sword-glow 2s ease-in-out infinite' }}>📜</div>
+            <h2 style={{
+              fontFamily:'Cinzel,serif', color:'#ffae00', margin:0,
+              fontSize:'clamp(1rem,4vw,1.3rem)', letterSpacing:'0.2em',
+              textShadow:'0 0 20px rgba(255,174,0,0.5)',
+            }}>注意事項</h2>
+
+            {/* 枠線アニメーション */}
+            <div style={{
+              width:'100%',
+              padding:2,
+              borderRadius:12,
+              background:'linear-gradient(90deg, #7f2000, #ffae00, #ff6a00, #7f2000)',
+              backgroundSize:'300% 300%',
+              animation:'rpg-border-flow 3s linear infinite',
+              boxShadow:'0 0 20px rgba(255,106,0,0.3)',
+            }}>
+              <div style={{
+                background:'rgba(10,5,0,0.95)',
+                borderRadius:10,
+                padding:'20px 24px',
+                display:'flex', flexDirection:'column', gap:14,
+              }}>
+                {[
+                  { icon:'🔇', text:'このゲームの内容を不特定多数の場で発言することは厳禁です（LINEやSNSなど）' },
+                  { icon:'🐛', text:'バグを見つけた際は必ず運営に報告してください' },
+                  { icon:'⚖️', text:'モラルを守って行動しましょう' },
+                ].map((item, i) => (
+                  <div key={i} style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
+                    <span style={{ fontSize:'1.2rem', flexShrink:0, marginTop:1 }}>{item.icon}</span>
+                    <p style={{
+                      margin:0, color:'rgba(255,220,150,0.9)', fontSize:'0.85rem', lineHeight:1.6,
+                      borderLeft:'2px solid rgba(255,106,0,0.4)', paddingLeft:10,
+                    }}>{item.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* カウントダウン */}
+            <p style={{
+              color:'rgba(255,174,0,0.6)', fontSize:'0.8rem', margin:0, fontFamily:'Cinzel,serif',
+            }}>
+              {countdown > 0 ? (
+                <>ゲーム開始まで <span style={{ animation:'rpg-countdown-pulse 1s ease-in-out infinite', display:'inline-block', color:'#f0c060', fontWeight:700, fontSize:'1rem' }}>{countdown}</span> 秒</>
+              ) : (
+                <span style={{ color:'#ffae00' }}>Loading...</span>
+              )}
+            </p>
+          </div>
+        )}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -604,6 +899,7 @@ export default function App() {
   useAutoSave();
   const isAuthLoading = useGameStore(s => s.isAuthLoading);
   const player = useGameStore(s => s.player);
+  const [splashDone, setSplashDone] = useState(false);
   const activeTab = useGameStore(s => s.activeTab) as TabId;
   const setActiveTab = useGameStore(s => s.setActiveTab);
   const addNotification = useGameStore(s => s.addNotification);
@@ -702,7 +998,7 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player?.uid]);
 
-  if (isAuthLoading || !player) return <LoadingScreen />;
+  if (isAuthLoading || !player || !splashDone) return <LoadingScreen authReady={!isAuthLoading && !!player} onDone={() => setSplashDone(true)} />;
 
   // メンテナンス中チェック（ADMIN除く）
   if (maintenanceStatus?.active && !ADMIN_UIDS.includes(player.uid)) {
