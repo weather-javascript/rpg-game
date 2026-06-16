@@ -7,78 +7,168 @@
 export type FreeFieldNodeType =
   | 'entrance'    // 入口 / 出口（ワールド間・エリア間）
   | 'safe'        // 安全地帯 / 拠点
-  | 'danger'      // 通常戦闘エリア（未実装）
-  | 'boss'        // ボス地点（未実装）
-  | 'harvest'     // 採取ポイント（未実装）
-  | 'shop'        // ショップ（未実装）
-  | 'fishing'     // 釣りポイント（未実装）
+  | 'danger'      // 通常戦闘エリア
+  | 'boss'        // ボス地点
+  | 'harvest'     // 採取ポイント
+  | 'shop'        // ショップ
+  | 'fishing'     // 釣りポイント
   | 'test'        // テスト / βボス地点
   | 'shortcut'    // ショートカット
   | 'transition'  // 別ワールド / 別エリアへの遷移
   | 'fever'       // フィーバー専用会場
-  | 'landmark';   // ランドマーク（独立した地形・建造物など）
+  | 'landmark';   // ランドマーク
 
 // ──────────────────────────────────────────────
 // フィーバー種別
 // ──────────────────────────────────────────────
 export type FreeFieldFeverType =
-  | 'gold'    // ゴールドフィーバー
-  | 'red'     // レッドフィーバー
-  | 'dragon'; // ドラゴンフィーバー
+  | 'gold'
+  | 'red'
+  | 'dragon';
+
+// ──────────────────────────────────────────────
+// ノードアクション種別
+// ──────────────────────────────────────────────
+export type FreeFieldNodeActionType =
+  | 'battleTrigger'  // 戦闘開始
+  | 'harvest'        // 採取
+  | 'warp'           // ワープ・移動
+  | 'shop'           // ショップを開く
+  | 'fishing'        // 釣りを始める
+  | 'test'           // テスター（武器・装備試用）
+  | 'fever'          // フィーバー関連
+  | 'landmark'       // 地点確認・説明表示
+  | 'hidden';        // 条件付き隠し要素
+
+// ──────────────────────────────────────────────
+// 解放条件
+// ──────────────────────────────────────────────
+export interface FreeFieldUnlockCondition {
+  // TODO: 解放条件の詳細仕様が決まったら実装する
+  type: string;
+  value?: unknown;
+  description?: string;
+}
+
+// ──────────────────────────────────────────────
+// 報酬ヒント
+// ──────────────────────────────────────────────
+export interface FreeFieldNodeRewardHint {
+  itemId?: string;
+  description: string;
+  dropRate?: string;  // 例: '20%', '低確率'
+}
+
+// ──────────────────────────────────────────────
+// ノードアクション
+// ──────────────────────────────────────────────
+export interface FreeFieldNodeAction {
+  /** アクション種別 */
+  type: FreeFieldNodeActionType;
+  /** 表示ラベル（例: '戦う', '採取する', 'ショップを開く'） */
+  label: string;
+  /** 詳細説明 */
+  description?: string;
+  /** ターゲットノードID（warp先など） */
+  targetNodeId?: string;
+  /** ターゲットエリアID（warp先エリアなど） */
+  targetAreaId?: string;
+  /** ターゲットワールドID（遷移先） */
+  targetWorldId?: string;
+  /** 接続する既存システムID（gatherNodeId, shopId, dungeonId など） */
+  systemTargetId?: string;
+  /** 解放条件（なければ常に利用可能） */
+  unlockConditions?: FreeFieldUnlockCondition[];
+  /** コスト（例: {gold: 100} や {itemId: 'key', amount: 1}） */
+  cost?: { gold?: number; itemId?: string; amount?: number };
+  /** 報酬ヒント一覧 */
+  rewardHints?: FreeFieldNodeRewardHint[];
+  /** 一度しか使えないか */
+  onceOnly?: boolean;
+  /** 隠し要素か（条件を満たすまで表示しない） */
+  hidden?: boolean;
+  /** クールダウン（秒） */
+  cooldownSeconds?: number;
+  /** 戦闘開始が自動か手動か (battleTrigger のみ) */
+  triggerMode?: 'auto' | 'manual';
+  /** 採取の危険度 (harvest のみ: 1~5) */
+  harvestDanger?: number;
+  /** 採取中に戦闘が発生するか (harvest のみ) */
+  combatDuringHarvest?: boolean;
+  /** フィーバー種別 (fever のみ) */
+  feverType?: FreeFieldFeverType;
+  /** フィーバー発生条件説明 (fever のみ) */
+  feverConditionText?: string;
+}
+
+// ──────────────────────────────────────────────
+// ノードインタラクション（アクション実行時の状態管理用スタブ）
+// ──────────────────────────────────────────────
+export interface FreeFieldNodeInteraction {
+  nodeId: string;
+  actionType: FreeFieldNodeActionType;
+  lastUsedAt?: number;  // Unix ms
+  useCount?: number;
+  completed?: boolean;  // onceOnly 用
+}
+
+// ──────────────────────────────────────────────
+// ノードアクセスルール
+// ──────────────────────────────────────────────
+export interface FreeFieldNodeAccessRule {
+  nodeId: string;
+  requiresItemId?: string;
+  requiresQuestComplete?: string;
+  requiresLevel?: number;
+  description?: string;
+}
 
 // ──────────────────────────────────────────────
 // ノード
 // ──────────────────────────────────────────────
 export interface FreeFieldNode {
-  /** 一意ID（例: ffgg_node_01） */
+  /** 一意ID */
   id: string;
-  /** 内部名称（英字スネークケース推奨） */
+  /** 内部名称 */
   name: string;
-  /** 表示名（日本語・原文準拠） */
+  /** 表示名 */
   displayName: string;
-  /** 原文に基づく説明 */
+  /** 説明 */
   description?: string;
   /** ノード種別 */
   type: FreeFieldNodeType;
+  /** 所属ワールドID */
+  worldId?: string;
   /** 所属エリアID */
   areaId: string;
   /** 地図上の相対座標 (0.0〜1.0) */
   position: { x: number; y: number };
   /** 接続先ノードID一覧 */
   connections: string[];
-  /** 原文の番号ラベル（例: '①'） */
+  /** 原文の番号ラベル */
   indexLabel?: string;
-  /** 別名・表記ゆれ（原文のまま保持） */
+  /** 別名・表記ゆれ */
   aliasNames?: string[];
-  /** タグ（バイオーム・役割など自由記述） */
+  /** タグ */
   tags?: string[];
-  /** 未確定事項・補足メモ（勝手に補完せずここに残す） */
+  /** 未確定事項・補足メモ */
   notes?: string;
 
-  // ── 将来拡張フィールド（未実装・型のみ） ──
-  /** 解放条件（未実装） */
-  unlockConditions?: FreeFieldUnlockCondition[];
-  /** 敵出現に関するヒント（未実装） */
-  encounterHints?: string[];
-  /** 採取に関するヒント（未実装） */
-  resourceHints?: string[];
-  /** イベント・フィーバーに関するヒント（未実装） */
-  eventHints?: string[];
-  /** 危険度（未実装。1〜5程度を想定） */
-  dangerLevel?: number;
-  /** 安全地帯フラグ */
-  isSafeZone?: boolean;
-  /** 隠しノードフラグ（未実装） */
-  isHidden?: boolean;
-}
+  // ── アクション定義 ──
+  /** このノードで実行できるアクション一覧 */
+  actions?: FreeFieldNodeAction[];
 
-// ──────────────────────────────────────────────
-// 解放条件（将来用スタブ）
-// ──────────────────────────────────────────────
-export interface FreeFieldUnlockCondition {
-  // TODO: 解放条件の詳細仕様が決まったら実装する
-  type: string;
-  value?: unknown;
+  // ── 将来拡張フィールド（未実装・型のみ） ──
+  unlockConditions?: FreeFieldUnlockCondition[];
+  encounterHints?: string[];
+  resourceHints?: string[];
+  eventHints?: string[];
+  dangerLevel?: number;
+  isSafeZone?: boolean;
+  isHidden?: boolean;
+
+  // freefieldData.ts 側の拡張フィールド（型エラー回避）
+  gatherNodeIds?: string[];
 }
 
 // ──────────────────────────────────────────────
@@ -91,7 +181,6 @@ export interface FreeFieldArea {
   description?: string;
   notes?: string;
   tags?: string[];
-  /** このエリアに属するノードID一覧（正引き用） */
   nodeIds: string[];
 }
 
@@ -104,11 +193,8 @@ export interface FreeFieldWorld {
   displayName: string;
   description?: string;
   notes?: string;
-  /** マップサイズ（原文記載のブロック数など） */
   mapSizeHint?: string;
-  /** 地図のアスペクト比 width/height */
   mapAspect?: number;
-  /** このワールドに属するエリアID一覧 */
   areaIds: string[];
 }
 
@@ -120,28 +206,21 @@ export interface FreeFieldFever {
   type: FreeFieldFeverType;
   displayName: string;
   aliases?: string[];
-  /** 発生トリガーの説明テキスト（原文準拠） */
   triggerText: string;
-  /** 発生条件の説明テキスト（原文準拠） */
   activationConditionText: string;
-  /** フィーバー中の説明 */
   description: string;
-  /** フィーバー終了時の挙動説明 */
   onEndDescription?: string;
-  /** 関連ドロップのヒント（実装なし、メモのみ） */
   relatedLootHints?: string[];
-  /** 関連ボスのヒント（実装なし、メモのみ） */
   relatedBossHints?: string[];
   notes?: string;
 }
 
 // ──────────────────────────────────────────────
-// Codex エントリ（FF1/FF2 ボス・説明文の分離保持用）
+// Codex エントリ
 // ──────────────────────────────────────────────
 export interface FreeFieldCodexEntry {
   id: string;
   title: string;
-  /** どのセクション・ワールドに属するか（例: 'ff1', 'ff2', 'ffgg'） */
   section: string;
   summary?: string;
   statsText?: string;
