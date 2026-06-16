@@ -1452,48 +1452,10 @@ export const GATHER_NODE_MASTER: Record<string, GatherNodeMaster> = {
   },
 
   // ── FFGG 採取ノード ──
-  ffgg_forest_herb: {
-    id:'ffgg_forest_herb', name:'森地帯の薬草場', description:'ホワイトバジル・緑輝石・コスモニウムが採れる。危険エリア内採取。', icon:'leaf',
-    requiredSkill:{skillId:'mining',minLevel:20}, cooldownMs:15000, staminaCost:20,
-    drops:[
-      {itemId:'white_basil',   baseRate:0.70, minAmount:1, maxAmount:3, skillRateBonus:0.05},
-      {itemId:'green_wheat',   baseRate:0.60, minAmount:1, maxAmount:3},
-      {itemId:'green_gem_ore', baseRate:0.30, minAmount:1, maxAmount:2},
-      {itemId:'cosmonium',     baseRate:0.03, minAmount:1, maxAmount:1},
-      {itemId:'ff_coin_small', baseRate:0.20, minAmount:1, maxAmount:2},
-    ],
-  },
-  ffgg_desert_gather: {
-    id:'ffgg_desert_gather', name:'砂漠地帯の採掘場', description:'熱砂の琥珀・ニトロトリン・岩鱗の断片が採れる。高温危険エリア。', icon:'rock',
-    requiredSkill:{skillId:'mining',minLevel:30}, cooldownMs:20000, staminaCost:25,
-    drops:[
-      {itemId:'hot_sand_amber', baseRate:0.40, minAmount:1, maxAmount:2, skillRateBonus:0.04},
-      {itemId:'nitrotrin',      baseRate:0.25, minAmount:1, maxAmount:2},
-      {itemId:'rock_scale',     baseRate:0.20, minAmount:1, maxAmount:1},
-      {itemId:'matelakaite',    baseRate:0.10, minAmount:1, maxAmount:1},
-      {itemId:'ff_coin_small',  baseRate:0.30, minAmount:1, maxAmount:3},
-    ],
-  },
-  ffgg_cave_gem_vein: {
-    id:'ffgg_cave_gem_vein', name:'洞窟宝石鉱脈', description:'オーロラスピネル・ウエントペリドット・洞窟王の宝石が採れる。最深部。', icon:'gem',
-    requiredSkill:{skillId:'mining',minLevel:50}, cooldownMs:30000, staminaCost:35,
-    drops:[
-      {itemId:'aurora_spinel', baseRate:0.30, minAmount:1, maxAmount:2, skillRateBonus:0.03},
-      {itemId:'uento_peridot', baseRate:0.20, minAmount:1, maxAmount:1},
-      {itemId:'cave_king_gem', baseRate:0.25, minAmount:1, maxAmount:2},
-      {itemId:'matelakaite',   baseRate:0.30, minAmount:1, maxAmount:2},
-    ],
-  },
-  ffgg_snow_gather: {
-    id:'ffgg_snow_gather', name:'雪山採取場', description:'狼牙魔結晶の断片・水鱗・海原の欠片が採れる。極寒エリア。', icon:'ice',
-    requiredSkill:{skillId:'mining',minLevel:35}, cooldownMs:18000, staminaCost:22,
-    drops:[
-      {itemId:'water_scale',       baseRate:0.30, minAmount:1, maxAmount:2},
-      {itemId:'wolf_magic_crystal', baseRate:0.15, minAmount:1, maxAmount:1, skillRateBonus:0.02},
-      {itemId:'ocean_shard',        baseRate:0.20, minAmount:1, maxAmount:2},
-      {itemId:'ff_coin_small',      baseRate:0.25, minAmount:1, maxAmount:2},
-    ],
-  },
+
+
+
+
 };
 
 // ============================================================
