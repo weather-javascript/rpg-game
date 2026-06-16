@@ -493,6 +493,65 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
     ],
     useEffect: { attackBonus: 13, message: '=業炎の剣=で斬りつけた！', attackType: 'physical' },
   },
+
+  // ============================================================
+  // FFGG 素材 ── 鱗系（名称を仕様表記に統一）
+  // ============================================================
+  // 下位鱗（既存 scale_low_1〜4 と重複しないよう「緑鱗」等の別IDで追加）
+  green_scale:  { id:'green_scale',  name:'緑鱗',  description:'森地帯の緑竜から入手。緑系装備のクラフト素材。【入手】森地帯②/フィーバー【用途】鱗系上位武器', category:'material', itemType:'Item', rarity:'uncommon', sellPrice:250,  buyPrice:0, maxStack:99, icon:'ore_green' },
+  red_scale:    { id:'red_scale',    name:'赤鱗',  description:'平原地帯の赤竜から入手。攻撃系装備の素材。【入手】平原地帯③【用途】鱗系上位武器', category:'material', itemType:'Item', rarity:'uncommon', sellPrice:250,  buyPrice:0, maxStack:99, icon:'ore_red' },
+  rock_scale:   { id:'rock_scale',   name:'岩鱗',  description:'砂漠地帯の岩竜から入手。防御系装備の素材。【入手】砂漠地帯④/エガルドン【用途】鱗系防具', category:'material', itemType:'Item', rarity:'uncommon', sellPrice:250,  buyPrice:0, maxStack:99, icon:'ore_brown' },
+  water_scale:  { id:'water_scale',  name:'水鱗',  description:'雪山エリアの水竜から入手。魔法系装備の素材。【入手】雪山⑤/波狼【用途】鱗系杖・防具', category:'material', itemType:'Item', rarity:'uncommon', sellPrice:250,  buyPrice:0, maxStack:99, icon:'ore_blue' },
+  // 上位鱗（鱗系最終素材）
+  green_scale_high: { id:'green_scale_high', name:'緑鱗（上位）', description:'緑竜上位個体から入手。緑鱗より遥かに希少。【入手】ドラゴンフィーバー⑭/サバンナ⑥【用途】最上位装備', category:'material', itemType:'Item', rarity:'rare', sellPrice:1200, buyPrice:0, maxStack:99, icon:'ore_green' },
+  red_scale_high:   { id:'red_scale_high',   name:'赤鱗（上位）', description:'赤竜上位個体から入手。【入手】平原③上位/フィーバー【用途】最上位武器', category:'material', itemType:'Item', rarity:'rare', sellPrice:1200, buyPrice:0, maxStack:99, icon:'ore_red' },
+  rock_scale_high:  { id:'rock_scale_high',  name:'岩鱗（上位）', description:'岩竜上位個体・エガルドンから入手。【入手】砂漠④ボス【用途】最上位防具', category:'material', itemType:'Item', rarity:'rare', sellPrice:1200, buyPrice:0, maxStack:99, icon:'ore_brown' },
+  water_scale_high: { id:'water_scale_high', name:'水鱗（上位）', description:'波狼・Sea Memoriaから入手。【入手】雪山ボス【用途】最上位魔装', category:'material', itemType:'Item', rarity:'rare', sellPrice:1200, buyPrice:0, maxStack:99, icon:'ore_blue' },
+
+  // ============================================================
+  // FFGG 素材 ── 植物・薬草系
+  // ============================================================
+  white_basil:   { id:'white_basil',   name:'ホワイトバジル',   description:'森地帯②の採取ノードで入手できる薬草。回復薬・バフポーションの素材。【入手】森地帯②採取【用途】上位ポーション', category:'material', itemType:'Item', rarity:'uncommon', sellPrice:150, buyPrice:0, maxStack:99, icon:'leaf' },
+  green_wheat:   { id:'green_wheat',   name:'緑小麦',           description:'FFGGエリアの植物系素材。食料・醸造の素材。【入手】森〜サバンナ採取ノード【用途】上位食料/醸造', category:'material', itemType:'Item', rarity:'common',   sellPrice:60,  buyPrice:0, maxStack:99, icon:'leaf' },
+  green_gem_ore: { id:'green_gem_ore', name:'緑輝石',           description:'緑小麦と共に採れる光る鉱物。装飾品の素材。【入手】森地帯採取【用途】アクセサリ・装飾', category:'material', itemType:'Item', rarity:'uncommon', sellPrice:400, buyPrice:0, maxStack:99, icon:'emerald' },
+  nitrotrin:     { id:'nitrotrin',     name:'ニトロトリン',      description:'危険な爆発性植物。採取には注意が必要。爆発系武器の素材。【入手】砂漠・サバンナ採取（危険）【用途】爆発武器/特殊弾薬', category:'material', itemType:'Item', rarity:'rare', sellPrice:800, buyPrice:0, maxStack:99, icon:'explosion' },
+
+  // ============================================================
+  // FFGG 素材 ── 宝石・鉱石系
+  // ============================================================
+  cave_king_gem:   { id:'cave_king_gem',   name:'洞窟王の宝石',    description:'洞窟系ダンジョンの深部で入手。強力な杖の素材。【入手】洞窟系ノード/洞窟王ボス【用途】cave_staff系杖', category:'material', itemType:'Item', rarity:'rare',      sellPrice:800,  buyPrice:0, maxStack:99, icon:'gem_blue' },
+  aurora_spinel:   { id:'aurora_spinel',   name:'オーロラスピネル', description:'洞窟の奥深くで採れる七色に輝く宝石。【入手】洞窟採取ノード/ボスドロップ【用途】上位魔装・強化素材', category:'material', itemType:'Item', rarity:'epic',      sellPrice:3500, buyPrice:0, maxStack:99, icon:'gem' },
+  nether_ruby:     { id:'nether_ruby',     name:'ネザードルビー',   description:'FF2エリア深部の赤い宝石。灼熱のエネルギーを秘める。【入手】FF2エリア⑧ボス【用途】炎系最上位装備', category:'material', itemType:'Item', rarity:'epic',      sellPrice:4000, buyPrice:0, maxStack:99, icon:'gem_red' },
+  matelakaite:     { id:'matelakaite',     name:'マテラカイト',     description:'ダンジョン系で採れる特殊鉱石。魔法増幅効果がある。【入手】ダンジョン系採取【用途】魔法武器強化', category:'material', itemType:'Item', rarity:'rare',      sellPrice:2500, buyPrice:0, maxStack:99, icon:'ore_blue' },
+  cosmonium:       { id:'cosmonium',       name:'コスモニウム',     description:'宇宙の力を持つ希少鉱石。森地帯でのみ採れる。【入手】森地帯②採取（低確率）【用途】最終強化素材', category:'material', itemType:'Item', rarity:'legendary', sellPrice:8000, buyPrice:0, maxStack:10,  icon:'galaxy' },
+  uento_peridot:   { id:'uento_peridot',   name:'ウエントペリドット', description:'ダンジョン系の深部に眠る緑の宝石。防御系装備に使う。【入手】ダンジョン系【用途】防御装備強化', category:'material', itemType:'Item', rarity:'epic',    sellPrice:3000, buyPrice:0, maxStack:99, icon:'emerald' },
+  evil_garnet:     { id:'evil_garnet',     name:'イーヴィルガーネット', description:'魔物の核から生まれた暗黒の赤石。呪い装備の素材。【入手】ダンジョン系ボスドロップ【用途】呪い装備', category:'material', itemType:'Item', rarity:'epic', sellPrice:3500, buyPrice:0, maxStack:99, icon:'ore_red' },
+  antique_coin:    { id:'antique_coin',    name:'アンティークコイン', description:'海賊船・砂漠エリアで見つかる古い硬貨。骨董品として高値がつく。【入手】海賊船⑩/砂漠④/森②【用途】売却・交換', category:'material', itemType:'Item', rarity:'rare',  sellPrice:2000, buyPrice:0, maxStack:99, icon:'coin' },
+
+  // ============================================================
+  // FFGG 素材 ── 戦闘ドロップ系
+  // ============================================================
+  slamy_liquid:    { id:'slamy_liquid',    name:'スラムイ溶液',    description:'FF2エリアの特殊スライムが落とす溶液。腐食性が高い。【入手】FF2エリア⑧敵ドロップ【用途】特殊武器・薬品', category:'material', itemType:'Item', rarity:'rare',      sellPrice:1000, buyPrice:0, maxStack:99, icon:'bubbles' },
+  poison_sphere:   { id:'poison_sphere',   name:'ポイズンスフィア', description:'毒モンスターが落とす毒の球体。毒系武器の素材。【入手】FF2エリア⑧/サバンナ⑥【用途】毒系武器', category:'material', itemType:'Item', rarity:'rare',      sellPrice:1200, buyPrice:0, maxStack:99, icon:'bubbles' },
+  ocean_orb:       { id:'ocean_orb',       name:'海原のオーブ',    description:'Sea Memoriaが落とす海の力が宿るオーブ。【入手】雪山ボス Sea Memoria【用途】海系最上位装備', category:'material', itemType:'Item', rarity:'epic',      sellPrice:5000, buyPrice:0, maxStack:10,  icon:'magic_stone_blue' },
+  ocean_shard:     { id:'ocean_shard',     name:'海原の欠片',      description:'海原のオーブの欠片。水竜エリアの敵も落とす。【入手】雪山⑤/海賊船⑩敵ドロップ【用途】海系装備', category:'material', itemType:'Item', rarity:'rare',      sellPrice:1500, buyPrice:0, maxStack:99, icon:'droplet' },
+  silver_bullet:   { id:'silver_bullet',   name:'銀の弾丸',        description:'FF2エリアで入手できる特殊弾。魔物に特効がある。【入手】FF2エリア⑧宝箱/ドロップ【用途】特殊弾薬・強化素材', category:'material', itemType:'Item', rarity:'rare',    sellPrice:600,  buyPrice:0, maxStack:99, icon:'bullet' },
+  light_trus:      { id:'light_trus',      name:'光輝トラス',      description:'サバンナの強敵が落とす光の部品。機械系装備の素材。【入手】サバンナ⑥⑦ボスドロップ【用途】機械系装備', category:'material', itemType:'Item', rarity:'epic',      sellPrice:4500, buyPrice:0, maxStack:99, icon:'lightning' },
+  punk_parts_a:    { id:'punk_parts_a',    name:'パンクパーツA',   description:'ダンジョン系の機械敵が落とす部品A。カスタム装備の素材。【入手】ダンジョン系機械敵【用途】カスタム装備A', category:'material', itemType:'Item', rarity:'rare',    sellPrice:1800, buyPrice:0, maxStack:99, icon:'robot' },
+  punk_parts_b:    { id:'punk_parts_b',    name:'パンクパーツB',   description:'ダンジョン系の機械敵が落とす部品B。カスタム装備の素材。【入手】ダンジョン系機械敵【用途】カスタム装備B', category:'material', itemType:'Item', rarity:'rare',    sellPrice:1800, buyPrice:0, maxStack:99, icon:'robot' },
+  whale_oil_tank:  { id:'whale_oil_tank',  name:'鯨油タンク',      description:'FF2エリアの巨大魚型敵が落とす油タンク。燃料・錬金素材。【入手】FF2エリア⑧大型敵【用途】燃料系装備/錬金', category:'material', itemType:'Item', rarity:'epic',  sellPrice:3000, buyPrice:0, maxStack:99, icon:'toolbox' },
+  bloody_rain:     { id:'bloody_rain',     name:'ブラッドリィレイン', description:'FF2エリアの暗黒系ボスから入手。血の雨を降らせる素材。【入手】FF2エリア⑧ボス（低確率）【用途】暗黒系装備', category:'material', itemType:'Item', rarity:'epic', sellPrice:6000, buyPrice:0, maxStack:10,  icon:'droplet' },
+  em_iron_steel:   { id:'em_iron_steel',   name:'電磁魔鉄鋼',      description:'電気と魔力が融合した特殊鋼。サバンナ深部で入手。【入手】サバンナ⑥⑦上位敵ドロップ【用途】電磁系装備', category:'material', itemType:'Item', rarity:'epic',  sellPrice:5000, buyPrice:0, maxStack:99, icon:'lightning' },
+  dark_magic_iron: { id:'dark_magic_iron', name:'黒魔鉄鋼',        description:'呪われた魔鉄の塊。ダンジョン最深部で入手。【入手】ダンジョン系ボス【用途】最上位暗黒装備', category:'material', itemType:'Item', rarity:'epic',  sellPrice:5500, buyPrice:0, maxStack:99, icon:'ore_dark' },
+
+  // ============================================================
+  // FFGG 素材 ── 特殊・レア素材
+  // ============================================================
+  withered_heart:  { id:'withered_heart',  name:'枯れた心',        description:'砂漠地帯の強敵が低確率で落とす干涸らびた心臓。呪い装備の核。【入手】砂漠④エガルドン/強敵（レア）【用途】呪い装備', category:'material', itemType:'Item', rarity:'epic',      sellPrice:5000, buyPrice:0, maxStack:10,  icon:'ore_dark' },
+  hot_sand_amber:  { id:'hot_sand_amber',  name:'熱砂の琥珀',      description:'砂漠の炎熱で固まった琥珀。内部に古代生物が閉じ込められている。【入手】砂漠④採取/エガルドン【用途】錬金・飾り物', category:'material', itemType:'Item', rarity:'rare',      sellPrice:2500, buyPrice:0, maxStack:99, icon:'ore_brown' },
+  wolf_magic_crystal: { id:'wolf_magic_crystal', name:'狼牙魔結晶', description:'波狼が落とす強力な魔力結晶。雪山の力を宿す。【入手】雪山⑤ボス 波狼【用途】雪山系最上位装備', category:'material', itemType:'Item', rarity:'epic',  sellPrice:4000, buyPrice:0, maxStack:99, icon:'crystal_ball' },
+  carib_rough_wave: { id:'carib_rough_wave', name:'カリブの荒波',  description:'海賊船エリアのフィーバー中のみ入手可能な特殊素材。【入手】海賊船⑩フィーバー限定【用途】海賊系最上位装備', category:'material', itemType:'Item', rarity:'rare',    sellPrice:2000, buyPrice:0, maxStack:99, icon:'wave' },
+  // ※ caribbean_wave は既存IDと同義なので上書きせず carib_rough_wave として追加
 };
 
 // ============================================================
@@ -1158,6 +1217,171 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     requiredCraftingLevel: 50,
     craftingExpGain: 30000,
   },
+
+  // ============================================================
+  // FFGG 素材を使うクラフトレシピ
+  // ============================================================
+
+  // ── 鱗系上位武器 ──
+  {
+    id: 'ffgg_green_blade',
+    name: '緑竜刃を作る',
+    description: '緑鱗×4と緑鱗（上位）×2、鉄塊×3から作る上位武器。攻撃力+12。森地帯周回の成果。',
+    outputItemId: 'iron_sword', // TODO: ffgg_green_blade 専用アイテムIDに差し替え
+    outputAmount: 1,
+    inputs: [{ itemId: 'green_scale', amount: 4 }, { itemId: 'green_scale_high', amount: 2 }, { itemId: 'iron_ingot', amount: 3 }],
+    shape: ['green_scale_high','green_scale','green_scale_high', 'green_scale','iron_ingot','green_scale', 'iron_ingot','','iron_ingot'],
+    requiredCraftingLevel: 30,
+    craftingExpGain: 500,
+  },
+  {
+    id: 'ffgg_red_blade',
+    name: '赤竜刃を作る',
+    description: '赤鱗×4と赤鱗（上位）×2、鉄塊×3から作る上位武器。攻撃力+14。平原周回の成果。',
+    outputItemId: 'iron_sword', // TODO: ffgg_red_blade 専用アイテムIDに差し替え
+    outputAmount: 1,
+    inputs: [{ itemId: 'red_scale', amount: 4 }, { itemId: 'red_scale_high', amount: 2 }, { itemId: 'iron_ingot', amount: 3 }],
+    shape: ['red_scale_high','red_scale','red_scale_high', 'red_scale','iron_ingot','red_scale', 'iron_ingot','','iron_ingot'],
+    requiredCraftingLevel: 30,
+    craftingExpGain: 500,
+  },
+
+  // ── 鱗系防具 ──
+  {
+    id: 'ffgg_rock_armor',
+    name: '岩鱗の鎧を作る',
+    description: '岩鱗×6と岩鱗（上位）×2から作る重防具。砂漠周回の成果。防御力+12。',
+    outputItemId: 'iron_chestplate', // TODO: ffgg_rock_armor 専用アイテムIDに差し替え
+    outputAmount: 1,
+    inputs: [{ itemId: 'rock_scale', amount: 6 }, { itemId: 'rock_scale_high', amount: 2 }, { itemId: 'iron_ingot', amount: 1 }],
+    shape: ['rock_scale','rock_scale_high','rock_scale', 'rock_scale','iron_ingot','rock_scale', 'rock_scale','rock_scale_high','rock_scale'],
+    requiredCraftingLevel: 30,
+    craftingExpGain: 600,
+  },
+
+  // ── 洞窟王の宝石 系 ──
+  {
+    id: 'cave_staff_from_cave_king_gem',
+    name: '洞窟の杖を作る（宝石版）',
+    description: '洞窟王の宝石×3と鉄塊×3、古代の欠片×3で作る。範囲攻撃貫通10。',
+    outputItemId: 'cave_staff',
+    outputAmount: 1,
+    inputs: [{ itemId: 'cave_king_gem', amount: 3 }, { itemId: 'iron_ingot', amount: 3 }, { itemId: 'ancient_shard', amount: 3 }],
+    shape: ['cave_king_gem','iron_ingot','cave_king_gem', 'iron_ingot','ancient_shard','iron_ingot', 'cave_king_gem','','cave_king_gem'],
+    requiredCraftingLevel: 25,
+    craftingExpGain: 400,
+  },
+  {
+    id: 'cave_staff2_from_aurora',
+    name: '岩窟の杖を作る',
+    description: 'オーロラスピネル×4と洞窟の杖×1、ネザードルビー×2で強化。範囲攻撃貫通20。',
+    outputItemId: 'cave_staff2',
+    outputAmount: 1,
+    inputs: [{ itemId: 'aurora_spinel', amount: 4 }, { itemId: 'cave_staff', amount: 1 }, { itemId: 'nether_ruby', amount: 2 }],
+    shape: ['aurora_spinel','nether_ruby','aurora_spinel', 'aurora_spinel','cave_staff','aurora_spinel', '','nether_ruby',''],
+    requiredCraftingLevel: 45,
+    craftingExpGain: 2000,
+  },
+
+  // ── スラムイ溶液・海原系 ──
+  {
+    id: 'slamy_potion_brew',
+    name: 'スラムイ特殊ポーションを調合する',
+    description: 'スラムイ溶液×2とホワイトバジル×3、スライムゼリー×3から作る上位回復薬。HP+100回復。',
+    outputItemId: 'mega_potion',
+    outputAmount: 3,
+    inputs: [{ itemId: 'slamy_liquid', amount: 2 }, { itemId: 'white_basil', amount: 3 }, { itemId: 'slime_gel', amount: 3 }],
+    shape: ['white_basil','slamy_liquid','white_basil', 'white_basil','slime_gel','white_basil', '','slamy_liquid',''],
+    requiredCraftingLevel: 35,
+    craftingExpGain: 600,
+  },
+  {
+    id: 'ocean_orb_staff',
+    name: '海原の杖を作る',
+    description: '海原のオーブ×1と海原の欠片×4、マテラカイト×2、鉄塊×2から作る魔杖。範囲貫通15。',
+    outputItemId: 'cave_staff2', // TODO: ocean_orb_staff 専用アイテムIDに差し替え
+    outputAmount: 1,
+    inputs: [{ itemId: 'ocean_orb', amount: 1 }, { itemId: 'ocean_shard', amount: 4 }, { itemId: 'matelakaite', amount: 2 }, { itemId: 'iron_ingot', amount: 2 }],
+    shape: ['ocean_shard','ocean_orb','ocean_shard', 'matelakaite','iron_ingot','matelakaite', 'ocean_shard','iron_ingot','ocean_shard'],
+    requiredCraftingLevel: 50,
+    craftingExpGain: 3000,
+  },
+
+  // ── 電磁魔鉄鋼・黒魔鉄鋼系 ──
+  {
+    id: 'em_iron_sword',
+    name: '電磁魔鉄剣を作る',
+    description: '電磁魔鉄鋼×4とウエントペリドット×2、鉄塊×3から作る上位武器。攻撃力+15。',
+    outputItemId: 'emerald_sword', // TODO: em_iron_sword 専用アイテムIDに差し替え
+    outputAmount: 1,
+    inputs: [{ itemId: 'em_iron_steel', amount: 4 }, { itemId: 'uento_peridot', amount: 2 }, { itemId: 'iron_ingot', amount: 3 }],
+    shape: ['em_iron_steel','uento_peridot','em_iron_steel', 'em_iron_steel','iron_ingot','em_iron_steel', 'iron_ingot','uento_peridot','iron_ingot'],
+    requiredCraftingLevel: 55,
+    craftingExpGain: 4000,
+  },
+  {
+    id: 'dark_magic_iron_armor',
+    name: '黒魔鉄の鎧を作る',
+    description: '黒魔鉄鋼×6とイーヴィルガーネット×2、鉄塊×1から作る最上位防具。防御力+15。',
+    outputItemId: 'iron_chestplate', // TODO: dark_magic_iron_armor 専用アイテムIDに差し替え
+    outputAmount: 1,
+    inputs: [{ itemId: 'dark_magic_iron', amount: 6 }, { itemId: 'evil_garnet', amount: 2 }, { itemId: 'iron_ingot', amount: 1 }],
+    shape: ['dark_magic_iron','evil_garnet','dark_magic_iron', 'dark_magic_iron','iron_ingot','dark_magic_iron', 'dark_magic_iron','evil_garnet','dark_magic_iron'],
+    requiredCraftingLevel: 60,
+    craftingExpGain: 5000,
+  },
+
+  // ── ニトロトリン特殊弾薬 ──
+  {
+    id: 'nitrotrin_bomb',
+    name: 'ニトロ爆弾を作る',
+    description: 'ニトロトリン×3と銀の弾丸×3、石炭×3から作る爆発物。敵に投げると大ダメージ。',
+    outputItemId: 'gunpowder', // TODO: nitrotrin_bomb 専用アイテムIDに差し替え
+    outputAmount: 5,
+    inputs: [{ itemId: 'nitrotrin', amount: 3 }, { itemId: 'silver_bullet', amount: 3 }, { itemId: 'coal', amount: 3 }],
+    shape: ['nitrotrin','silver_bullet','nitrotrin', 'silver_bullet','coal','silver_bullet', 'nitrotrin','coal','nitrotrin'],
+    requiredCraftingLevel: 40,
+    craftingExpGain: 800,
+  },
+
+  // ── パンクパーツ系 ──
+  {
+    id: 'punk_equipment_ab',
+    name: 'パンクギアを作る',
+    description: 'パンクパーツA×4とパンクパーツB×4、光輝トラス×1から作るカスタム装備。防御力+10、攻撃力+5。',
+    outputItemId: 'iron_chestplate', // TODO: punk_gear 専用アイテムIDに差し替え
+    outputAmount: 1,
+    inputs: [{ itemId: 'punk_parts_a', amount: 4 }, { itemId: 'punk_parts_b', amount: 4 }, { itemId: 'light_trus', amount: 1 }],
+    shape: ['punk_parts_a','light_trus','punk_parts_a', 'punk_parts_b','punk_parts_a','punk_parts_b', 'punk_parts_a','punk_parts_b','punk_parts_b'],
+    requiredCraftingLevel: 50,
+    craftingExpGain: 3500,
+  },
+
+  // ── FF大判クラフト（FF小判交換） ──
+  {
+    id: 'ff_coin_exchange',
+    name: 'FF大判に交換する',
+    description: 'FF小判×9個を1枚のFF大判に圧縮する。売却価値が上がる。',
+    outputItemId: 'ff_coin_large',
+    outputAmount: 1,
+    inputs: [{ itemId: 'ff_coin_small', amount: 9 }],
+    shape: ['ff_coin_small','ff_coin_small','ff_coin_small', 'ff_coin_small','ff_coin_small','ff_coin_small', 'ff_coin_small','ff_coin_small','ff_coin_small'],
+    requiredCraftingLevel: 10,
+    craftingExpGain: 50,
+  },
+
+  // ── ホワイトバジル上位ポーション ──
+  {
+    id: 'white_basil_elixir',
+    name: 'バジルエリクサーを調合する',
+    description: 'ホワイトバジル×4と狼牙魔結晶×1、スライムゼリー×4からHP・満腹度を200回復する上位薬を作る。',
+    outputItemId: 'elixir',
+    outputAmount: 1,
+    inputs: [{ itemId: 'white_basil', amount: 4 }, { itemId: 'wolf_magic_crystal', amount: 1 }, { itemId: 'slime_gel', amount: 4 }],
+    shape: ['white_basil','wolf_magic_crystal','white_basil', 'white_basil','slime_gel','white_basil', 'slime_gel','slime_gel','slime_gel'],
+    requiredCraftingLevel: 45,
+    craftingExpGain: 1200,
+  },
 ];
 
 // ============================================================
@@ -1225,6 +1449,50 @@ export const GATHER_NODE_MASTER: Record<string, GatherNodeMaster> = {
     id:'fishing_ggr_pond', name:'GGR釣り場', description:'クレートとお金が釣れる！', icon:'fishing_rod',
     requiredSkill:{skillId:'fishing',minLevel:300}, cooldownMs:4000, staminaCost:6,
     drops:[{itemId:'crate_leather',baseRate:0.40,minAmount:1,maxAmount:1},{itemId:'crate_gold',baseRate:0.20,minAmount:1,maxAmount:1},{itemId:'crate_diamond',baseRate:0.08,minAmount:1,maxAmount:1},{itemId:'crate_enhanced',baseRate:0.02,minAmount:1,maxAmount:1},{itemId:'la_juice_high',baseRate:0.05,minAmount:1,maxAmount:1},{itemId:'ff_coin_large',baseRate:0.03,minAmount:1,maxAmount:1}],
+  },
+
+  // ── FFGG 採取ノード ──
+  ffgg_forest_herb: {
+    id:'ffgg_forest_herb', name:'森地帯の薬草場', description:'ホワイトバジル・緑輝石・コスモニウムが採れる。危険エリア内採取。', icon:'leaf',
+    requiredSkill:{skillId:'mining',minLevel:20}, cooldownMs:15000, staminaCost:20,
+    drops:[
+      {itemId:'white_basil',   baseRate:0.70, minAmount:1, maxAmount:3, skillRateBonus:0.05},
+      {itemId:'green_wheat',   baseRate:0.60, minAmount:1, maxAmount:3},
+      {itemId:'green_gem_ore', baseRate:0.30, minAmount:1, maxAmount:2},
+      {itemId:'cosmonium',     baseRate:0.03, minAmount:1, maxAmount:1},
+      {itemId:'ff_coin_small', baseRate:0.20, minAmount:1, maxAmount:2},
+    ],
+  },
+  ffgg_desert_gather: {
+    id:'ffgg_desert_gather', name:'砂漠地帯の採掘場', description:'熱砂の琥珀・ニトロトリン・岩鱗の断片が採れる。高温危険エリア。', icon:'rock',
+    requiredSkill:{skillId:'mining',minLevel:30}, cooldownMs:20000, staminaCost:25,
+    drops:[
+      {itemId:'hot_sand_amber', baseRate:0.40, minAmount:1, maxAmount:2, skillRateBonus:0.04},
+      {itemId:'nitrotrin',      baseRate:0.25, minAmount:1, maxAmount:2},
+      {itemId:'rock_scale',     baseRate:0.20, minAmount:1, maxAmount:1},
+      {itemId:'matelakaite',    baseRate:0.10, minAmount:1, maxAmount:1},
+      {itemId:'ff_coin_small',  baseRate:0.30, minAmount:1, maxAmount:3},
+    ],
+  },
+  ffgg_cave_gem_vein: {
+    id:'ffgg_cave_gem_vein', name:'洞窟宝石鉱脈', description:'オーロラスピネル・ウエントペリドット・洞窟王の宝石が採れる。最深部。', icon:'gem',
+    requiredSkill:{skillId:'mining',minLevel:50}, cooldownMs:30000, staminaCost:35,
+    drops:[
+      {itemId:'aurora_spinel', baseRate:0.30, minAmount:1, maxAmount:2, skillRateBonus:0.03},
+      {itemId:'uento_peridot', baseRate:0.20, minAmount:1, maxAmount:1},
+      {itemId:'cave_king_gem', baseRate:0.25, minAmount:1, maxAmount:2},
+      {itemId:'matelakaite',   baseRate:0.30, minAmount:1, maxAmount:2},
+    ],
+  },
+  ffgg_snow_gather: {
+    id:'ffgg_snow_gather', name:'雪山採取場', description:'狼牙魔結晶の断片・水鱗・海原の欠片が採れる。極寒エリア。', icon:'ice',
+    requiredSkill:{skillId:'mining',minLevel:35}, cooldownMs:18000, staminaCost:22,
+    drops:[
+      {itemId:'water_scale',       baseRate:0.30, minAmount:1, maxAmount:2},
+      {itemId:'wolf_magic_crystal', baseRate:0.15, minAmount:1, maxAmount:1, skillRateBonus:0.02},
+      {itemId:'ocean_shard',        baseRate:0.20, minAmount:1, maxAmount:2},
+      {itemId:'ff_coin_small',      baseRate:0.25, minAmount:1, maxAmount:2},
+    ],
   },
 };
 

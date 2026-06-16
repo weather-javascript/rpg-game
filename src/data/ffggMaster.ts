@@ -107,6 +107,7 @@ export const FFGG_FOREST_ENEMIES: Record<string, FFGGEnemyDefinition> = {
     drops: [
       { itemId: 'cave_fragment', baseRate: 0.5, minAmount: 1, maxAmount: 2 },
       { itemId: 'coin',          baseRate: 1.0, minAmount: 5, maxAmount: 10 },
+      { itemId: 'green_scale',   baseRate: 0.15, minAmount: 1, maxAmount: 1 },
     ],
     skills: [
       { id: 'grido_bite',   name: 'ガブリ', type: 'single', damageMult: 1.0 },
@@ -125,6 +126,8 @@ export const FFGG_FOREST_ENEMIES: Record<string, FFGGEnemyDefinition> = {
     drops: [
       { itemId: 'cave_fragment', baseRate: 0.7, minAmount: 2, maxAmount: 3 },
       { itemId: 'goblin_ear',    baseRate: 0.3, minAmount: 1, maxAmount: 1 },
+      { itemId: 'green_scale',   baseRate: 0.25, minAmount: 1, maxAmount: 2 },
+      { itemId: 'ff_coin_small', baseRate: 0.15, minAmount: 1, maxAmount: 1 },
     ],
     skills: [
       { id: 'alpha_bite',   name: 'かみつき', type: 'single', damageMult: 1.1 },
@@ -143,6 +146,7 @@ export const FFGG_FOREST_ENEMIES: Record<string, FFGGEnemyDefinition> = {
     drops: [
       { itemId: 'slime_gel',     baseRate: 0.8, minAmount: 1, maxAmount: 3 },
       { itemId: 'ancient_shard', baseRate: 0.1, minAmount: 1, maxAmount: 1 },
+      { itemId: 'slamy_liquid',  baseRate: 0.08, minAmount: 1, maxAmount: 1 },
     ],
     skills: [
       { id: 'soul_single',  name: '粘液飛ばし', type: 'single', damageMult: 1.0 },
@@ -159,8 +163,9 @@ export const FFGG_FOREST_ENEMIES: Record<string, FFGGEnemyDefinition> = {
     baseExp: 35, baseGold: 25,
     areaIds: ['ffgg_forest','ffgg_pirate'],
     drops: [
-      { itemId: 'coin',          baseRate: 1.0, minAmount: 10, maxAmount: 20 },
-      { itemId: 'cave_fragment', baseRate: 0.3, minAmount: 1, maxAmount: 1 },
+      { itemId: 'coin',           baseRate: 1.0, minAmount: 10, maxAmount: 20 },
+      { itemId: 'cave_fragment',  baseRate: 0.3, minAmount: 1, maxAmount: 1 },
+      { itemId: 'antique_coin',   baseRate: 0.05, minAmount: 1, maxAmount: 1 },
     ],
     skills: [
       { id: 'pirate_slash', name: 'サーベル斬り', type: 'single', damageMult: 1.1 },
@@ -177,6 +182,8 @@ export const FFGG_FOREST_ENEMIES: Record<string, FFGGEnemyDefinition> = {
     drops: [
       { itemId: 'hard_magic_stone', baseRate: 0.2, minAmount: 1, maxAmount: 1 },
       { itemId: 'goblin_ear',       baseRate: 0.5, minAmount: 2, maxAmount: 3 },
+      { itemId: 'green_scale',      baseRate: 0.30, minAmount: 1, maxAmount: 2 },
+      { itemId: 'cosmonium',        baseRate: 0.02, minAmount: 1, maxAmount: 1 },
     ],
     skills: [
       { id: 'ripper_ambush', name: '奇襲斬り',     type: 'single',    damageMult: 1.5 },
@@ -201,6 +208,7 @@ export const FFGG_DESERT_ENEMIES: Record<string, FFGGEnemyDefinition> = {
     drops: [
       { itemId: 'magma_stone',   baseRate: 0.5, minAmount: 1, maxAmount: 2 },
       { itemId: 'magic_stone',   baseRate: 0.2, minAmount: 1, maxAmount: 1 },
+      { itemId: 'rock_scale',    baseRate: 0.20, minAmount: 1, maxAmount: 1 },
     ],
     skills: [
       { id: 'gadra_single',  name: '砂弾', type: 'single', damageMult: 1.0 },
@@ -222,6 +230,8 @@ export const FFGG_DESERT_ENEMIES: Record<string, FFGGEnemyDefinition> = {
     drops: [
       { itemId: 'hard_magic_stone', baseRate: 0.4, minAmount: 1, maxAmount: 2 },
       { itemId: 'magma_stone',      baseRate: 1.0, minAmount: 2, maxAmount: 3 },
+      { itemId: 'rock_scale',       baseRate: 0.30, minAmount: 1, maxAmount: 2 },
+      { itemId: 'hot_sand_amber',   baseRate: 0.08, minAmount: 1, maxAmount: 1 },
     ],
     skills: [
       { id: 'gadrakai_wave',    name: '広域超衝撃波', type: 'wave', damageMult: 1.8, isAoe: true,
@@ -242,6 +252,8 @@ export const FFGG_DESERT_ENEMIES: Record<string, FFGGEnemyDefinition> = {
     drops: [
       { itemId: 'hard_magic_stone', baseRate: 0.6, minAmount: 1, maxAmount: 2 },
       { itemId: 'ancient_shard',    baseRate: 0.3, minAmount: 1, maxAmount: 2 },
+      { itemId: 'rock_scale',       baseRate: 0.35, minAmount: 1, maxAmount: 2 },
+      { itemId: 'withered_heart',   baseRate: 0.03, minAmount: 1, maxAmount: 1 },
     ],
     skills: [
       { id: 'egard_slash',  name: '大剣振り', type: 'single', damageMult: 1.3 },
@@ -266,6 +278,7 @@ export const FFGG_SNOW_ENEMIES: Record<string, FFGGEnemyDefinition> = {
     drops: [
       { itemId: 'spirit_ice',    baseRate: 0.6, minAmount: 1, maxAmount: 2 },
       { itemId: 'cave_fragment', baseRate: 0.3, minAmount: 1, maxAmount: 2 },
+      { itemId: 'water_scale',   baseRate: 0.20, minAmount: 1, maxAmount: 1 },
     ],
     skills: [
       { id: 'adora_rush', name: '連続突き', type: 'single', damageMult: 0.7 },
@@ -285,6 +298,8 @@ export const FFGG_SNOW_ENEMIES: Record<string, FFGGEnemyDefinition> = {
     drops: [
       { itemId: 'spirit_ice',       baseRate: 0.8, minAmount: 2, maxAmount: 3 },
       { itemId: 'hard_magic_stone', baseRate: 0.2, minAmount: 1, maxAmount: 1 },
+      { itemId: 'water_scale',      baseRate: 0.35, minAmount: 1, maxAmount: 2 },
+      { itemId: 'ocean_shard',      baseRate: 0.10, minAmount: 1, maxAmount: 1 },
     ],
     skills: [
       { id: 'adorakai_rush',  name: '超連続突き', type: 'single', damageMult: 0.8 },
@@ -302,8 +317,10 @@ export const FFGG_SNOW_ENEMIES: Record<string, FFGGEnemyDefinition> = {
     baseExp: 50, baseGold: 30,
     areaIds: ['ffgg_snow'],
     drops: [
-      { itemId: 'mole_claw',  baseRate: 0.7, minAmount: 1, maxAmount: 2 },
-      { itemId: 'spirit_ice', baseRate: 0.2, minAmount: 1, maxAmount: 1 },
+      { itemId: 'mole_claw',        baseRate: 0.7, minAmount: 1, maxAmount: 2 },
+      { itemId: 'spirit_ice',       baseRate: 0.2, minAmount: 1, maxAmount: 1 },
+      { itemId: 'wolf_crystal',     baseRate: 0.10, minAmount: 1, maxAmount: 1 },
+      { itemId: 'wolf_magic_crystal', baseRate: 0.04, minAmount: 1, maxAmount: 1 },
     ],
     skills: [
       { id: 'fang_bite',  name: '牙噛み', type: 'single', damageMult: 1.2 },
@@ -510,6 +527,9 @@ export const FFGG_BOSSES: Record<string, FFGGBossDefinition> = {
       { itemId: 'spirit_ice',       baseRate: 1.0, minAmount: 5, maxAmount: 8 },
       { itemId: 'ancient_shard',    baseRate: 0.5, minAmount: 2, maxAmount: 4 },
       { itemId: 'hard_magic_stone', baseRate: 0.3, minAmount: 1, maxAmount: 2 },
+      { itemId: 'ocean_orb',        baseRate: 0.30, minAmount: 1, maxAmount: 1 },
+      { itemId: 'ocean_shard',      baseRate: 0.70, minAmount: 2, maxAmount: 4 },
+      { itemId: 'water_scale_high', baseRate: 0.35, minAmount: 1, maxAmount: 2 },
     ],
     skills: [
       { id: 'sea_counter', name: '水面反撃', type: 'counter', damageMult: 1.3,
@@ -561,6 +581,9 @@ export const FFGG_BOSSES: Record<string, FFGGBossDefinition> = {
       { itemId: 'hard_magic_stone', baseRate: 1.0, minAmount: 3, maxAmount: 6 },
       { itemId: 'ancient_shard',    baseRate: 0.8, minAmount: 2, maxAmount: 4 },
       { itemId: 'dragon_scale',     baseRate: 0.2, minAmount: 1, maxAmount: 1 },
+      { itemId: 'slamy_liquid',     baseRate: 0.50, minAmount: 2, maxAmount: 4 },
+      { itemId: 'poison_sphere',    baseRate: 0.30, minAmount: 1, maxAmount: 2 },
+      { itemId: 'light_trus',       baseRate: 0.15, minAmount: 1, maxAmount: 1 },
     ],
     skills: [
       { id: 'slam_homing',  name: '王の追尾弾', type: 'homing', damageMult: 1.8,
@@ -587,6 +610,9 @@ export const FFGG_BOSSES: Record<string, FFGGBossDefinition> = {
     drops: [
       { itemId: 'coin',             baseRate: 1.0, minAmount: 80, maxAmount: 150 },
       { itemId: 'hard_magic_stone', baseRate: 0.5, minAmount: 2, maxAmount: 3 },
+      { itemId: 'antique_coin',     baseRate: 0.40, minAmount: 1, maxAmount: 3 },
+      { itemId: 'carib_rough_wave', baseRate: 0.20, minAmount: 1, maxAmount: 1 },
+      { itemId: 'ff_coin_small',    baseRate: 1.0,  minAmount: 5, maxAmount: 15 },
     ],
     skills: [
       { id: 'brute_smash',  name: '大槌叩き', type: 'single', damageMult: 1.5 },
@@ -696,9 +722,11 @@ export const FFGG_BOSSES: Record<string, FFGGBossDefinition> = {
     baseExp: 1600, baseGold: 1100,
     areaIds: ['ffgg_snow'],
     drops: [
-      { itemId: 'spirit_ice',       baseRate: 1.0, minAmount: 6, maxAmount: 10 },
-      { itemId: 'hard_magic_stone', baseRate: 0.7,  minAmount: 3, maxAmount: 5 },
-      { itemId: 'dragon_scale',     baseRate: 0.3,  minAmount: 1, maxAmount: 2 },
+      { itemId: 'spirit_ice',         baseRate: 1.0, minAmount: 6, maxAmount: 10 },
+      { itemId: 'hard_magic_stone',   baseRate: 0.7,  minAmount: 3, maxAmount: 5 },
+      { itemId: 'dragon_scale',       baseRate: 0.3,  minAmount: 1, maxAmount: 2 },
+      { itemId: 'wolf_magic_crystal', baseRate: 0.50, minAmount: 1, maxAmount: 2 },
+      { itemId: 'water_scale_high',   baseRate: 0.40, minAmount: 1, maxAmount: 2 },
     ],
     skills: [
       { id: 'wwolf_wave',  name: '円形衝撃波', type: 'wave', damageMult: 2.0, isAoe: true,
@@ -725,6 +753,9 @@ export const FFGG_BOSSES: Record<string, FFGGBossDefinition> = {
       { itemId: 'hard_magic_stone', baseRate: 1.0, minAmount: 8, maxAmount: 12 },
       { itemId: 'dragon_scale',     baseRate: 0.5,  minAmount: 2, maxAmount: 3 },
       { itemId: 'ancient_shard',    baseRate: 1.0,  minAmount: 5, maxAmount: 8 },
+      { itemId: 'rock_scale_high',  baseRate: 0.60, minAmount: 1, maxAmount: 3 },
+      { itemId: 'withered_heart',   baseRate: 0.20, minAmount: 1, maxAmount: 1 },
+      { itemId: 'hot_sand_amber',   baseRate: 0.40, minAmount: 1, maxAmount: 2 },
     ],
     skills: [
       { id: 'egaldon_wave',  name: '砂嵐衝撃波', type: 'wave', damageMult: 1.8, isAoe: true,
