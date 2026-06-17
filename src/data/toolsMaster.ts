@@ -106,5 +106,27 @@ export const TOOLS_MASTER: Record<string, ToolMaster> = {
   daily_legend: { id:'daily_legend', name:'日替り伝説のミスリル斧', category:'woodcutting', material:'mythril', type:'efficiency', speedMultiplier:1.2, yieldMultiplier:1.2, rareMultiplier:1.2, staminaMultiplier:0.72, comboBonus:0, specialEffectId:'daily_legend', acquisitionTags:['drop'], dropSources:['collection_reward'] },
 };
 
+// 新カテゴリ用デフォルトツール
+const NEW_CAT_TOOLS = [
+  // gathering
+  { id:'basic_basket',       name:'基本バスケット',   category:'gathering' as const, material:'wood' as const, type:'yield' as const, speedMultiplier:1, yieldMultiplier:1.2, rareMultiplier:1, staminaMultiplier:1, comboBonus:0, specialEffectId:null },
+  { id:'woven_gathering_bag',name:'織りかご',          category:'gathering' as const, material:'wood' as const, type:'speed' as const, speedMultiplier:1.5, yieldMultiplier:1, rareMultiplier:1, staminaMultiplier:0.9, comboBonus:0, specialEffectId:null },
+  { id:'rare_net_basket',    name:'希少採集網',        category:'gathering' as const, material:'iron' as const, type:'rare' as const, speedMultiplier:1, yieldMultiplier:1, rareMultiplier:1.8, staminaMultiplier:1, comboBonus:0, specialEffectId:null },
+  // herbalism
+  { id:'basic_herb_knife',   name:'基本薬草ナイフ',   category:'herbalism' as const, material:'stone' as const, type:'yield' as const, speedMultiplier:1, yieldMultiplier:1.2, rareMultiplier:1, staminaMultiplier:1, comboBonus:0, specialEffectId:null },
+  { id:'silver_herb_sickle', name:'銀の薬草鎌',       category:'herbalism' as const, material:'iron' as const, type:'rare' as const, speedMultiplier:1, yieldMultiplier:1, rareMultiplier:1.8, staminaMultiplier:1, comboBonus:0, specialEffectId:null },
+  { id:'golden_herb_scythe', name:'金の薬草大鎌',     category:'herbalism' as const, material:'gold' as const, type:'efficiency' as const, speedMultiplier:1.3, yieldMultiplier:1.3, rareMultiplier:1.3, staminaMultiplier:0.8, comboBonus:0.1, specialEffectId:null },
+  // insect
+  { id:'basic_bug_net',      name:'基本虫取り網',     category:'insect' as const, material:'wood' as const, type:'yield' as const, speedMultiplier:1, yieldMultiplier:1.2, rareMultiplier:1, staminaMultiplier:1, comboBonus:0, specialEffectId:null },
+  { id:'night_bug_lantern',  name:'夜の虫取りランタン', category:'insect' as const, material:'iron' as const, type:'rare' as const, speedMultiplier:1, yieldMultiplier:1, rareMultiplier:1.8, staminaMultiplier:1, comboBonus:0, specialEffectId:null },
+  { id:'combo_bug_net',      name:'コンボ虫取り網',   category:'insect' as const, material:'gold' as const, type:'combo' as const, speedMultiplier:1.1, yieldMultiplier:1.1, rareMultiplier:1, staminaMultiplier:1, comboBonus:0.2, specialEffectId:null },
+];
+for (const t of NEW_CAT_TOOLS) {
+  (TOOLS_MASTER as Record<string, typeof t>)[t.id] = t;
+}
+
 export const DEFAULT_MINING_TOOL_ID = 'wood_yield_pickaxe';
 export const DEFAULT_WOODCUTTING_TOOL_ID = 'wood_yield_axe';
+export const DEFAULT_GATHERING_TOOL_ID = 'basic_basket';
+export const DEFAULT_HERBALISM_TOOL_ID = 'basic_herb_knife';
+export const DEFAULT_INSECT_TOOL_ID = 'basic_bug_net';

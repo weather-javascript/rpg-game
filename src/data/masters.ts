@@ -199,6 +199,33 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   fishing_ticket_p:{ id:'fishing_ticket_p', name:'釣りチケットプラス', description:'魚や釣りチケットを換算したもの。', category:'treasure',  itemType:'Item', rarity:'uncommon', sellPrice:80, buyPrice:0, maxStack:-1, icon:'ticket_striped' },
   totem:           { id:'totem',            name:'不死のトーテム',  description:'Yリアクターの素材。',          category:'treasure',  itemType:'Item', rarity:'rare',     sellPrice:200, buyPrice:0, maxStack:99, icon:'totem' },
   y_random_box:    { id:'y_random_box',     name:'Yランダムボックス', description:'中身はランダム。',            category:'treasure',  itemType:'Item', rarity:'rare',     sellPrice:300, buyPrice:0, maxStack:99, icon:'box' },
+  // ── 採集アイテム (gathering) ──
+  mushroom:        { id:'mushroom',          name:'キノコ',          description:'食用キノコ。料理に使える。',   category:'food',     itemType:'Item', rarity:'common',   sellPrice:5,   buyPrice:0, maxStack:99, icon:'leaf' },
+  red_mushroom:    { id:'red_mushroom',      name:'赤いキノコ',      description:'毒消しの材料。',              category:'material', itemType:'Item', rarity:'uncommon', sellPrice:15,  buyPrice:0, maxStack:99, icon:'leaf' },
+  brown_mushroom:  { id:'brown_mushroom',    name:'茶色のキノコ',    description:'スープの具材。',              category:'food',     itemType:'Item', rarity:'common',   sellPrice:8,   buyPrice:0, maxStack:99, icon:'leaf' },
+  glowing_mushroom:{ id:'glowing_mushroom',  name:'輝くキノコ',      description:'光る幻のキノコ。',            category:'material', itemType:'Item', rarity:'rare',     sellPrice:80,  buyPrice:0, maxStack:99, icon:'sparkle' },
+  dragon_mushroom: { id:'dragon_mushroom',   name:'竜のキノコ',      description:'伝説の薬になる幻のキノコ。',  category:'material', itemType:'Item', rarity:'legendary',sellPrice:500, buyPrice:0, maxStack:99, icon:'galaxy' },
+  sweet_berry:     { id:'sweet_berry',       name:'甘い実',          description:'甘酸っぱい小さな実。',        category:'food',     itemType:'Item', rarity:'common',   sellPrice:3,   buyPrice:0, maxStack:99, icon:'cherry_blossom' },
+  glow_berry:      { id:'glow_berry',        name:'輝く実',          description:'洞窟に生える発光する実。',    category:'food',     itemType:'Item', rarity:'uncommon', sellPrice:20,  buyPrice:0, maxStack:99, icon:'star_glow' },
+  apple:           { id:'apple',             name:'リンゴ',          description:'木から落ちたリンゴ。',        category:'food',     itemType:'Item', rarity:'common',   sellPrice:4,   buyPrice:0, maxStack:99, icon:'cherry_blossom' },
+  carrot:          { id:'carrot',            name:'ニンジン',        description:'野生のニンジン。',            category:'food',     itemType:'Item', rarity:'common',   sellPrice:4,   buyPrice:0, maxStack:99, icon:'leaf' },
+  potato:          { id:'potato',            name:'ジャガイモ',      description:'野生のジャガイモ。',          category:'food',     itemType:'Item', rarity:'common',   sellPrice:4,   buyPrice:0, maxStack:99, icon:'leaf' },
+  beetroot:        { id:'beetroot',          name:'ビートルート',    description:'野生のビート。',             category:'food',     itemType:'Item', rarity:'common',   sellPrice:5,   buyPrice:0, maxStack:99, icon:'leaf' },
+  wheat:           { id:'wheat',             name:'小麦',            description:'野生の小麦。',               category:'material', itemType:'Item', rarity:'common',   sellPrice:3,   buyPrice:0, maxStack:99, icon:'leaf' },
+  // ── 薬草アイテム (herbalism) ──
+  herb_basic:      { id:'herb_basic',        name:'基本薬草',        description:'ありふれた薬草。',            category:'material', itemType:'Item', rarity:'common',   sellPrice:10,  buyPrice:0, maxStack:99, icon:'leaf' },
+  herb_healing:    { id:'herb_healing',      name:'回復薬草',        description:'傷を癒やす薬草。',            category:'material', itemType:'Item', rarity:'common',   sellPrice:25,  buyPrice:0, maxStack:99, icon:'leaf' },
+  herb_stamina:    { id:'herb_stamina',      name:'スタミナ薬草',    description:'疲れを和らげる薬草。',        category:'material', itemType:'Item', rarity:'uncommon', sellPrice:40,  buyPrice:0, maxStack:99, icon:'leaf' },
+  herb_mana:       { id:'herb_mana',         name:'マナ薬草',        description:'魔力を高める薬草。',          category:'material', itemType:'Item', rarity:'rare',     sellPrice:100, buyPrice:0, maxStack:99, icon:'sparkle' },
+  herb_rare:       { id:'herb_rare',         name:'希少薬草',        description:'めったに採れない薬草。',      category:'material', itemType:'Item', rarity:'rare',     sellPrice:200, buyPrice:0, maxStack:99, icon:'sparkle' },
+  herb_legendary:  { id:'herb_legendary',    name:'伝説の薬草',      description:'古代から伝わる究極の薬草。',  category:'material', itemType:'Item', rarity:'legendary',sellPrice:1000,buyPrice:0, maxStack:99, icon:'galaxy' },
+  // ── 虫アイテム (insect) ──
+  firefly:         { id:'firefly',           name:'ホタル',          description:'夜の森で輝く虫。',            category:'material', itemType:'Item', rarity:'common',   sellPrice:15,  buyPrice:0, maxStack:99, icon:'star_glow' },
+  common_bug:      { id:'common_bug',        name:'普通の虫',        description:'どこにでもいる虫。',          category:'material', itemType:'Item', rarity:'common',   sellPrice:3,   buyPrice:0, maxStack:99, icon:'bamboo' },
+  glowing_bug:     { id:'glowing_bug',       name:'光る虫',          description:'発光する珍しい虫。',          category:'material', itemType:'Item', rarity:'uncommon', sellPrice:50,  buyPrice:0, maxStack:99, icon:'sparkle' },
+  cave_bug:        { id:'cave_bug',          name:'洞窟の虫',        description:'暗い場所に住む虫。',          category:'material', itemType:'Item', rarity:'uncommon', sellPrice:30,  buyPrice:0, maxStack:99, icon:'ore_dark' },
+  crystal_bug:     { id:'crystal_bug',       name:'水晶虫',          description:'水晶の体を持つ虫。',          category:'material', itemType:'Item', rarity:'rare',     sellPrice:150, buyPrice:0, maxStack:99, icon:'gem' },
+  rainbow_bug:     { id:'rainbow_bug',       name:'虹色の虫',        description:'伝説の七色に輝く虫。',        category:'material', itemType:'Item', rarity:'legendary',sellPrice:800, buyPrice:0, maxStack:99, icon:'galaxy' },
   y_reactor:       { id:'y_reactor',        name:'Yリアクター',     description:'釣りの最重要アイテム。',       category:'material',  itemType:'Item', rarity:'epic',     sellPrice:1000,buyPrice:0, maxStack:99, icon:'lightning' },
   z_reactor:       { id:'z_reactor',        name:'Zリアクター',     description:'通常釣りの最終目標。',         category:'material',  itemType:'Item', rarity:'legendary',sellPrice:5000,buyPrice:0, maxStack:99, icon:'battery' },
   nether_proof:    { id:'nether_proof',     name:'ネザー解放の証',  description:'Zリアクターの素材。',          category:'material',  itemType:'Item', rarity:'rare',     sellPrice:500, buyPrice:0, maxStack:99, icon:'volcano' },
@@ -1451,7 +1478,138 @@ export const GATHER_NODE_MASTER: Record<string, GatherNodeMaster> = {
     drops:[{itemId:'crate_leather',baseRate:0.40,minAmount:1,maxAmount:1},{itemId:'crate_gold',baseRate:0.20,minAmount:1,maxAmount:1},{itemId:'crate_diamond',baseRate:0.08,minAmount:1,maxAmount:1},{itemId:'crate_enhanced',baseRate:0.02,minAmount:1,maxAmount:1},{itemId:'la_juice_high',baseRate:0.05,minAmount:1,maxAmount:1},{itemId:'ff_coin_large',baseRate:0.03,minAmount:1,maxAmount:1}],
   },
 
-  // ── FFGG 採取ノード ──
+  // ── 採集ノード（gathering: 食材・キノコ）──
+  mushroom_forest: {
+    id:'mushroom_forest', name:'キノコの森', description:'食用キノコが採れる。朝にドロップ率UP。', icon:'leaf',
+    requiredSkill:{skillId:'gathering',minLevel:1}, cooldownMs:4000, staminaCost:5,
+    drops:[
+      {itemId:'mushroom',      baseRate:0.90, minAmount:1, maxAmount:4, skillRateBonus:0.05},
+      {itemId:'red_mushroom',  baseRate:0.60, minAmount:1, maxAmount:3},
+      {itemId:'brown_mushroom',baseRate:0.50, minAmount:1, maxAmount:2},
+      {itemId:'glowing_mushroom',baseRate:0.10,minAmount:1,maxAmount:1},
+    ],
+  },
+  berry_patch: {
+    id:'berry_patch', name:'果実の茂み', description:'甘い果実が採れる。', icon:'cherry_blossom',
+    requiredSkill:{skillId:'gathering',minLevel:3}, cooldownMs:5000, staminaCost:6,
+    drops:[
+      {itemId:'sweet_berry',  baseRate:0.90, minAmount:2, maxAmount:5, skillRateBonus:0.05},
+      {itemId:'glow_berry',   baseRate:0.20, minAmount:1, maxAmount:2},
+      {itemId:'apple',        baseRate:0.30, minAmount:1, maxAmount:3},
+    ],
+  },
+  vegetable_field: {
+    id:'vegetable_field', name:'野菜畑跡', description:'野生の野菜が育っている。', icon:'leaf',
+    requiredSkill:{skillId:'gathering',minLevel:5}, cooldownMs:6000, staminaCost:7,
+    drops:[
+      {itemId:'carrot',       baseRate:0.80, minAmount:1, maxAmount:4, skillRateBonus:0.04},
+      {itemId:'potato',       baseRate:0.70, minAmount:1, maxAmount:4},
+      {itemId:'beetroot',     baseRate:0.50, minAmount:1, maxAmount:3},
+      {itemId:'wheat',        baseRate:0.60, minAmount:2, maxAmount:5},
+    ],
+  },
+  rare_mushroom_cave: {
+    id:'rare_mushroom_cave', name:'希少キノコの洞窟', description:'幻のキノコが生える薄暗い洞窟。', icon:'ore_dark',
+    requiredSkill:{skillId:'gathering',minLevel:15}, cooldownMs:12000, staminaCost:12,
+    drops:[
+      {itemId:'glowing_mushroom',baseRate:0.40,minAmount:1,maxAmount:2,skillRateBonus:0.03},
+      {itemId:'dragon_mushroom', baseRate:0.10,minAmount:1,maxAmount:1},
+      {itemId:'mushroom',        baseRate:0.90,minAmount:2,maxAmount:5},
+    ],
+  },
+
+  // ── 薬草ノード（herbalism）──
+  herb_meadow: {
+    id:'herb_meadow', name:'薬草の草原', description:'基本的な薬草が採れる。夕方にレア率UP。', icon:'leaf',
+    requiredSkill:{skillId:'herbalism',minLevel:1}, cooldownMs:4000, staminaCost:5,
+    drops:[
+      {itemId:'herb_basic',    baseRate:0.90, minAmount:1, maxAmount:3, skillRateBonus:0.05},
+      {itemId:'herb_healing',  baseRate:0.40, minAmount:1, maxAmount:2},
+      {itemId:'herb_stamina',  baseRate:0.25, minAmount:1, maxAmount:1},
+    ],
+  },
+  magic_herb_grove: {
+    id:'magic_herb_grove', name:'魔法薬草の林', description:'魔法効果のある薬草が採れる。', icon:'sparkle',
+    requiredSkill:{skillId:'herbalism',minLevel:8}, cooldownMs:8000, staminaCost:10,
+    drops:[
+      {itemId:'herb_mana',     baseRate:0.50, minAmount:1, maxAmount:2, skillRateBonus:0.04},
+      {itemId:'herb_rare',     baseRate:0.20, minAmount:1, maxAmount:1},
+      {itemId:'herb_healing',  baseRate:0.60, minAmount:1, maxAmount:3},
+    ],
+  },
+  ancient_herb_field: {
+    id:'ancient_herb_field', name:'古代薬草の遺跡', description:'古代の薬草が眠る遺跡。', icon:'galaxy',
+    requiredSkill:{skillId:'herbalism',minLevel:20}, cooldownMs:15000, staminaCost:18,
+    drops:[
+      {itemId:'herb_rare',     baseRate:0.35, minAmount:1, maxAmount:2, skillRateBonus:0.03},
+      {itemId:'herb_legendary',baseRate:0.08, minAmount:1, maxAmount:1},
+      {itemId:'herb_mana',     baseRate:0.50, minAmount:1, maxAmount:2},
+    ],
+  },
+
+  // ── 採虫ノード（insect）──
+  night_forest_insect: {
+    id:'night_forest_insect', name:'夜の森の虫採り', description:'夜にドロップ率×1.4。霧の夜は×1.5。', icon:'bamboo',
+    requiredSkill:{skillId:'insect',minLevel:1}, cooldownMs:4000, staminaCost:5,
+    drops:[
+      {itemId:'firefly',       baseRate:0.70, minAmount:1, maxAmount:3, skillRateBonus:0.05},
+      {itemId:'common_bug',    baseRate:0.90, minAmount:2, maxAmount:5},
+      {itemId:'glowing_bug',   baseRate:0.15, minAmount:1, maxAmount:1},
+    ],
+  },
+  cave_insect: {
+    id:'cave_insect', name:'洞窟の虫採り', description:'洞窟に住む珍しい虫。', icon:'ore_dark',
+    requiredSkill:{skillId:'insect',minLevel:5}, cooldownMs:6000, staminaCost:7,
+    drops:[
+      {itemId:'cave_bug',      baseRate:0.80, minAmount:1, maxAmount:3, skillRateBonus:0.04},
+      {itemId:'crystal_bug',   baseRate:0.25, minAmount:1, maxAmount:1},
+      {itemId:'common_bug',    baseRate:0.70, minAmount:1, maxAmount:3},
+    ],
+  },
+  rare_insect_swamp: {
+    id:'rare_insect_swamp', name:'希少昆虫の沼地', description:'霧の中に珍しい虫が潜む。', icon:'palm_tree',
+    requiredSkill:{skillId:'insect',minLevel:12}, cooldownMs:10000, staminaCost:12,
+    drops:[
+      {itemId:'crystal_bug',   baseRate:0.40, minAmount:1, maxAmount:2, skillRateBonus:0.03},
+      {itemId:'rainbow_bug',   baseRate:0.10, minAmount:1, maxAmount:1},
+      {itemId:'cave_bug',      baseRate:0.60, minAmount:1, maxAmount:2},
+    ],
+  },
+
+  // ── 危険ノード ──
+  danger_mine_deep: {
+    id:'danger_mine_deep', name:'⚠️ 深淵採掘場', description:'危険！報酬×2〜5倍。失敗時HPとスタミナ損失。夜・雷で出現。', icon:'ore_dark',
+    requiredSkill:{skillId:'mining',minLevel:15}, cooldownMs:20000, staminaCost:20,
+    isDanger:true, dangerCategory:'danger_mining',
+    drops:[
+      {itemId:'diamond',       baseRate:0.50, minAmount:1, maxAmount:3},
+      {itemId:'ancient_debris',baseRate:0.15, minAmount:1, maxAmount:1},
+      {itemId:'netherite_scrap',baseRate:0.10,minAmount:1,maxAmount:1},
+      {itemId:'emerald',       baseRate:0.60, minAmount:2, maxAmount:5},
+    ],
+  },
+  danger_old_forest: {
+    id:'danger_old_forest', name:'⚠️ 古代樹の森', description:'危険！報酬×2〜5倍。強力な毒トゲあり。夜・雷で出現。', icon:'pine_tree',
+    requiredSkill:{skillId:'woodcutting',minLevel:10}, cooldownMs:18000, staminaCost:18,
+    isDanger:true, dangerCategory:'danger_wood',
+    drops:[
+      {itemId:'dark_oak_log',  baseRate:0.80, minAmount:3, maxAmount:8},
+      {itemId:'dragon_bone',   baseRate:0.15, minAmount:1, maxAmount:1},
+      {itemId:'soul_flame',    baseRate:0.10, minAmount:1, maxAmount:1},
+      {itemId:'jungle_log',    baseRate:0.60, minAmount:2, maxAmount:6},
+    ],
+  },
+  danger_cursed_herb: {
+    id:'danger_cursed_herb', name:'⚠️ 呪われた薬草地', description:'危険！報酬×2〜5倍。毒薬草が混じる。夜・雷で出現。', icon:'sparkle',
+    requiredSkill:{skillId:'herbalism',minLevel:10}, cooldownMs:15000, staminaCost:16,
+    isDanger:true, dangerCategory:'danger_herb',
+    drops:[
+      {itemId:'herb_legendary',baseRate:0.30, minAmount:1, maxAmount:2},
+      {itemId:'herb_rare',     baseRate:0.60, minAmount:1, maxAmount:3},
+      {itemId:'herb_mana',     baseRate:0.70, minAmount:2, maxAmount:4},
+    ],
+  },
+
   ffgg_forest_herb: {
     id:'ffgg_forest_herb', name:'森地帯の薬草場', description:'ホワイトバジル・緑輝石・コスモニウムが採れる。危険エリア内採取。', icon:'leaf',
     requiredSkill:{skillId:'mining',minLevel:20}, cooldownMs:15000, staminaCost:20,
@@ -1970,6 +2128,19 @@ export const DEFAULT_PLAYER_STATS = {
 // フォーマット: { version: 'x.x.x', date: 'YYYY-MM-DD', changes: ['変更内容...'] }
 // ============================================================
 export const VERSION_PATCHES = [
+  {
+    version: '2.20.0',
+    date: '2026-06-18',
+    changes: [
+      '🌿 採取システム大幅拡張: gathering（採集）・herbalism（薬草）・insect（採虫）カテゴリ追加',
+      '⏰ 時間帯ボーナス追加: 朝/昼/夕/夜でカテゴリごとに速度・ドロップ・レア率補正',
+      '🌦️ 天候ボーナス追加: 雨/雷/霧で各カテゴリへの補正適用',
+      '🔗 連続採取コンボシステム追加: 5/10/20連続で効率・レア率UP、30秒放置でリセット',
+      '⚠️ 危険ノード追加: 深淵採掘場・古代樹の森・呪われた薬草地（夜・雷で出現率UP）',
+      '📖 採取図鑑追加: 初回取得で登録、カテゴリコンプ・全体コンプで効率ボーナス',
+      '🧤 採取専用装備: 全5カテゴリ対応のツールスロット追加',
+    ],
+  },
   {
     version: '2.19.0',
     date: '2026-06-18',

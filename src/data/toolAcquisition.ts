@@ -518,9 +518,9 @@ export type TimeOfDay = 'morning' | 'daytime' | 'evening' | 'night';
 
 export function getTimeOfDay(): TimeOfDay {
   const h = new Date().getHours();
-  if (h >= 5 && h < 10) return 'morning';
-  if (h >= 10 && h < 17) return 'daytime';
-  if (h >= 17 && h < 22) return 'evening';
+  if (h >= 5 && h <= 10) return 'morning';
+  if (h >= 11 && h <= 16) return 'daytime';
+  if (h >= 17 && h <= 19) return 'evening';
   return 'night';
 }
 
