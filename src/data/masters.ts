@@ -1452,10 +1452,48 @@ export const GATHER_NODE_MASTER: Record<string, GatherNodeMaster> = {
   },
 
   // ── FFGG 採取ノード ──
-
-
-
-
+  ffgg_forest_herb: {
+    id:'ffgg_forest_herb', name:'森地帯の薬草場', description:'ホワイトバジル・緑輝石・コスモニウムが採れる。危険エリア内採取。', icon:'leaf',
+    requiredSkill:{skillId:'mining',minLevel:20}, cooldownMs:15000, staminaCost:20,
+    drops:[
+      {itemId:'white_basil',   baseRate:0.70, minAmount:1, maxAmount:3, skillRateBonus:0.05},
+      {itemId:'green_wheat',   baseRate:0.60, minAmount:1, maxAmount:3},
+      {itemId:'green_gem_ore', baseRate:0.30, minAmount:1, maxAmount:2},
+      {itemId:'cosmonium',     baseRate:0.03, minAmount:1, maxAmount:1},
+      {itemId:'ff_coin_small', baseRate:0.20, minAmount:1, maxAmount:2},
+    ],
+  },
+  ffgg_desert_gather: {
+    id:'ffgg_desert_gather', name:'砂漠地帯の採掘場', description:'熱砂の琥珀・ニトロトリン・岩鱗の断片が採れる。高温危険エリア。', icon:'rock',
+    requiredSkill:{skillId:'mining',minLevel:30}, cooldownMs:20000, staminaCost:25,
+    drops:[
+      {itemId:'hot_sand_amber', baseRate:0.40, minAmount:1, maxAmount:2, skillRateBonus:0.04},
+      {itemId:'nitrotrin',      baseRate:0.25, minAmount:1, maxAmount:2},
+      {itemId:'rock_scale',     baseRate:0.20, minAmount:1, maxAmount:1},
+      {itemId:'matelakaite',    baseRate:0.10, minAmount:1, maxAmount:1},
+      {itemId:'ff_coin_small',  baseRate:0.30, minAmount:1, maxAmount:3},
+    ],
+  },
+  ffgg_cave_gem_vein: {
+    id:'ffgg_cave_gem_vein', name:'洞窟宝石鉱脈', description:'オーロラスピネル・ウエントペリドット・洞窟王の宝石が採れる。最深部。', icon:'gem',
+    requiredSkill:{skillId:'mining',minLevel:50}, cooldownMs:30000, staminaCost:35,
+    drops:[
+      {itemId:'aurora_spinel', baseRate:0.30, minAmount:1, maxAmount:2, skillRateBonus:0.03},
+      {itemId:'uento_peridot', baseRate:0.20, minAmount:1, maxAmount:1},
+      {itemId:'cave_king_gem', baseRate:0.25, minAmount:1, maxAmount:2},
+      {itemId:'matelakaite',   baseRate:0.30, minAmount:1, maxAmount:2},
+    ],
+  },
+  ffgg_snow_gather: {
+    id:'ffgg_snow_gather', name:'雪山採取場', description:'狼牙魔結晶の断片・水鱗・海原の欠片が採れる。極寒エリア。', icon:'ice',
+    requiredSkill:{skillId:'mining',minLevel:35}, cooldownMs:18000, staminaCost:22,
+    drops:[
+      {itemId:'water_scale',       baseRate:0.30, minAmount:1, maxAmount:2},
+      {itemId:'wolf_magic_crystal', baseRate:0.15, minAmount:1, maxAmount:1, skillRateBonus:0.02},
+      {itemId:'ocean_shard',        baseRate:0.20, minAmount:1, maxAmount:2},
+      {itemId:'ff_coin_small',      baseRate:0.25, minAmount:1, maxAmount:2},
+    ],
+  },
 };
 
 // ============================================================
@@ -1932,6 +1970,26 @@ export const DEFAULT_PLAYER_STATS = {
 // フォーマット: { version: 'x.x.x', date: 'YYYY-MM-DD', changes: ['変更内容...'] }
 // ============================================================
 export const VERSION_PATCHES = [
+  {
+    version: '2.19.0',
+    date: '2026-06-18',
+    changes: [
+      '⚔️ ダンジョン戦闘に武器固有の演出エフェクトを追加！攻撃時、敵のHPバー付近に武器ごとの専用アニメーション（斬撃・炎・氷・光・闇など）が表示されるように',
+      '✨ 回復・防御武器（Revolution Healwand、Memory of Flower、Diamond Staff、Revolution Defencer、魔造壊盾=Goliath=など）の使用時は自分のホットバー付近に専用エフェクトを表示',
+      '💥 必殺技・連続発動（=Silvers eye=など）・クリティカル時はより強い演出になり、ダメージ数値のポップアップ表示や軽い画面シェイクも追加',
+      '🐉 敵を撃破した瞬間に専用の「消滅」エフェクトを追加。既存の戦闘ロジック・ダメージ計算・ログ表示には影響なし',
+    ],
+  },
+  {
+    version: '2.18.0',
+    date: '2026-06-17',
+    changes: [
+      '📖 冒険ナビに新サブタブ「攻略WIKI」を追加！プレイヤー同士でページを自由に作成・編集できるWIKI機能が利用可能に',
+      '✏️ 見出し・太字・イタリック・文字色変更・内部ページリンク・ゲーム内アイコン埋め込みに対応したブロックエディタを実装',
+      '🗂️ ページ検索・カテゴリ一覧・最近更新・人気ページ・関連ページ表示に対応。アイテム/武器/防具/ダンジョン/初心者ガイドなどのテンプレートから新規ページを作成可能',
+      '🕓 ページ編集履歴と差し戻し機能、ページロック・保護、通報機能を実装し、誰でも編集できる環境でも安全性を確保',
+    ],
+  },
   {
     version: '2.17.0',
     date: '2026-06-15',
