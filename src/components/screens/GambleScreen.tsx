@@ -33,6 +33,163 @@ interface SessionStats {
 }
 const initStats = (): SessionStats => ({ totalBet: 0, totalWon: 0, gamesPlayed: 0, wins: 0, biggestWin: 0, biggestLoss: 0 });
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth <= breakpoint : false
+  );
+
+  useEffect(() => {
+    const update = () => setIsMobile(window.innerWidth <= breakpoint);
+    update();
+    window.addEventListener('resize', update, { passive: true });
+    return () => window.removeEventListener('resize', update);
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
+const GAMBLE_UI_CSS = `
+  @keyframes gamble-bg-drift {
+    0%   { transform: translate3d(-2%, -1%, 0) scale(1); }
+    50%  { transform: translate3d(2%, 1%, 0) scale(1.02); }
+    100% { transform: translate3d(-1%, 2%, 0) scale(1.01); }
+  }
+  @keyframes gamble-shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes gamble-float {
+    0%,100% { transform: translateY(0); }
+    50%     { transform: translateY(-4px); }
+  }
+  @keyframes gamble-pulse {
+    0%,100% { box-shadow: 0 0 0 rgba(91,141,238,0); }
+    50%     { box-shadow: 0 0 28px rgba(91,141,238,0.28); }
+  }
+  @keyframes gamble-sparkle {
+    0%,100% { opacity: .45; filter: blur(0px); }
+    50%     { opacity: 1; filter: blur(.2px); }
+  }
+
+  .gamble-shell {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+  .gamble-shell::before,
+  .gamble-shell::after {
+    content: "";
+    position: absolute;
+    inset: -18%;
+    pointer-events: none;
+  }
+  .gamble-shell::before {
+    background:
+      radial-gradient(circle at 12% 18%, rgba(240,192,96,0.14), transparent 18%),
+      radial-gradient(circle at 82% 12%, rgba(91,141,238,0.16), transparent 18%),
+      radial-gradient(circle at 64% 84%, rgba(224,96,224,0.12), transparent 18%),
+      radial-gradient(circle at 45% 55%, rgba(76,175,135,0.10), transparent 20%);
+    animation: gamble-bg-drift 14s ease-in-out infinite alternate;
+    z-index: 0;
+  }
+  .gamble-shell::after {
+    background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.08) 35%, transparent 70%);
+    background-size: 200% 100%;
+    animation: gamble-shimmer 8s linear infinite;
+    mix-blend-mode: screen;
+    opacity: .25;
+    z-index: 0;
+  }
+
+  .gamble-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.04);
+    backdrop-filter: blur(10px);
+  }
+  .gamble-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.12) 18%, transparent 36%, transparent 64%, rgba(255,255,255,0.10) 82%, transparent 100%);
+    background-size: 220% 100%;
+    animation: gamble-shimmer 6s linear infinite;
+    pointer-events: none;
+    opacity: .18;
+  }
+
+  .gamble-tabbar {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  .gamble-tabbar button {
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background-color .18s ease, opacity .18s ease;
+    will-change: transform;
+  }
+  .gamble-tabbar button:hover {
+    transform: translateY(-2px);
+  }
+  .gamble-tabbar button:active {
+    transform: translateY(1px) scale(.985);
+  }
+  .gamble-tabbar button.gamble-active {
+    animation: gamble-float 2.6s ease-in-out infinite, gamble-pulse 2.6s ease-in-out infinite;
+  }
+
+  .gamble-mobile-grid {
+    display: grid;
+    gap: 6px;
+  }
+
+  @media (max-width: 768px) {
+    .gamble-shell {
+      padding-left: 8px !important;
+      padding-right: 8px !important;
+      padding-top: 10px !important;
+      padding-bottom: 18px !important;
+    }
+    .gamble-card {
+      border-radius: 14px;
+    }
+    .gamble-main-title {
+      font-size: 1.08rem !important;
+    }
+    .gamble-balance {
+      padding: 8px 10px !important;
+      gap: 6px !important;
+    }
+    .gamble-mainTabs {
+      gap: 6px !important;
+      flex-wrap: wrap !important;
+      overflow-x: visible !important;
+    }
+    .gamble-mainTabs button {
+      flex: 1 1 calc(25% - 6px) !important;
+      min-width: 0 !important;
+      padding: 7px 6px !important;
+      font-size: 0.64rem !important;
+    }
+    .gamble-gameTabs {
+      flex-wrap: wrap !important;
+      overflow-x: visible !important;
+    }
+    .gamble-gameTabs button {
+      flex: 1 1 calc(50% - 4px) !important;
+      min-width: 0 !important;
+      padding: 7px 8px !important;
+      font-size: 0.72rem !important;
+    }
+    .gamble-panel {
+      padding: 12px !important;
+    }
+  }
+`;
+
 function resolveGenericGamble(game: GambleMaster, bet: number, multiplierBonus = 1.0): GambleResult {
   const rand = secureRandom();
   let cum = 0;
@@ -49,6 +206,7 @@ function resolveGenericGamble(game: GambleMaster, bet: number, multiplierBonus =
 }
 
 function ResultDisplay({ result, bet = 0 }: { result: GambleResult; bet?: number }) {
+  const mobile = useIsMobile();
   const isReplay = result.rewardLabel.includes('REPLAY');
   const isWin = result.goldDelta > 0;
   const labelColor = isReplay ? '#5b8dee' : isWin ? '#4caf87' : '#e05555';
@@ -57,15 +215,15 @@ function ResultDisplay({ result, bet = 0 }: { result: GambleResult; bet?: number
   // 手元に戻る合計額（賭け金返還分 + 差益）を表示
   const totalReturn = result.goldDelta + bet;
   return (
-    <div style={{ padding: '10px', background: bgColor, border: `1px solid ${borderColor}`, borderRadius: 8, marginBottom: 10, textAlign: 'center' }}>
-      <div style={{ fontSize: '1.2rem', fontWeight: 700, color: labelColor, marginBottom: 4 }}>
+    <div className="gamble-card" style={{ padding: mobile ? '12px' : '10px', background: bgColor, border: `1px solid ${borderColor}`, borderRadius: 8, marginBottom: 10, textAlign: 'center', boxShadow: `0 0 0 1px rgba(255,255,255,0.03), 0 10px 26px ${borderColor}22` }}>
+      <div style={{ fontSize: mobile ? '1.02rem' : '1.2rem', fontWeight: 700, color: labelColor, marginBottom: 4 }}>
         {result.symbols?.join(' ') ?? ''} {result.rewardLabel}
       </div>
-      <div style={{ fontSize: '1rem', fontWeight: 700, color: labelColor }}>
+      <div style={{ fontSize: mobile ? '0.9rem' : '1rem', fontWeight: 700, color: labelColor }}>
         {isReplay ? `🔄 掛け金返還 (+${bet.toLocaleString()}WC)` : isWin ? `+${totalReturn.toLocaleString()}WC` : `${result.goldDelta.toLocaleString()}WC`}
       </div>
       {result.itemRewards.length > 0 && (
-        <div style={{ marginTop: 6, fontSize: '0.8rem' }}>
+        <div style={{ marginTop: 6, fontSize: mobile ? '0.72rem' : '0.8rem' }}>
           {result.itemRewards.map(r => <span key={r.itemId} style={{display:'inline-flex',alignItems:'center',gap:3}}><GameIcon id={ITEM_MASTER[r.itemId]?.icon ?? ''} size={14} /> {ITEM_MASTER[r.itemId]?.name} ×{r.amount} </span>)}
         </div>
       )}
@@ -75,27 +233,29 @@ function ResultDisplay({ result, bet = 0 }: { result: GambleResult; bet?: number
 
 // ジャックポット表示（蓄積のみ、対戦中に偶然発生）
 function JackpotBanner({ pool }: { pool: number }) {
+  const mobile = useIsMobile();
   if (pool <= 0) return null;
   return (
-    <div style={{ background: 'linear-gradient(135deg,rgba(240,192,96,0.15),rgba(240,168,48,0.15))', border: '2px solid #f0c060', borderRadius: 10, padding: '10px 14px', marginBottom: 12, textAlign: 'center' }}>
-      <div style={{ fontSize: '0.8rem', color: '#8a92b2', marginBottom: 2 }}>🌟 現在のジャックポットプール</div>
-      <div style={{ fontSize: '2rem', fontWeight: 700, color: '#f0c060' }}>{pool.toLocaleString()}WC</div>
-      <div style={{ fontSize: '0.72rem', color: '#4a5070', marginTop: 4 }}>他のギャンブルをプレイするたびに蓄積されます。超低確率で自動当選！</div>
+    <div className="gamble-card" style={{ background: 'linear-gradient(135deg,rgba(240,192,96,0.15),rgba(240,168,48,0.15))', border: '2px solid #f0c060', borderRadius: 10, padding: mobile ? '9px 12px' : '10px 14px', marginBottom: 12, textAlign: 'center', animation: 'gamble-pulse 2.8s ease-in-out infinite' }}>
+      <div style={{ fontSize: mobile ? '0.72rem' : '0.8rem', color: '#8a92b2', marginBottom: 2 }}>🌟 現在のジャックポットプール</div>
+      <div style={{ fontSize: mobile ? '1.5rem' : '2rem', fontWeight: 700, color: '#f0c060' }}>{pool.toLocaleString()}WC</div>
+      <div style={{ fontSize: mobile ? '0.68rem' : '0.72rem', color: '#4a5070', marginTop: 4 }}>他のギャンブルをプレイするたびに蓄積されます。超低確率で自動当選！</div>
     </div>
   );
 }
 
 // 賭け金入力
 function BetInput({ game, bet, setBet, disabled = false }: { game: GambleMaster; bet: number; setBet: (v: number) => void; disabled?: boolean }) {
+  const mobile = useIsMobile();
   const player = useGameStore(s => s.player);
   const presets = [game.minBet, Math.floor(game.maxBet * 0.1), Math.floor(game.maxBet * 0.25), game.maxBet].filter((v, i, a) => a.indexOf(v) === i);
   return (
     <div style={{ marginBottom: 10 }}>
       {disabled && <div style={{ fontSize: '0.72rem', color: '#e05555', marginBottom: 4 }}>⚠ ゲーム中は賭け金を変更できません</div>}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: mobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, auto))', gap: 4, marginBottom: 6 }}>
         {presets.map(p => (
           <button key={p} onClick={() => !disabled && setBet(Math.min(p, player?.wealthCoin ?? 0))}
-            style={{ padding: '3px 8px', background: bet === p ? '#5b8dee' : '#1c2235', color: bet === p ? '#fff' : '#8a92b2', border: `1px solid ${bet === p ? '#5b8dee' : '#2d3752'}`, borderRadius: 4, cursor: disabled ? 'not-allowed' : 'pointer', fontSize: '0.75rem', opacity: disabled ? 0.5 : 1 }}>
+            style={{ padding: mobile ? '8px 6px' : '3px 8px', background: bet === p ? '#5b8dee' : '#1c2235', color: bet === p ? '#fff' : '#8a92b2', border: `1px solid ${bet === p ? '#5b8dee' : '#2d3752'}`, borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer', fontSize: mobile ? '0.72rem' : '0.75rem', opacity: disabled ? 0.5 : 1, minHeight: mobile ? 36 : undefined }}>
             {p.toLocaleString()}WC
           </button>
         ))}
@@ -105,7 +265,7 @@ function BetInput({ game, bet, setBet, disabled = false }: { game: GambleMaster;
       <input type="number" value={bet} min={game.minBet} max={Math.min(game.maxBet, player?.wealthCoin ?? 0)}
         onChange={e => !disabled && setBet(Math.max(game.minBet, Math.min(game.maxBet, Number(e.target.value))))}
         disabled={disabled}
-        style={{ width: '100%', padding: '6px 10px', background: disabled ? '#161b26' : '#1c2235', border: `1px solid ${disabled ? '#4a5070' : '#2d3752'}`, color: disabled ? '#4a5070' : '#e8e6ff', borderRadius: 6, fontSize: '0.9rem', boxSizing: 'border-box' as const, cursor: disabled ? 'not-allowed' : 'text' }}
+        style={{ width: '100%', padding: mobile ? '12px 12px' : '6px 10px', background: disabled ? '#161b26' : '#1c2235', border: `1px solid ${disabled ? '#4a5070' : '#2d3752'}`, color: disabled ? '#4a5070' : '#e8e6ff', borderRadius: 10, fontSize: mobile ? '1rem' : '0.9rem', boxSizing: 'border-box' as const, cursor: disabled ? 'not-allowed' : 'text', minHeight: mobile ? 44 : undefined }}
       />
     </div>
   );
@@ -834,11 +994,13 @@ const SUIT_ICONS: Record<string,string> = { S:'♠', H:'♥', D:'♦', C:'♣' }
 const SUIT_COLORS: Record<string,string> = { S:'#e8e6ff', H:'#e05555', D:'#e05555', C:'#e8e6ff' };
 
 function TxCard({ rank, suit, faceDown = false, small = false }: { rank: string; suit: string; faceDown?: boolean; small?: boolean }) {
-  const w = small ? 30 : 40, h = small ? 44 : 58;
+  const mobile = useIsMobile();
+  const w = small ? (mobile ? 26 : 30) : (mobile ? 34 : 40), h = small ? (mobile ? 38 : 44) : (mobile ? 50 : 58);
   return (
     <div style={{
       width: w, height: h,
       background: faceDown ? 'linear-gradient(135deg,#1c2235,#2d3752)' : '#fff',
+      boxShadow: faceDown ? 'inset 0 0 10px rgba(255,255,255,0.03)' : '0 6px 16px rgba(0,0,0,0.16)',
       border: `1.5px solid ${faceDown ? '#4a5070' : '#ccc'}`,
       borderRadius: 5, display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', fontSize: small ? '0.7rem' : '0.85rem', fontWeight: 700,
@@ -1376,6 +1538,7 @@ function TexasHoldemPanel() {
 // PvP対戦パネル
 // ============================================================
 function PvPPanel({ bet }: { bet: number }) {
+  const mobile = useIsMobile();
   const player = useGameStore(s => s.player);
   const changeWealthCoin = useGameStore(s => s.changeWealthCoin);
   const addNotification = useGameStore(s => s.addNotification);
@@ -1582,6 +1745,7 @@ const SLOT_TIERS = [
 
 // スロット専用パネル（固定台制・台別ジャックポット）
 function SlotPanel({ onResult, onJackpotContrib, multiplierBonus = 1.0, onLockChange }: { onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number; onLockChange?: (locked: boolean) => void }) {
+  const mobile = useIsMobile();
   const { player, changeWealthCoin, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeWealthCoin: s.changeWealthCoin, addItems: s.addItems, addNotification: s.addNotification }));
   const [selectedTier, setSelectedTier] = useState(0); // index into SLOT_TIERS
   const [result, setResult] = useState<GambleResult | null>(null);
@@ -4544,12 +4708,16 @@ export function GambleScreen() {
   const netProfit = stats.totalWon - stats.totalBet;
   const gambleRankInfo = getGambleRank(player.totalWagered ?? 0);
 
-  return (
-    <div style={{ padding: '12px 8px' }}>
-      <h2 style={{ fontFamily: 'Cinzel,serif', color: '#f0c060', marginBottom: 8, borderBottom: '1px solid #2d3752', paddingBottom: 8 }}>🎰 ギャンブル</h2>
+  const isMobile = useIsMobile();
 
-      {/* G/WC残高表示 */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10, background: '#1c2235', border: '1px solid #2d3752', borderRadius: 8, padding: '8px 12px', flexWrap: 'wrap', alignItems: 'center' }}>
+  return (
+    <div className="gamble-shell" style={{ padding: isMobile ? '10px 8px 18px' : '12px 8px' }}>
+      <style>{GAMBLE_UI_CSS}</style>
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <h2 className="gamble-main-title" style={{ fontFamily: 'Cinzel,serif', color: '#f0c060', marginBottom: 8, borderBottom: '1px solid #2d3752', paddingBottom: 8 }}>🎰 ギャンブル</h2>
+
+        {/* G/WC残高表示 */}
+        <div className="gamble-card gamble-balance" style={{ display: 'flex', gap: 8, marginBottom: 10, background: 'linear-gradient(135deg, rgba(28,34,53,0.95), rgba(22,27,38,0.95))', border: '1px solid #2d3752', borderRadius: 8, padding: '8px 12px', flexWrap: 'wrap', alignItems: 'center' }}>
         <span style={{ fontSize: '0.85rem', color: '#8a92b2' }}>💰 <span style={{ color: '#f0c060', fontWeight: 700 }}>{player.gold.toLocaleString()}G</span></span>
         <span style={{ color: '#2d3752' }}>|</span>
         <span style={{ fontSize: '0.85rem', color: '#8a92b2' }}>🪙 WC: <span style={{ color: '#4caf87', fontWeight: 700 }}>{(player.wealthCoin ?? 0).toLocaleString()}WC</span></span>
@@ -4558,7 +4726,7 @@ export function GambleScreen() {
       </div>
 
       {/* メインタブ */}
-      <div style={{ display: 'flex', gap: 3, marginBottom: 12, overflowX: 'auto', paddingBottom: 2 }}>
+      <div className="gamble-tabbar gamble-mainTabs" style={{ marginBottom: 12 }}>
         {([
           ['home','🏠','ホーム'],
           ['gamble','🎲','ゲーム'],
@@ -4570,7 +4738,8 @@ export function GambleScreen() {
           ['stock','📈','株式'],
         ] as [MainTab, string, string][]).map(([id, icon, name]) => (
           <button key={id} onClick={() => setMainTab(id)}
-            style={{ flexShrink: 0, padding: '6px 7px', fontSize: '0.68rem', fontWeight: 700, background: mainTab === id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${mainTab === id ? '#5b8dee' : '#2d3752'}`, color: mainTab === id ? '#e8e6ff' : '#8a92b2', borderRadius: 6, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+            className={mainTab === id ? 'gamble-active' : ''}
+            style={{ flexShrink: 0, padding: '6px 7px', fontSize: '0.68rem', fontWeight: 700, background: mainTab === id ? 'linear-gradient(135deg, rgba(91,141,238,0.30), rgba(91,141,238,0.16))' : '#1c2235', border: `1px solid ${mainTab === id ? '#5b8dee' : '#2d3752'}`, color: mainTab === id ? '#e8e6ff' : '#8a92b2', borderRadius: 8, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, boxShadow: mainTab === id ? '0 10px 24px rgba(91,141,238,0.22)' : 'none' }}>
             <span style={{fontSize:'0.9rem'}}>{icon}</span>
             <span>{name}</span>
           </button>
@@ -4679,16 +4848,17 @@ export function GambleScreen() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto', paddingBottom: 2 }}>
+      <div className="gamble-tabbar gamble-gameTabs" style={{ marginBottom: 12 }}>
         {GAME_TABS.map(t => (
           <button key={t.id} onClick={() => !isGambling && setActiveGame(t.id)}
-            style={{ flexShrink: 0, padding: '6px 10px', fontSize: '0.75rem', background: activeGame===t.id ? 'rgba(91,141,238,0.2)' : '#1c2235', border: `1px solid ${activeGame===t.id ? '#5b8dee' : '#2d3752'}`, color: activeGame===t.id ? '#e8e6ff' : isGambling ? '#4a5070' : '#8a92b2', borderRadius: 6, cursor: isGambling ? 'not-allowed' : 'pointer', opacity: isGambling && activeGame!==t.id ? 0.5 : 1 }}>
+            className={activeGame===t.id ? 'gamble-active' : ''}
+            style={{ flexShrink: 0, padding: '6px 10px', fontSize: '0.75rem', background: activeGame===t.id ? 'linear-gradient(135deg, rgba(91,141,238,0.28), rgba(91,141,238,0.16))' : '#1c2235', border: `1px solid ${activeGame===t.id ? '#5b8dee' : '#2d3752'}`, color: activeGame===t.id ? '#e8e6ff' : isGambling ? '#4a5070' : '#8a92b2', borderRadius: 8, cursor: isGambling ? 'not-allowed' : 'pointer', opacity: isGambling && activeGame!==t.id ? 0.5 : 1, boxShadow: activeGame===t.id ? '0 8px 18px rgba(91,141,238,0.18)' : 'none' }}>
             <GameIcon id={t.icon} size={15} style={{marginRight:3}} /> {t.label}
           </button>
         ))}
       </div>
 
-      <div style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 10, padding: 14 }}>
+      <div className="gamble-card gamble-panel" style={{ background: 'linear-gradient(180deg, rgba(28,34,53,0.96), rgba(22,27,38,0.96))', border: '1px solid #2d3752', borderRadius: 10, padding: 14 }}>
         {activeGame !== 'pvp' && (
           <div style={{ marginBottom: 10 }}>
             <div style={{ fontWeight: 700, fontSize: '1rem', display:'flex', alignItems:'center', gap:6 }}><GameIcon id={game.icon} size={20} /> {game.name}</div>
@@ -4745,6 +4915,7 @@ export function GambleScreen() {
         </details>
       )}
       </>}
+      </div>
     </div>
   );
 }
