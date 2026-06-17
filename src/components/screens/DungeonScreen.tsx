@@ -12,6 +12,8 @@ import { postActivityFeed, subscribeMonsterOverrides, subscribeDungeonOverrides,
 import type { MonsterOverride, DungeonOverride } from '../../services/multiplayer';
 import { TOOLS_MASTER } from '../../data/toolsMaster';
 import { TOOL_GACHA_TABLE } from '../../data/toolAcquisition';
+import { useCombatFx } from '../combat/useCombatFx';
+import { EnemyFxOverlay, SelfFxBadge, SelfFxBanner } from '../combat/CombatFx';
 
 // ============================================================
 // 戦闘ロジック（1ターン分）
@@ -404,6 +406,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
   const [showHotbar, setShowHotbar] = useState(false);
   const [hotbarModal, setHotbarModal] = useState<{slot:string;idx?:number} | null>(null);
   const [localEquip, setLocalEquip] = useState<EquipmentSlots>(equipment);
+  const combatFx = useCombatFx();
 
   // Fix 7: sync localEquip changes to store so they persist after battle
   const setLocalEquipAndSave = useCallback((updater: (prev: EquipmentSlots) => EquipmentSlots) => {
@@ -826,13 +829,26 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       reitoumaguroExtra.push({ text: `❄️ =冷海の覇魚=が発動！ 貫通${reitoumaguroPenetrateDmg}ダメージ追加！`, color: '#9b6df0' });
     }
 
+    const fxHits: { idx: number; damage: number; isCritical: boolean }[] = [];
     const newEnemies = battle.enemies.map((e, i) => {
       if (e.hp <= 0) return e;
       if (!isArea && i !== targetIdx) return e;
       const mon = getMergedMonster(e.monsterId);
       const dmg = (areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0)) + reitoumaguroPenetrateDmg;
+      fxHits.push({ idx: i, damage: dmg, isCritical: reitoumaguroPenetrateDmg > 0 });
       return { ...e, hp: Math.max(0, e.hp - dmg) };
     });
+    if (fxHits.length > 0) {
+      combatFx.triggerEnemyFx(battle.equippedWeaponId, fxHits);
+      for (const hit of fxHits) {
+        if (battle.enemies[hit.idx].hp > 0 && newEnemies[hit.idx].hp <= 0) {
+          combatFx.triggerDefeatFx(hit.idx);
+        }
+      }
+    }
+    if (frostbiteSkill || (penetrateChanceSkill && reitoumaguroPenetrateDmg > 0)) {
+      combatFx.triggerSelfFx(battle.equippedWeaponId, 'self');
+    }
 
     const totalDmg = battle.enemies.reduce((acc, e, i) => {
       if (e.hp <= 0) return acc;
@@ -996,9 +1012,20 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     }
 
     // 必殺技は全体攻撃
-    const newEnemies = battle.enemies.map(e =>
-      e.hp > 0 ? { ...e, hp: Math.max(0, e.hp - dmgTotal) } : e
-    );
+    const ultFxHits: { idx: number; damage: number; isCritical: boolean }[] = [];
+    const newEnemies = battle.enemies.map((e, i) => {
+      if (e.hp <= 0) return e;
+      ultFxHits.push({ idx: i, damage: dmgTotal, isCritical: true });
+      return { ...e, hp: Math.max(0, e.hp - dmgTotal) };
+    });
+    if (ultFxHits.length > 0) {
+      combatFx.triggerEnemyFx(battle.equippedWeaponId, ultFxHits, { isUltimate: true });
+      for (const hit of ultFxHits) {
+        if (battle.enemies[hit.idx].hp > 0 && newEnemies[hit.idx].hp <= 0) {
+          combatFx.triggerDefeatFx(hit.idx);
+        }
+      }
+    }
 
     // KXモード: 眷属討伐でKXにダメージ
     if (battle.kx && !battle.kx.isAwakened) {
@@ -1098,6 +1125,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       // Goliathシールド特別処理：攻撃ではなくシールド発動
       const goliathSkill = item.weaponSkills?.find(s => s.type === 'goliath_shield') as import('../../types/game').WeaponGoliathSkill | undefined;
       if (goliathSkill) {
+        combatFx.triggerSelfFx(itemId, 'self');
         const randomAliveIdx = battle.enemies.reduce<number[]>((acc, e, i) => e.hp > 0 ? [...acc, i] : acc, []);
         const finalStunIdx = randomAliveIdx.length > 0
           ? randomAliveIdx[Math.floor(Math.random() * randomAliveIdx.length)]
@@ -1228,11 +1256,21 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
             if (!silversKxWin) setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
             return;
           }
-          const { enemies: hitEnemies } = hitResults[hitIdx];
+          const { enemies: hitEnemies, prevEnemies: hitPrevEnemies } = hitResults[hitIdx];
           const hitLog = [...prevState.log, {
             text: `👁️ =Silvers eye= ${hitIdx + 1}撃目！（${hitIdx + 1}/${activations}）`,
             color: '#c0c8ff',
           }];
+          const silversFxHits: { idx: number; damage: number; isCritical: boolean }[] = [];
+          for (let i = 0; i < hitEnemies.length; i++) {
+            if (hitPrevEnemies[i].hp > 0) {
+              silversFxHits.push({ idx: i, damage: hitPrevEnemies[i].hp - hitEnemies[i].hp, isCritical: false });
+            }
+          }
+          if (silversFxHits.length > 0) combatFx.triggerEnemyFx(itemId, silversFxHits, { shake: hitIdx === 0 });
+          for (let i = 0; i < hitEnemies.length; i++) {
+            if (hitPrevEnemies[i].hp > 0 && hitEnemies[i].hp <= 0) combatFx.triggerDefeatFx(i);
+          }
           const nextState: TurnBattleState = {
             ...prevState,
             enemies: hitEnemies,
@@ -1264,13 +1302,21 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           const isAreaW = !!item.isAreaWeapon;
           const areaPen = item.areaPenetrate ?? 0;
           const atkBase = item.weaponAtk ?? (item.useEffect?.attackBonus ? player.stats.attack + item.useEffect.attackBonus : player.stats.attack);
+          const inlineFxHits: { idx: number; damage: number; isCritical: boolean }[] = [];
           const newEnemies = prev.enemies.map((e, i) => {
             if (e.hp <= 0) return e;
             if (!isAreaW && i !== targetIdx) return e;
             const mon = getMergedMonster(e.monsterId);
             const dmg = areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0);
+            inlineFxHits.push({ idx: i, damage: dmg, isCritical: false });
             return { ...e, hp: Math.max(0, e.hp - dmg) };
           });
+          if (inlineFxHits.length > 0) {
+            combatFx.triggerEnemyFx(itemId, inlineFxHits);
+            for (const hit of inlineFxHits) {
+              if (prev.enemies[hit.idx].hp > 0 && newEnemies[hit.idx].hp <= 0) combatFx.triggerDefeatFx(hit.idx);
+            }
+          }
           const msg = item.useEffect?.message ?? `${item.name}で攻撃した`;
           let logEntries: { text: string; color: string }[] = [{ text: `🗡️ ${msg}`, color: '#f0c060' }];
 
@@ -1342,6 +1388,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         const ok = consumeItem(itemId, 1);
         if (!ok) { addNotification('warning', `${item.name}が足りません`); return; }
       }
+      combatFx.triggerSelfFx(itemId, 'self');
       const { hpRestore, satietyRestore, message } = item.useEffect;
       if (hpRestore && hpRestore > 0) changeHp(hpRestore);
       if (satietyRestore && satietyRestore > 0) changeSatiety(satietyRestore);
@@ -1436,7 +1483,8 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
   const hpPct = (player.stats.hp / player.stats.maxHp) * 100;
 
   return (
-    <div style={{ background: '#161b26', border: '2px solid #e05555', borderRadius: 12, padding: 14 }}>
+    <div style={{ background: '#161b26', border: '2px solid #e05555', borderRadius: 12, padding: 14, overflow: 'hidden' }}>
+      <div key={combatFx.shakeKey} className={combatFx.shakeKey > 0 ? 'combatfx-shake' : undefined}>
       {/* ターゲット選択モーダル */}
       {battle.turn === 'select_target' && (
         <TargetSelectModal
@@ -1513,7 +1561,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           return (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, opacity: isDead ? 0.35 : 1 }}>
               <span style={{ fontSize: '2.2rem' }}><GameIcon id={monster?.icon ?? 'skull'} size={36} /></span>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, position: 'relative' }}>
                 <div style={{ fontWeight: 700, color: isDead ? '#4a5070' : '#e05555', fontSize: '0.88rem' }}>
                   {monster?.name ?? '?'}{monster?.isBoss && ' 👑'}{isDead && ' 💀'}
                 </div>
@@ -1521,6 +1569,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
                 <div style={{ height: 5, background: '#2d3752', borderRadius: 3, overflow: 'hidden' }}>
                   <div style={{ height: '100%', background: isDead ? '#4a5070' : '#e05555', width: `${mHpPct}%`, transition: 'width 0.3s' }} />
                 </div>
+                <EnemyFxOverlay fxList={combatFx.enemyFx[i] ?? []} />
               </div>
               {battle.turn === 'monster' && !battle.result && !isDead && (
                 <span style={{ fontSize: '1rem', animation: 'pulse 0.5s infinite' }}>⚡</span>
@@ -1600,11 +1649,13 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           })()}
 
           {/* ホットバーアイテム使用 */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap', position: 'relative' }}>
+            <SelfFxBanner fxList={combatFx.selfFx} />
             {localEquip.hotbar.map((itemId, i) => {
               const item = itemId ? ITEM_MASTER[itemId] : null;
               const qty = itemId ? (player.inventory[itemId] ?? 0) : 0;
               const cd = itemId ? (battle.itemCooldowns[itemId] ?? 0) : 0;
+              const isEquippedAndActive = !!itemId && itemId === battle.equippedWeaponId && combatFx.selfFx.length > 0;
               return (
                 <button key={i} onClick={() => handleUseHotbarItem(i)}
                   disabled={battle.turn !== 'player' || !item || qty === 0 || cd > 0}
@@ -1622,6 +1673,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
                           : <span style={{ position:'absolute', bottom:1, right:2, fontSize:'0.5rem', color:'#f0c060' }}>{qty}</span>}
                       </>
                     : <span style={{ fontSize: '0.6rem', color: '#4a5070' }}>{i+1}</span>}
+                  {isEquippedAndActive && <SelfFxBadge fxList={combatFx.selfFx} />}
                 </button>
               );
             })}
@@ -1634,6 +1686,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
               🏃 逃走
             </button>
           </div>
+
 
           {showHotbar && (
             <HotbarPanel equipment={localEquip} inventory={player.inventory}
@@ -1660,6 +1713,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           onClose={() => setHotbarModal(null)}
         />
       )}
+      </div>
     </div>
   );
 }
