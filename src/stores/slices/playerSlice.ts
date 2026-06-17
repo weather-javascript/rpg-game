@@ -20,10 +20,12 @@ export interface PlayerSlice {
   useItem:            (itemId: string) => { success: boolean; message: string };
   changeDisplayName:  (name: string) => boolean;
   updateEquipment:    (equipment: EquipmentSlots) => void;
-  setEquippedTool:    (category: 'mining' | 'woodcutting', toolId: string) => void;
+  setEquippedTool:    (category: 'mining' | 'woodcutting' | 'gathering' | 'herbalism' | 'insect', toolId: string) => void;
   addOwnedTool:       (toolId: string) => void;
   addUnlockedToolGroup: (groupId: string) => void;
   updateToolAcquisitionStats: (patch: Partial<{ totalGatherCount: number; maxCombo: number; nightGatherCount: number; rainGatherCount: number; dangerSuccessCount: number }>) => void;
+  updateGatherCombo:  (category: string, success: boolean) => void;
+  updateGatherCollection: (itemIds: string[], amounts: Record<string, number>) => void;
 }
 
 export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (set, get) => ({
@@ -205,7 +207,10 @@ export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (
       if (!state.player) return state;
       const equippedTools = { ...(state.player.equippedTools ?? { miningToolId: 'wood_yield_pickaxe', woodcuttingToolId: 'wood_yield_axe' }) };
       if (category === 'mining') equippedTools.miningToolId = toolId;
-      else equippedTools.woodcuttingToolId = toolId;
+      else if (category === 'woodcutting') equippedTools.woodcuttingToolId = toolId;
+      else if (category === 'gathering') equippedTools.gatheringToolId = toolId;
+      else if (category === 'herbalism') equippedTools.herbalismToolId = toolId;
+      else if (category === 'insect') equippedTools.insectToolId = toolId;
       return { player: { ...state.player, equippedTools } };
     });
   },
@@ -237,6 +242,35 @@ export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (
         totalGatherCount: 0, maxCombo: 0, nightGatherCount: 0, rainGatherCount: 0, dangerSuccessCount: 0,
       };
       return { player: { ...state.player, toolAcquisitionStats: { ...prev, ...patch } } };
+    });
+  },
+
+  updateGatherCombo: (category, success) => {
+    set((state) => {
+      if (!state.player) return state;
+      const prev = state.player.gatherCombo;
+      const now = Date.now();
+      if (!success) {
+        return { player: { ...state.player, gatherCombo: { category, count: 0, lastAt: now } } };
+      }
+      if (prev && prev.category === category && (now - prev.lastAt) < 30000) {
+        return { player: { ...state.player, gatherCombo: { category, count: prev.count + 1, lastAt: now } } };
+      }
+      return { player: { ...state.player, gatherCombo: { category, count: 1, lastAt: now } } };
+    });
+  },
+
+  updateGatherCollection: (itemIds, amounts) => {
+    set((state) => {
+      if (!state.player) return state;
+      const prev = state.player.gatherCollection ?? { discoveredItems: [], itemCounts: {} };
+      const discovered = new Set(prev.discoveredItems);
+      const counts = { ...prev.itemCounts };
+      for (const id of itemIds) {
+        discovered.add(id);
+        counts[id] = (counts[id] ?? 0) + (amounts[id] ?? 0);
+      }
+      return { player: { ...state.player, gatherCollection: { discoveredItems: [...discovered], itemCounts: counts } } };
     });
   },
 });
