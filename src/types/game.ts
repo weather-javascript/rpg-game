@@ -4,7 +4,8 @@ export type IdMap<T> = Record<string, T>;
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 export type ItemCategory = 'material' | 'tool' | 'consumable' | 'weapon' | 'armor' | 'treasure' | 'food' | 'potion' | 'bait';
 export type ItemType = 'Weapon' | 'Armor' | 'Item' | 'Heal';
-export type SkillId = 'mining' | 'woodcutting' | 'combat' | 'fishing' | 'crafting';
+export type SkillId = 'mining' | 'woodcutting' | 'combat' | 'fishing' | 'crafting' | 'gathering' | 'herbalism' | 'insect';
+export type GatherCategory = 'mining' | 'woodcutting' | 'gathering' | 'herbalism' | 'insect';
 
 // ============================================================
 // 共通バフ・デバフ型
@@ -287,7 +288,7 @@ export interface DropEntry {
 export interface ToolMaster {
   id: string;
   name: string;
-  category: 'mining' | 'woodcutting';
+  category: 'mining' | 'woodcutting' | 'gathering' | 'herbalism' | 'insect';
   material: 'wood' | 'stone' | 'iron' | 'gold' | 'mythril';
   type: 'speed' | 'yield' | 'rare' | 'combo' | 'efficiency';
   speedMultiplier: number;
@@ -309,6 +310,8 @@ export interface GatherNodeMaster {
   cooldownMs: number;
   drops: DropEntry[];
   staminaCost: number;
+  isDanger?: boolean;       // 危険ノード
+  dangerCategory?: 'danger_mining' | 'danger_wood' | 'danger_herb';
 }
 
 export interface DungeonArea {
@@ -442,8 +445,18 @@ export interface PlayerData {
   dungeonClearedCount: IdMap<number>;
   fishingScore: number;
   equippedRodId: string;
-  // 採取ツール装備（採掘・伐採）
-  equippedTools?: { miningToolId: string; woodcuttingToolId: string };
+  // 採取ツール装備（採掘・伐採・新カテゴリ）
+  equippedTools?: {
+    miningToolId: string;
+    woodcuttingToolId: string;
+    gatheringToolId?: string;
+    herbalismToolId?: string;
+    insectToolId?: string;
+  };
+  // 採取コンボ（カテゴリ別）
+  gatherCombo?: { category: string; count: number; lastAt: number };
+  // 採取図鑑
+  gatherCollection?: { discoveredItems: string[]; itemCounts: Record<string, number> };
   // 採取ツール所持・解放
   ownedToolIds?: string[];
   unlockedToolIds?: string[]; // 条件解放済みグループID ('unlock_basic','unlock_combo',...)
