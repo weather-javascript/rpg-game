@@ -6,7 +6,6 @@ import { GameIcon } from '../icons';
 import {
   fetchRecentlyUpdatedPages,
   fetchPopularPages,
-  fetchWikiPagesByCategory,
 } from '../../services/wikiService';
 import { recommendDungeonIdForLevel, getIconCandidateByRef } from './wikiMasterBridge';
 import { DUNGEON_MASTER } from '../../data/masters';

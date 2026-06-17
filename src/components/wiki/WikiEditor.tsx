@@ -15,7 +15,7 @@ import {
   slugify,
   WIKI_LIMITS,
 } from '../../services/wikiService';
-import { WIKI_CATEGORY_LABELS, type WikiCategory, type WikiPage, type WikiPageInput, type WikiTemplateId, type ContentBlock } from '../../types/wiki';
+import { WIKI_CATEGORY_LABELS, type WikiCategory, type WikiPageInput, type WikiTemplateId, type ContentBlock } from '../../types/wiki';
 
 const RECENT_ICON_STORAGE_KEY = 'wiki_recent_icon_refs';
 const RECENT_ICON_LIMIT = 16;
