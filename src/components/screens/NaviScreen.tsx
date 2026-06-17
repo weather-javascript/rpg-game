@@ -1,10 +1,13 @@
 // src/components/screens/NaviScreen.tsx
 // 冒険ナビゲーションシステム
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { DUNGEON_MASTER } from '../../data/masters';
 import type { PlayerData } from '../../types/game';
+import { WikiTab } from '../wiki/WikiTab';
+
+type NaviSubTab = 'navi' | 'wiki';
 
 // ダンジョン進行順（メインルート）
 const MAIN_DUNGEON_ORDER = [
@@ -154,6 +157,76 @@ function computeGoal(player: PlayerData): NaviGoal {
 }
 
 export function NaviScreen() {
+  const [subTab, setSubTab] = useState<NaviSubTab>(() => {
+    try {
+      const saved = localStorage.getItem('navi_sub_tab');
+      if (saved === 'navi' || saved === 'wiki') return saved;
+    } catch {
+      // ignore storage errors
+    }
+    return 'navi';
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('navi_sub_tab', subTab);
+    } catch {
+      // ignore storage errors
+    }
+  }, [subTab]);
+
+  const SUB_TABS: { id: NaviSubTab; label: string; hint: string }[] = [
+    { id: 'navi', label: '🧭 冒険ナビ', hint: '次にやることを見る' },
+    { id: 'wiki', label: '📖 攻略WIKI', hint: '検索・編集・履歴' },
+  ];
+
+  return (
+    <div style={{ padding: '12px 12px 0' }}>
+      <div style={{
+        marginBottom: 12,
+        padding: '12px 14px',
+        borderRadius: 12,
+        border: '1px solid #2d3752',
+        background: 'linear-gradient(135deg, #1a2035, #161b26)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: '1.02rem', fontWeight: 800, color: '#f0c060' }}>冒険ナビ</div>
+            <div style={{ fontSize: '0.74rem', color: '#8a92b2', marginTop: 2 }}>タブを切り替えて、行き先案内と攻略WIKIを使い分けられます。</div>
+          </div>
+          <div style={{ fontSize: '0.68rem', color: '#5b8dee', fontWeight: 700, padding: '4px 8px', borderRadius: 999, border: '1px solid #2d3752', background: 'rgba(91,141,238,0.10)' }}>2タブ</div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+          {SUB_TABS.map(t => {
+            const active = subTab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setSubTab(t.id)}
+                style={{
+                  width: '100%', padding: '12px 10px', borderRadius: 12, fontSize: '0.82rem', fontWeight: 800,
+                  border: `1px solid ${active ? '#5b8dee' : '#2d3752'}`,
+                  background: active ? 'rgba(91,141,238,0.18)' : '#161b26',
+                  color: active ? '#5b8dee' : '#c8d0e0',
+                  textAlign: 'left',
+                  lineHeight: 1.35,
+                }}
+              >
+                <div>{t.label}</div>
+                <div style={{ fontSize: '0.68rem', color: active ? '#a8c4ff' : '#8a92b2', marginTop: 3, fontWeight: 600 }}>{t.hint}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {subTab === 'navi' ? <NaviHomePanel onOpenWiki={() => setSubTab('wiki')} /> : <WikiTab />}
+    </div>
+  );
+}
+
+function NaviHomePanel({ onOpenWiki }: { onOpenWiki: () => void }) {
   const player = useGameStore(s => s.player);
   const setActiveTab = useGameStore(s => s.setActiveTab);
   const changeGold = useGameStore(s => s.changeGold);
@@ -295,6 +368,16 @@ export function NaviScreen() {
               🎉 報酬を受け取る
             </button>
           )}
+          <button
+            onClick={onOpenWiki}
+            style={{
+              flex: 1, padding: '10px 0', borderRadius: 8, border: '1px solid #2d3752', cursor: 'pointer', fontWeight: 700,
+              fontSize: '0.85rem',
+              background: '#161b26', color: '#f0c060',
+            }}
+          >
+            📖 WIKIを開く
+          </button>
         </div>
       </div>
 
