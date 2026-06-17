@@ -1538,7 +1538,6 @@ function TexasHoldemPanel() {
 // PvP対戦パネル
 // ============================================================
 function PvPPanel({ bet }: { bet: number }) {
-  const mobile = useIsMobile();
   const player = useGameStore(s => s.player);
   const changeWealthCoin = useGameStore(s => s.changeWealthCoin);
   const addNotification = useGameStore(s => s.addNotification);
@@ -1745,7 +1744,6 @@ const SLOT_TIERS = [
 
 // スロット専用パネル（固定台制・台別ジャックポット）
 function SlotPanel({ onResult, onJackpotContrib, multiplierBonus = 1.0, onLockChange }: { onResult: (r: GambleResult) => void; onJackpotContrib: (bet: number) => void; multiplierBonus?: number; onLockChange?: (locked: boolean) => void }) {
-  const mobile = useIsMobile();
   const { player, changeWealthCoin, addItems, addNotification } = useGameStore(s => ({ player: s.player, changeWealthCoin: s.changeWealthCoin, addItems: s.addItems, addNotification: s.addNotification }));
   const [selectedTier, setSelectedTier] = useState(0); // index into SLOT_TIERS
   const [result, setResult] = useState<GambleResult | null>(null);
