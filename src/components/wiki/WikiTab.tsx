@@ -103,7 +103,7 @@ export function WikiTab() {
   }
 
   return (
-    <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+    <div className="wiki-tab-root" style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
       {/* 左カラム：カテゴリ・最近更新ナビ（モバイルは折りたたみ） */}
       <button
         className="wiki-sidebar-toggle"
@@ -212,6 +212,28 @@ export function WikiTab() {
       )}
 
       <style>{`
+        .wiki-tab-root input,
+        .wiki-tab-root textarea,
+        .wiki-tab-root [contenteditable="true"] {
+          background: #ffffff !important;
+          color: #111827 !important;
+          caret-color: #111827 !important;
+          border-color: #cbd5e1 !important;
+        }
+
+        .wiki-tab-root input::placeholder,
+        .wiki-tab-root textarea::placeholder {
+          color: #6b7280 !important;
+          opacity: 1 !important;
+        }
+
+        .wiki-tab-root input:focus,
+        .wiki-tab-root textarea:focus,
+        .wiki-tab-root [contenteditable="true"]:focus {
+          outline: none !important;
+          box-shadow: 0 0 0 2px rgba(91, 141, 238, 0.18) !important;
+        }
+
         @media (max-width: 700px) {
           .wiki-sidebar-toggle { display: block !important; }
           .wiki-sidebar { display: none !important; }
