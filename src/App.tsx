@@ -61,6 +61,26 @@ const LOADING_HINTS = [
   '🌟 星を配置しています',
 ];
 
+const TABNAV_CSS = `
+  @keyframes tabnav-glow {
+    0%, 100% { opacity: .55; transform: scaleX(.96); }
+    50% { opacity: 1; transform: scaleX(1); }
+  }
+  @keyframes tabnav-float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-2px); }
+  }
+  @keyframes tabnav-sheen {
+    0% { transform: translateX(-120%) skewX(-18deg); opacity: 0; }
+    20% { opacity: .75; }
+    100% { transform: translateX(220%) skewX(-18deg); opacity: 0; }
+  }
+  @keyframes tabnav-breathe {
+    0%, 100% { box-shadow: 0 0 0 rgba(240,192,96,0); }
+    50% { box-shadow: 0 0 22px rgba(240,192,96,.18); }
+  }
+`;
+
 const LOADING_SCREEN_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap');
 
@@ -778,29 +798,97 @@ function TabNav({ activeTab, setTab }: { activeTab: TabId; setTab: (t: TabId) =>
   const locked = (isFishingLocked && activeTab === 'fishing') || (isGatheringLocked && activeTab === 'gathering');
   const lockLabel = isGatheringLocked && activeTab === 'gathering' ? '⛏️ 採掘中…' : '🎣 釣り中…';
   return (
-    <nav style={{ display:'flex', background:'#161b26', borderTop:'1px solid #2d3752', position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:900, zIndex:100 }}>
-      {locked && (
-        <div style={{ position:'absolute', inset:0, background:'rgba(13,15,20,0.55)', zIndex:10, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'all', cursor:'not-allowed' }}>
-          <span style={{ fontSize:'0.7rem', color:'#8a92b2', letterSpacing:1 }}>{lockLabel}</span>
-        </div>
-      )}
-      {TABS.map(tab => (
-        <button
-          key={tab.id}
-          onClick={() => { if (!locked) setTab(tab.id); }}
-          style={{
-            flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2, padding:'7px 2px',
-            background:'transparent', color: activeTab === tab.id ? '#f0c060' : '#8a92b2',
-            border:'none', borderTop:`2px solid ${activeTab === tab.id ? '#f0c060' : 'transparent'}`,
-            cursor: locked ? 'not-allowed' : 'pointer', fontSize:'0.6rem', transition:'all 0.2s',
-            opacity: locked && tab.id !== 'fishing' ? 0.4 : 1,
-          }}
-        >
-          <span style={{ display:'flex', alignItems:'center', justifyContent:'center' }}><GameIcon id={tab.icon} size={20} /></span>
-          <span>{tab.label}</span>
-        </button>
-      ))}
-    </nav>
+    <>
+      <style>{TABNAV_CSS}</style>
+      <nav
+        style={{
+          display:'flex',
+          position:'fixed',
+          bottom:0,
+          left:'50%',
+          transform:'translateX(-50%)',
+          width:'100%',
+          maxWidth:900,
+          zIndex:100,
+          padding:'7px 8px 8px',
+          gap:6,
+          background:'linear-gradient(180deg, rgba(15,18,28,0.92), rgba(11,14,22,0.98))',
+          borderTop:'1px solid rgba(61,71,98,0.9)',
+          boxShadow:'0 -10px 28px rgba(0,0,0,0.35)',
+          backdropFilter:'blur(10px)',
+          WebkitBackdropFilter:'blur(10px)',
+          animation:'tabnav-breathe 3.6s ease-in-out infinite',
+        }}
+      >
+        {locked && (
+          <div style={{ position:'absolute', inset:0, background:'rgba(13,15,20,0.55)', zIndex:10, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'all', cursor:'not-allowed' }}>
+            <span style={{ fontSize:'0.7rem', color:'#8a92b2', letterSpacing:1 }}>{lockLabel}</span>
+          </div>
+        )}
+        {TABS.map(tab => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => { if (!locked) setTab(tab.id); }}
+              className={isActive ? 'tabnav-item tabnav-item-active' : 'tabnav-item'}
+              style={{
+                flex:1,
+                display:'flex',
+                flexDirection:'column',
+                alignItems:'center',
+                justifyContent:'center',
+                gap:4,
+                minHeight:54,
+                padding:'8px 2px 7px',
+                background:isActive ? 'linear-gradient(180deg, rgba(255,255,255,0.08), rgba(240,192,96,0.08))' : 'linear-gradient(180deg, rgba(28,34,53,0.72), rgba(22,27,38,0.72))',
+                color: isActive ? '#ffe0a0' : '#8a92b2',
+                border:'1px solid',
+                borderColor: isActive ? 'rgba(240,192,96,0.55)' : 'rgba(45,55,82,0.9)',
+                borderRadius:14,
+                cursor: locked ? 'not-allowed' : 'pointer',
+                fontSize:'0.62rem',
+                position:'relative',
+                overflow:'hidden',
+                transform: isActive ? 'translateY(-6px) scale(1.03)' : 'translateY(0px) scale(1)',
+                boxShadow: isActive
+                  ? '0 10px 24px rgba(240,192,96,0.18), 0 0 0 1px rgba(240,192,96,0.18) inset'
+                  : '0 4px 14px rgba(0,0,0,0.18)',
+                transition:'transform 180ms ease, box-shadow 180ms ease, background 180ms ease, color 180ms ease, border-color 180ms ease, filter 180ms ease',
+                opacity: locked && tab.id !== 'fishing' ? 0.45 : 1,
+                filter: isActive ? 'saturate(1.18)' : 'saturate(0.94)',
+              }}
+            >
+              <span
+                style={{
+                  position:'absolute',
+                  inset:'auto 10% 0',
+                  height:2,
+                  borderRadius:999,
+                  background:isActive ? 'linear-gradient(90deg, rgba(240,192,96,0), rgba(240,192,96,1), rgba(240,192,96,0))' : 'transparent',
+                  animation:isActive ? 'tabnav-glow 1.9s ease-in-out infinite' : 'none',
+                }}
+              />
+              <span
+                style={{
+                  position:'absolute',
+                  top:-18,
+                  left:'-35%',
+                  width:'70%',
+                  height:'180%',
+                  background:'linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent)',
+                  transform:'translateX(-120%) skewX(-18deg)',
+                  animation:isActive ? 'tabnav-sheen 2.8s ease-in-out infinite' : 'none',
+                  pointerEvents:'none',
+                }}
+              />
+              <span style={{ display:'flex', alignItems:'center', justifyContent:'center', transform: isActive ? 'translateY(-1px)' : 'translateY(0)', transition:'transform 180ms ease', animation: isActive ? 'tabnav-float 1.9s ease-in-out infinite' : 'none' }}><GameIcon id={tab.icon} size={20} /></span>
+              <span style={{ fontWeight: isActive ? 700 : 500, letterSpacing:isActive ? '0.04em' : '0.02em', textShadow:isActive ? '0 0 10px rgba(240,192,96,0.25)' : 'none' }}>{tab.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+    </>
   );
 }
 
