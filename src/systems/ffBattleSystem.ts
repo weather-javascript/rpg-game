@@ -42,7 +42,7 @@ export function createTriggerEnemy(encounterProfileId: string): FFBattleEnemy | 
 // ============================================================
 export function spawnEnemiesAfterTrigger(
   encounterProfileId: string,
-  nodeId: string,
+  _nodeId: string,
 ): FFBattleEnemy[] {
   const profile = FFGG_ENCOUNTER_TABLE[encounterProfileId];
   if (!profile) return [];
@@ -331,7 +331,7 @@ function collectDrops(def: FFGGEnemyDefinition | undefined): {
 
 export function executeFFHarvest(
   harvestNode: FreeFieldHarvestNode,
-  playerId: string,
+  _playerId: string,
 ): FFHarvestResult {
   const items: { itemId: string; displayName: string; amount: number }[] = [];
 
