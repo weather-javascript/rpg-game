@@ -99,10 +99,12 @@ export interface FreeFieldNodeAction {
   feverType?: FreeFieldFeverType;
   /** フィーバー発生条件説明 (fever のみ) */
   feverConditionText?: string;
+  /** エンカウンタープロファイルID（battleTrigger のみ、省略時はareaIdを使用） */
+  encounterProfileId?: string;
 }
 
 // ──────────────────────────────────────────────
-// ノードインタラクション（アクション実行時の状態管理用スタブ）
+// ノードインタラクション（アクション実行時の状態管理用）
 // ──────────────────────────────────────────────
 export interface FreeFieldNodeInteraction {
   nodeId: string;
@@ -121,6 +123,71 @@ export interface FreeFieldNodeAccessRule {
   requiresQuestComplete?: string;
   requiresLevel?: number;
   description?: string;
+}
+
+// ──────────────────────────────────────────────
+// FF専用採集ノード
+// ──────────────────────────────────────────────
+export interface FreeFieldHarvestNode {
+  id: string;
+  displayName: string;
+  areaId: string;
+  /** 採集できるアイテム */
+  items: FreeFieldHarvestItem[];
+  /** 採集回数上限（リセットまで） */
+  maxUses?: number;
+  /** クールダウン（秒） */
+  cooldownSeconds?: number;
+  /** 必要ツールID */
+  requiredToolId?: string;
+  /** 危険度 1-5（高いと戦闘が割り込む可能性） */
+  dangerLevel?: number;
+}
+
+export interface FreeFieldHarvestItem {
+  itemId: string;
+  displayName: string;
+  baseRate: number;    // 0.0-1.0
+  minAmount: number;
+  maxAmount: number;
+  isRare?: boolean;
+}
+
+// ──────────────────────────────────────────────
+// FF専用ワープターゲット
+// ──────────────────────────────────────────────
+export interface FreeFieldWarpTarget {
+  targetType: 'node' | 'area' | 'world';
+  targetId: string;
+  displayName: string;
+  hidden?: boolean;
+  requiresCondition?: FreeFieldUnlockCondition;
+}
+
+// ──────────────────────────────────────────────
+// FF専用戦闘トリガー設定
+// ──────────────────────────────────────────────
+export interface FreeFieldBattleTrigger {
+  /** トリガー敵ID（ffggMaster の FFGG_ALL_ENEMIES キー） */
+  triggerEnemyId: string;
+  /** スポーン敵プール（triggerEnemyId 撃破後に出る） */
+  spawnEnemyIds: string[];
+  /** スポーン数 min/max */
+  spawnMin: number;
+  spawnMax: number;
+  /** スポーン発生確率 (0-1) */
+  spawnChance: number;
+  /** 最大同時出現上限 */
+  maxConcurrent: number;
+}
+
+// ──────────────────────────────────────────────
+// FF専用ショップリンク
+// ──────────────────────────────────────────────
+export interface FreeFieldShopLink {
+  shopId: string;
+  displayName: string;
+  // TODO: ショップアイテムリストは仕様確定後に追加
 }
 
 // ──────────────────────────────────────────────
@@ -228,4 +295,47 @@ export interface FreeFieldCodexEntry {
   skillsText?: string;
   strategyText?: string;
   notes?: string;
+}
+
+// ──────────────────────────────────────────────
+// FF採集結果
+// ──────────────────────────────────────────────
+export interface FFHarvestResult {
+  nodeId: string;
+  items: { itemId: string; displayName: string; amount: number }[];
+  triggeredCombat: boolean;
+  message: string;
+}
+
+// ──────────────────────────────────────────────
+// FFバトルセッション（インラインバトル用）
+// ──────────────────────────────────────────────
+export interface FFBattleSession {
+  nodeId: string;
+  areaId: string;
+  encounterProfileId?: string;
+  phase: 'trigger' | 'spawn' | 'done';
+  triggerEnemyId: string;
+  triggerEnemyHp: number;
+  triggerEnemyMaxHp: number;
+  spawnedEnemies: FFBattleEnemy[];
+  currentEnemyIdx: number;
+  log: string[];
+  playerHp: number;
+  playerMaxHp: number;
+  turn: 'player' | 'enemy' | 'result';
+  result: 'win' | 'lose' | 'escaped' | null;
+  drops: { itemId: string; displayName: string; amount: number }[];
+  expGained: number;
+  goldGained: number;
+}
+
+export interface FFBattleEnemy {
+  defId: string;
+  name: string;
+  hp: number;
+  maxHp: number;
+  attack: number;
+  defense: number;
+  drops: { itemId: string; baseRate: number; minAmount: number; maxAmount: number }[];
 }
