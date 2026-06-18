@@ -23,7 +23,7 @@ import type {
   FFBattleSession,
   FFHarvestResult,
 } from '../../types/freefield';
-import { FFGG_ENCOUNTER_TABLE, FFGG_ALL_ENEMIES, FFGG_FEVER_DEFINITIONS } from '../../data/ffggMaster';
+import { FFGG_ENCOUNTER_TABLE, FFGG_ALL_ENEMIES } from '../../data/ffggMaster';
 import { useGameStore } from '../../stores/gameStore';
 import {
   initFFBattleSession,
@@ -627,7 +627,7 @@ function FFTesterModal({ onClose }: { onClose: () => void }) {
 // ────────────────────────────────────────────
 // フィーバー状態モーダル
 // ────────────────────────────────────────────
-function FFFeverModal({ action, onClose }: { action: FreeFieldNodeAction; onClose: () => void }) {
+function FFFeverModal({ action: _action, onClose }: { action: FreeFieldNodeAction; onClose: () => void }) {
   // TODO: ドラゴンソール蓄積量は playerSlice 拡張後に取得
   const dragonSoulCurrent = 0; // TODO: useGameStore(s => s.player?.dragonSoulCount ?? 0)
   const dragonSoulTarget = 30000;
