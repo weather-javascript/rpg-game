@@ -4,6 +4,7 @@
 // GatheringScreen には混ぜない。向き依存表現は使わない。
 
 import { useState, useMemo, useCallback } from 'react';
+import { FFBattleUI } from '../combat/UnifiedBattleUI';
 import {
   FREE_FIELD_WORLDS,
   FREE_FIELD_AREAS_ALL,
@@ -330,170 +331,6 @@ function AreaSelector({
           {a.displayName}
         </button>
       ))}
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────
-// FF専用バトルモーダル
-// ────────────────────────────────────────────
-function FFBattleModal({
-  session,
-  onPlayerAttack,
-  onEscape,
-  onClose,
-}: {
-  session: FFBattleSession;
-  onPlayerAttack: () => void;
-  onEscape: () => void;
-  onClose: () => void;
-}) {
-  const playerHpPct = Math.max(0, (session.playerHp / session.playerMaxHp) * 100);
-  const isResult = session.result !== null;
-
-  const currentEnemy = session.phase === 'trigger'
-    ? { name: FFGG_ALL_ENEMIES[session.triggerEnemyId]?.name ?? '???', hp: session.triggerEnemyHp, maxHp: session.triggerEnemyMaxHp }
-    : session.phase === 'spawn' && session.spawnedEnemies[session.currentEnemyIdx]
-      ? session.spawnedEnemies[session.currentEnemyIdx]
-      : null;
-
-  const totalEnemies = session.phase === 'spawn' ? session.spawnedEnemies.length : 1;
-  const currentIdx = session.phase === 'spawn' ? session.currentEnemyIdx + 1 : 1;
-
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-    }}>
-      <div style={{
-        background: '#0f1420', border: '2px solid #e06050', borderRadius: 12,
-        padding: 18, maxWidth: 420, width: '100%', maxHeight: '90vh', overflowY: 'auto',
-      }}>
-        {/* ヘッダー */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div style={{ color: '#e06050', fontWeight: 700, fontSize: '0.95rem' }}>
-            ⚔️ FF フィールドバトル
-            {session.phase === 'trigger' && <span style={{ marginLeft: 6, fontSize: '0.75rem', color: '#ff8060' }}>【戦闘トリガー】</span>}
-            {session.phase === 'spawn' && <span style={{ marginLeft: 6, fontSize: '0.75rem', color: '#ff6060' }}>【スポーン {currentIdx}/{totalEnemies}体】</span>}
-            {session.phase === 'done' && <span style={{ marginLeft: 6, fontSize: '0.75rem', color: '#60c060' }}>【戦闘終了】</span>}
-          </div>
-          {isResult && (
-            <button onClick={onClose} style={{ background: 'none', border: '1px solid #3d4772', borderRadius: 4, color: '#8a92b2', cursor: 'pointer', padding: '2px 8px', fontSize: '0.70rem' }}>
-              閉じる
-            </button>
-          )}
-        </div>
-
-        {/* 自分のHP */}
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: '0.72rem', color: '#8a92b2', marginBottom: 2 }}>
-            自分のHP: {session.playerHp} / {session.playerMaxHp}
-          </div>
-          <div style={{ background: '#1a2030', borderRadius: 4, height: 10, overflow: 'hidden' }}>
-            <div style={{
-              height: '100%', width: `${playerHpPct}%`,
-              background: playerHpPct > 50 ? '#40c060' : playerHpPct > 25 ? '#f0c040' : '#e04040',
-              transition: 'width 0.2s',
-            }} />
-          </div>
-        </div>
-
-        {/* 敵情報 */}
-        {currentEnemy && (
-          <div style={{
-            background: 'rgba(224,96,80,0.10)', border: '1px solid #e06050',
-            borderRadius: 8, padding: '8px 10px', marginBottom: 10,
-          }}>
-            <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#ff8060', marginBottom: 4 }}>
-              👾 {currentEnemy.name}
-            </div>
-            <div style={{ fontSize: '0.72rem', color: '#8a92b2', marginBottom: 2 }}>
-              HP: {currentEnemy.hp} / {currentEnemy.maxHp}
-            </div>
-            <div style={{ background: '#1a2030', borderRadius: 4, height: 8, overflow: 'hidden' }}>
-              <div style={{
-                height: '100%',
-                width: `${Math.max(0, (currentEnemy.hp / currentEnemy.maxHp) * 100)}%`,
-                background: '#e04040',
-                transition: 'width 0.2s',
-              }} />
-            </div>
-          </div>
-        )}
-
-        {/* 戦闘ログ */}
-        <div style={{
-          background: '#080c14', border: '1px solid #2d3752', borderRadius: 6,
-          padding: '6px 8px', marginBottom: 10, maxHeight: 140, overflowY: 'auto',
-          fontSize: '0.70rem', lineHeight: 1.6,
-        }}>
-          {session.log.slice(-8).map((line, i) => (
-            <div key={i} style={{ color: line.includes('💥') || line.includes('✅') || line.includes('🎉') ? '#80d0a0' : line.includes('🗡️') || line.includes('💔') ? '#e08060' : '#b0b8d0' }}>
-              {line}
-            </div>
-          ))}
-        </div>
-
-        {/* 結果表示 */}
-        {isResult && (
-          <div style={{
-            background: session.result === 'win' ? 'rgba(60,160,80,0.15)' : session.result === 'escaped' ? 'rgba(160,100,200,0.15)' : 'rgba(160,60,60,0.15)',
-            border: `1px solid ${session.result === 'win' ? '#40c060' : session.result === 'escaped' ? '#a060d0' : '#c04040'}`,
-            borderRadius: 8, padding: '8px 10px', marginBottom: 10,
-          }}>
-            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: session.result === 'win' ? '#60d080' : session.result === 'escaped' ? '#c080ff' : '#e06060', marginBottom: 4 }}>
-              {session.result === 'win' ? '🎉 勝利！' : session.result === 'escaped' ? '💨 逃走成功' : '💔 敗北'}
-            </div>
-            {session.result === 'win' && (
-              <>
-                <div style={{ fontSize: '0.72rem', color: '#8a92b2' }}>EXP: +{session.expGained}　Gold: +{session.goldGained}</div>
-                {session.drops.length > 0 && (
-                  <div style={{ marginTop: 4 }}>
-                    <div style={{ fontSize: '0.65rem', color: '#6a7290', marginBottom: 2 }}>💎 ドロップ</div>
-                    {session.drops.map((d, i) => (
-                      <div key={i} style={{ fontSize: '0.68rem', color: '#70c090' }}>
-                        {d.displayName} × {d.amount}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* 行動ボタン */}
-        {!isResult && session.turn === 'player' && (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button
-              onClick={onPlayerAttack}
-              style={{
-                flex: 1, padding: '8px 0', borderRadius: 6, cursor: 'pointer',
-                background: 'rgba(224,96,80,0.18)', border: '1px solid #e06050',
-                color: '#e06050', fontWeight: 700, fontSize: '0.78rem',
-              }}
-            >
-              ⚔️ 攻撃
-            </button>
-            <button
-              onClick={onEscape}
-              style={{
-                flex: 1, padding: '8px 0', borderRadius: 6, cursor: 'pointer',
-                background: 'rgba(160,100,200,0.15)', border: '1px solid #a060d0',
-                color: '#a060d0', fontWeight: 700, fontSize: '0.78rem',
-              }}
-            >
-              💨 逃げる
-            </button>
-          </div>
-        )}
-
-        {!isResult && session.turn === 'enemy' && (
-          <div style={{ textAlign: 'center', color: '#e08060', fontSize: '0.75rem', padding: '8px 0' }}>
-            敵のターン...
-          </div>
-        )}
-      </div>
     </div>
   );
 }
@@ -1480,14 +1317,21 @@ export function FreeFieldScreen() {
 
   return (
     <div style={{ padding: '4px 0 80px' }}>
-      {/* バトルモーダル */}
+      {/* バトルUI（ダンジョン戦闘と統一されたデザイン） */}
       {battleSession && (
-        <FFBattleModal
-          session={battleSession}
-          onPlayerAttack={handlePlayerAttack}
-          onEscape={handleEscape}
-          onClose={handleBattleClose}
-        />
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+        }}>
+          <div style={{ maxWidth: 420, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <FFBattleUI
+              session={battleSession}
+              onPlayerAttack={handlePlayerAttack}
+              onEscape={handleEscape}
+              onClose={handleBattleClose}
+            />
+          </div>
+        </div>
       )}
       {/* 採集結果モーダル */}
       {harvestResult && (
