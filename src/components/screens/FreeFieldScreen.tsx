@@ -1,11 +1,14 @@
 // src/components/screens/FreeFieldScreen.tsx
-// フリーフィールド地図 UI（ノードアクション表示・各システム接続フェーズ）
+// フリーフィールド画面 — ノードアクション完全実装版
+// 戦闘・採集・ワープ・ショップ・釣り・テスターを FreeField 内で動かす。
+// GatheringScreen には混ぜない。向き依存表現は使わない。
 
 import { useState, useMemo, useCallback } from 'react';
 import {
   FREE_FIELD_WORLDS,
   FREE_FIELD_AREAS_ALL,
   FREE_FIELD_NODES_ALL,
+  FFGG_HARVEST_NODES,
   getAreasByWorld,
   getNodesByWorld,
   getNodesByArea,
@@ -17,9 +20,18 @@ import type {
   FreeFieldNodeType,
   FreeFieldNodeAction,
   FreeFieldNodeActionType,
+  FFBattleSession,
+  FFHarvestResult,
 } from '../../types/freefield';
 import { FFGG_ENCOUNTER_TABLE, FFGG_ALL_ENEMIES, FFGG_FEVER_DEFINITIONS } from '../../data/ffggMaster';
 import { useGameStore } from '../../stores/gameStore';
+import {
+  initFFBattleSession,
+  playerAttack as doPlayerAttack,
+  enemyTurn as doEnemyTurn,
+  tryEscape,
+  executeFFHarvest,
+} from '../../systems/ffBattleSystem';
 
 // ────────────────────────────────────────────
 // アクション種別の表示設定
@@ -146,14 +158,9 @@ function NodePin({
   );
 }
 
-// ────────────────────────────────────────────
-// ノードラベル
-// ────────────────────────────────────────────
 function NodeLabel({ node, selected }: { node: FreeFieldNode; selected: boolean }) {
   const cfg = NODE_CFG[node.type];
-  const shortName = node.indexLabel
-    ? `${node.indexLabel}`
-    : node.displayName.slice(0, 4);
+  const shortName = node.indexLabel ? `${node.indexLabel}` : node.displayName.slice(0, 4);
   return (
     <div
       style={{
@@ -178,9 +185,6 @@ function NodeLabel({ node, selected }: { node: FreeFieldNode; selected: boolean 
   );
 }
 
-// ────────────────────────────────────────────
-// エリア背景バッジ
-// ────────────────────────────────────────────
 const AREA_COLORS: Record<string, string> = {
   ffgg_forest:  'rgba(20,60,20,0.32)',
   ffgg_plain:   'rgba(50,60,20,0.28)',
@@ -191,9 +195,6 @@ const AREA_COLORS: Record<string, string> = {
   ffgg_special: 'rgba(40,20,60,0.28)',
 };
 
-// ────────────────────────────────────────────
-// 地図View
-// ────────────────────────────────────────────
 function MapView({
   world,
   activeAreaId,
@@ -334,6 +335,408 @@ function AreaSelector({
 }
 
 // ────────────────────────────────────────────
+// FF専用バトルモーダル
+// ────────────────────────────────────────────
+function FFBattleModal({
+  session,
+  onPlayerAttack,
+  onEscape,
+  onClose,
+}: {
+  session: FFBattleSession;
+  onPlayerAttack: () => void;
+  onEscape: () => void;
+  onClose: () => void;
+}) {
+  const playerHpPct = Math.max(0, (session.playerHp / session.playerMaxHp) * 100);
+  const isResult = session.result !== null;
+
+  const currentEnemy = session.phase === 'trigger'
+    ? { name: FFGG_ALL_ENEMIES[session.triggerEnemyId]?.name ?? '???', hp: session.triggerEnemyHp, maxHp: session.triggerEnemyMaxHp }
+    : session.phase === 'spawn' && session.spawnedEnemies[session.currentEnemyIdx]
+      ? session.spawnedEnemies[session.currentEnemyIdx]
+      : null;
+
+  const totalEnemies = session.phase === 'spawn' ? session.spawnedEnemies.length : 1;
+  const currentIdx = session.phase === 'spawn' ? session.currentEnemyIdx + 1 : 1;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }}>
+      <div style={{
+        background: '#0f1420', border: '2px solid #e06050', borderRadius: 12,
+        padding: 18, maxWidth: 420, width: '100%', maxHeight: '90vh', overflowY: 'auto',
+      }}>
+        {/* ヘッダー */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ color: '#e06050', fontWeight: 700, fontSize: '0.95rem' }}>
+            ⚔️ FF フィールドバトル
+            {session.phase === 'trigger' && <span style={{ marginLeft: 6, fontSize: '0.75rem', color: '#ff8060' }}>【戦闘トリガー】</span>}
+            {session.phase === 'spawn' && <span style={{ marginLeft: 6, fontSize: '0.75rem', color: '#ff6060' }}>【スポーン {currentIdx}/{totalEnemies}体】</span>}
+            {session.phase === 'done' && <span style={{ marginLeft: 6, fontSize: '0.75rem', color: '#60c060' }}>【戦闘終了】</span>}
+          </div>
+          {isResult && (
+            <button onClick={onClose} style={{ background: 'none', border: '1px solid #3d4772', borderRadius: 4, color: '#8a92b2', cursor: 'pointer', padding: '2px 8px', fontSize: '0.70rem' }}>
+              閉じる
+            </button>
+          )}
+        </div>
+
+        {/* 自分のHP */}
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: '0.72rem', color: '#8a92b2', marginBottom: 2 }}>
+            自分のHP: {session.playerHp} / {session.playerMaxHp}
+          </div>
+          <div style={{ background: '#1a2030', borderRadius: 4, height: 10, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', width: `${playerHpPct}%`,
+              background: playerHpPct > 50 ? '#40c060' : playerHpPct > 25 ? '#f0c040' : '#e04040',
+              transition: 'width 0.2s',
+            }} />
+          </div>
+        </div>
+
+        {/* 敵情報 */}
+        {currentEnemy && (
+          <div style={{
+            background: 'rgba(224,96,80,0.10)', border: '1px solid #e06050',
+            borderRadius: 8, padding: '8px 10px', marginBottom: 10,
+          }}>
+            <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#ff8060', marginBottom: 4 }}>
+              👾 {currentEnemy.name}
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#8a92b2', marginBottom: 2 }}>
+              HP: {currentEnemy.hp} / {currentEnemy.maxHp}
+            </div>
+            <div style={{ background: '#1a2030', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                width: `${Math.max(0, (currentEnemy.hp / currentEnemy.maxHp) * 100)}%`,
+                background: '#e04040',
+                transition: 'width 0.2s',
+              }} />
+            </div>
+          </div>
+        )}
+
+        {/* 戦闘ログ */}
+        <div style={{
+          background: '#080c14', border: '1px solid #2d3752', borderRadius: 6,
+          padding: '6px 8px', marginBottom: 10, maxHeight: 140, overflowY: 'auto',
+          fontSize: '0.70rem', lineHeight: 1.6,
+        }}>
+          {session.log.slice(-8).map((line, i) => (
+            <div key={i} style={{ color: line.includes('💥') || line.includes('✅') || line.includes('🎉') ? '#80d0a0' : line.includes('🗡️') || line.includes('💔') ? '#e08060' : '#b0b8d0' }}>
+              {line}
+            </div>
+          ))}
+        </div>
+
+        {/* 結果表示 */}
+        {isResult && (
+          <div style={{
+            background: session.result === 'win' ? 'rgba(60,160,80,0.15)' : session.result === 'escaped' ? 'rgba(160,100,200,0.15)' : 'rgba(160,60,60,0.15)',
+            border: `1px solid ${session.result === 'win' ? '#40c060' : session.result === 'escaped' ? '#a060d0' : '#c04040'}`,
+            borderRadius: 8, padding: '8px 10px', marginBottom: 10,
+          }}>
+            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: session.result === 'win' ? '#60d080' : session.result === 'escaped' ? '#c080ff' : '#e06060', marginBottom: 4 }}>
+              {session.result === 'win' ? '🎉 勝利！' : session.result === 'escaped' ? '💨 逃走成功' : '💔 敗北'}
+            </div>
+            {session.result === 'win' && (
+              <>
+                <div style={{ fontSize: '0.72rem', color: '#8a92b2' }}>EXP: +{session.expGained}　Gold: +{session.goldGained}</div>
+                {session.drops.length > 0 && (
+                  <div style={{ marginTop: 4 }}>
+                    <div style={{ fontSize: '0.65rem', color: '#6a7290', marginBottom: 2 }}>💎 ドロップ</div>
+                    {session.drops.map((d, i) => (
+                      <div key={i} style={{ fontSize: '0.68rem', color: '#70c090' }}>
+                        {d.displayName} × {d.amount}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* 行動ボタン */}
+        {!isResult && session.turn === 'player' && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={onPlayerAttack}
+              style={{
+                flex: 1, padding: '8px 0', borderRadius: 6, cursor: 'pointer',
+                background: 'rgba(224,96,80,0.18)', border: '1px solid #e06050',
+                color: '#e06050', fontWeight: 700, fontSize: '0.78rem',
+              }}
+            >
+              ⚔️ 攻撃
+            </button>
+            <button
+              onClick={onEscape}
+              style={{
+                flex: 1, padding: '8px 0', borderRadius: 6, cursor: 'pointer',
+                background: 'rgba(160,100,200,0.15)', border: '1px solid #a060d0',
+                color: '#a060d0', fontWeight: 700, fontSize: '0.78rem',
+              }}
+            >
+              💨 逃げる
+            </button>
+          </div>
+        )}
+
+        {!isResult && session.turn === 'enemy' && (
+          <div style={{ textAlign: 'center', color: '#e08060', fontSize: '0.75rem', padding: '8px 0' }}>
+            敵のターン...
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
+// FF採集モーダル
+// ────────────────────────────────────────────
+function FFHarvestModal({
+  result,
+  onClose,
+}: {
+  result: FFHarvestResult;
+  onClose: () => void;
+}) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.80)', zIndex: 1000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }}>
+      <div style={{
+        background: '#0f1420', border: '2px solid #40c080', borderRadius: 12,
+        padding: 18, maxWidth: 360, width: '100%',
+      }}>
+        <div style={{ fontWeight: 700, color: '#40c080', fontSize: '0.95rem', marginBottom: 10 }}>
+          🌿 FF採集結果
+        </div>
+        <div style={{ fontSize: '0.80rem', color: '#b0b8d0', marginBottom: 10, lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+          {result.message}
+        </div>
+        {result.items.length > 0 && (
+          <div style={{ marginBottom: 10 }}>
+            {result.items.map((item, i) => (
+              <div key={i} style={{
+                background: 'rgba(64,192,128,0.10)', border: '1px solid #40c080',
+                borderRadius: 6, padding: '4px 8px', marginBottom: 4,
+                fontSize: '0.78rem', color: '#70e0a0',
+              }}>
+                ✅ {item.displayName} × {item.amount}
+              </div>
+            ))}
+          </div>
+        )}
+        {result.triggeredCombat && (
+          <div style={{
+            background: 'rgba(224,96,80,0.12)', border: '1px solid #e06050',
+            borderRadius: 6, padding: '4px 8px', marginBottom: 10,
+            fontSize: '0.72rem', color: '#e08060',
+          }}>
+            ⚠️ 採集中に敵が出現した！（戦闘は別途「戦う」ボタンから）
+          </div>
+        )}
+        <button
+          onClick={onClose}
+          style={{
+            width: '100%', padding: '7px 0', borderRadius: 6, cursor: 'pointer',
+            background: 'rgba(64,192,128,0.15)', border: '1px solid #40c080',
+            color: '#40c080', fontWeight: 700, fontSize: '0.78rem',
+          }}
+        >
+          閉じる
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
+// テスターモーダル
+// ────────────────────────────────────────────
+function FFTesterModal({ onClose }: { onClose: () => void }) {
+  const player = useGameStore(s => s.player);
+  const atk = player?.stats?.attack ?? 0;
+  const def = player?.stats?.defense ?? 0;
+  const hp = player?.stats?.hp ?? 0;
+  const maxHp = player?.stats?.maxHp ?? 0;
+
+  // 仮想ダミー敵に対するダメージ計算
+  const dummyDef = 20;
+  const dmg = Math.max(1, atk - Math.floor(dummyDef * 0.5));
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.80)', zIndex: 1000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }}>
+      <div style={{
+        background: '#0f1420', border: '2px solid #8080a0', borderRadius: 12,
+        padding: 18, maxWidth: 380, width: '100%',
+      }}>
+        <div style={{ fontWeight: 700, color: '#8080a0', fontSize: '0.95rem', marginBottom: 12 }}>
+          🔬 武器テスター
+        </div>
+
+        <div style={{ background: 'rgba(40,45,70,0.6)', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
+          <div style={{ fontSize: '0.75rem', color: '#8a92b2', marginBottom: 6, fontWeight: 700 }}>現在のステータス</div>
+          <div style={{ fontSize: '0.72rem', color: '#b0b8d0', lineHeight: 1.8 }}>
+            <div>⚔️ 攻撃力: {atk}</div>
+            <div>🛡️ 防御力: {def}</div>
+            <div>❤️ HP: {hp} / {maxHp}</div>
+          </div>
+        </div>
+
+        <div style={{ background: 'rgba(128,128,160,0.12)', border: '1px solid #8080a0', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
+          <div style={{ fontSize: '0.75rem', color: '#a0a0c0', marginBottom: 6, fontWeight: 700 }}>ダミー目標（防御20）への推定ダメージ</div>
+          <div style={{ fontSize: '1.1rem', color: '#c0c0e0', fontWeight: 700 }}>約 {dmg} ダメージ</div>
+          <div style={{ fontSize: '0.65rem', color: '#6a7290', marginTop: 4 }}>
+            計算式: 攻撃力({atk}) - 防御({dummyDef})×0.5 = {dmg}
+          </div>
+        </div>
+
+        <div style={{ fontSize: '0.65rem', color: '#606880', marginBottom: 12 }}>
+          {/* TODO: 実際の武器別ダメージ計算・スキル試用は仕様確定後に追加 */}
+          ※ テスターは参考値を表示します。実際の戦闘では敵の防御力・スキルによって変動します。
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{
+            width: '100%', padding: '7px 0', borderRadius: 6, cursor: 'pointer',
+            background: 'rgba(128,128,160,0.15)', border: '1px solid #8080a0',
+            color: '#8080a0', fontWeight: 700, fontSize: '0.78rem',
+          }}
+        >
+          閉じる
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
+// フィーバー状態モーダル
+// ────────────────────────────────────────────
+function FFFeverModal({ action, onClose }: { action: FreeFieldNodeAction; onClose: () => void }) {
+  // TODO: ドラゴンソール蓄積量は playerSlice 拡張後に取得
+  const dragonSoulCurrent = 0; // TODO: useGameStore(s => s.player?.dragonSoulCount ?? 0)
+  const dragonSoulTarget = 30000;
+  const progress = Math.min(1, dragonSoulCurrent / dragonSoulTarget);
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.80)', zIndex: 1000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }}>
+      <div style={{
+        background: '#0f1420', border: '2px solid #ff8020', borderRadius: 12,
+        padding: 18, maxWidth: 380, width: '100%',
+      }}>
+        <div style={{ fontWeight: 700, color: '#ff8020', fontSize: '0.95rem', marginBottom: 12 }}>
+          🔥 ドラゴンフィーバー状態
+        </div>
+
+        <div style={{ background: 'rgba(255,128,32,0.10)', border: '1px solid #ff8020', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
+          <div style={{ fontSize: '0.75rem', color: '#ffa060', marginBottom: 6 }}>ドラゴンソール蓄積量</div>
+          <div style={{ fontSize: '0.70rem', color: '#c08040', marginBottom: 4 }}>
+            {dragonSoulCurrent.toLocaleString()} / {dragonSoulTarget.toLocaleString()}
+          </div>
+          <div style={{ background: '#1a2030', borderRadius: 4, height: 10, overflow: 'hidden', marginBottom: 6 }}>
+            <div style={{
+              height: '100%', width: `${progress * 100}%`,
+              background: 'linear-gradient(90deg, #ff8020, #ffd040)',
+            }} />
+          </div>
+          {dragonSoulCurrent >= dragonSoulTarget
+            ? <div style={{ fontSize: '0.72rem', color: '#ff6020', fontWeight: 700 }}>🔥 ドラゴンフィーバー発動可能！</div>
+            : <div style={{ fontSize: '0.65rem', color: '#806040' }}>残り: {(dragonSoulTarget - dragonSoulCurrent).toLocaleString()}</div>
+          }
+        </div>
+
+        <div style={{ fontSize: '0.65rem', color: '#606880', marginBottom: 12 }}>
+          {/* TODO: ドラゴンソール蓄積・フィーバー発動ロジックは playerSlice 拡張後に実装 */}
+          ※ ドラゴンソールは敵撃破で蓄積されます。30000に達するとドラゴンフィーバーが発動します。
+          発動ロジックは実装準備中です。
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{
+            width: '100%', padding: '7px 0', borderRadius: 6, cursor: 'pointer',
+            background: 'rgba(255,128,32,0.15)', border: '1px solid #ff8020',
+            color: '#ff8020', fontWeight: 700, fontSize: '0.78rem',
+          }}
+        >
+          閉じる
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
+// ランドマーク情報モーダル
+// ────────────────────────────────────────────
+function FFLandmarkModal({ node, action, onClose }: { node: FreeFieldNode; action: FreeFieldNodeAction; onClose: () => void }) {
+  const cfg = NODE_CFG[node.type];
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.80)', zIndex: 1000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }}>
+      <div style={{
+        background: '#0f1420', border: `2px solid ${cfg.color}`, borderRadius: 12,
+        padding: 18, maxWidth: 380, width: '100%',
+      }}>
+        <div style={{ fontWeight: 700, color: cfg.color, fontSize: '0.95rem', marginBottom: 8 }}>
+          {cfg.emoji} {node.indexLabel} {node.displayName}
+        </div>
+        <div style={{ fontSize: '0.78rem', color: '#b0b8d0', lineHeight: 1.6, marginBottom: 10 }}>
+          {action.description ?? node.description ?? 'この地点の詳細情報はありません。'}
+        </div>
+        {node.encounterHints && node.encounterHints.length > 0 && (
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: '0.65rem', color: '#e06050', marginBottom: 4 }}>⚔️ 出現モブ情報</div>
+            {node.encounterHints.map((h, i) => (
+              <div key={i} style={{ fontSize: '0.68rem', color: '#b0a090', lineHeight: 1.5 }}>• {h}</div>
+            ))}
+          </div>
+        )}
+        {node.resourceHints && node.resourceHints.length > 0 && (
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: '0.65rem', color: '#40c080', marginBottom: 4 }}>🌿 素材情報</div>
+            {node.resourceHints.map((h, i) => (
+              <div key={i} style={{ fontSize: '0.68rem', color: '#80c0a0', lineHeight: 1.5 }}>• {h}</div>
+            ))}
+          </div>
+        )}
+        <button
+          onClick={onClose}
+          style={{
+            width: '100%', padding: '7px 0', borderRadius: 6, cursor: 'pointer',
+            background: `rgba(${cfg.color.replace(/[^,\d]/g, '')},0.12)`,
+            border: `1px solid ${cfg.color}`,
+            color: cfg.color, fontWeight: 700, fontSize: '0.78rem',
+          }}
+        >
+          閉じる
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
 // アクションボタン
 // ────────────────────────────────────────────
 function ActionButton({
@@ -345,7 +748,6 @@ function ActionButton({
 }) {
   const cfg = ACTION_CFG[action.type];
   const hasUnlock = (action.unlockConditions ?? []).length > 0;
-  const isTodo = action.description?.includes('TODO') || action.label.includes('TODO');
 
   return (
     <div style={{
@@ -367,27 +769,21 @@ function ActionButton({
               隠し
             </span>
           )}
-          {isTodo && (
-            <span style={{ fontSize: '0.58rem', color: '#806040', background: 'rgba(60,45,15,0.4)', borderRadius: 3, padding: '1px 4px' }}>
-              TODO
-            </span>
-          )}
         </div>
         <button
           onClick={() => onExecute(action)}
-          disabled={isTodo}
           style={{
             padding: '3px 10px',
             fontSize: '0.68rem',
             borderRadius: 5,
-            cursor: isTodo ? 'not-allowed' : 'pointer',
-            background: isTodo ? 'rgba(40,44,60,0.4)' : `rgba(${cfg.color.replace(/[^,\d]/g, '')},0.15)`,
-            border: `1px solid ${isTodo ? '#3d4772' : cfg.color}`,
-            color: isTodo ? '#505870' : cfg.color,
+            cursor: 'pointer',
+            background: `rgba(${cfg.color.slice(1).match(/.{2}/g)?.map(x => parseInt(x,16)).join(',') ?? '255,255,255'},0.15)`,
+            border: `1px solid ${action.hidden ? '#3d4772' : cfg.color}`,
+            color: action.hidden ? '#505870' : cfg.color,
             fontWeight: 600,
           }}
         >
-          {isTodo ? '🚧未実装' : `${cfg.emoji} 実行`}
+          {cfg.emoji} 実行
         </button>
       </div>
 
@@ -397,7 +793,6 @@ function ActionButton({
         </div>
       )}
 
-      {/* アクション固有情報 */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
         {action.triggerMode && (
           <span style={{ fontSize: '0.60rem', color: action.triggerMode === 'auto' ? '#e06050' : '#6090c0', background: 'rgba(30,35,55,0.5)', borderRadius: 3, padding: '1px 5px' }}>
@@ -419,11 +814,6 @@ function ActionButton({
             ⏱ CD: {action.cooldownSeconds}s
           </span>
         )}
-        {action.onceOnly && (
-          <span style={{ fontSize: '0.60rem', color: '#a060a0', background: 'rgba(30,20,40,0.5)', borderRadius: 3, padding: '1px 5px' }}>
-            🔑一度限り
-          </span>
-        )}
         {action.feverType && (
           <span style={{ fontSize: '0.60rem', color: '#ff8020', background: 'rgba(40,20,10,0.4)', borderRadius: 3, padding: '1px 5px' }}>
             🔥 {action.feverType === 'dragon' ? 'ドラゴンフィーバー' : action.feverType === 'red' ? 'レッドフィーバー' : 'ゴールドフィーバー'}
@@ -443,7 +833,6 @@ function ActionButton({
         )}
       </div>
 
-      {/* 解放条件 */}
       {hasUnlock && (
         <div style={{ marginTop: 4 }}>
           {(action.unlockConditions ?? []).map((c, i) => (
@@ -454,7 +843,6 @@ function ActionButton({
         </div>
       )}
 
-      {/* 報酬ヒント */}
       {(action.rewardHints ?? []).length > 0 && (
         <div style={{ marginTop: 4 }}>
           <div style={{ fontSize: '0.60rem', color: '#6a7290', marginBottom: 2 }}>💎 報酬ヒント</div>
@@ -472,91 +860,81 @@ function ActionButton({
 }
 
 // ────────────────────────────────────────────
-// アクション実行ハンドラ（既存システム接続）
-// ────────────────────────────────────────────
-function useActionHandler() {
-  const setActiveTab = useGameStore(s => s.setActiveTab);
-
-  const handleAction = useCallback((action: FreeFieldNodeAction, _node: FreeFieldNode) => {
-    switch (action.type) {
-      case 'fishing':
-        // 既存釣り画面へ接続
-        setActiveTab('fishing');
-        break;
-      case 'harvest':
-        // 既存採取画面へ接続
-        setActiveTab('gathering');
-        break;
-      case 'shop':
-        // TODO: 既存ショップUIへの接続（shopId別に分岐）
-        // 現状はmarket画面へ
-        setActiveTab('market');
-        break;
-      case 'battleTrigger':
-        // TODO: 既存ダンジョン/戦闘システムへのフック
-        // DungeonScreenのダンジョン選択を経由する想定
-        setActiveTab('dungeon');
-        break;
-      case 'test':
-        // TODO: テスターUI（未実装）
-        // 現状はダンジョンタブへ
-        setActiveTab('dungeon');
-        break;
-      case 'warp':
-        // TODO: ノード間移動・ワープ処理（未実装）
-        // 現状はアラートのみ
-        if (action.targetWorldId) {
-          alert(`TODO: ワールド遷移 → ${action.targetWorldId}\n（遷移実装未定）`);
-        }
-        // ノード内移動はFreeFieldScreen側で処理
-        break;
-      case 'fever':
-        // TODO: フィーバー発生ロジック（未実装）
-        alert(`TODO: フィーバー発生\n条件: ${action.feverConditionText ?? '未確定'}`);
-        break;
-      case 'landmark':
-        // 地点情報表示（パネル内に表示済みのため何もしない）
-        break;
-      case 'hidden':
-        // TODO: 隠し要素の解放チェック（未実装）
-        alert('TODO: 隠し要素の解放条件チェックは未実装');
-        break;
-      default:
-        break;
-    }
-  }, [setActiveTab]);
-
-  return handleAction;
-}
-
-// ────────────────────────────────────────────
-// アクション一覧パネル
+// アクション一覧パネル（実行ハンドラ付き）
 // ────────────────────────────────────────────
 function NodeActionsPanel({
   node,
   onWarpToNode,
+  onBattleStart,
+  onHarvestStart,
+  onFishingStart,
+  onTestStart,
+  onShopStart,
+  onFeverStart,
+  onLandmarkStart,
 }: {
   node: FreeFieldNode;
   onWarpToNode?: (nodeId: string) => void;
+  onBattleStart: (action: FreeFieldNodeAction, node: FreeFieldNode) => void;
+  onHarvestStart: (action: FreeFieldNodeAction, node: FreeFieldNode) => void;
+  onFishingStart: () => void;
+  onTestStart: () => void;
+  onShopStart: () => void;
+  onFeverStart: (action: FreeFieldNodeAction) => void;
+  onLandmarkStart: (action: FreeFieldNodeAction) => void;
 }) {
-  const handleAction = useActionHandler();
   const actions = node.actions ?? [];
-
-  // hidden アクションは条件未確定のものも含めて薄く表示
-  const visibleActions = actions.filter(a => !a.hidden || true); // 全部表示（TODOで薄く）
+  const visibleActions = actions; // 全部表示（hidden は薄く）
 
   if (visibleActions.length === 0) return null;
 
-  // アクション種別サマリー（このノードでできること）
   const typeSet = new Set(actions.map(a => a.type));
   const hasBattle = typeSet.has('battleTrigger');
   const hasHarvest = typeSet.has('harvest');
   const hasFever = typeSet.has('fever');
   const warpActions = actions.filter(a => a.type === 'warp');
 
+  const handleExecute = (action: FreeFieldNodeAction) => {
+    switch (action.type) {
+      case 'battleTrigger':
+        onBattleStart(action, node);
+        break;
+      case 'harvest':
+        onHarvestStart(action, node);
+        break;
+      case 'warp':
+        if (action.targetNodeId && onWarpToNode) {
+          onWarpToNode(action.targetNodeId);
+        } else if (action.targetWorldId) {
+          // TODO: ワールド間遷移は実装準備中
+          alert(`FF ワールド遷移: ${action.targetWorldId}\n（TODO: World 間遷移の実装方針が決まったら接続を更新する）`);
+        }
+        break;
+      case 'fishing':
+        onFishingStart();
+        break;
+      case 'test':
+        onTestStart();
+        break;
+      case 'shop':
+        onShopStart();
+        break;
+      case 'fever':
+        onFeverStart(action);
+        break;
+      case 'landmark':
+        onLandmarkStart(action);
+        break;
+      case 'hidden':
+        // TODO: 隠し要素の解放条件チェックは未実装
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
     <div style={{ marginTop: 10 }}>
-      {/* このノードでできること サマリー */}
       <div style={{
         background: 'rgba(20,26,42,0.8)',
         border: '1px solid #2d3752',
@@ -574,7 +952,7 @@ function NodeActionsPanel({
               <span key={t} style={{
                 fontSize: '0.65rem',
                 color: cfg.color,
-                background: `rgba(${cfg.color.slice(1).match(/.{2}/g)!.map(x => parseInt(x,16)).join(',')}, 0.12)`,
+                background: `rgba(${cfg.color.slice(1).match(/.{2}/g)?.map(x => parseInt(x,16)).join(',') ?? '255,255,255'}, 0.12)`,
                 border: `1px solid ${cfg.color}`,
                 borderRadius: 5,
                 padding: '2px 7px',
@@ -586,7 +964,7 @@ function NodeActionsPanel({
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6, fontSize: '0.62rem', color: '#6a7290' }}>
           {hasBattle && <span>⚔️ 戦闘あり</span>}
-          {hasHarvest && <span>🌿 採取あり</span>}
+          {hasHarvest && <span>🌿 採取あり（FF専用）</span>}
           {hasFever && <span style={{ color: '#ff8020' }}>🔥 フィーバー関連</span>}
           {warpActions.length > 0 && (
             <span style={{ color: '#a060d0' }}>
@@ -600,7 +978,6 @@ function NodeActionsPanel({
         </div>
       </div>
 
-      {/* アクションボタン一覧 */}
       <div style={{ fontSize: '0.68rem', color: '#8a92b2', marginBottom: 5, fontWeight: 700 }}>
         🎮 アクション
       </div>
@@ -608,12 +985,7 @@ function NodeActionsPanel({
         <ActionButton
           key={idx}
           action={action}
-          onExecute={(a) => {
-            if (a.type === 'warp' && a.targetNodeId && onWarpToNode) {
-              onWarpToNode(a.targetNodeId);
-            }
-            handleAction(a, node);
-          }}
+          onExecute={handleExecute}
         />
       ))}
     </div>
@@ -627,10 +999,24 @@ function NodeDetailPanel({
   node,
   onClose,
   onWarpToNode,
+  onBattleStart,
+  onHarvestStart,
+  onFishingStart,
+  onTestStart,
+  onShopStart,
+  onFeverStart,
+  onLandmarkStart,
 }: {
   node: FreeFieldNode;
   onClose: () => void;
   onWarpToNode?: (nodeId: string) => void;
+  onBattleStart: (action: FreeFieldNodeAction, node: FreeFieldNode) => void;
+  onHarvestStart: (action: FreeFieldNodeAction, node: FreeFieldNode) => void;
+  onFishingStart: () => void;
+  onTestStart: () => void;
+  onShopStart: () => void;
+  onFeverStart: (action: FreeFieldNodeAction) => void;
+  onLandmarkStart: (action: FreeFieldNodeAction) => void;
 }) {
   const cfg = NODE_CFG[node.type];
   const area = FREE_FIELD_AREAS_ALL[node.areaId];
@@ -648,7 +1034,6 @@ function NodeDetailPanel({
       padding: 14,
       marginTop: 10,
     }}>
-      {/* ヘッダー */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: '0.95rem', color: cfg.color }}>
@@ -670,27 +1055,15 @@ function NodeDetailPanel({
         </button>
       </div>
 
-      {/* 種別・エリア */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: '0.70rem', color: '#8a92b2', marginBottom: 8 }}>
-        <span>
-          種別: <span style={{ color: cfg.color }}>{cfg.label}</span>
-        </span>
-        {area && (
-          <span>
-            エリア: <span style={{ color: '#9090c0' }}>{area.displayName}</span>
-          </span>
-        )}
+        <span>種別: <span style={{ color: cfg.color }}>{cfg.label}</span></span>
+        {area && <span>エリア: <span style={{ color: '#9090c0' }}>{area.displayName}</span></span>}
         {node.dangerLevel != null && (
-          <span style={{ color: '#c06040' }}>
-            危険度: {'⭐'.repeat(node.dangerLevel)}
-          </span>
+          <span style={{ color: '#c06040' }}>危険度: {'⭐'.repeat(node.dangerLevel)}</span>
         )}
-        {node.isSafeZone && (
-          <span style={{ color: '#60a060' }}>✅ 安全地帯</span>
-        )}
+        {node.isSafeZone && <span style={{ color: '#60a060' }}>✅ 安全地帯</span>}
       </div>
 
-      {/* 説明 */}
       {node.description && (
         <div style={{ fontSize: '0.78rem', color: '#b0b8d0', marginBottom: 8, lineHeight: 1.55 }}>
           {node.description}
@@ -698,7 +1071,17 @@ function NodeDetailPanel({
       )}
 
       {/* アクション一覧 ← メイン */}
-      <NodeActionsPanel node={node} onWarpToNode={onWarpToNode} />
+      <NodeActionsPanel
+        node={node}
+        onWarpToNode={onWarpToNode}
+        onBattleStart={onBattleStart}
+        onHarvestStart={onHarvestStart}
+        onFishingStart={onFishingStart}
+        onTestStart={onTestStart}
+        onShopStart={onShopStart}
+        onFeverStart={onFeverStart}
+        onLandmarkStart={onLandmarkStart}
+      />
 
       {/* 接続先 */}
       {connectedNodes.length > 0 && (
@@ -729,7 +1112,6 @@ function NodeDetailPanel({
         </div>
       )}
 
-      {/* タグ */}
       {node.tags && node.tags.length > 0 && (
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
           {node.tags.map(t => (
@@ -740,7 +1122,6 @@ function NodeDetailPanel({
         </div>
       )}
 
-      {/* 詳細情報トグル */}
       <button
         onClick={() => setShowDetail(v => !v)}
         style={{
@@ -749,7 +1130,7 @@ function NodeDetailPanel({
           borderRadius: 5, color: '#6a7290', fontSize: '0.65rem', cursor: 'pointer',
         }}
       >
-        {showDetail ? '▲ 詳細情報を閉じる' : '▼ 詳細情報を見る（ヒント・メモ）'}
+        {showDetail ? '▲ 詳細情報を閉じる' : '▼ 詳細情報を見る（ヒント・エンカウンター）'}
       </button>
 
       {showDetail && (
@@ -785,7 +1166,7 @@ function NodeDetailPanel({
             </div>
           )}
 
-          {/* FFGG エンカウンター情報パネル */}
+          {/* FFGGエンカウンター情報パネル */}
           {(() => {
             const profile = FFGG_ENCOUNTER_TABLE[node.areaId];
             if (!profile) return null;
@@ -804,13 +1185,6 @@ function NodeDetailPanel({
                 {midBoss && <div style={{ color: '#c060c0', marginBottom: 2 }}>⚡ 中ボス: {midBoss}</div>}
                 {boss && <div style={{ color: '#e05555', marginBottom: 2 }}>💀 ボス: {boss}</div>}
                 {feverChancePct > 0 && <div style={{ color: '#ff8020', marginBottom: 2 }}>🔥 フィーバー発生率: {feverChancePct}%</div>}
-                <div style={{ color: '#6090c0', marginBottom: 2 }}>
-                  🔥 フィーバー種別: {Object.values(FFGG_FEVER_DEFINITIONS).filter(f => {
-                    if (node.areaId === 'ffgg_plain') return f.type === 'red' || f.type === 'dragon';
-                    if (node.areaId === 'ffgg_savanna') return f.type === 'red' || f.type === 'dragon';
-                    return f.type === 'gold';
-                  }).map(f => f.displayName).join(' / ')}
-                </div>
               </div>
             );
           })()}
@@ -861,12 +1235,122 @@ function NodeListPanel({
 }
 
 // ────────────────────────────────────────────
+// FF採集タブ（FreeField専用・GatheringScreen非使用）
+// ────────────────────────────────────────────
+function FFHarvestTab() {
+  const [lastResult, setLastResult] = useState<FFHarvestResult | null>(null);
+  const [harvesting, setHarvesting] = useState<string | null>(null);
+  const addNotification = useGameStore(s => s.addNotification);
+
+  const handleHarvest = (nodeId: string) => {
+    const harvestNode = FFGG_HARVEST_NODES[nodeId];
+    if (!harvestNode) return;
+    setHarvesting(nodeId);
+
+    setTimeout(() => {
+      const result = executeFFHarvest(harvestNode, 'player');
+      setLastResult(result);
+      setHarvesting(null);
+
+      if (result.items.length > 0) {
+        addNotification('success', `FF採集: ${result.items.map(i => `${i.displayName}×${i.amount}`).join(', ')}`);
+      } else {
+        addNotification('info', 'FF採集: 何も見つからなかった');
+      }
+    }, 800);
+  };
+
+  return (
+    <div>
+      <div style={{ fontSize: '0.75rem', color: '#40c080', fontWeight: 700, marginBottom: 10 }}>
+        🌿 FF専用採集スポット
+      </div>
+      <div style={{ fontSize: '0.65rem', color: '#6a7290', marginBottom: 10 }}>
+        ※ FF採集は通常採取タブとは別の専用システムです。各エリアのノードの採集アクションからも実行できます。
+      </div>
+
+      {Object.values(FFGG_HARVEST_NODES).map(hnode => (
+        <div key={hnode.id} style={{
+          background: '#161b26', border: '1px solid #2d3752', borderRadius: 8,
+          padding: '10px 12px', marginBottom: 8,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <div>
+              <div style={{ fontSize: '0.80rem', fontWeight: 700, color: '#40c080' }}>{hnode.displayName}</div>
+              <div style={{ fontSize: '0.65rem', color: '#6a7290' }}>
+                エリア: {FREE_FIELD_AREAS_ALL[hnode.areaId]?.displayName ?? hnode.areaId}
+                {hnode.dangerLevel != null && ` | 危険度: ${'⭐'.repeat(hnode.dangerLevel)}`}
+                {hnode.cooldownSeconds != null && hnode.cooldownSeconds > 0 && ` | CD: ${hnode.cooldownSeconds}s`}
+              </div>
+            </div>
+            <button
+              onClick={() => handleHarvest(hnode.id)}
+              disabled={harvesting === hnode.id}
+              style={{
+                padding: '5px 12px', borderRadius: 6, cursor: harvesting === hnode.id ? 'not-allowed' : 'pointer',
+                background: harvesting === hnode.id ? 'rgba(40,44,60,0.4)' : 'rgba(64,192,128,0.15)',
+                border: '1px solid #40c080', color: '#40c080', fontWeight: 600, fontSize: '0.72rem',
+              }}
+            >
+              {harvesting === hnode.id ? '採集中...' : '🌿 採集'}
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {hnode.items.map((item, i) => (
+              <span key={i} style={{
+                fontSize: '0.60rem', padding: '1px 6px',
+                background: item.isRare ? 'rgba(255,180,20,0.12)' : 'rgba(40,60,40,0.4)',
+                border: `1px solid ${item.isRare ? '#f0c060' : '#3d5040'}`,
+                borderRadius: 4, color: item.isRare ? '#f0c060' : '#70c090',
+              }}>
+                {item.displayName} {Math.round(item.baseRate * 100)}%
+                {item.isRare && ' ★'}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {lastResult && (
+        <div style={{
+          background: lastResult.items.length > 0 ? 'rgba(64,192,128,0.10)' : 'rgba(40,44,60,0.4)',
+          border: `1px solid ${lastResult.items.length > 0 ? '#40c080' : '#3d4772'}`,
+          borderRadius: 8, padding: '10px 12px', marginTop: 8,
+        }}>
+          <div style={{ fontSize: '0.72rem', color: '#8a92b2', marginBottom: 4 }}>最後の採集結果</div>
+          <div style={{ fontSize: '0.72rem', color: '#b0b8d0', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+            {lastResult.message}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
 // メイン
 // ────────────────────────────────────────────
 export function FreeFieldScreen() {
   const [selectedWorldId, setSelectedWorldId] = useState<string>(FREE_FIELD_WORLDS[0].id);
   const [activeAreaId, setActiveAreaId] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<FreeFieldNode | null>(null);
+  const [activeTab, setActiveTab] = useState<'map' | 'harvest'>('map');
+
+  // モーダル状態
+  const [battleSession, setBattleSession] = useState<FFBattleSession | null>(null);
+  const [harvestResult, setHarvestResult] = useState<FFHarvestResult | null>(null);
+  const [showTester, setShowTester] = useState(false);
+  const [feverAction, setFeverAction] = useState<FreeFieldNodeAction | null>(null);
+  const [landmarkAction, setLandmarkAction] = useState<{ action: FreeFieldNodeAction; node: FreeFieldNode } | null>(null);
+
+  const player = useGameStore(s => s.player);
+  const setGlobalTab = useGameStore(s => s.setActiveTab);
+  const addNotification = useGameStore(s => s.addNotification);
+
+  const playerHp = player?.stats?.hp ?? 100;
+  const playerMaxHp = player?.stats?.maxHp ?? 100;
+  const playerAtk = player?.stats?.attack ?? 30;
+  const playerDef = player?.stats?.defense ?? 15;
 
   const world = FREE_FIELD_WORLDS.find(w => w.id === selectedWorldId)!;
   const areas = getAreasByWorld(world.id);
@@ -887,20 +1371,141 @@ export function FreeFieldScreen() {
     setSelectedNode(prev => (prev?.id === node.id ? null : node));
   };
 
-  // ワープアクションからノードを選択
   const handleWarpToNode = useCallback((nodeId: string) => {
     const target = FREE_FIELD_NODES_ALL[nodeId];
     if (target) {
       setSelectedNode(target);
-      // 対象エリアに切り替え
       if (target.areaId !== activeAreaId) {
         setActiveAreaId(target.areaId);
       }
+      addNotification('info', `${target.indexLabel ?? ''} ${target.displayName} へ移動`);
     }
-  }, [activeAreaId]);
+  }, [activeAreaId, addNotification]);
+
+  // ── バトル開始 ──
+  const handleBattleStart = useCallback((action: FreeFieldNodeAction, node: FreeFieldNode) => {
+    const profileId = action.encounterProfileId ?? node.areaId;
+    const session = initFFBattleSession({
+      nodeId: node.id,
+      areaId: node.areaId,
+      encounterProfileId: profileId,
+      playerHp,
+      playerMaxHp,
+    });
+    if (!session) {
+      addNotification('error', 'このエリアに戦闘トリガーが設定されていません');
+      return;
+    }
+    setBattleSession(session);
+  }, [playerHp, playerMaxHp, addNotification]);
+
+  // ── バトル操作 ──
+  const handlePlayerAttack = useCallback(() => {
+    if (!battleSession) return;
+    let s = doPlayerAttack(battleSession, playerAtk);
+    // 敵ターンを自動実行
+    if (s.turn === 'enemy' && !s.result) {
+      setTimeout(() => {
+        setBattleSession(prev => {
+          if (!prev) return prev;
+          const afterEnemy = doEnemyTurn(prev, playerDef);
+          return afterEnemy;
+        });
+      }, 600);
+    }
+    setBattleSession(s);
+  }, [battleSession, playerAtk, playerDef]);
+
+  const handleEscape = useCallback(() => {
+    if (!battleSession) return;
+    const s = tryEscape(battleSession);
+    setBattleSession(s);
+  }, [battleSession]);
+
+  const handleBattleClose = useCallback(() => {
+    if (battleSession?.result === 'win') {
+      addNotification('success', `戦闘勝利！ EXP+${battleSession.expGained} Gold+${battleSession.goldGained}`);
+      // TODO: 実際にプレイヤーにEXP/ゴールド付与するには playerSlice.addExp など追加が必要
+    }
+    setBattleSession(null);
+  }, [battleSession, addNotification]);
+
+  // ── 採集 ──
+  const handleHarvestStart = useCallback((action: FreeFieldNodeAction, node: FreeFieldNode) => {
+    const harvestNodeId = action.systemTargetId ?? node.gatherNodeIds?.[0];
+    if (!harvestNodeId) {
+      addNotification('error', 'この採集スポットのデータが未設定です');
+      return;
+    }
+    const harvestNode = FFGG_HARVEST_NODES[harvestNodeId];
+    if (!harvestNode) {
+      addNotification('error', `採集スポット "${harvestNodeId}" が見つかりません`);
+      return;
+    }
+    const result = executeFFHarvest(harvestNode, 'player');
+    setHarvestResult(result);
+    if (result.items.length > 0) {
+      addNotification('success', `FF採集: ${result.items.map(i => `${i.displayName}×${i.amount}`).join(', ')}`);
+      // TODO: 実際にインベントリへ追加するには playerSlice.addItem など追加が必要
+    }
+  }, [addNotification]);
+
+  // ── 釣り ──
+  const handleFishingStart = useCallback(() => {
+    setGlobalTab('fishing');
+    addNotification('info', '🎣 釣り画面へ移動');
+  }, [setGlobalTab, addNotification]);
+
+  // ── テスター ──
+  const handleTestStart = useCallback(() => {
+    setShowTester(true);
+  }, []);
+
+  // ── ショップ ──
+  const handleShopStart = useCallback(() => {
+    // TODO: FFGGの隠しSHOP専用UIは仕様確定後に実装
+    setGlobalTab('market');
+    addNotification('info', '🛒 ショップへ移動（FF専用ショップは準備中）');
+  }, [setGlobalTab, addNotification]);
+
+  // ── フィーバー ──
+  const handleFeverStart = useCallback((action: FreeFieldNodeAction) => {
+    setFeverAction(action);
+  }, []);
+
+  // ── ランドマーク ──
+  const handleLandmarkStart = useCallback((action: FreeFieldNodeAction) => {
+    if (selectedNode) setLandmarkAction({ action, node: selectedNode });
+  }, [selectedNode]);
 
   return (
     <div style={{ padding: '4px 0 80px' }}>
+      {/* バトルモーダル */}
+      {battleSession && (
+        <FFBattleModal
+          session={battleSession}
+          onPlayerAttack={handlePlayerAttack}
+          onEscape={handleEscape}
+          onClose={handleBattleClose}
+        />
+      )}
+      {/* 採集結果モーダル */}
+      {harvestResult && (
+        <FFHarvestModal result={harvestResult} onClose={() => setHarvestResult(null)} />
+      )}
+      {/* テスターモーダル */}
+      {showTester && <FFTesterModal onClose={() => setShowTester(false)} />}
+      {/* フィーバーモーダル */}
+      {feverAction && <FFFeverModal action={feverAction} onClose={() => setFeverAction(null)} />}
+      {/* ランドマークモーダル */}
+      {landmarkAction && (
+        <FFLandmarkModal
+          node={landmarkAction.node}
+          action={landmarkAction.action}
+          onClose={() => setLandmarkAction(null)}
+        />
+      )}
+
       <h2 style={{
         fontFamily: 'Cinzel,serif', color: '#60a0ff',
         borderBottom: '1px solid #2d3752', paddingBottom: 8, marginBottom: 12,
@@ -927,62 +1532,93 @@ export function FreeFieldScreen() {
         ))}
       </div>
 
-      {/* ワールド説明 */}
-      {world.description && (
-        <div style={{ fontSize: '0.70rem', color: '#8a92b2', marginBottom: 6, lineHeight: 1.5 }}>
-          {world.description}
-          {world.mapSizeHint && (
-            <span style={{ marginLeft: 8, color: '#606880' }}>({world.mapSizeHint})</span>
-          )}
-        </div>
-      )}
-
-      {/* エリアフィルター */}
-      <AreaSelector areas={areas} activeId={activeAreaId} onSelect={handleSelectArea} />
-
-      {/* 地図（横スクロール可） */}
-      <div style={{ overflowX: 'auto', overflowY: 'hidden' }}>
-        <div style={{ minWidth: 300 }}>
-          <MapView
-            world={world}
-            activeAreaId={activeAreaId}
-            selectedNode={selectedNode}
-            onSelectNode={handleSelectNode}
-          />
-        </div>
+      {/* タブ：地図 / FF採集 */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+        {(['map', 'harvest'] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            style={{
+              padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600,
+              background: activeTab === tab ? 'rgba(64,192,128,0.15)' : '#1c2235',
+              border: `1px solid ${activeTab === tab ? '#40c080' : '#2d3752'}`,
+              color: activeTab === tab ? '#40c080' : '#8a92b2',
+            }}
+          >
+            {tab === 'map' ? '🗺️ マップ' : '🌿 FF採集'}
+          </button>
+        ))}
       </div>
 
-      {/* エリア説明 */}
-      {activeAreaId && FREE_FIELD_AREAS_ALL[activeAreaId] && (
-        <div style={{
-          marginTop: 8, background: '#161b26', border: '1px solid #2d3752',
-          borderRadius: 6, padding: '7px 10px', fontSize: '0.72rem', color: '#8a92b2',
-        }}>
-          <span style={{ color: '#6090ff', fontWeight: 700 }}>
-            {FREE_FIELD_AREAS_ALL[activeAreaId].displayName}
-          </span>
-          {FREE_FIELD_AREAS_ALL[activeAreaId].description && (
-            <span style={{ marginLeft: 6 }}>— {FREE_FIELD_AREAS_ALL[activeAreaId].description}</span>
+      {activeTab === 'harvest' ? (
+        <FFHarvestTab />
+      ) : (
+        <>
+          {/* ワールド説明 */}
+          {world.description && (
+            <div style={{ fontSize: '0.70rem', color: '#8a92b2', marginBottom: 6, lineHeight: 1.5 }}>
+              {world.description}
+              {world.mapSizeHint && (
+                <span style={{ marginLeft: 8, color: '#606880' }}>({world.mapSizeHint})</span>
+              )}
+            </div>
           )}
-        </div>
-      )}
 
-      {/* ノード詳細パネル（アクション含む） */}
-      {selectedNode && (
-        <NodeDetailPanel
-          node={selectedNode}
-          onClose={() => setSelectedNode(null)}
-          onWarpToNode={handleWarpToNode}
-        />
-      )}
+          {/* エリアフィルター */}
+          <AreaSelector areas={areas} activeId={activeAreaId} onSelect={handleSelectArea} />
 
-      {/* エリア内ノード一覧 */}
-      {activeAreaId && (
-        <NodeListPanel
-          nodes={nodesInActiveArea}
-          selectedNode={selectedNode}
-          onSelectNode={handleSelectNode}
-        />
+          {/* 地図（横スクロール可） */}
+          <div style={{ overflowX: 'auto', overflowY: 'hidden' }}>
+            <div style={{ minWidth: 300 }}>
+              <MapView
+                world={world}
+                activeAreaId={activeAreaId}
+                selectedNode={selectedNode}
+                onSelectNode={handleSelectNode}
+              />
+            </div>
+          </div>
+
+          {/* エリア説明 */}
+          {activeAreaId && FREE_FIELD_AREAS_ALL[activeAreaId] && (
+            <div style={{
+              marginTop: 8, background: '#161b26', border: '1px solid #2d3752',
+              borderRadius: 6, padding: '7px 10px', fontSize: '0.72rem', color: '#8a92b2',
+            }}>
+              <span style={{ color: '#6090ff', fontWeight: 700 }}>
+                {FREE_FIELD_AREAS_ALL[activeAreaId].displayName}
+              </span>
+              {FREE_FIELD_AREAS_ALL[activeAreaId].description && (
+                <span style={{ marginLeft: 6 }}>— {FREE_FIELD_AREAS_ALL[activeAreaId].description}</span>
+              )}
+            </div>
+          )}
+
+          {/* ノード詳細パネル（アクション含む） */}
+          {selectedNode && (
+            <NodeDetailPanel
+              node={selectedNode}
+              onClose={() => setSelectedNode(null)}
+              onWarpToNode={handleWarpToNode}
+              onBattleStart={handleBattleStart}
+              onHarvestStart={handleHarvestStart}
+              onFishingStart={handleFishingStart}
+              onTestStart={handleTestStart}
+              onShopStart={handleShopStart}
+              onFeverStart={handleFeverStart}
+              onLandmarkStart={handleLandmarkStart}
+            />
+          )}
+
+          {/* エリア内ノード一覧 */}
+          {activeAreaId && (
+            <NodeListPanel
+              nodes={nodesInActiveArea}
+              selectedNode={selectedNode}
+              onSelectNode={handleSelectNode}
+            />
+          )}
+        </>
       )}
     </div>
   );
