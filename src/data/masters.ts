@@ -1657,6 +1657,8 @@ export const GATHER_NODE_MASTER: Record<string, GatherNodeMaster> = {
 // ============================================================
 // モンスターマスター
 // ============================================================
+// FFGG enemies are merged below (imported lazily to avoid circular deps)
+// We inline minimal MonsterMaster-compatible entries for FF dungeon battles
 export const MONSTER_MASTER: Record<string, MonsterMaster> = {
   // 初級
   cave_minion:  { id:'cave_minion',  name:'洞窟王の手下', description:'俊敏に動き回る。', icon:'silhouette', maxHp:20,  attack:2,  defense:1,  baseExp:8,   baseGold:3,   dungeonIds:['beginner_cave'], drops:[{itemId:'cave_fragment',baseRate:0.7,minAmount:1,maxAmount:2},{itemId:'contract',baseRate:0.1,minAmount:1,maxAmount:1}] },
@@ -1710,6 +1712,39 @@ export const MONSTER_MASTER: Record<string, MonsterMaster> = {
   slime:  { id:'slime',  name:'スライム', description:'初歩的なモンスター。', icon:'bubbles', maxHp:30,  attack:5,  defense:2,  baseExp:15,  baseGold:8,   dungeonIds:['beginner_cave'], drops:[{itemId:'slime_gel',baseRate:0.8,minAmount:1,maxAmount:3}] },
   goblin: { id:'goblin', name:'ゴブリン', description:'小さいが油断できない。', icon:'goblin', maxHp:60,  attack:12, defense:5,  baseExp:35,  baseGold:20,  dungeonIds:['goblin_den'], drops:[{itemId:'goblin_ear',baseRate:0.6,minAmount:1,maxAmount:2}] },
   dragon: { id:'dragon', name:'ドラゴン', description:'最強クラスの古代生命体。', icon:'dragon', maxHp:1000,attack:80, defense:50, baseExp:800, baseGold:500, dungeonIds:[], isBoss:true, drops:[{itemId:'dragon_scale',baseRate:0.3,minAmount:1,maxAmount:3},{itemId:'ancient_shard',baseRate:0.8,minAmount:2,maxAmount:5}] },
+  // ── FFGG フリーフィールド敵 ──
+  // 共通
+  ff_pumpkin_head:   { id:'ff_pumpkin_head',   name:'カボチャ頭',           description:'全エリアに出没するカボチャの怪物。',         icon:'lantern',          maxHp:120, attack:18, defense:5,  baseExp:35,  baseGold:20,  dungeonIds:['ff_forest','ff_plain','ff_desert','ff_snow','ff_savanna','ff_pirate'], drops:[{itemId:'cave_fragment',baseRate:0.6,minAmount:1,maxAmount:2},{itemId:'goblin_ear',baseRate:0.2,minAmount:1,maxAmount:1}] },
+  ff_uni_eyed:       { id:'ff_uni_eyed',       name:'ユーアイド',           description:'浮遊する単眼生物。レーザーを発射する。',       icon:'magic_stone_blue', maxHp:90,  attack:25, defense:3,  baseExp:45,  baseGold:30,  dungeonIds:['ff_forest','ff_desert','ff_snow','ff_savanna'], drops:[{itemId:'ancient_shard',baseRate:0.3,minAmount:1,maxAmount:1}] },
+  ff_silver_crystal: { id:'ff_silver_crystal', name:'白銀結晶',             description:'全身が結晶質。被弾すると反撃する。',           icon:'ice',              maxHp:200, attack:22, defense:15, baseExp:60,  baseGold:35,  dungeonIds:['ff_forest','ff_plain','ff_snow','ff_pirate','ff_savanna'], drops:[{itemId:'ancient_shard',baseRate:0.4,minAmount:1,maxAmount:2}] },
+  // 森エリア
+  ff_grido:          { id:'ff_grido',          name:'グリド',               description:'森に潜む小型の群れ型モブ。',                   icon:'goblin',           maxHp:80,  attack:15, defense:3,  baseExp:25,  baseGold:15,  dungeonIds:['ff_forest'], drops:[{itemId:'cave_fragment',baseRate:0.5,minAmount:1,maxAmount:2},{itemId:'coin',baseRate:1.0,minAmount:5,maxAmount:10},{itemId:'green_scale',baseRate:0.15,minAmount:1,maxAmount:1}] },
+  ff_grido_alpha:    { id:'ff_grido_alpha',    name:'グリド・アルファ',      description:'群れのリーダー。',                             icon:'goblin',           maxHp:150, attack:20, defense:6,  baseExp:50,  baseGold:30,  dungeonIds:['ff_forest'], drops:[{itemId:'cave_fragment',baseRate:0.7,minAmount:2,maxAmount:3},{itemId:'goblin_ear',baseRate:0.3,minAmount:1,maxAmount:1}] },
+  ff_souldrop:       { id:'ff_souldrop',       name:'ソールドロップ',        description:'魂が凝縮した液状モブ。',                       icon:'bubbles',          maxHp:100, attack:18, defense:4,  baseExp:30,  baseGold:18,  dungeonIds:['ff_forest'], drops:[{itemId:'slime_gel',baseRate:0.8,minAmount:1,maxAmount:3},{itemId:'slamy_liquid',baseRate:0.08,minAmount:1,maxAmount:1}] },
+  ff_pirates_grunt:  { id:'ff_pirates_grunt',  name:'パイレーツ（森）',      description:'森に迷い込んだ海賊の手下。',                   icon:'anchor',           maxHp:110, attack:22, defense:5,  baseExp:35,  baseGold:25,  dungeonIds:['ff_forest','ff_pirate'], drops:[{itemId:'coin',baseRate:1.0,minAmount:10,maxAmount:20}] },
+  ff_forest_ripper:  { id:'ff_forest_ripper',  name:'フォレストリッパー',    description:'低確率で奇襲してくる危険な存在。',             icon:'dagger',           maxHp:200, attack:50, defense:8,  baseExp:100, baseGold:60,  dungeonIds:['ff_forest'], drops:[{itemId:'hard_magic_stone',baseRate:0.2,minAmount:1,maxAmount:1},{itemId:'green_scale',baseRate:0.30,minAmount:1,maxAmount:2}] },
+  // 平原エリア
+  ff_drag:           { id:'ff_drag',           name:'ドラグ',               description:'平原を徘徊する翼竜型モンスター。',             icon:'dragon',           maxHp:130, attack:28, defense:8,  baseExp:55,  baseGold:35,  dungeonIds:['ff_plain'], drops:[{itemId:'dragon_scale',baseRate:0.15,minAmount:1,maxAmount:1},{itemId:'cave_fragment',baseRate:0.5,minAmount:1,maxAmount:2}] },
+  ff_drag_strong:    { id:'ff_drag_strong',    name:'ドラグ（強）',          description:'より大型の翼竜。',                             icon:'dragon',           maxHp:250, attack:38, defense:15, baseExp:90,  baseGold:55,  dungeonIds:['ff_plain'], drops:[{itemId:'dragon_scale',baseRate:0.3,minAmount:1,maxAmount:2}] },
+  // 砂漠エリア
+  ff_gadra:          { id:'ff_gadra',          name:'ガドラ',               description:'砂漠に棲むサソリ型モンスター。',               icon:'scorpion',         maxHp:160, attack:30, defense:10, baseExp:60,  baseGold:40,  dungeonIds:['ff_desert'], drops:[{itemId:'ancient_shard',baseRate:0.35,minAmount:1,maxAmount:2}] },
+  ff_gadra_kai:      { id:'ff_gadra_kai',      name:'ガドラ改',             description:'強化型ガドラ。毒攻撃を持つ。',                 icon:'scorpion',         maxHp:280, attack:42, defense:18, baseExp:100, baseGold:65,  dungeonIds:['ff_desert'], drops:[{itemId:'ancient_shard',baseRate:0.5,minAmount:1,maxAmount:3},{itemId:'hard_magic_stone',baseRate:0.1,minAmount:1,maxAmount:1}] },
+  ff_egard:          { id:'ff_egard',          name:'エガード',             description:'砂漠の防衛型モンスター。防御力が高い。',       icon:'shield',           maxHp:350, attack:25, defense:30, baseExp:80,  baseGold:50,  dungeonIds:['ff_desert'], drops:[{itemId:'cave_fragment',baseRate:0.8,minAmount:2,maxAmount:4}] },
+  // 雪原エリア
+  ff_adora:          { id:'ff_adora',          name:'アドラ',               description:'雪原の氷狼型モンスター。',                     icon:'blizzard',         maxHp:140, attack:32, defense:8,  baseExp:65,  baseGold:40,  dungeonIds:['ff_snow'], drops:[{itemId:'spirit_ice',baseRate:0.5,minAmount:1,maxAmount:2}] },
+  ff_adora_kai:      { id:'ff_adora_kai',      name:'アドラ改',             description:'より凶暴な氷狼。全体攻撃持ち。',               icon:'blizzard',         maxHp:260, attack:45, defense:14, baseExp:110, baseGold:70,  dungeonIds:['ff_snow'], drops:[{itemId:'spirit_ice',baseRate:0.7,minAmount:2,maxAmount:3},{itemId:'hard_magic_stone',baseRate:0.12,minAmount:1,maxAmount:1}] },
+  ff_fang_wolf:      { id:'ff_fang_wolf',      name:'ファングウルフ',        description:'牙が強力な雪原の肉食獣。',                     icon:'blizzard',         maxHp:120, attack:35, defense:6,  baseExp:55,  baseGold:35,  dungeonIds:['ff_snow'], drops:[{itemId:'hard_magic_stone',baseRate:0.08,minAmount:1,maxAmount:1}] },
+  // サバンナエリア
+  ff_savanna_wanderer: { id:'ff_savanna_wanderer', name:'サバンナワンダラー', description:'サバンナを放浪する大型モンスター。',            icon:'swords',           maxHp:300, attack:40, defense:15, baseExp:90,  baseGold:60,  dungeonIds:['ff_savanna'], drops:[{itemId:'ancient_shard',baseRate:0.4,minAmount:1,maxAmount:2}] },
+  // 海賊エリア
+  ff_pirates_cannon: { id:'ff_pirates_cannon', name:'パイレーツ・キャノン', description:'大砲を持つ海賊。遠距離攻撃が厄介。',           icon:'anchor',           maxHp:180, attack:45, defense:10, baseExp:80,  baseGold:60,  dungeonIds:['ff_pirate'], drops:[{itemId:'coin',baseRate:1.0,minAmount:20,maxAmount:40},{itemId:'antique_coin',baseRate:0.08,minAmount:1,maxAmount:1}] },
+  ff_pirates_captain: { id:'ff_pirates_captain', name:'パイレーツ・キャプテン', description:'海賊船長。手下を呼ぶ。',                   icon:'anchor',           maxHp:400, attack:55, defense:20, baseExp:150, baseGold:120, dungeonIds:['ff_pirate'], isMidBoss:true, drops:[{itemId:'coin',baseRate:1.0,minAmount:50,maxAmount:100},{itemId:'antique_coin',baseRate:0.2,minAmount:1,maxAmount:2}] },
+  // ボス
+  ff_giant_comet:    { id:'ff_giant_comet',    name:'巨大彗星',             description:'森エリアのボス。隕石攻撃が危険。',             icon:'star',             maxHp:800, attack:65, defense:25, baseExp:350, baseGold:250, dungeonIds:['ff_forest'], isBoss:true, drops:[{itemId:'hard_magic_stone',baseRate:0.6,minAmount:1,maxAmount:2},{itemId:'ancient_shard',baseRate:1.0,minAmount:3,maxAmount:5}] },
+  ff_egaldon:        { id:'ff_egaldon',        name:'エガルドン',           description:'砂漠エリアのボス。強固な防御を誇る。',         icon:'scorpion',         maxHp:1200,attack:70, defense:40, baseExp:500, baseGold:350, dungeonIds:['ff_desert'], isBoss:true, drops:[{itemId:'hard_magic_stone',baseRate:0.8,minAmount:2,maxAmount:3},{itemId:'cosmonium',baseRate:0.1,minAmount:1,maxAmount:1}] },
+  ff_wave_wolf:      { id:'ff_wave_wolf',      name:'ウェーブウルフ',        description:'雪原エリアのボス。波動攻撃が全体に届く。',     icon:'blizzard',         maxHp:1000,attack:75, defense:30, baseExp:450, baseGold:300, dungeonIds:['ff_snow'], isBoss:true, drops:[{itemId:'spirit_ice',baseRate:1.0,minAmount:3,maxAmount:5},{itemId:'hard_magic_stone',baseRate:0.5,minAmount:1,maxAmount:2}] },
+  ff_slam_iking:     { id:'ff_slam_iking',     name:'スラムアイキング',      description:'サバンナエリアの王者。圧倒的なパワー。',       icon:'crown',            maxHp:1500,attack:90, defense:35, baseExp:650, baseGold:450, dungeonIds:['ff_savanna'], isBoss:true, drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:2,maxAmount:4},{itemId:'ancient_shard',baseRate:0.8,minAmount:2,maxAmount:4},{itemId:'cosmonium',baseRate:0.15,minAmount:1,maxAmount:1}] },
+  ff_brute_leader:   { id:'ff_brute_leader',   name:'ブルートリーダー',      description:'海賊エリアのボス。',                           icon:'anchor',           maxHp:1300,attack:80, defense:30, baseExp:550, baseGold:400, dungeonIds:['ff_pirate'], isBoss:true, drops:[{itemId:'coin',baseRate:1.0,minAmount:200,maxAmount:400},{itemId:'antique_coin',baseRate:0.5,minAmount:1,maxAmount:3},{itemId:'cosmonium',baseRate:0.1,minAmount:1,maxAmount:1}] },
 };
 
 // ============================================================
@@ -1838,6 +1873,71 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
       { name:'赤岩回廊', description:'後半戦の始まり。難易度が大幅上昇。', monsters:[{monsterId:'dwarf_red',count:3},{monsterId:'dwarf_black',count:2},{monsterId:'ragnalok',count:1},{monsterId:'stain_pot',count:8}], isHardArea:true },
       { name:'火山街[難所]', description:'全ての敵が総動員。ラグナロク2体が大門前に待つ。', monsters:[{monsterId:'ragnalok',count:2},{monsterId:'dwarf_black',count:4},{monsterId:'stain_pot',count:12}], isHardArea:true },
       { name:'大橋地帯[最難関]', description:'全モンスターが本気でプレイヤーを殺しに来る最終エリア。', monsters:[{monsterId:'volcano_boss',count:1,isBoss:true},{monsterId:'dwarf_black',count:5},{monsterId:'ragnalok',count:3}], isHardArea:true },
+    ],
+  },
+  // ── フリーフィールド(FFGG)ダンジョン ──
+  ff_forest: {
+    id:'ff_forest', name:'FFGGフォレスト', description:'自由の大地・森エリア。グリドの群れに注意。',
+    icon:'cave_hole', tier:'intermediate', requiredLevel:1, floors:3, expBonus:1.5, goldBonus:1.5,
+    monsterIds:['ff_grido','ff_grido_alpha','ff_souldrop','ff_pirates_grunt','ff_pumpkin_head','ff_uni_eyed','ff_silver_crystal','ff_forest_ripper'],
+    bossId:'ff_giant_comet',
+    areas:[
+      { name:'森の入口',   monsters:[{monsterId:'ff_grido',count:2},{monsterId:'ff_pumpkin_head',count:1}] },
+      { name:'森の深部',   monsters:[{monsterId:'ff_grido_alpha',count:1},{monsterId:'ff_souldrop',count:1},{monsterId:'ff_uni_eyed',count:1}] },
+      { name:'森の最奥',   description:'巨大彗星が潜む危険地帯。', monsters:[{monsterId:'ff_giant_comet',count:1,isBoss:true}], isHardArea:true },
+    ],
+  },
+  ff_plain: {
+    id:'ff_plain', name:'FFGGプレイン', description:'自由の大地・平原エリア。翼竜が飛び交う。',
+    icon:'cherry_blossom', tier:'intermediate', requiredLevel:1, floors:2, expBonus:1.5, goldBonus:1.5,
+    monsterIds:['ff_drag','ff_drag_strong','ff_pumpkin_head','ff_silver_crystal'],
+    areas:[
+      { name:'広大な平原',   monsters:[{monsterId:'ff_drag',count:2},{monsterId:'ff_pumpkin_head',count:1}] },
+      { name:'翼竜の縄張り', description:'強化翼竜が待ち受ける。', monsters:[{monsterId:'ff_drag_strong',count:1},{monsterId:'ff_silver_crystal',count:1}], isHardArea:true },
+    ],
+  },
+  ff_desert: {
+    id:'ff_desert', name:'FFGGデザート', description:'自由の大地・砂漠エリア。ガドラの毒に注意。',
+    icon:'dungeon_building', tier:'advanced', requiredLevel:1, floors:3, expBonus:2.0, goldBonus:2.0,
+    monsterIds:['ff_gadra','ff_gadra_kai','ff_egard','ff_pumpkin_head','ff_uni_eyed','ff_silver_crystal'],
+    bossId:'ff_egaldon',
+    areas:[
+      { name:'砂漠地帯',   monsters:[{monsterId:'ff_gadra',count:2},{monsterId:'ff_pumpkin_head',count:1}] },
+      { name:'砂漠深部',   monsters:[{monsterId:'ff_gadra_kai',count:1},{monsterId:'ff_egard',count:1},{monsterId:'ff_uni_eyed',count:1}] },
+      { name:'砂漠の王',   description:'エガルドンが待ち構える。', monsters:[{monsterId:'ff_egaldon',count:1,isBoss:true}], isHardArea:true },
+    ],
+  },
+  ff_snow: {
+    id:'ff_snow', name:'FFGGスノー', description:'自由の大地・雪原エリア。氷属性攻撃が多い。',
+    icon:'snowflake', tier:'advanced', requiredLevel:1, floors:3, expBonus:2.0, goldBonus:2.0,
+    monsterIds:['ff_adora','ff_adora_kai','ff_fang_wolf','ff_pumpkin_head','ff_silver_crystal'],
+    bossId:'ff_wave_wolf',
+    areas:[
+      { name:'雪原',         monsters:[{monsterId:'ff_adora',count:2},{monsterId:'ff_fang_wolf',count:1}] },
+      { name:'吹雪の中',     monsters:[{monsterId:'ff_adora_kai',count:1},{monsterId:'ff_silver_crystal',count:2}] },
+      { name:'ウルフの巣',   description:'ウェーブウルフの縄張り。', monsters:[{monsterId:'ff_wave_wolf',count:1,isBoss:true}], isHardArea:true },
+    ],
+  },
+  ff_savanna: {
+    id:'ff_savanna', name:'FFGGサバンナ', description:'自由の大地・サバンナエリア。スラムアイキングに注意。',
+    icon:'dungeon_building', tier:'super', requiredLevel:1, floors:3, expBonus:3.0, goldBonus:2.5,
+    monsterIds:['ff_savanna_wanderer','ff_grido','ff_gadra','ff_adora','ff_drag','ff_pumpkin_head','ff_uni_eyed','ff_silver_crystal'],
+    bossId:'ff_slam_iking',
+    areas:[
+      { name:'サバンナ前半', monsters:[{monsterId:'ff_savanna_wanderer',count:1},{monsterId:'ff_drag',count:1},{monsterId:'ff_pumpkin_head',count:1}] },
+      { name:'サバンナ深部', monsters:[{monsterId:'ff_savanna_wanderer',count:2},{monsterId:'ff_uni_eyed',count:1},{monsterId:'ff_silver_crystal',count:1}] },
+      { name:'王の座',       description:'スラムアイキングとの決戦。', monsters:[{monsterId:'ff_slam_iking',count:1,isBoss:true}], isHardArea:true },
+    ],
+  },
+  ff_pirate: {
+    id:'ff_pirate', name:'FFGGパイレーツ', description:'自由の大地・海賊エリア。お宝が眠る危険地帯。',
+    icon:'dungeon_building', tier:'super', requiredLevel:1, floors:3, expBonus:3.0, goldBonus:3.0,
+    monsterIds:['ff_pirates_grunt','ff_pirates_cannon','ff_pirates_captain','ff_pumpkin_head','ff_silver_crystal'],
+    bossId:'ff_brute_leader',
+    areas:[
+      { name:'海賊の拠点',   monsters:[{monsterId:'ff_pirates_grunt',count:2},{monsterId:'ff_pumpkin_head',count:1}] },
+      { name:'船内',         monsters:[{monsterId:'ff_pirates_cannon',count:1},{monsterId:'ff_pirates_grunt',count:2}] },
+      { name:'船長室',       description:'ブルートリーダーの間。', monsters:[{monsterId:'ff_brute_leader',count:1,isBoss:true}], isHardArea:true },
     ],
   },
 };
