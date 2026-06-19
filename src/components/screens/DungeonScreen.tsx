@@ -1041,7 +1041,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
 
     const fxHits: { idx: number; damage: number; isCritical: boolean }[] = [];
     const perWeaponLogs: { text: string; color: string }[] = [];
-    const newEnemies = battle.enemies.map((e, i) => ({ ...e }));
+    const newEnemies = battle.enemies.map((e) => ({ ...e }));
 
     for (const w of weapons) {
       const atkBase = w.weaponAtk ?? player.stats.attack;
@@ -1157,7 +1157,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         setBattle(b => ({ ...b, log: [...newLog], turn: 'result', result: 'win', kx: { ...battle.kx!, awakeHp: 0 }, pendingAction: null, pendingMultiCast: null, weaponMana: finalMana, itemCooldowns: newCooldowns }));
         return;
       }
-      setBattle(b => ({ ...b, log: newLog, turn: 'monster', isDefending: false, pendingAction: null, pendingMultiCast: null, kx: { ...battle.kx, awakeHp: newAwakeHp }, weaponMana: finalMana, itemCooldowns: newCooldowns }));
+      setBattle(b => ({ ...b, log: newLog, turn: 'monster', isDefending: false, pendingAction: null, pendingMultiCast: null, kx: { ...battle.kx!, awakeHp: newAwakeHp }, weaponMana: finalMana, itemCooldowns: newCooldowns }));
       setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
       return;
     }
