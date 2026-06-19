@@ -14,6 +14,7 @@ export interface CombatBuff {
   type: string;   // 'poison' | 'atk_up' | 'shield' | 'burn' | 'freeze' | 'curse' | ...
   value: number;  // ダメージ量 / 上昇量 / カット率など
   turns: number;  // 残ターン数
+  meta?: { weaponId?: string; weaponName?: string; hits?: { dmg: number; count: number; penetrate: boolean }[]; cooldownTurns?: number; [key: string]: unknown };
 }
 
 // ============================================================
@@ -131,7 +132,90 @@ export interface WeaponMultiCastSkill {
   manaRestore: number;     // 発動後に回復するMana量
   cooldownTurns: number;   // 発動後のクールダウンターン数
 }
-export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill | WeaponGoliathSkill | WeaponSilversEyeSkill | WeaponFrostbiteSelfDamageSkill | WeaponPenetrateOnUseChanceSkill | WeaponBurnPerTurnSkill | WeaponMultiCastSkill;
+/**
+ * delayed_multihit: 使用後delayTurnsターン後に複数ヒットのダメージを与える（Emerald Crusadeなど）。
+ * hitsの各エントリは {dmg, count, penetrate} で、penetrate=trueなら防御無視の固定ダメージ。
+ */
+export interface WeaponDelayedMultiHitSkill {
+  type: 'delayed_multihit';
+  delayTurns: number;
+  hits: { dmg: number; count: number; penetrate: boolean }[];
+  cooldownTurns: number;
+}
+/**
+ * self_lock: 使用時から指定ターンの間、回復不可＋HPを指定%以下に固定する（Emerald Crusadeなど）。
+ */
+export interface WeaponSelfLockSkill {
+  type: 'self_lock';
+  noHealTurns: number;
+  hpCapPct: number;
+  capTurns: number;
+}
+/**
+ * scaling_attack: 生存敵数に比例した物理ダメージ＋固定貫通ダメージ（Amethyst Storeakなど）。
+ */
+export interface WeaponScalingAttackSkill {
+  type: 'scaling_attack';
+  base: number;
+  perEnemy: number;
+  penetrate: number;
+}
+/**
+ * random_stun: ランダムな敵1体を指定ターン攻撃不可にする（Amethyst Storeakなど）。
+ */
+export interface WeaponRandomStunSkill {
+  type: 'random_stun';
+  stunTurns: number;
+}
+/**
+ * def_buff_self_dmg: 自身の防御力を指定ターンの間倍率上昇させ、その後指定ターンの間
+ * 自分のHPに比例した割合自傷ダメージを与える（jewelry caneなど）。
+ */
+export interface WeaponDefBuffSelfDamageSkill {
+  type: 'def_buff_self_dmg';
+  defMultiplier: number;
+  buffTurns: number;
+  selfDmgPct: number;
+  selfDmgTurns: number;
+  cooldownTurns: number;
+}
+/**
+ * delayed_self_heal: 使用時に最大HPの一定%自傷し、delayTurns後に最大HPの一定%回復する（Damage-to-healなど）。
+ */
+export interface WeaponDelayedSelfHealSkill {
+  type: 'delayed_self_heal';
+  selfDamagePct: number;
+  healDelayTurns: number;
+  healPct: number;
+  cooldownTurns: number;
+}
+/**
+ * mana_drain_repeat: 共有Manaを消費しながら固定ダメージを連続発動する（Gread Strropheaなど）。
+ * manaBudget分（または共有Manaが尽きるまで）、perHitManaCostずつ消費しながらperHitDamageを与え続ける。
+ */
+export interface WeaponManaDrainRepeatSkill {
+  type: 'mana_drain_repeat';
+  manaBudget: number;
+  perHitManaCost: number;
+  perHitDamage: number;
+  cooldownTurns: number;
+}
+/**
+ * satiety_from_damage_pct: このターンに与えた合計ダメージ／敵合計最大HPの割合(%)+bonusFlatだけ
+ * 満腹度を引き上げる（上限はmaxSatiety）（Gread Strropheaなど）。
+ */
+export interface WeaponSatietyFromDamageSkill {
+  type: 'satiety_from_damage_pct';
+  bonusFlat: number;
+}
+/**
+ * mana_restore_on_use: 使用時に共有Manaを回復する。攻撃判定なし・クールダウンなし（Mana Rodなど）。
+ */
+export interface WeaponManaRestoreOnUseSkill {
+  type: 'mana_restore_on_use';
+  amount: number;
+}
+export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill | WeaponGoliathSkill | WeaponSilversEyeSkill | WeaponFrostbiteSelfDamageSkill | WeaponPenetrateOnUseChanceSkill | WeaponBurnPerTurnSkill | WeaponMultiCastSkill | WeaponDelayedMultiHitSkill | WeaponSelfLockSkill | WeaponScalingAttackSkill | WeaponRandomStunSkill | WeaponDefBuffSelfDamageSkill | WeaponDelayedSelfHealSkill | WeaponManaDrainRepeatSkill | WeaponSatietyFromDamageSkill | WeaponManaRestoreOnUseSkill;
 
 export interface WeaponUltimate {
   name: string;
