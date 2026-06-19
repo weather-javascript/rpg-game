@@ -120,7 +120,18 @@ export interface WeaponBurnPerTurnSkill {
   type: 'burn_per_turn';
   totalDamage: number;
 }
-export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill | WeaponGoliathSkill | WeaponSilversEyeSkill | WeaponFrostbiteSelfDamageSkill | WeaponPenetrateOnUseChanceSkill | WeaponBurnPerTurnSkill;
+/**
+ * multi_weapon_cast: 発動すると自身は攻撃判定にならず、追加で武器を選択数分選び、
+ * 選んだ武器とこの武器を同時に発動できる（=-=Cataclysm Spear-Level1=-=など）。
+ * 発動後manaRestoreだけMana回復し、cooldownTurnsターンは使用不可。
+ */
+export interface WeaponMultiCastSkill {
+  type: 'multi_weapon_cast';
+  selectCount: number;     // 追加で選択できる武器数
+  manaRestore: number;     // 発動後に回復するMana量
+  cooldownTurns: number;   // 発動後のクールダウンターン数
+}
+export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill | WeaponGoliathSkill | WeaponSilversEyeSkill | WeaponFrostbiteSelfDamageSkill | WeaponPenetrateOnUseChanceSkill | WeaponBurnPerTurnSkill | WeaponMultiCastSkill;
 
 export interface WeaponUltimate {
   name: string;
@@ -239,6 +250,7 @@ export interface ItemMaster {
   areaPenetrate?: number;   // 範囲攻撃の貫通ダメージ（防御無視）
   weaponDef?: number;       // 装備時防御ボーナス（防具）
   weaponHpBonus?: number;   // 装備時最大HP増加
+  defenseMultiplier?: number; // 装備時、合計防御力に乗算される倍率（ホットバー所持で発動）
   armorToughness?: number;  // 防具強度（ダメージ軽減計算に使用）
   epf?: number;             // 装備時EPF（ダメージ軽減Ⅱ等によるダメージ軽減ポイント）
   moveSpeedPct?: number;    // 装備時移動速度変化（%、負の値で低下）
