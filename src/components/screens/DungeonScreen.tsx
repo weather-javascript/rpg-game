@@ -55,7 +55,7 @@ interface TurnBattleState {
   enemies: EnemyState[];       // 出現中の敵リスト
   targetIdx: number;           // 単発攻撃のターゲット
   playerHpSnapshot: number;
-  turn: 'player' | 'monster' | 'result' | 'select_target';
+  turn: 'player' | 'monster' | 'result' | 'select_target' | 'select_support_weapon';
   log: { text: string; color: string }[];
   result: 'win' | 'lose' | 'escaped' | null;
   expGained: number;
@@ -81,13 +81,15 @@ interface TurnBattleState {
   // tickCooldowns()で一括デクリメント
   itemCooldowns: Record<string, number>;
   // 単発攻撃の一時保存（ターゲット選択後に使う）
-  pendingAction: null | { type: 'attack' | 'weapon' | 'ultimate'; itemId?: string };
+  pendingAction: null | { type: 'attack' | 'weapon' | 'ultimate' | 'multicast'; itemId?: string; itemIds?: string[] };
   // KXモード用（省略可）
   kx?: KxState;
   // Goliathシールド：残りターン数（0=無効）
   goliathShieldTurns: number;
   // Goliathシールド：次フェーズ攻撃不可の敵インデックス（-1=なし）
   goliathStunnedEnemyIdx: number;
+  // =-=Cataclysm Spear-Level1=-= 等のサポート武器選択待ち状態
+  pendingMultiCast: { itemId: string; remaining: number; selectedIds: string[] } | null;
 }
 
 // KXボス戦専用状態
@@ -400,6 +402,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       } : undefined,
       goliathShieldTurns: 0,
       goliathStunnedEnemyIdx: -1,
+      pendingMultiCast: null,
     };
   });
 
@@ -425,12 +428,18 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       ...equip.hotbar,
       equip.helmet, equip.chestplate, equip.leggings, equip.boots, equip.offhand,
     ];
+    let defMultiplier = 1;
     for (const itemId of allSlots) {
       if (!itemId) continue;
       const item = ITEM_MASTER[itemId];
       if (item?.weaponDef) def += item.weaponDef;
     }
-    return def;
+    for (const itemId of equip.hotbar) {
+      if (!itemId) continue;
+      const item = ITEM_MASTER[itemId];
+      if (item?.defenseMultiplier) defMultiplier *= item.defenseMultiplier;
+    }
+    return Math.round(def * defMultiplier);
   }, [player.stats.defense, localEquip]);
 
   // 防具強度の合計（ダメージ軽減計算用）
@@ -960,6 +969,145 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
   };
 
+  // =-=Cataclysm Spear-Level1=-=用: 選択した2武器を同時に発動
+  const executeMultiCast = (targetIdx: number, itemIds: string[], spearItemId: string) => {
+    const weapons = itemIds.map(id => ITEM_MASTER[id]).filter((w): w is NonNullable<typeof w> => !!w);
+    const anyArea = weapons.some(w => !!w.isAreaWeapon);
+
+    const fxHits: { idx: number; damage: number; isCritical: boolean }[] = [];
+    const perWeaponLogs: { text: string; color: string }[] = [];
+    const newEnemies = battle.enemies.map((e, i) => ({ ...e }));
+
+    for (const w of weapons) {
+      const atkBase = w.weaponAtk ?? player.stats.attack;
+      const isArea = !!w.isAreaWeapon || anyArea;
+      const areaPen = w.areaPenetrate ?? 0;
+      let weaponTotal = 0;
+      for (let i = 0; i < newEnemies.length; i++) {
+        const e = newEnemies[i];
+        if (e.hp <= 0) continue;
+        if (!isArea && i !== targetIdx) continue;
+        const mon = getMergedMonster(e.monsterId);
+        const dmg = areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0);
+        weaponTotal += dmg;
+        const prevHp = e.hp;
+        e.hp = Math.max(0, e.hp - dmg);
+        fxHits.push({ idx: i, damage: dmg, isCritical: false });
+        if (prevHp > 0 && e.hp <= 0) combatFx.triggerDefeatFx(i);
+      }
+      perWeaponLogs.push({ text: `⚔️ ${w.name}で攻撃！ ${weaponTotal}ダメージ！`, color: '#4caf87' });
+    }
+    if (fxHits.length > 0) combatFx.triggerEnemyFx(itemIds[0] ?? null, fxHits);
+
+    const spear = ITEM_MASTER[spearItemId];
+    const multiSkill = spear?.weaponSkills?.find(s => s.type === 'multi_weapon_cast') as import('../../types/game').WeaponMultiCastSkill | undefined;
+    const finalMana = Math.min(battle.weaponMana + (multiSkill?.manaRestore ?? 0), battle.weaponManaMax);
+    const newCooldowns = { ...battle.itemCooldowns };
+    if (multiSkill) newCooldowns[spearItemId] = multiSkill.cooldownTurns;
+    for (const id of itemIds) {
+      const wi = ITEM_MASTER[id];
+      if (wi?.cooldownTurns) newCooldowns[id] = wi.cooldownTurns;
+    }
+
+    let newLog = [
+      ...battle.log,
+      { text: `🔱 =-=Cataclysm Spear-Level1=-=発動！${weapons.map(w => w.name).join('・')}が同時に襲いかかる！`, color: '#9b6df0' },
+      ...perWeaponLogs,
+      { text: `💠 Manaが${multiSkill?.manaRestore ?? 0}回復した！（${finalMana}/${battle.weaponManaMax}）`, color: '#4fc3f7' },
+    ];
+
+    // === KXモード: 眷属討伐でKXにダメージ ===
+    if (battle.kx && !battle.kx.isAwakened) {
+      const KX_MAX_HP = battle.kx.maxHp;
+      const MINION_DMG: Record<string, number> = {
+        roam_armor: Math.floor(KX_MAX_HP * 0.04),
+        death_armor: Math.floor(KX_MAX_HP * 0.08),
+      };
+      let newKxHp = battle.kx.hp;
+      let newDrops: { itemId: string; amount: number }[] = [];
+      for (let i = 0; i < newEnemies.length; i++) {
+        const prev = battle.enemies[i];
+        const next = newEnemies[i];
+        if (prev.hp > 0 && next.hp <= 0) {
+          const fixedDmg = MINION_DMG[prev.monsterId];
+          if (fixedDmg) {
+            newKxHp = Math.max(0, newKxHp - fixedDmg);
+            newLog.push({ text: `💥 ${getMergedMonster(prev.monsterId)?.name}を倒した！KX-G21に${fixedDmg}ダメージ！(HP: ${newKxHp}/${KX_MAX_HP})`, color: '#f0c060' });
+          }
+          if (prev.monsterId === 'roam_armor') newDrops.push({ itemId: 'mech_armor_oparts', amount: 1 });
+          if (prev.monsterId === 'death_armor') newDrops.push({ itemId: 'rusty_mystery_obj', amount: 1 });
+        }
+      }
+      if (newDrops.length > 0) addItems(newDrops);
+
+      if (newKxHp <= 0) {
+        if (secureRandom() < 0.2) {
+          newLog.push({ text: '「さぁ、延長戦の始まりだ！」 KX-G21が覚醒した！', color: '#ff00ff' });
+          const awakeKx: KxState = { ...battle.kx, hp: 0, isAwakened: true, awakeHp: battle.kx.awakeMaxHp, burnTurns: 0 };
+          setBattle(b => ({ ...b, enemies: [], log: newLog, turn: 'player', kx: awakeKx, pendingAction: null, pendingMultiCast: null, weaponMana: finalMana, itemCooldowns: newCooldowns }));
+        } else {
+          newLog.push({ text: '🏆 KX-G21を討伐した！', color: '#f0c060' });
+          addItems([{ itemId: 'super_spanner', amount: 10 }, { itemId: 'makai_bihin', amount: 10 }, { itemId: 'kx_mech_track', amount: 1 }]);
+          setBattle(b => ({ ...b, enemies: newEnemies, log: [...newLog], turn: 'result', result: 'win', kx: { ...battle.kx!, hp: 0 }, pendingAction: null, pendingMultiCast: null, weaponMana: finalMana, itemCooldowns: newCooldowns }));
+        }
+        return;
+      }
+
+      const pct = newKxHp / KX_MAX_HP * 100;
+      let newPhase = battle.kx.phase;
+      if (pct <= 30 && newPhase < 4) newPhase = 4;
+      else if (pct <= 50 && newPhase < 3) newPhase = 3;
+      else if (pct <= 80 && newPhase < 2) newPhase = 2;
+      const phaseMessages: Record<number, string> = {
+        2: 'KX-G21.軽度の損傷を確認...攻撃方法を変更します...',
+        3: 'KX-G21...ｷﾞｷﾞ...中度ﾉ損傷を確認...魔術回路を構成ｼまス...',
+        4: 'KX-G21...ﾌｶイ損ｼｮ...ｦｶｸﾆﾝ...リミｯﾀｰヲかｲｼﾞｮｼまｽ..',
+      };
+      if (newPhase !== battle.kx.phase) {
+        newLog.push({ text: `🔴 【第${newPhase}形態】${phaseMessages[newPhase]}`, color: '#ff6b6b' });
+      }
+      const aliveAfter = newEnemies.filter(e => e.hp > 0);
+      let finalEnemies = newEnemies;
+      if (aliveAfter.length === 0 && newKxHp > 0) {
+        newLog.push({ text: 'KX-G21が眷属を再召喚した！', color: '#e05555' });
+        finalEnemies = spawnKxMinions(newPhase);
+      }
+      const updatedKx: KxState = { ...battle.kx, hp: newKxHp, phase: newPhase };
+      setBattle(b => ({ ...b, enemies: finalEnemies, log: newLog, turn: 'monster', isDefending: false, pendingAction: null, pendingMultiCast: null, kx: updatedKx, weaponMana: finalMana, itemCooldowns: newCooldowns }));
+      setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+      return;
+    }
+
+    if (battle.kx?.isAwakened) {
+      const combinedAwakenedDmg = weapons.reduce((acc, w) => {
+        const atkBase = w.weaponAtk ?? player.stats.attack;
+        const areaPen = w.areaPenetrate ?? 0;
+        return acc + (areaPen > 0 ? areaPen : calcDamage(atkBase, 0));
+      }, 0);
+      const newAwakeHp = Math.max(0, battle.kx.awakeHp - combinedAwakenedDmg);
+      newLog.push({ text: `⚔️ KX覚醒に${combinedAwakenedDmg}ダメージ！(HP: ${newAwakeHp}/${battle.kx.awakeMaxHp})`, color: '#5b8dee' });
+      if (newAwakeHp <= 0) {
+        newLog.push({ text: '🏆 KX-G21[ライフエナジー]を討伐した！', color: '#f0c060' });
+        addItems([{ itemId: 'life_control_core', amount: 1 }]);
+        setBattle(b => ({ ...b, log: [...newLog], turn: 'result', result: 'win', kx: { ...battle.kx!, awakeHp: 0 }, pendingAction: null, pendingMultiCast: null, weaponMana: finalMana, itemCooldowns: newCooldowns }));
+        return;
+      }
+      setBattle(b => ({ ...b, log: newLog, turn: 'monster', isDefending: false, pendingAction: null, pendingMultiCast: null, kx: { ...battle.kx, awakeHp: newAwakeHp }, weaponMana: finalMana, itemCooldowns: newCooldowns }));
+      setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+      return;
+    }
+
+    // 通常モード
+    const alive = newEnemies.filter(e => e.hp > 0);
+    if (alive.length === 0) {
+      const { exp, gold, drops } = calcWinRewards(newEnemies);
+      setBattle(b => ({ ...b, enemies: newEnemies, log: [...newLog, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, pendingAction: null, pendingMultiCast: null, weaponMana: finalMana, itemCooldowns: newCooldowns }));
+      return;
+    }
+    setBattle(b => ({ ...b, enemies: newEnemies, log: newLog, turn: 'monster', isDefending: false, pendingAction: null, pendingMultiCast: null, weaponMana: finalMana, itemCooldowns: newCooldowns }));
+    setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+  };
+
   // プレイヤー行動: 攻撃
   const handleAttack = () => {
     if (battle.turn !== 'player' || battle.result) return;
@@ -1150,6 +1298,31 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         };
         setBattle(afterGoliath);
         setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+        return;
+      }
+      // =-=Cataclysm Spear-Level1=-= 特別処理：自身は攻撃判定にならず、追加で武器を選択
+      const multiCastSkill = item.weaponSkills?.find(s => s.type === 'multi_weapon_cast') as import('../../types/game').WeaponMultiCastSkill | undefined;
+      if (multiCastSkill) {
+        const candidates = localEquip.hotbar.filter((id) => {
+          if (!id || id === itemId) return false;
+          const cand = ITEM_MASTER[id];
+          if (!cand || cand.itemType !== 'Weapon') return false;
+          if ((battle.itemCooldowns[id] ?? 0) > 0) return false;
+          return true;
+        });
+        const uniqueCandidates = Array.from(new Set(candidates));
+        if (uniqueCandidates.length < multiCastSkill.selectCount) {
+          addNotification('warning', `発動には武器があと${multiCastSkill.selectCount}個必要です`);
+          return;
+        }
+        const logMsg = item.useEffect?.message ?? '=-=Cataclysm Spear-Level1=-=を発動！';
+        setBattle(b => ({
+          ...b,
+          log: [...b.log, { text: `🔱 ${logMsg}（残り${multiCastSkill.selectCount}回）`, color: '#9b6df0' }],
+          turn: 'select_support_weapon',
+          pendingMultiCast: { itemId, remaining: multiCastSkill.selectCount, selectedIds: [] },
+          equippedWeaponId: itemId,
+        }));
         return;
       }
       // Silvers eye特別処理：マナを消費しながら連続発動（0.2秒間隔のコンボ演出）
@@ -1438,6 +1611,43 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
   };
 
+  // =-=Cataclysm Spear-Level1=-= サポート武器選択
+  const handleSelectSupportWeapon = (chosenItemId: string) => {
+    if (battle.turn !== 'select_support_weapon' || !battle.pendingMultiCast) return;
+    const pending = battle.pendingMultiCast;
+    if (pending.selectedIds.includes(chosenItemId)) return;
+    const chosenItem = ITEM_MASTER[chosenItemId];
+    const newSelected = [...pending.selectedIds, chosenItemId];
+    const newRemaining = pending.remaining - 1;
+    const selectLog = { text: `🗡️ ${chosenItem?.name ?? chosenItemId}を選択！（残り${Math.max(0, newRemaining)}回）`, color: '#c0c8ff' };
+
+    if (newRemaining > 0) {
+      setBattle(b => ({
+        ...b,
+        log: [...b.log, selectLog],
+        pendingMultiCast: { ...pending, remaining: newRemaining, selectedIds: newSelected },
+      }));
+      return;
+    }
+
+    // 選択完了 → 同時発動
+    const spearItemId = pending.itemId;
+    const anyArea = newSelected.some(id => !!ITEM_MASTER[id]?.isAreaWeapon);
+    const alive = battle.enemies.filter(e => e.hp > 0);
+    setBattle(b => ({ ...b, log: [...b.log, selectLog] }));
+    if (!anyArea && alive.length > 1 && !battle.kx?.isAwakened) {
+      setBattle(b => ({
+        ...b,
+        turn: 'select_target',
+        pendingAction: { type: 'multicast', itemIds: newSelected, itemId: spearItemId },
+        pendingMultiCast: { ...pending, remaining: 0, selectedIds: newSelected },
+      }));
+      return;
+    }
+    const targetIdx = battle.enemies.findIndex(e => e.hp > 0);
+    setTimeout(() => executeMultiCast(targetIdx, newSelected, spearItemId), 50);
+  };
+
   // 逃走
   const handleEscape = () => {
     if (battle.turn !== 'player' || battle.result) return;
@@ -1493,7 +1703,9 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           onSelect={(idx) => {
             const pending = battle.pendingAction;
             setBattle(b => ({ ...b, turn: 'player', pendingAction: null }));
-            if (pending?.type === 'attack') {
+            if (pending?.type === 'multicast' && pending.itemIds && pending.itemId) {
+              setTimeout(() => executeMultiCast(idx, pending.itemIds!, pending.itemId!), 50);
+            } else if (pending?.type === 'attack') {
               setTimeout(() => executeAttack(idx), 50);
             } else if (pending?.type === 'weapon' && pending.itemId) {
               const item = ITEM_MASTER[pending.itemId];
@@ -1519,8 +1731,48 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
               }, 50);
             }
           }}
-          onCancel={() => setBattle(b => ({ ...b, turn: 'player', pendingAction: null }))}
+          onCancel={() => setBattle(b => ({ ...b, turn: 'player', pendingAction: null, pendingMultiCast: null }))}
         />
+      )}
+
+      {/* =-=Cataclysm Spear-Level1=-= サポート武器選択モーダル */}
+      {battle.turn === 'select_support_weapon' && battle.pendingMultiCast && (
+        <div style={{ background: '#0a0d18', border: '2px solid #9b6df0', borderRadius: 10, padding: 14, marginBottom: 10 }}>
+          <div style={{ color: '#9b6df0', fontWeight: 700, marginBottom: 8 }}>
+            武器を選んでください（残り{battle.pendingMultiCast.remaining}回）
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {localEquip.hotbar.map((slotId, idx) => {
+              if (!slotId || slotId === battle.pendingMultiCast!.itemId) return null;
+              const slotItem = ITEM_MASTER[slotId];
+              if (!slotItem || slotItem.itemType !== 'Weapon') return null;
+              if (battle.pendingMultiCast!.selectedIds.includes(slotId)) return null;
+              const cd = battle.itemCooldowns[slotId] ?? 0;
+              const disabled = cd > 0;
+              return (
+                <button
+                  key={`${slotId}-${idx}`}
+                  disabled={disabled}
+                  onClick={() => handleSelectSupportWeapon(slotId)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
+                    background: disabled ? '#222' : '#1b2030', border: '1px solid #9b6df0',
+                    borderRadius: 8, color: disabled ? '#666' : '#e8e6ff', cursor: disabled ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <GameIcon id={slotItem.icon} size={20} />
+                  {slotItem.name}{disabled ? `（CD${cd}）` : ''}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => setBattle(b => ({ ...b, turn: 'player', pendingMultiCast: null }))}
+            style={{ marginTop: 10, padding: '4px 10px', background: '#222', border: '1px solid #555', borderRadius: 6, color: '#ccc', cursor: 'pointer' }}
+          >
+            キャンセル
+          </button>
+        </div>
       )}
 
       {/* KXボスHP（KXモード時） */}
