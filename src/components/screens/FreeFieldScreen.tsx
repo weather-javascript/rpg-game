@@ -1072,10 +1072,16 @@ function FFHarvestTab() {
   const [lastResult, setLastResult] = useState<FFHarvestResult | null>(null);
   const [harvesting, setHarvesting] = useState<string | null>(null);
   const addNotification = useGameStore(s => s.addNotification);
+  const player = useGameStore(s => s.player);
+  const hasGatherKit = (player?.inventory?.['ffgg_gather_kit'] ?? 0) > 0;
 
   const handleHarvest = (nodeId: string) => {
     const harvestNode = FFGG_HARVEST_NODES[nodeId];
     if (!harvestNode) return;
+    if (harvestNode.requiredToolId && (player?.inventory?.[harvestNode.requiredToolId] ?? 0) <= 0) {
+      addNotification('error', '専用ツール（FF採集キット）が必要です');
+      return;
+    }
     setHarvesting(nodeId);
 
     setTimeout(() => {
@@ -1098,9 +1104,12 @@ function FFHarvestTab() {
       </div>
       <div style={{ fontSize: '0.65rem', color: '#6a7290', marginBottom: 10 }}>
         ※ FF採集は通常採取タブとは別の専用システムです。各エリアのノードの採集アクションからも実行できます。
+        {!hasGatherKit && <span style={{ color: '#f0a830' }}> 🔒 採集にはFF採集キットが必要です（クラフトでFF小判×9から作成可）。</span>}
       </div>
 
-      {Object.values(FFGG_HARVEST_NODES).map(hnode => (
+      {Object.values(FFGG_HARVEST_NODES).map(hnode => {
+        const locked = !!hnode.requiredToolId && (player?.inventory?.[hnode.requiredToolId] ?? 0) <= 0;
+        return (
         <div key={hnode.id} style={{
           background: '#161b26', border: '1px solid #2d3752', borderRadius: 8,
           padding: '10px 12px', marginBottom: 8,
@@ -1116,14 +1125,14 @@ function FFHarvestTab() {
             </div>
             <button
               onClick={() => handleHarvest(hnode.id)}
-              disabled={harvesting === hnode.id}
+              disabled={harvesting === hnode.id || locked}
               style={{
-                padding: '5px 12px', borderRadius: 6, cursor: harvesting === hnode.id ? 'not-allowed' : 'pointer',
-                background: harvesting === hnode.id ? 'rgba(40,44,60,0.4)' : 'rgba(64,192,128,0.15)',
-                border: '1px solid #40c080', color: '#40c080', fontWeight: 600, fontSize: '0.72rem',
+                padding: '5px 12px', borderRadius: 6, cursor: (harvesting === hnode.id || locked) ? 'not-allowed' : 'pointer',
+                background: locked ? 'rgba(60,40,30,0.4)' : harvesting === hnode.id ? 'rgba(40,44,60,0.4)' : 'rgba(64,192,128,0.15)',
+                border: `1px solid ${locked ? '#7a5a30' : '#40c080'}`, color: locked ? '#f0a830' : '#40c080', fontWeight: 600, fontSize: '0.72rem',
               }}
             >
-              {harvesting === hnode.id ? '採集中...' : '🌿 採集'}
+              {locked ? '🔒 専用ツール必要' : harvesting === hnode.id ? '採集中...' : '🌿 採集'}
             </button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -1140,7 +1149,8 @@ function FFHarvestTab() {
             ))}
           </div>
         </div>
-      ))}
+        );
+      })}
 
       {lastResult && (
         <div style={{
@@ -1188,9 +1198,9 @@ export function FreeFieldScreen({ onStartFFBattle }: { onStartFFBattle?: (req: F
   const [feverAction, setFeverAction] = useState<FreeFieldNodeAction | null>(null);
   const [landmarkAction, setLandmarkAction] = useState<{ action: FreeFieldNodeAction; node: FreeFieldNode } | null>(null);
 
-  const player = useGameStore(s => s.player);
   const setGlobalTab = useGameStore(s => s.setActiveTab);
   const addNotification = useGameStore(s => s.addNotification);
+  const player = useGameStore(s => s.player);
 
   const world = FREE_FIELD_WORLDS.find(w => w.id === selectedWorldId)!;
   const areas = getAreasByWorld(world.id);
@@ -1248,13 +1258,17 @@ export function FreeFieldScreen({ onStartFFBattle }: { onStartFFBattle?: (req: F
       addNotification('error', `採集スポット "${harvestNodeId}" が見つかりません`);
       return;
     }
+    if (harvestNode.requiredToolId && (player?.inventory?.[harvestNode.requiredToolId] ?? 0) <= 0) {
+      addNotification('error', '専用ツール（FF採集キット）が必要です');
+      return;
+    }
     const result = executeFFHarvest(harvestNode, 'player');
     setHarvestResult(result);
     if (result.items.length > 0) {
       addNotification('success', `FF採集: ${result.items.map(i => `${i.displayName}×${i.amount}`).join(', ')}`);
       // TODO: 実際にインベントリへ追加するには playerSlice.addItem など追加が必要
     }
-  }, [addNotification]);
+  }, [addNotification, player]);
 
   // ── 釣り ──
   const handleFishingStart = useCallback(() => {

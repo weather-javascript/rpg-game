@@ -2151,7 +2151,6 @@ export function DungeonScreen() {
   const addSkillExp = useGameStore(s => s.addSkillExp);
   const changeSatiety = useGameStore(s => s.changeSatiety);
   const addNotification = useGameStore(s => s.addNotification);
-  const changeWealthCoin = useGameStore(s => s.changeWealthCoin);
   const recordDungeonClear = useGameStore(s => s.recordDungeonClear);
   const isDungeonUnlocked = useGameStore(s => s.isDungeonUnlocked);
 
