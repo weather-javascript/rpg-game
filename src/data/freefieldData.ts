@@ -22,6 +22,7 @@ export const FFGG_HARVEST_NODES: Record<string, FreeFieldHarvestNode> = {
     areaId: 'ffgg_forest',
     cooldownSeconds: 120,
     dangerLevel: 3,
+    requiredToolId: 'ffgg_gather_kit',
     items: [
       { itemId: 'white_basil',   displayName: 'ホワイトバジル',   baseRate: 0.70, minAmount: 1, maxAmount: 3 },
       { itemId: 'green_gem_ore', displayName: '緑輝石',           baseRate: 0.30, minAmount: 1, maxAmount: 2 },
@@ -36,6 +37,7 @@ export const FFGG_HARVEST_NODES: Record<string, FreeFieldHarvestNode> = {
     areaId: 'ffgg_desert',
     cooldownSeconds: 180,
     dangerLevel: 4,
+    requiredToolId: 'ffgg_gather_kit',
     items: [
       { itemId: 'hot_sand_amber', displayName: '熱砂の琥珀',     baseRate: 0.06, minAmount: 1, maxAmount: 1, isRare: true },
       { itemId: 'nitrotrin',      displayName: 'ニトロトリン',   baseRate: 0.40, minAmount: 1, maxAmount: 2 },
@@ -50,10 +52,26 @@ export const FFGG_HARVEST_NODES: Record<string, FreeFieldHarvestNode> = {
     areaId: 'ffgg_snow',
     cooldownSeconds: 150,
     dangerLevel: 3,
+    requiredToolId: 'ffgg_gather_kit',
     items: [
       { itemId: 'ocean_shard',   displayName: '海原の欠片',     baseRate: 0.50, minAmount: 1, maxAmount: 2 },
       { itemId: 'ice_crystal',   displayName: '氷晶',           baseRate: 0.40, minAmount: 1, maxAmount: 3 },
       { itemId: 'snow_herb',     displayName: '雪山草',         baseRate: 0.60, minAmount: 1, maxAmount: 2 },
+    ],
+  },
+
+  ffgg_cave_gem_vein: {
+    id: 'ffgg_cave_gem_vein',
+    displayName: '洞窟宝石鉱脈',
+    areaId: 'ffgg_special',
+    cooldownSeconds: 240,
+    dangerLevel: 4,
+    requiredToolId: 'ffgg_gather_kit',
+    items: [
+      { itemId: 'aurora_spinel', displayName: 'オーロラスピネル', baseRate: 0.30, minAmount: 1, maxAmount: 2 },
+      { itemId: 'uento_peridot', displayName: 'ウエントペリドット', baseRate: 0.20, minAmount: 1, maxAmount: 1 },
+      { itemId: 'matelakaite',   displayName: 'マテラカイト',     baseRate: 0.30, minAmount: 1, maxAmount: 2 },
+      { itemId: 'cave_king_gem', displayName: '洞窟王の宝石',     baseRate: 0.10, minAmount: 1, maxAmount: 1, isRare: true },
     ],
   },
 
@@ -63,6 +81,7 @@ export const FFGG_HARVEST_NODES: Record<string, FreeFieldHarvestNode> = {
     areaId: 'ffgg_desert',
     cooldownSeconds: 300,
     dangerLevel: 5,
+    requiredToolId: 'ffgg_gather_kit',
     items: [
       { itemId: 'hot_sand_amber', displayName: '熱砂の琥珀',   baseRate: 0.12, minAmount: 1, maxAmount: 2, isRare: true },
       { itemId: 'antique_coin',   displayName: 'アンティークコイン', baseRate: 0.25, minAmount: 1, maxAmount: 2 },

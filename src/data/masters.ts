@@ -231,6 +231,7 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   nether_proof:    { id:'nether_proof',     name:'ネザー解放の証',  description:'Zリアクターの素材。',          category:'material',  itemType:'Item', rarity:'rare',     sellPrice:500, buyPrice:0, maxStack:99, icon:'volcano' },
   ff_coin_small:   { id:'ff_coin_small',    name:'FF小判',         description:'大判に交換してお金に。',        category:'treasure',  itemType:'Item', rarity:'uncommon', sellPrice:100, buyPrice:0, maxStack:-1, icon:'yen' },
   ff_coin_large:   { id:'ff_coin_large',    name:'FF大判',         description:'高額で売れる。',               category:'treasure',  itemType:'Item', rarity:'rare',     sellPrice:500000,buyPrice:0,maxStack:99, icon:'dollar' },
+  ffgg_gather_kit: { id:'ffgg_gather_kit',  name:'FF採集キット',   description:'FF系統エリア専用の採集ツール。これを持っているとFFタブの採集スポットで採集できる。FF小判9枚と交換可能。', category:'tool', itemType:'Item', rarity:'rare', sellPrice:0, buyPrice:0, maxStack:1, icon:'pickaxe' },
   scale_low_1:     { id:'scale_low_1',     name:'下位鱗（炎）',   description:'FFGGエリアの下位鱗。', category:'material',  itemType:'Item', rarity:'uncommon', sellPrice:200,  buyPrice:0, maxStack:99, icon:'ore_red' },
   scale_low_2:     { id:'scale_low_2',     name:'下位鱗（水）',   description:'FFGGエリアの下位鱗。', category:'material',  itemType:'Item', rarity:'uncommon', sellPrice:200,  buyPrice:0, maxStack:99, icon:'ore_blue' },
   scale_low_3:     { id:'scale_low_3',     name:'下位鱗（風）',   description:'FFGGエリアの下位鱗。', category:'material',  itemType:'Item', rarity:'uncommon', sellPrice:200,  buyPrice:0, maxStack:99, icon:'ore_green' },
@@ -1397,6 +1398,18 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     craftingExpGain: 50,
   },
 
+  // ── FF採集キット（FFタブ専用採集スポットの解放ツール） ──
+  {
+    id: 'ffgg_gather_kit_craft',
+    name: 'FF採集キットを作る',
+    description: 'FF小判×9個でFF採集キットを1個作成する。FFタブの採集スポットの利用に必須。',
+    outputItemId: 'ffgg_gather_kit',
+    outputAmount: 1,
+    inputs: [{ itemId: 'ff_coin_small', amount: 9 }],
+    requiredCraftingLevel: 10,
+    craftingExpGain: 80,
+  },
+
   // ── ホワイトバジル上位ポーション ──
   {
     id: 'white_basil_elixir',
@@ -1610,48 +1623,8 @@ export const GATHER_NODE_MASTER: Record<string, GatherNodeMaster> = {
     ],
   },
 
-  ffgg_forest_herb: {
-    id:'ffgg_forest_herb', name:'森地帯の薬草場', description:'ホワイトバジル・緑輝石・コスモニウムが採れる。危険エリア内採取。', icon:'leaf',
-    requiredSkill:{skillId:'mining',minLevel:20}, cooldownMs:15000, staminaCost:20,
-    drops:[
-      {itemId:'white_basil',   baseRate:0.70, minAmount:1, maxAmount:3, skillRateBonus:0.05},
-      {itemId:'green_wheat',   baseRate:0.60, minAmount:1, maxAmount:3},
-      {itemId:'green_gem_ore', baseRate:0.30, minAmount:1, maxAmount:2},
-      {itemId:'cosmonium',     baseRate:0.03, minAmount:1, maxAmount:1},
-      {itemId:'ff_coin_small', baseRate:0.20, minAmount:1, maxAmount:2},
-    ],
-  },
-  ffgg_desert_gather: {
-    id:'ffgg_desert_gather', name:'砂漠地帯の採掘場', description:'熱砂の琥珀・ニトロトリン・岩鱗の断片が採れる。高温危険エリア。', icon:'rock',
-    requiredSkill:{skillId:'mining',minLevel:30}, cooldownMs:20000, staminaCost:25,
-    drops:[
-      {itemId:'hot_sand_amber', baseRate:0.40, minAmount:1, maxAmount:2, skillRateBonus:0.04},
-      {itemId:'nitrotrin',      baseRate:0.25, minAmount:1, maxAmount:2},
-      {itemId:'rock_scale',     baseRate:0.20, minAmount:1, maxAmount:1},
-      {itemId:'matelakaite',    baseRate:0.10, minAmount:1, maxAmount:1},
-      {itemId:'ff_coin_small',  baseRate:0.30, minAmount:1, maxAmount:3},
-    ],
-  },
-  ffgg_cave_gem_vein: {
-    id:'ffgg_cave_gem_vein', name:'洞窟宝石鉱脈', description:'オーロラスピネル・ウエントペリドット・洞窟王の宝石が採れる。最深部。', icon:'gem',
-    requiredSkill:{skillId:'mining',minLevel:50}, cooldownMs:30000, staminaCost:35,
-    drops:[
-      {itemId:'aurora_spinel', baseRate:0.30, minAmount:1, maxAmount:2, skillRateBonus:0.03},
-      {itemId:'uento_peridot', baseRate:0.20, minAmount:1, maxAmount:1},
-      {itemId:'cave_king_gem', baseRate:0.25, minAmount:1, maxAmount:2},
-      {itemId:'matelakaite',   baseRate:0.30, minAmount:1, maxAmount:2},
-    ],
-  },
-  ffgg_snow_gather: {
-    id:'ffgg_snow_gather', name:'雪山採取場', description:'狼牙魔結晶の断片・水鱗・海原の欠片が採れる。極寒エリア。', icon:'ice',
-    requiredSkill:{skillId:'mining',minLevel:35}, cooldownMs:18000, staminaCost:22,
-    drops:[
-      {itemId:'water_scale',       baseRate:0.30, minAmount:1, maxAmount:2},
-      {itemId:'wolf_magic_crystal', baseRate:0.15, minAmount:1, maxAmount:1, skillRateBonus:0.02},
-      {itemId:'ocean_shard',        baseRate:0.20, minAmount:1, maxAmount:2},
-      {itemId:'ff_coin_small',      baseRate:0.25, minAmount:1, maxAmount:2},
-    ],
-  },
+  // FF系統（ffgg_*）の採集ノードはFFタブ専用システム（FFGG_HARVEST_NODES / src/data/freefieldData.ts）に
+  // 一本化。専用ツール（ffgg_gather_kit）所持時のみFFタブから採集可能。
 };
 
 // ============================================================
@@ -2228,6 +2201,16 @@ export const DEFAULT_PLAYER_STATS = {
 // フォーマット: { version: 'x.x.x', date: 'YYYY-MM-DD', changes: ['変更内容...'] }
 // ============================================================
 export const VERSION_PATCHES = [
+  {
+    version: '2.21.0',
+    date: '2026-06-19',
+    changes: [
+      '🌾 採取タブにあったFF系統の採集スポット（森地帯の薬草場・砂漠地帯の採掘場・洞窟宝石鉱脈・雪山採取場）をFFタブの「🌿 FF採集」専用システムに統合',
+      '🛠️ 新アイテム「FF採集キット」を追加。FF系統の採集スポットはこのキットを所持している場合のみ採集可能に（FF小判×9個からクラフトで作成可）',
+      '💎 洞窟宝石鉱脈で採れていたオーロラスピネル・ウエントペリドット・洞窟王の宝石などはFFタブ内の新スポットに引き継ぎ',
+      '🐛 ビルドエラー修正（DungeonScreen / FreeFieldScreenの未使用変数を整理）',
+    ],
+  },
   {
     version: '2.20.0',
     date: '2026-06-18',
