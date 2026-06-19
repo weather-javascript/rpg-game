@@ -1,5 +1,6 @@
 // src/components/screens/DungeonScreen.tsx
 import { FreeFieldScreen } from './FreeFieldScreen';
+import type { FFBattleRequest } from './FreeFieldScreen';
 import { GameIcon } from '../icons';
 import { useState, useCallback, useEffect } from 'react';
 import { useGameStore } from '../../stores/gameStore';
@@ -2197,8 +2198,12 @@ export function DungeonScreen() {
   const [autoBattle, setAutoBattle] = useState(false);
   // 0=なし, 1=デビルアーマー戦, 2=デッドアーマー戦
   const [devilArmorPhase, setDevilArmorPhase] = useState(0);
+  // FF フリーフィールド戦闘
+  const [ffBattleRunState, setFfBattleRunState] = useState<DungeonRunState | null>(null);
+  const [ffBattleKey, setFfBattleKey] = useState(0);
+  const [ffBattleMana, setFfBattleMana] = useState(0);
 
-  const HIDDEN_DUNGEON_IDS = ['devil_armor_fight', 'dead_armor_fight', 'sky_castle_ex', 'dragons_lair'];
+  const HIDDEN_DUNGEON_IDS = ['devil_armor_fight', 'dead_armor_fight', 'sky_castle_ex', 'dragons_lair', 'ff_forest', 'ff_plain', 'ff_desert', 'ff_snow', 'ff_savanna', 'ff_pirate'];
   const dungeons = Object.values(DUNGEON_MASTER).filter(d => !HIDDEN_DUNGEON_IDS.includes(d.id));
   const lockedDungeons = dungeons.filter(d => !isDungeonUnlocked(d.id));
 
@@ -2359,6 +2364,43 @@ export function DungeonScreen() {
     setRunLog(prev => [...prev, '🏃 逃走した。']);
   }, []);
 
+  // ── フリーフィールド戦闘ハンドラ ──
+  const handleStartFFBattle = useCallback((req: FFBattleRequest) => {
+    if (!player) return;
+    const rs: DungeonRunState = {
+      dungeonId: req.dungeonId,
+      currentFloor: 1,
+      currentAreaName: req.areaName,
+      currentAreaIdx: 0,
+      monstersDefeated: 0,
+      totalExp: 0,
+      totalGold: 0,
+      totalDrops: [],
+      isComplete: false,
+      isFailed: false,
+    };
+    setFfBattleRunState(rs);
+    setFfBattleKey(k => k + 1);
+    setFfBattleMana(0);
+  }, [player]);
+
+  const handleFFBattleEnd = useCallback((won: boolean, expGained: number, goldGained: number, drops: {itemId:string;amount:number}[], _hpDelta: number) => {
+    if (won) {
+      addNotification('success', `🏆 FF戦闘勝利！ EXP+${expGained} Gold+${goldGained}`);
+      addItems(drops);
+      addExp(expGained);
+      changeGold(goldGained);
+    } else {
+      addNotification('error', '💀 FF戦闘敗北...');
+    }
+    setFfBattleRunState(null);
+  }, [addNotification, addItems, addExp, changeGold]);
+
+  const handleFFBattleEscape = useCallback(() => {
+    addNotification('info', '💨 FF戦闘から逃走した');
+    setFfBattleRunState(null);
+  }, [addNotification]);
+
   // オートバトル：戦闘終了後に自動で次の戦闘を開始
   useEffect(() => {
     if (!autoBattle || inBattle || !runState || runState.isComplete || runState.isFailed || showBossChoice || showZeroChoice || showDevilArmorChoice || kxBossMode) return;
@@ -2443,7 +2485,26 @@ export function DungeonScreen() {
 
       {gachaTabActive && <GachaPanel player={player} addItems={addItems} changeGold={changeGold} addNotification={addNotification} />}
       {trapTabActive && <TrapWorldPanel player={player} addItems={addItems} addNotification={addNotification} />}
-      {freeFieldTabActive && <FreeFieldScreen />}
+      {freeFieldTabActive && <FreeFieldScreen onStartFFBattle={handleStartFFBattle} />}
+      {/* FF フリーフィールド戦闘オーバーレイ（TurnBattle） */}
+      {ffBattleRunState && freeFieldTabActive && (
+        <div style={{ position: 'fixed', inset: 0, background: '#0a0d14', zIndex: 1000, overflowY: 'auto' }}>
+          <div style={{ maxWidth: 520, margin: '0 auto', padding: '12px 12px 80px' }}>
+            <div style={{ background: 'rgba(96,160,255,0.10)', border: '1px solid #2d3752', borderRadius: 8, padding: '6px 12px', marginBottom: 10, fontSize: '0.72rem', color: '#60a0ff', fontWeight: 700 }}>
+              🗺️ フリーフィールド戦闘 — {ffBattleRunState.currentAreaName}
+            </div>
+            <TurnBattle
+              key={ffBattleKey}
+              runState={ffBattleRunState}
+              equipment={player?.equipment ?? defaultEquipmentSlots()}
+              onBattleEnd={handleFFBattleEnd}
+              onEscape={handleFFBattleEscape}
+              initialMana={ffBattleMana}
+              onManaUpdate={setFfBattleMana}
+            />
+          </div>
+        </div>
+      )}
       {!gachaTabActive && !trapTabActive && !freeFieldTabActive && <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <h2 style={{ fontFamily: 'Cinzel,serif', color: '#f0c060', borderBottom: '1px solid #2d3752', paddingBottom: 8, flex: 1 }}>⚔️ ダンジョン</h2>

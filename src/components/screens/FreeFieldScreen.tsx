@@ -4,7 +4,6 @@
 // GatheringScreen には混ぜない。向き依存表現は使わない。
 
 import { useState, useMemo, useCallback } from 'react';
-import { FFBattleUI } from '../combat/UnifiedBattleUI';
 import {
   FREE_FIELD_WORLDS,
   FREE_FIELD_AREAS_ALL,
@@ -21,16 +20,11 @@ import type {
   FreeFieldNodeType,
   FreeFieldNodeAction,
   FreeFieldNodeActionType,
-  FFBattleSession,
   FFHarvestResult,
 } from '../../types/freefield';
 import { FFGG_ENCOUNTER_TABLE, FFGG_ALL_ENEMIES } from '../../data/ffggMaster';
 import { useGameStore } from '../../stores/gameStore';
 import {
-  initFFBattleSession,
-  playerAttack as doPlayerAttack,
-  enemyTurn as doEnemyTurn,
-  tryEscape,
   executeFFHarvest,
 } from '../../systems/ffBattleSystem';
 
@@ -1167,14 +1161,28 @@ function FFHarvestTab() {
 // ────────────────────────────────────────────
 // メイン
 // ────────────────────────────────────────────
-export function FreeFieldScreen() {
+// FF エリアID → DUNGEON_MASTER のダンジョンID へのマッピング
+const FF_AREA_TO_DUNGEON: Record<string, string> = {
+  ffgg_forest:  'ff_forest',
+  ffgg_plain:   'ff_plain',
+  ffgg_desert:  'ff_desert',
+  ffgg_snow:    'ff_snow',
+  ffgg_savanna: 'ff_savanna',
+  ffgg_pirate:  'ff_pirate',
+};
+
+export interface FFBattleRequest {
+  dungeonId: string;
+  areaName: string;
+}
+
+export function FreeFieldScreen({ onStartFFBattle }: { onStartFFBattle?: (req: FFBattleRequest) => void }) {
   const [selectedWorldId, setSelectedWorldId] = useState<string>(FREE_FIELD_WORLDS[0].id);
   const [activeAreaId, setActiveAreaId] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<FreeFieldNode | null>(null);
   const [activeTab, setActiveTab] = useState<'map' | 'harvest'>('map');
 
-  // モーダル状態
-  const [battleSession, setBattleSession] = useState<FFBattleSession | null>(null);
+  // バトル状態 — 実際の戦闘はDungeonScreenのTurnBattleに委譲（onStartFFBattle prop）
   const [harvestResult, setHarvestResult] = useState<FFHarvestResult | null>(null);
   const [showTester, setShowTester] = useState(false);
   const [feverAction, setFeverAction] = useState<FreeFieldNodeAction | null>(null);
@@ -1183,11 +1191,6 @@ export function FreeFieldScreen() {
   const player = useGameStore(s => s.player);
   const setGlobalTab = useGameStore(s => s.setActiveTab);
   const addNotification = useGameStore(s => s.addNotification);
-
-  const playerHp = player?.stats?.hp ?? 100;
-  const playerMaxHp = player?.stats?.maxHp ?? 100;
-  const playerAtk = player?.stats?.attack ?? 30;
-  const playerDef = player?.stats?.defense ?? 15;
 
   const world = FREE_FIELD_WORLDS.find(w => w.id === selectedWorldId)!;
   const areas = getAreasByWorld(world.id);
@@ -1219,53 +1222,19 @@ export function FreeFieldScreen() {
     }
   }, [activeAreaId, addNotification]);
 
-  // ── バトル開始 ──
-  const handleBattleStart = useCallback((action: FreeFieldNodeAction, node: FreeFieldNode) => {
-    const profileId = action.encounterProfileId ?? node.areaId;
-    const session = initFFBattleSession({
-      nodeId: node.id,
-      areaId: node.areaId,
-      encounterProfileId: profileId,
-      playerHp,
-      playerMaxHp,
-    });
-    if (!session) {
-      addNotification('error', 'このエリアに戦闘トリガーが設定されていません');
+  // ── バトル開始（親DungeonScreenのTurnBattleに委譲） ──
+  const handleBattleStart = useCallback((_action: FreeFieldNodeAction, node: FreeFieldNode) => {
+    const dungeonId = FF_AREA_TO_DUNGEON[node.areaId];
+    if (!dungeonId) {
+      addNotification('error', 'このエリアは戦闘未対応です');
       return;
     }
-    setBattleSession(session);
-  }, [playerHp, playerMaxHp, addNotification]);
-
-  // ── バトル操作 ──
-  const handlePlayerAttack = useCallback(() => {
-    if (!battleSession) return;
-    let s = doPlayerAttack(battleSession, playerAtk);
-    // 敵ターンを自動実行
-    if (s.turn === 'enemy' && !s.result) {
-      setTimeout(() => {
-        setBattleSession(prev => {
-          if (!prev) return prev;
-          const afterEnemy = doEnemyTurn(prev, playerDef);
-          return afterEnemy;
-        });
-      }, 600);
+    if (onStartFFBattle) {
+      onStartFFBattle({ dungeonId, areaName: node.displayName });
+    } else {
+      addNotification('warning', '戦闘を開始するにはダンジョンタブから入ってください');
     }
-    setBattleSession(s);
-  }, [battleSession, playerAtk, playerDef]);
-
-  const handleEscape = useCallback(() => {
-    if (!battleSession) return;
-    const s = tryEscape(battleSession);
-    setBattleSession(s);
-  }, [battleSession]);
-
-  const handleBattleClose = useCallback(() => {
-    if (battleSession?.result === 'win') {
-      addNotification('success', `戦闘勝利！ EXP+${battleSession.expGained} Gold+${battleSession.goldGained}`);
-      // TODO: 実際にプレイヤーにEXP/ゴールド付与するには playerSlice.addExp など追加が必要
-    }
-    setBattleSession(null);
-  }, [battleSession, addNotification]);
+  }, [addNotification, onStartFFBattle]);
 
   // ── 採集 ──
   const handleHarvestStart = useCallback((action: FreeFieldNodeAction, node: FreeFieldNode) => {
@@ -1317,22 +1286,6 @@ export function FreeFieldScreen() {
 
   return (
     <div style={{ padding: '4px 0 80px' }}>
-      {/* バトルUI（ダンジョン戦闘と統一されたデザイン） */}
-      {battleSession && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-        }}>
-          <div style={{ maxWidth: 420, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <FFBattleUI
-              session={battleSession}
-              onPlayerAttack={handlePlayerAttack}
-              onEscape={handleEscape}
-              onClose={handleBattleClose}
-            />
-          </div>
-        </div>
-      )}
       {/* 採集結果モーダル */}
       {harvestResult && (
         <FFHarvestModal result={harvestResult} onClose={() => setHarvestResult(null)} />
