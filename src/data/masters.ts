@@ -600,6 +600,92 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
     ],
     useEffect: { attackBonus: 0, message: '=-=Cataclysm Spear-Level1=-=を発動！武器を選んでください。', attackType: 'physical' },
   },
+
+  emerald_crusade: {
+    id: 'emerald_crusade',
+    name: 'Emerald Crusade',
+    description: '使用後6ターン後に貫通含む複数ヒットダメージ（物理16×8、貫通10×8、貫通20×2）を与える（発動後クールダウン7ターン）。使用時から2ターンは回復不可＋HPが25%以下に固定される。',
+    category: 'weapon', itemType: 'Weapon', rarity: 'epic',
+    sellPrice: 0, buyPrice: 0, maxStack: 1, icon: 'emerald_crusade_png',
+    weaponAtk: 0,
+    nonconsumable: true,
+    weaponSkills: [
+      { type: 'delayed_multihit' as const, delayTurns: 6, hits: [
+        { dmg: 16, count: 8, penetrate: false },
+        { dmg: 10, count: 8, penetrate: true },
+        { dmg: 20, count: 2, penetrate: true },
+      ], cooldownTurns: 7 },
+      { type: 'self_lock' as const, noHealTurns: 2, hpCapPct: 25, capTurns: 2 },
+    ],
+    useEffect: { attackBonus: 0, message: 'Emerald Crusadeを発動！刃に魔力を込めた...', attackType: 'physical' },
+  },
+  amethyst_storeak: {
+    id: 'amethyst_storeak',
+    name: 'Amethyst Storeak',
+    description: '物理21+(戦闘中の敵の数×15)＋貫通11ダメージで攻撃。ランダムな敵1体を3ターン攻撃不可にする。',
+    category: 'weapon', itemType: 'Weapon', rarity: 'epic',
+    sellPrice: 0, buyPrice: 0, maxStack: 1, icon: 'amethyst_storeak_png',
+    weaponAtk: 0,
+    nonconsumable: true,
+    weaponSkills: [
+      { type: 'scaling_attack' as const, base: 21, perEnemy: 15, penetrate: 11 },
+      { type: 'random_stun' as const, stunTurns: 3 },
+    ],
+    useEffect: { attackBonus: 0, message: 'Amethyst Storeakで斬りつけた！', attackType: 'physical' },
+  },
+  jewelry_cane: {
+    id: 'jewelry_cane',
+    name: 'jewelry cane',
+    description: '自身の防御力を5ターンの間1.5倍にする（発動後クールダウン8ターン）。発動後5ターンは自分のHPに比例した5%の割合ダメージを受ける。',
+    category: 'weapon', itemType: 'Weapon', rarity: 'rare',
+    sellPrice: 0, buyPrice: 0, maxStack: 1, icon: 'jewelry_cane_png',
+    weaponAtk: 0,
+    nonconsumable: true,
+    weaponSkills: [
+      { type: 'def_buff_self_dmg' as const, defMultiplier: 1.5, buffTurns: 5, selfDmgPct: 5, selfDmgTurns: 5, cooldownTurns: 8 },
+    ],
+    useEffect: { attackBonus: 0, message: 'jewelry caneを構えた！防御力が上昇する...', attackType: 'physical' },
+  },
+  damage_to_heal: {
+    id: 'damage_to_heal',
+    name: 'Damage-to-heal',
+    description: '使用時に最大HPの10%分自傷し、その3ターン後に最大HPの30%分HPを回復する（クールダウン8ターン）。',
+    category: 'weapon', itemType: 'Weapon', rarity: 'rare',
+    sellPrice: 0, buyPrice: 0, maxStack: 1, icon: 'damage_to_heal_png',
+    weaponAtk: 0,
+    nonconsumable: true,
+    weaponSkills: [
+      { type: 'delayed_self_heal' as const, selfDamagePct: 10, healDelayTurns: 3, healPct: 30, cooldownTurns: 8 },
+    ],
+    useEffect: { attackBonus: 0, message: 'Damage-to-healを発動！自分の血を糧に力を蓄える...', attackType: 'physical' },
+  },
+  gread_strophea: {
+    id: 'gread_strophea',
+    name: 'Gread Strophea',
+    description: 'Manaを40消費して物理5ダメージをManaがなくなるまでそのターン出し続ける（クールダウン3ターン）。与えた合計ダメージが敵合計HPに占める割合(%)+20だけ満腹度を上昇させる（上限100）。',
+    category: 'weapon', itemType: 'Weapon', rarity: 'rare',
+    sellPrice: 0, buyPrice: 0, maxStack: 1, icon: 'gread_strophea_png',
+    weaponAtk: 0,
+    nonconsumable: true,
+    weaponSkills: [
+      { type: 'mana_drain_repeat' as const, manaBudget: 40, perHitManaCost: 1, perHitDamage: 5, cooldownTurns: 3 },
+      { type: 'satiety_from_damage_pct' as const, bonusFlat: 20 },
+    ],
+    useEffect: { attackBonus: 0, message: 'Gread Stropheaが唸る！連続攻撃を開始！', attackType: 'physical' },
+  },
+  mana_rod: {
+    id: 'mana_rod',
+    name: 'Mana Rod',
+    description: '使用時にManaを120回復する（クールダウンなし）。',
+    category: 'weapon', itemType: 'Weapon', rarity: 'uncommon',
+    sellPrice: 0, buyPrice: 0, maxStack: 1, icon: 'mana_rod_png',
+    weaponAtk: 0,
+    nonconsumable: true,
+    weaponSkills: [
+      { type: 'mana_restore_on_use' as const, amount: 120 },
+    ],
+    useEffect: { attackBonus: 0, message: 'Mana Rodを掲げた！Manaが満ちていく...', attackType: 'physical' },
+  },
 };
 
 // ============================================================
