@@ -2286,6 +2286,24 @@ export function DungeonScreen() {
     const areas = dungeon?.areas;
     let nextAreaIdx = runState.currentAreaIdx ?? 0;
     let isComplete = false;
+
+    // 洞窟王（初級ダンジョンの最終エリア）は1体倒したらクリア選択を即表示
+    if (
+      runState.dungeonId === 'beginner_cave' &&
+      areas &&
+      nextAreaIdx === areas.length - 1
+    ) {
+      recordDungeonClear(runState.dungeonId);
+      addNotification('success', `🏆 洞窟王撃破！🪙 ガチャコイン+1枚！`);
+      if (player) postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'dungeon_clear', message: `が「${dungeon?.name}」をクリアしました！` }).catch(() => {});
+      setRunState(prev => prev ? {
+        ...prev, monstersDefeated: newDefeated, totalExp: newExp, totalGold: newGold,
+        totalDrops: allDrops, isComplete: false,
+      } : null);
+      setShowBossChoice(true);
+      return;
+    }
+
     if (newDefeated % areaThreshold === 0 && areas) {
       if (nextAreaIdx < areas.length - 1) {
         nextAreaIdx = nextAreaIdx + 1;
@@ -2757,7 +2775,7 @@ export function DungeonScreen() {
                       delay += 2000;
                     });
                     // 覚醒抽選
-                    const willAwaken = Math.random() < 0.2;
+                    const willAwaken = secureRandom() < 0.2;
                     if (willAwaken) {
                       const awakenLines: { text: string; color: string }[] = [
                         { text: '....', color: '#ff8c00' },
@@ -2782,10 +2800,10 @@ export function DungeonScreen() {
                         setKxBossMode(true);
                       }, delay);
                     } else {
-                      // 覚醒なし → コイン4つ付与してクリア
+                      // 覚醒なし → ガチャコイン4枚付与してクリア
                       setTimeout(() => {
-                        changeWealthCoin(4);
-                        addNotification('success', '🌟 裏超上級クリア！WCを4枚獲得！');
+                        recordDungeonClear('sky_castle_ex');
+                        addNotification('success', '🌟 裏超上級クリア！🪙 ガチャコイン+4枚獲得！');
                         setRunState(prev => prev ? { ...prev, isComplete: true } : null);
                       }, delay);
                     }
