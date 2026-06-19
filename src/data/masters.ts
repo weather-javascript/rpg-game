@@ -580,6 +580,26 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   wolf_magic_crystal: { id:'wolf_magic_crystal', name:'狼牙魔結晶', description:'波狼が落とす強力な魔力結晶。雪山の力を宿す。【入手】雪山⑤ボス 波狼【用途】雪山系最上位装備', category:'material', itemType:'Item', rarity:'epic',  sellPrice:4000, buyPrice:0, maxStack:99, icon:'crystal_ball' },
   carib_rough_wave: { id:'carib_rough_wave', name:'カリブの荒波',  description:'海賊船エリアのフィーバー中のみ入手可能な特殊素材。【入手】海賊船⑩フィーバー限定【用途】海賊系最上位装備', category:'material', itemType:'Item', rarity:'rare',    sellPrice:2000, buyPrice:0, maxStack:99, icon:'wave' },
   // ※ caribbean_wave は既存IDと同義なので上書きせず carib_rough_wave として追加
+
+  // ============================================================
+  // サポート武器：=-=Cataclysm Spear-Level1=-=
+  // ============================================================
+  cataclysm_spear_lv1: {
+    id: 'cataclysm_spear_lv1',
+    name: '=-=Cataclysm Spear-Level1=-=',
+    description: 'ホットバーに入れている時HP+20、今つけている防具の防御力を1.15倍にする。発動すると攻撃判定にはならず、この武器と追加で2つの武器を選択して同時に攻撃・スキル発動できる（クールタイム3ターン）。発動後Mana120回復。',
+    category: 'weapon', itemType: 'Weapon', rarity: 'legendary',
+    sellPrice: 0, buyPrice: 0, maxStack: 1, icon: 'cataclysm_spear_png',
+    weaponAtk: 0,
+    weaponHpBonus: 20,
+    defenseMultiplier: 1.15,
+    cooldownTurns: 3,
+    nonconsumable: true,
+    weaponSkills: [
+      { type: 'multi_weapon_cast' as const, selectCount: 2, manaRestore: 120, cooldownTurns: 3 },
+    ],
+    useEffect: { attackBonus: 0, message: '=-=Cataclysm Spear-Level1=-=を発動！武器を選んでください。', attackType: 'physical' },
+  },
 };
 
 // ============================================================
@@ -1408,6 +1428,29 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     inputs: [{ itemId: 'ff_coin_small', amount: 9 }],
     requiredCraftingLevel: 10,
     craftingExpGain: 80,
+  },
+
+  // ── サポート武器：=-=Cataclysm Spear-Level1=-= ──
+  {
+    id: 'cataclysm_spear_lv1_craft',
+    name: '=-=Cataclysm Spear-Level1=-=を作る',
+    description: '安定出力パール×6、圧縮ダイヤブロック×16、洞窟王の宝石×32、LIFE CONTROL SYSTEM CORE×2、オンタイムチケット×30から作成する。',
+    outputItemId: 'cataclysm_spear_lv1',
+    outputAmount: 1,
+    inputs: [
+      { itemId: 'stable_pearl', amount: 6 },
+      { itemId: 'compressed_diamond_ore_block', amount: 16 },
+      { itemId: 'cave_king_gem', amount: 32 },
+      { itemId: 'life_control_core', amount: 2 },
+      { itemId: 'ontime_ticket', amount: 30 },
+    ],
+    shape: [
+      'stable_pearl', 'compressed_diamond_ore_block', 'cave_king_gem',
+      '', 'life_control_core', '',
+      'ontime_ticket', 'ontime_ticket', 'ontime_ticket',
+    ],
+    requiredCraftingLevel: 50,
+    craftingExpGain: 20000,
   },
 
   // ── ホワイトバジル上位ポーション ──
