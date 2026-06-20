@@ -214,6 +214,7 @@ export interface WeaponSatietyFromDamageSkill {
 export interface WeaponManaRestoreOnUseSkill {
   type: 'mana_restore_on_use';
   amount: number;
+  cooldownTurns?: number;
 }
 export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill | WeaponGoliathSkill | WeaponSilversEyeSkill | WeaponFrostbiteSelfDamageSkill | WeaponPenetrateOnUseChanceSkill | WeaponBurnPerTurnSkill | WeaponMultiCastSkill | WeaponDelayedMultiHitSkill | WeaponSelfLockSkill | WeaponScalingAttackSkill | WeaponRandomStunSkill | WeaponDefBuffSelfDamageSkill | WeaponDelayedSelfHealSkill | WeaponManaDrainRepeatSkill | WeaponSatietyFromDamageSkill | WeaponManaRestoreOnUseSkill;
 
