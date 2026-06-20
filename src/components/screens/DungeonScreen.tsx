@@ -25,6 +25,16 @@ function calcDamage(atk: number, def: number): number {
 }
 
 // ============================================================
+// モンスターのdefensePct（被ダメージ軽減率）を実戦闘に反映
+// 貫通攻撃（penetrate / areaPenetrate）はこの軽減を無視する想定のため、
+// 貫通分岐の外側（通常calcDamage結果）にのみ適用すること。
+// ============================================================
+function applyDefensePct(dmg: number, mon: MonsterMaster | null | undefined): number {
+  if (!mon?.defensePct) return dmg;
+  return Math.max(1, Math.round(dmg * (1 - mon.defensePct)));
+}
+
+// ============================================================
 // 防具によるダメージ軽減（統一計算式）
 // 最終被ダメージ = 元のダメージ * (1 - 軽減ポイント/25) * (1 - 合計EPF/25)
 // 軽減ポイント = min(20, max(防御力/5, 防御力 - (4*元のダメージ)/(防具強度+8)))
@@ -662,7 +672,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
               const h = flatHits[hitIdx];
               const cur = prev.enemies[tIdx];
               const mon = getMergedMonster(cur.monsterId);
-              const dmg = h.penetrate ? h.dmg : calcDamage(h.dmg, mon?.defense ?? 0);
+              const dmg = h.penetrate ? h.dmg : applyDefensePct(calcDamage(h.dmg, mon?.defense ?? 0), mon);
               const prevHp = cur.hp;
               const newHp = Math.max(0, prevHp - dmg);
               const newEnemiesArr = prev.enemies.map((e, i) => i === tIdx ? { ...e, hp: newHp } : e);
@@ -836,6 +846,9 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     for (const enemy of aliveAfterPassive) {
       const monster = getMergedMonster(enemy.monsterId);
       if (!monster) continue;
+      // 実効攻撃力：attackがフレーバー値止まり（ドワーフ系等のスキル依存個体）の場合は
+      // effectiveAttackを実戦闘ダメージに使用する。未設定の個体は従来通りattackを使用。
+      const realAtk = monster.effectiveAttack ?? monster.attack;
 
       // Goliathシールドによるスタン：このターン攻撃不可
       const enemyIdx = newBattle.enemies.findIndex(e => e === enemy || (e.monsterId === enemy.monsterId && e.hp === enemy.hp));
@@ -874,7 +887,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           continue;
         }
         // 通常攻撃
-        const mDmg = getArmorReducedDamage(monster.attack);
+        const mDmg = getArmorReducedDamage(realAtk);
         let reducedDmg = newBattle.isDefending ? Math.floor(mDmg * 0.5) : mDmg;
         if (hpCapActive) reducedDmg = 0;
         changeHp(-reducedDmg);
@@ -888,8 +901,8 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
 
       const isSpecial = monster.isBoss && randomChance(0.2);
       let mDmg = isSpecial
-        ? Math.floor(getArmorReducedDamage(monster.attack) * 1.5)
-        : getArmorReducedDamage(monster.attack);
+        ? Math.floor(getArmorReducedDamage(realAtk) * 1.5)
+        : getArmorReducedDamage(realAtk);
       if (weaponItem?.weaponSkills) {
         const shield = weaponItem.weaponSkills.find(s => s.type === 'hotbar_shield') as WeaponShieldSkill | undefined;
         if (shield) {
@@ -909,7 +922,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         changeHp(-(currentHp - 10));
         newLog.push({ text: `🛡️ Goliathが致命打を受けた！HP10で耐えた！`, color: '#00e5ff' });
         newLog.push(isSpecial
-          ? { text: `💥 ${monster.name}の特殊攻撃！ しかしGoliathが守った！`, color: '#e05555' }
+          ? { text: `💥 ${monster.name}の「${monster.specialAttack ?? '特殊攻撃'}」！ しかしGoliathが守った！`, color: '#e05555' }
           : { text: `🐉 ${monster.name}の攻撃！ Goliathが守った！${newBattle.isDefending ? '（防御中）' : ''}`, color: '#e05555' }
         );
         continue;
@@ -919,7 +932,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       newLog.push(hpCapActive
         ? { text: `🐉 ${monster.name}の攻撃！ HP固定により無効化！`, color: '#e05555' }
         : isSpecial
-          ? { text: `💥 ${monster.name}の特殊攻撃！ あなたに${reducedDmg}ダメージ！`, color: '#e05555' }
+          ? { text: `💥 ${monster.name}の「${monster.specialAttack ?? '特殊攻撃'}」！ あなたに${reducedDmg}ダメージ！`, color: '#e05555' }
           : { text: `🐉 ${monster.name}の攻撃！ あなたに${reducedDmg}ダメージ${newBattle.isDefending ? '（防御中）' : ''}`, color: '#e05555' }
       );
       if (newPlayerHp <= 0) {
@@ -957,7 +970,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       if (e.hp <= 0) return e;
       if (!isArea && i !== targetIdx) return e;
       const mon = getMergedMonster(e.monsterId);
-      const dmg = (areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0)) + reitoumaguroPenetrateDmg;
+      const dmg = (areaPen > 0 ? areaPen : applyDefensePct(calcDamage(atkBase, mon?.defense ?? 0), mon)) + reitoumaguroPenetrateDmg;
       fxHits.push({ idx: i, damage: dmg, isCritical: reitoumaguroPenetrateDmg > 0 });
       return { ...e, hp: Math.max(0, e.hp - dmg) };
     });
@@ -977,7 +990,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       if (e.hp <= 0) return acc;
       if (!isArea && i !== targetIdx) return acc;
       const mon = getMergedMonster(e.monsterId);
-      return acc + (areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0)) + reitoumaguroPenetrateDmg;
+      return acc + (areaPen > 0 ? areaPen : applyDefensePct(calcDamage(atkBase, mon?.defense ?? 0), mon)) + reitoumaguroPenetrateDmg;
     }, 0);
 
     const logMsg = isArea
@@ -1123,7 +1136,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         if (e.hp <= 0) continue;
         if (!isArea && i !== targetIdx) continue;
         const mon = getMergedMonster(e.monsterId);
-        const dmg = (areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0)) + extraPenetrateDmg;
+        const dmg = (areaPen > 0 ? areaPen : applyDefensePct(calcDamage(atkBase, mon?.defense ?? 0), mon)) + extraPenetrateDmg;
         weaponTotal += dmg;
         const prevHp = e.hp;
         e.hp = Math.max(0, e.hp - dmg);
@@ -1526,7 +1539,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
             const aliveCount = prev.enemies.filter(e => e.hp > 0).length;
             const atkBase = scalingSkill.base + aliveCount * scalingSkill.perEnemy;
             const mon = getMergedMonster(prev.enemies[targetIdx].monsterId);
-            const dmg = calcDamage(atkBase, mon?.defense ?? 0) + scalingSkill.penetrate;
+            const dmg = applyDefensePct(calcDamage(atkBase, mon?.defense ?? 0), mon) + scalingSkill.penetrate;
             const newEnemies = prev.enemies.map((e, i) => i === targetIdx ? { ...e, hp: Math.max(0, e.hp - dmg) } : e);
             combatFx.triggerEnemyFx(itemId, [{ idx: targetIdx, damage: dmg, isCritical: false }]);
             const logEntries = [{ text: `⚔️ ${item.name}で攻撃！ ${dmg}ダメージ！`, color: '#f0c060' }];
@@ -1602,7 +1615,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           guard++;
           const tIdx = enemiesSim.findIndex(e => e.hp > 0);
           const mon = getMergedMonster(enemiesSim[tIdx].monsterId);
-          const dmg = calcDamage(manaDrainSkill.perHitDamage, mon?.defense ?? 0);
+          const dmg = applyDefensePct(calcDamage(manaDrainSkill.perHitDamage, mon?.defense ?? 0), mon);
           enemiesSim = enemiesSim.map((e, i) => i === tIdx ? { ...e, hp: Math.max(0, e.hp - dmg) } : e);
           hitResults.push({ enemies: enemiesSim.map(e => ({ ...e })), tIdx, dmg });
           mana -= manaDrainSkill.perHitManaCost;
@@ -1698,7 +1711,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           enemies = enemies.map(e => {
             if (e.hp <= 0) return e;
             const mon = getMergedMonster(e.monsterId);
-            const dmg = calcDamage(silversSkill.attackDmg, mon?.defense ?? 0) + silversSkill.penetrateDmg;
+            const dmg = applyDefensePct(calcDamage(silversSkill.attackDmg, mon?.defense ?? 0), mon) + silversSkill.penetrateDmg;
             dmgList.push({ name: mon?.name ?? e.monsterId, dmg });
             return { ...e, hp: Math.max(0, e.hp - dmg) };
           });
@@ -1837,7 +1850,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
             if (e.hp <= 0) return e;
             if (!isAreaW && i !== targetIdx) return e;
             const mon = getMergedMonster(e.monsterId);
-            const dmg = areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0);
+            const dmg = areaPen > 0 ? areaPen : applyDefensePct(calcDamage(atkBase, mon?.defense ?? 0), mon);
             inlineFxHits.push({ idx: i, damage: dmg, isCritical: false });
             return { ...e, hp: Math.max(0, e.hp - dmg) };
           });
@@ -2074,7 +2087,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
                   const aliveCount = prev.enemies.filter(e => e.hp > 0).length;
                   const atkBase = scSkill.base + aliveCount * scSkill.perEnemy;
                   const mon = getMergedMonster(prev.enemies[idx].monsterId);
-                  const dmg = calcDamage(atkBase, mon?.defense ?? 0) + scSkill.penetrate;
+                  const dmg = applyDefensePct(calcDamage(atkBase, mon?.defense ?? 0), mon) + scSkill.penetrate;
                   const newEnemies = prev.enemies.map((e, i) => i === idx ? { ...e, hp: Math.max(0, e.hp - dmg) } : e);
                   combatFx.triggerEnemyFx(pending.itemId!, [{ idx, damage: dmg, isCritical: false }]);
                   const logEntries = [{ text: `⚔️ ${scItem?.name ?? ''}で攻撃！ ${dmg}ダメージ！`, color: '#f0c060' }];
@@ -2097,7 +2110,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
                   const newEnemies = prev.enemies.map((e, i) => {
                     if (e.hp <= 0 || i !== idx) return e;
                     const mon = getMergedMonster(e.monsterId);
-                    const dmg = calcDamage(atkBase, mon?.defense ?? 0);
+                    const dmg = applyDefensePct(calcDamage(atkBase, mon?.defense ?? 0), mon);
                     return { ...e, hp: Math.max(0, e.hp - dmg) };
                   });
                   const logEntries = [{ text: `🗡️ ${item?.name ?? ''}で攻撃！`, color: '#f0c060' }];
