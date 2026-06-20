@@ -137,6 +137,23 @@ export function CraftingScreen() {
   const [deletedDefaultRecipeIds, setDeletedDefaultRecipeIds] = useState<string[]>([]);
   const [tab, setTab] = useState<'craft' | 'recipes' | 'tool_recipes'>('craft');
 
+  // レシピ一覧タブ用: 検索・カテゴリ絞り込み・製作可能のみ・並び順・お気に入り
+  const [recipeSearchText, setRecipeSearchText] = useState('');
+  const [recipeCategoryFilter, setRecipeCategoryFilter] = useState<string>('all');
+  const [recipeCraftableOnly, setRecipeCraftableOnly] = useState(false);
+  const [recipeSortMode, setRecipeSortMode] = useState<'level' | 'craftable'>('level');
+  const [recipeFavorites, setRecipeFavorites] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('craft_recipe_favorites') ?? '[]')); } catch { return new Set(); }
+  });
+  const toggleRecipeFavorite = (recipeId: string) => {
+    setRecipeFavorites(prev => {
+      const next = new Set(prev);
+      if (next.has(recipeId)) next.delete(recipeId); else next.add(recipeId);
+      localStorage.setItem('craft_recipe_favorites', JSON.stringify([...next]));
+      return next;
+    });
+  };
+
   // Firestoreからカスタムレシピを購読
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'admin', 'craft_recipes'), snap => {
@@ -511,68 +528,169 @@ export function CraftingScreen() {
         </div>
       )}
 
-      {tab === 'recipes' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {allRecipes.map(recipe => {
+      {tab === 'recipes' && (() => {
+        const filteredSortedRecipes = (() => {
+          let list = allRecipes.filter(recipe => {
             const outItem = ITEM_MASTER[recipe.outputItemId];
-            const canCraft = craftingLevel >= recipe.requiredCraftingLevel;
-            const hasAll = recipe.inputs.every(inp => (inv[inp.itemId] ?? 0) >= inp.amount);
-            return (
-              <div key={recipe.id}
-                style={{
-                  background: '#1c2235', border: `1px solid ${hasAll && canCraft ? '#4caf87' : '#2d3752'}`,
-                  borderRadius: 8, padding: '10px 12px',
-                }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                  <GameIcon id={outItem?.icon ?? 'gem'} size={24} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: canCraft ? '#e8e6ff' : '#4a5070' }}>
-                      {recipe.name}
+            if (!outItem) return false;
+            if (recipeSearchText && !recipe.name.includes(recipeSearchText) && !outItem.name.includes(recipeSearchText)) return false;
+            if (recipeCategoryFilter === 'favorites') {
+              if (!recipeFavorites.has(recipe.id)) return false;
+            } else if (recipeCategoryFilter !== 'all') {
+              const cat = outItem.category ?? 'other';
+              if (recipeCategoryFilter === 'other') {
+                if (['material', 'food', 'weapon', 'armor'].includes(cat)) return false;
+              } else if (cat !== recipeCategoryFilter) return false;
+            }
+            if (recipeCraftableOnly) {
+              const canCraft = craftingLevel >= recipe.requiredCraftingLevel;
+              const hasAll = recipe.inputs.every(inp => (inv[inp.itemId] ?? 0) >= inp.amount);
+              if (!(canCraft && hasAll)) return false;
+            }
+            return true;
+          });
+          const isCraftable = (r: CraftRecipe) =>
+            craftingLevel >= r.requiredCraftingLevel && r.inputs.every(inp => (inv[inp.itemId] ?? 0) >= inp.amount);
+          list = [...list].sort((a, b) => {
+            if (recipeSortMode === 'craftable') {
+              const aOk = isCraftable(a), bOk = isCraftable(b);
+              if (aOk !== bOk) return aOk ? -1 : 1;
+            }
+            return a.requiredCraftingLevel - b.requiredCraftingLevel;
+          });
+          return list;
+        })();
+
+        return (
+          <div>
+            {/* 検索バー */}
+            <input
+              value={recipeSearchText} onChange={e => setRecipeSearchText(e.target.value)}
+              placeholder="🔍 レシピ名・完成品名で検索..."
+              style={{ width: '100%', padding: '6px 10px', background: '#161b26', border: '1px solid #2d3752', color: '#e8e6ff', borderRadius: 6, fontSize: '0.8rem', boxSizing: 'border-box', marginBottom: 8 }}
+            />
+
+            {/* カテゴリ絞り込み */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+              {[
+                { id: 'all',       label: '全て' },
+                { id: 'favorites', label: '⭐ お気に入り' },
+                { id: 'material',  label: '🪨 素材' },
+                { id: 'food',      label: '🍖 食料' },
+                { id: 'weapon',    label: '⚔️ 武器' },
+                { id: 'armor',     label: '🛡️ 防具' },
+                { id: 'other',     label: '📦 その他' },
+              ].map(cat => (
+                <button key={cat.id} onClick={() => setRecipeCategoryFilter(cat.id)}
+                  style={{ padding: '3px 8px', fontSize: '0.7rem', borderRadius: 10, cursor: 'pointer', fontWeight: recipeCategoryFilter === cat.id ? 700 : 400,
+                    background: recipeCategoryFilter === cat.id ? '#5b8dee' : '#161b26',
+                    border: `1px solid ${recipeCategoryFilter === cat.id ? '#5b8dee' : '#2d3752'}`,
+                    color: recipeCategoryFilter === cat.id ? '#fff' : '#8a92b2' }}>
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 製作可能のみ表示 ＋ 並び順 */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+              <button onClick={() => setRecipeCraftableOnly(v => !v)}
+                style={{ padding: '4px 10px', fontSize: '0.72rem', borderRadius: 6, cursor: 'pointer', fontWeight: recipeCraftableOnly ? 700 : 400,
+                  background: recipeCraftableOnly ? 'rgba(76,175,135,0.2)' : '#161b26',
+                  border: `1px solid ${recipeCraftableOnly ? '#4caf87' : '#2d3752'}`,
+                  color: recipeCraftableOnly ? '#4caf87' : '#8a92b2' }}>
+                {recipeCraftableOnly ? '✅ 製作可能のみ表示中' : '☐ 製作可能のみ表示'}
+              </button>
+              <span style={{ fontSize: '0.7rem', color: '#4a5070', marginLeft: 'auto' }}>並び順:</span>
+              {[
+                { id: 'level' as const,     label: '必要Lv順' },
+                { id: 'craftable' as const, label: '製作可能を上に' },
+              ].map(opt => (
+                <button key={opt.id} onClick={() => setRecipeSortMode(opt.id)}
+                  style={{ padding: '4px 10px', fontSize: '0.72rem', borderRadius: 6, cursor: 'pointer', fontWeight: recipeSortMode === opt.id ? 700 : 400,
+                    background: recipeSortMode === opt.id ? '#5b8dee' : '#161b26',
+                    border: `1px solid ${recipeSortMode === opt.id ? '#5b8dee' : '#2d3752'}`,
+                    color: recipeSortMode === opt.id ? '#fff' : '#8a92b2' }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ fontSize: '0.68rem', color: '#4a5070', marginBottom: 6 }}>
+              {filteredSortedRecipes.length} / {allRecipes.length} 件表示中
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {filteredSortedRecipes.length === 0 && (
+                <div style={{ color: '#4a5070', fontSize: '0.78rem', padding: '12px 0', textAlign: 'center' }}>該当するレシピがありません</div>
+              )}
+              {filteredSortedRecipes.map(recipe => {
+                const outItem = ITEM_MASTER[recipe.outputItemId];
+                const canCraft = craftingLevel >= recipe.requiredCraftingLevel;
+                const hasAll = recipe.inputs.every(inp => (inv[inp.itemId] ?? 0) >= inp.amount);
+                const isFav = recipeFavorites.has(recipe.id);
+                return (
+                  <div key={recipe.id}
+                    style={{
+                      background: '#1c2235', border: `1px solid ${hasAll && canCraft ? '#4caf87' : '#2d3752'}`,
+                      borderRadius: 8, padding: '10px 12px', position: 'relative',
+                    }}>
+                    <button onClick={() => toggleRecipeFavorite(recipe.id)}
+                      title={isFav ? 'お気に入りを外す' : 'お気に入りに追加'}
+                      style={{ position: 'absolute', top: 8, right: 8, background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.95rem', color: isFav ? '#f0c060' : '#4a5070', padding: 0, lineHeight: 1 }}>
+                      {isFav ? '⭐' : '☆'}
+                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, paddingRight: 20 }}>
+                      <GameIcon id={outItem?.icon ?? 'gem'} size={24} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: canCraft ? '#e8e6ff' : '#4a5070' }}>
+                          {recipe.name}
+                        </div>
+                        <div style={{ fontSize: '0.65rem', color: '#4a5070' }}>{recipe.description}</div>
+                      </div>
+                      <div style={{ textAlign: 'right', fontSize: '0.68rem', color: '#8a92b2' }}>
+                        <div>Lv{recipe.requiredCraftingLevel}~</div>
+                        <div style={{ color: '#f0c060' }}>→ ×{recipe.outputAmount}</div>
+                      </div>
                     </div>
-                    <div style={{ fontSize: '0.65rem', color: '#4a5070' }}>{recipe.description}</div>
-                  </div>
-                  <div style={{ textAlign: 'right', fontSize: '0.68rem', color: '#8a92b2' }}>
-                    <div>Lv{recipe.requiredCraftingLevel}~</div>
-                    <div style={{ color: '#f0c060' }}>→ ×{recipe.outputAmount}</div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                  {/* 3x3 shapeプレビュー */}
-                  {recipe.shape && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 20px)', gap: 1, flexShrink: 0 }}>
-                      {recipe.shape.map((cell, si) => {
-                        const ci = cell ? ITEM_MASTER[cell] : null;
-                        return (
-                          <div key={si} style={{ width: 20, height: 20, background: cell ? 'rgba(91,141,238,0.25)' : '#111827', border: `1px solid ${cell ? '#5b8dee' : '#1c2235'}`, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {ci && <GameIcon id={ci.icon} size={14} />}
-                          </div>
-                        );
-                      })}
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      {/* 3x3 shapeプレビュー */}
+                      {recipe.shape && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 20px)', gap: 1, flexShrink: 0 }}>
+                          {recipe.shape.map((cell, si) => {
+                            const ci = cell ? ITEM_MASTER[cell] : null;
+                            return (
+                              <div key={si} style={{ width: 20, height: 20, background: cell ? 'rgba(91,141,238,0.25)' : '#111827', border: `1px solid ${cell ? '#5b8dee' : '#1c2235'}`, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {ci && <GameIcon id={ci.icon} size={14} />}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {recipe.inputs.map(inp => {
+                          const iitem = ITEM_MASTER[inp.itemId];
+                          const have = inv[inp.itemId] ?? 0;
+                          return (
+                            <span key={inp.itemId}
+                              style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '2px 6px', background: have >= inp.amount ? 'rgba(76,175,135,0.15)' : 'rgba(224,85,85,0.1)', border: `1px solid ${have >= inp.amount ? '#4caf87' : '#e05555'}`, borderRadius: 4, fontSize: '0.7rem', color: have >= inp.amount ? '#4caf87' : '#e05555' }}>
+                              <GameIcon id={iitem?.icon ?? 'gem'} size={14} />
+                              {iitem?.name ?? inp.itemId} ×{inp.amount}
+                              <span style={{ color: '#8a92b2' }}>({have})</span>
+                            </span>
+                          );
+                        })}
+                      </div>
                     </div>
-                  )}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                    {recipe.inputs.map(inp => {
-                      const iitem = ITEM_MASTER[inp.itemId];
-                      const have = inv[inp.itemId] ?? 0;
-                      return (
-                        <span key={inp.itemId}
-                          style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '2px 6px', background: have >= inp.amount ? 'rgba(76,175,135,0.15)' : 'rgba(224,85,85,0.1)', border: `1px solid ${have >= inp.amount ? '#4caf87' : '#e05555'}`, borderRadius: 4, fontSize: '0.7rem', color: have >= inp.amount ? '#4caf87' : '#e05555' }}>
-                          <GameIcon id={iitem?.icon ?? 'gem'} size={14} />
-                          {iitem?.name ?? inp.itemId} ×{inp.amount}
-                          <span style={{ color: '#8a92b2' }}>({have})</span>
-                        </span>
-                      );
-                    })}
+                    {customRecipes.find(r => r.id === recipe.id) && (
+                      <div style={{ fontSize: '0.62rem', color: '#5b8dee', marginTop: 4 }}>★ 管理者追加レシピ</div>
+                    )}
                   </div>
-                </div>
-                {customRecipes.find(r => r.id === recipe.id) && (
-                  <div style={{ fontSize: '0.62rem', color: '#5b8dee', marginTop: 4 }}>★ 管理者追加レシピ</div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {tab === 'tool_recipes' && (() => {
         const ownedSet = new Set(player?.ownedToolIds ?? []);
