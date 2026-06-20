@@ -416,6 +416,9 @@ export interface DungeonArea {
   description?: string;
   monsters: { monsterId: string; count: number; isBoss?: boolean; isMidBoss?: boolean }[];
   isHardArea?: boolean;
+  isCheckpoint?: boolean;   // CP表示用フラグ
+  checkpointLabel?: string; // 'CP1'〜'CP5' など
+  isBranchPoint?: boolean;  // ここでルート分岐UIを出す
 }
 
 export interface MonsterMaster {
@@ -446,6 +449,12 @@ export interface DungeonMaster {
   monsterIds: string[];
   floors: number;
   areas?: DungeonArea[];
+  // ノードベース分岐ルート（火山 CP3分岐などで使用）
+  routes?: {
+    main: DungeonArea[];   // 共通→CP3まで
+    lich: DungeonArea[];   // CP3リッチルート（分岐A）
+    back: DungeonArea[];   // 裏火山本線（分岐B）
+  };
   bossId?: string;
   expBonus: number;
   goldBonus: number;
@@ -699,6 +708,8 @@ export interface DungeonRunState {
   kxHp?: number;          // KX現在HP
   kxIsAwakened?: boolean; // KX覚醒状態
   kxAwakened?: boolean;   // 覚醒KXを討伐してクリア（生命の超越）
+  // 火山CP3分岐管理
+  volcanoRoute?: 'main' | 'lich' | 'back'; // main=共通ルート, lich=CP3リッチ単体, back=裏火山本線
 }
 
 export interface GambleResult {
