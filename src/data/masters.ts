@@ -1815,14 +1815,44 @@ export const MONSTER_MASTER: Record<string, MonsterMaster> = {
   exs_minion:    { id:'exs_minion',  name:'エクス',          description:'魔改造品をドロップ。', icon:'gem', maxHp:100, attack:35, defense:10, baseExp:80, baseGold:50, dungeonIds:['sky_castle_ex'], drops:[{itemId:'makai_bihin',baseRate:1.0,minAmount:1,maxAmount:1}] },
   lightning_minion:{ id:'lightning_minion',name:'ライトニングボルト',description:'高火力の雷攻撃。', icon:'lightning', maxHp:60, attack:60, defense:5, baseExp:70, baseGold:40, dungeonIds:['sky_castle_ex'], drops:[] },
   // 火山モンスター
-  dwarf_leather:   { id:'dwarf_leather',  name:'ドワーフ[皮]',  description:'皮防具のドワーフ。基本的な強さ。', icon:'mage', maxHp:60,  attack:8,  defense:3,  baseExp:25, baseGold:8,  dungeonIds:['volcano'], drops:[{itemId:'dwarf_fragment',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'magma_stone',baseRate:0.3,minAmount:1,maxAmount:1}] },
-  dwarf_iron:      { id:'dwarf_iron',     name:'ドワーフ[鉄]',  description:'鉄防具のドワーフ。それなりに硬い。', icon:'pickaxe_hammer', maxHp:80,  attack:12, defense:6,  baseExp:35, baseGold:12, dungeonIds:['volcano'], drops:[{itemId:'dwarf_fragment',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'magma_stone',baseRate:0.5,minAmount:1,maxAmount:1}] },
-  dwarf_diamond:   { id:'dwarf_diamond',  name:'ドワーフ[ダイヤ]', description:'ダイヤ防具。飛び道具を放つ。',   icon:'gem', maxHp:120, attack:18, defense:12, baseExp:60, baseGold:20, dungeonIds:['volcano'], drops:[{itemId:'dwarf_fragment',baseRate:1.0,minAmount:2,maxAmount:3},{itemId:'magma_stone',baseRate:0.8,minAmount:1,maxAmount:2}] },
-  dwarf_red:       { id:'dwarf_red',      name:'ドワーフ[赤]',  description:'火山固有の赤ドワーフ。火炎攻撃。', icon:'ore_red', maxHp:100, attack:15, defense:8,  baseExp:50, baseGold:15, dungeonIds:['volcano'], drops:[{itemId:'magic_stone',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'magma_stone',baseRate:0.8,minAmount:1,maxAmount:2}] },
-  dwarf_black:     { id:'dwarf_black',    name:'黒ドワーフ',    description:'火山最強のドワーフ系統。',         icon:'ore_dark', maxHp:160, attack:25, defense:15, baseExp:100,baseGold:40, dungeonIds:['volcano'], drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'magma_stone',baseRate:1.0,minAmount:2,maxAmount:3}] },
-  stain_pot:       { id:'stain_pot',      name:'ステインポット', description:'HP1だが自爆ダメージが凄まじい。',   icon:'bomb', maxHp:1,   attack:80, defense:0,  baseExp:5,  baseGold:2,  dungeonIds:['volcano'], drops:[{itemId:'magma_stone',baseRate:0.1,minAmount:1,maxAmount:1}] },
-  ragnalok:        { id:'ragnalok',       name:'ラグナロク',    description:'職業スケルトン最上位。極めて危険。', icon:'skull', maxHp:200, attack:45, defense:20, baseExp:200,baseGold:80, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'暗黒斬撃', drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:2,maxAmount:3},{itemId:'magma_stone',baseRate:1.0,minAmount:2,maxAmount:4}] },
-  volcano_boss:    { id:'volcano_boss',   name:'獄炎帝',        description:'火山の最終ボス。',                icon:'volcano', maxHp:5000, attack:80, defense:30, baseExp:2000,baseGold:1000, dungeonIds:['volcano'], isBoss:true, specialAttack:'業火爆発', drops:[{itemId:'extreme_flame_aura',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'volcano_crown',baseRate:0.5,minAmount:1,maxAmount:1},{itemId:'hard_magic_stone',baseRate:1.0,minAmount:5,maxAmount:10}] },
+  dwarf_leather:   { id:'dwarf_leather',  name:'ドワーフ[皮]',      description:'皮防具のドワーフ。基本的な強さ。', icon:'mage', maxHp:60,  attack:8,  defense:3,  baseExp:25, baseGold:8,  dungeonIds:['volcano'], drops:[{itemId:'dwarf_fragment',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'magma_stone',baseRate:0.3,minAmount:1,maxAmount:1}] },
+  dwarf_gold:      { id:'dwarf_gold',     name:'ドワーフ[金]',      description:'金防具のドワーフ。中堅の強さ。',   icon:'gold', maxHp:70,  attack:10, defense:5,  baseExp:30, baseGold:10, dungeonIds:['volcano'], drops:[{itemId:'dwarf_fragment',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'magma_stone',baseRate:0.4,minAmount:1,maxAmount:1}] },
+  dwarf_iron:      { id:'dwarf_iron',     name:'ドワーフ[鉄]',      description:'鉄防具のドワーフ。それなりに硬い。', icon:'pickaxe_hammer', maxHp:80,  attack:12, defense:6,  baseExp:35, baseGold:12, dungeonIds:['volcano'], drops:[{itemId:'dwarf_fragment',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'magma_stone',baseRate:0.5,minAmount:1,maxAmount:1}] },
+  dwarf_diamond:   { id:'dwarf_diamond',  name:'ドワーフ[ダイヤ]',  description:'ダイヤ防具。カオスフレアを放つ。',   icon:'gem', maxHp:120, attack:18, defense:12, baseExp:60, baseGold:20, dungeonIds:['volcano'], drops:[{itemId:'dwarf_fragment',baseRate:1.0,minAmount:2,maxAmount:3},{itemId:'magma_stone',baseRate:0.8,minAmount:1,maxAmount:2}] },
+  dwarf_crossbow:  { id:'dwarf_crossbow', name:'ドワーフ[クロスボウ]', description:'遠距離攻撃専門のドワーフ。溶岩上から狙撃する。', icon:'arrow', maxHp:65, attack:14, defense:4, baseExp:28, baseGold:10, dungeonIds:['volcano'], drops:[{itemId:'dwarf_fragment',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'magma_stone',baseRate:0.4,minAmount:1,maxAmount:1}] },
+  dwarf_red:       { id:'dwarf_red',      name:'ドワーフ[赤]',      description:'火山固有の赤ドワーフ。火炎攻撃。', icon:'ore_red', maxHp:100, attack:15, defense:8,  baseExp:50, baseGold:15, dungeonIds:['volcano'], drops:[{itemId:'magic_stone',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'magma_stone',baseRate:0.8,minAmount:1,maxAmount:2}] },
+  dwarf_black:     { id:'dwarf_black',    name:'黒ドワーフ',        description:'火山最強のドワーフ系統。プレイヤーの最大HPに比例した特大ダメージを放つ。', icon:'ore_dark', maxHp:160, attack:25, defense:15, baseExp:100,baseGold:40, dungeonIds:['volcano'], drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'magma_stone',baseRate:1.0,minAmount:2,maxAmount:3}] },
+  dwarf_ancient:   { id:'dwarf_ancient',  name:'エンシェントドワーフ', description:'古代種の強力なドワーフ。大橋地帯に配置される守護者。', icon:'ore_dark', maxHp:280, attack:35, defense:20, baseExp:180, baseGold:70, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'古代の怒り', drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:2,maxAmount:3},{itemId:'magma_stone',baseRate:1.0,minAmount:3,maxAmount:5}] },
+  dwarf_ancient_awakened: { id:'dwarf_ancient_awakened', name:'[覚醒]エンシェントドワーフ', description:'力を解放した古代ドワーフ。裏火山城1階に潜む。', icon:'ore_dark', maxHp:320, attack:40, defense:22, baseExp:220, baseGold:90, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'覚醒の業火', drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:2,maxAmount:4},{itemId:'magma_stone',baseRate:1.0,minAmount:3,maxAmount:6}] },
+  stain_pot:       { id:'stain_pot',      name:'ステインポット',    description:'HP1だが自爆ダメージが凄まじい。オリハルコン一式でも3〜4発で消し飛ぶ。', icon:'bomb', maxHp:1,   attack:80, defense:0,  baseExp:5,  baseGold:2,  dungeonIds:['volcano'], drops:[{itemId:'magma_stone',baseRate:0.1,minAmount:1,maxAmount:1}] },
+  stain_kid:       { id:'stain_kid',      name:'ステインキッド',    description:'小型化したステインポット。当たり判定が小さく倒しづらいが自爆威力は3割程度。', icon:'bomb', maxHp:3, attack:30, defense:0, baseExp:8, baseGold:3, dungeonIds:['volcano'], drops:[{itemId:'magma_stone',baseRate:0.1,minAmount:1,maxAmount:1}] },
+  ragnalok:        { id:'ragnalok',       name:'ラグナロク',        description:'職業スケルトン最上位。対策なしでは一瞬で殺される凶悪なステータス。', icon:'skull', maxHp:200, attack:45, defense:20, baseExp:200,baseGold:80, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'暗黒斬撃', drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:2,maxAmount:3},{itemId:'magma_stone',baseRate:1.0,minAmount:2,maxAmount:4}] },
+  bannerman:       { id:'bannerman',      name:'バナーマン',        description:'周囲のモンスターに強力なバフをばら撒く。ステインポットや赤ドワーフが猛スピードで突進してくる。', icon:'flag', maxHp:90, attack:10, defense:5, baseExp:60, baseGold:25, dungeonIds:['volcano'], specialAttack:'強化の旗', drops:[{itemId:'dwarf_fragment',baseRate:0.5,minAmount:1,maxAmount:2}] },
+  lumberjack:      { id:'lumberjack',     name:'ランバージャック',  description:'闇森から流れ込んだ木こり型の強敵。', icon:'sword', maxHp:130, attack:20, defense:8, baseExp:70, baseGold:30, dungeonIds:['volcano'], drops:[{itemId:'dwarf_fragment',baseRate:0.8,minAmount:1,maxAmount:2}] },
+  hunter:          { id:'hunter',         name:'ハンター',          description:'遠距離攻撃でこちらを打ち抜き、引いては狙撃しトラップをばら撒く。滅茶苦茶鬱陶しい。', icon:'arrow', maxHp:90, attack:22, defense:6, baseExp:55, baseGold:22, dungeonIds:['volcano'], drops:[{itemId:'dwarf_fragment',baseRate:0.5,minAmount:1,maxAmount:1}] },
+  hunter_trainee:  { id:'hunter_trainee', name:'見習いハンター',   description:'ハンターの下位互換。無視安定だが数が多い。', icon:'arrow', maxHp:60, attack:15, defense:3, baseExp:30, baseGold:12, dungeonIds:['volcano'], drops:[{itemId:'dwarf_fragment',baseRate:0.3,minAmount:1,maxAmount:1}] },
+  assassin:        { id:'assassin',       name:'アサシン',          description:'暗闇から即死級のアサシネイションを放つ職業スケルトン。絶対に無視してはいけない。', icon:'dagger', maxHp:110, attack:50, defense:8, baseExp:120, baseGold:50, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'アサシネイション', drops:[{itemId:'hard_magic_stone',baseRate:0.8,minAmount:1,maxAmount:2}] },
+  defender:        { id:'defender',       name:'ディフェンサー',    description:'視点切り替えでこちらを翻弄する嫌らしい職業系。貫通ダメージで倒すと早い。', icon:'shield', maxHp:180, attack:18, defense:30, baseExp:80, baseGold:35, dungeonIds:['volcano'], defensePct:0.5, drops:[{itemId:'hard_magic_stone',baseRate:0.6,minAmount:1,maxAmount:1}] },
+  super_defender:  { id:'super_defender', name:'スーパーディフェンサー', description:'ディフェンサーの上位種。更に硬い壁として立ちはだかる。貫通攻撃推奨。', icon:'shield', maxHp:350, attack:22, defense:50, baseExp:160, baseGold:65, dungeonIds:['volcano'], isMidBoss:true, defensePct:0.7, specialAttack:'鉄壁の盾', drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:1,maxAmount:2}] },
+  alchemist:       { id:'alchemist',      name:'アルケミスト',      description:'デバフポーションを投げてこちらのステータスを下げる。行動を封じるように動く。', icon:'potion', maxHp:80, attack:15, defense:5, baseExp:50, baseGold:20, dungeonIds:['volcano'], specialAttack:'デバフポーション', drops:[{itemId:'magic_stone',baseRate:0.5,minAmount:1,maxAmount:1}] },
+  evil_summoner:   { id:'evil_summoner',  name:'エビルサマナー',    description:'プレイヤーの目の前にステインポットや赤ドワーフを召喚する。BUSTERを呼ぶこともある。', icon:'skull', maxHp:85, attack:12, defense:4, baseExp:60, baseGold:25, dungeonIds:['volcano'], specialAttack:'眷属召喚', drops:[{itemId:'magic_stone',baseRate:0.4,minAmount:1,maxAmount:1}] },
+  hell_summoner:   { id:'hell_summoner',  name:'ヘルサマナー',      description:'15×15範囲に貫通5555ダメージの人口太陽を放つ。近づかずに倒せ。', icon:'skull', maxHp:120, attack:5555, defense:3, baseExp:200, baseGold:100, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'人口太陽', drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:1,maxAmount:2}] },
+  danger_crown:    { id:'danger_crown',   name:'デンジャークラウン', description:'ラグナロクの対となる中ボス格。非常に面倒な嫌め手使い。ラグナロク程の脅威ではない。', icon:'crown', maxHp:250, attack:35, defense:18, baseExp:180, baseGold:70, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'嫌め手連撃', drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'magma_stone',baseRate:1.0,minAmount:2,maxAmount:4}] },
+  buster:          { id:'buster',         name:'BUSTER',            description:'エビルサマナーが極稀に召喚する超危険個体。出てきたらデスルーラ推奨。', icon:'bomb', maxHp:800, attack:120, defense:40, baseExp:500, baseGold:300, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'バスタービーム', drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:3,maxAmount:5},{itemId:'volcano_crown',baseRate:0.1,minAmount:1,maxAmount:1}] },
+  green_beret:     { id:'green_beret',    name:'グリーンベレー',    description:'精鋭部隊の一員。しっかり処理しないとその先が面倒になる。', icon:'shield', maxHp:200, attack:30, defense:15, baseExp:140, baseGold:55, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'精鋭突撃', drops:[{itemId:'hard_magic_stone',baseRate:0.8,minAmount:1,maxAmount:2}] },
+  scout:           { id:'scout',          name:'スカウト',          description:'近づいた瞬間に高火力を浴びせてくる。ノックバック耐性がないと奈落に落とされる。', icon:'arrow', maxHp:75, attack:60, defense:5, baseExp:90, baseGold:40, dungeonIds:['volcano'], specialAttack:'奈落突き', drops:[{itemId:'hard_magic_stone',baseRate:0.5,minAmount:1,maxAmount:1}] },
+  suppression_squad: { id:'suppression_squad', name:'鎮圧戦隊',  description:'組織的に動く精鋭部隊。倒すのに時間がかかると黒ドワーフが増援に来る。Vortex Hurricaneで奈落落としが効果的。', icon:'shield', maxHp:160, attack:25, defense:20, baseExp:120, baseGold:50, dungeonIds:['volcano'], specialAttack:'組織的包囲', drops:[{itemId:'hard_magic_stone',baseRate:0.7,minAmount:1,maxAmount:2}] },
+  seal_god:        { id:'seal_god',       name:'封印邪神',          description:'攻撃の余波でTPしてくるが、特攻しない限りは無害。無視安定。', icon:'gem', maxHp:500, attack:80, defense:30, baseExp:300, baseGold:150, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'邪神の封印', drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:2,maxAmount:4}] },
+  blue_zombie:     { id:'blue_zombie',    name:'ブルーゾンビ',      description:'青い死霊。単体では大したことないが集団で来ると面倒。', icon:'skull', maxHp:120, attack:20, defense:8, baseExp:70, baseGold:30, dungeonIds:['volcano'], drops:[{itemId:'magma_stone',baseRate:0.5,minAmount:1,maxAmount:2}] },
+  ryuma:           { id:'ryuma',          name:'リューマ',          description:'高速移動で翻弄してくる裏火山城の精鋭。', icon:'sword', maxHp:180, attack:28, defense:12, baseExp:130, baseGold:55, dungeonIds:['volcano'], specialAttack:'居合斬り', drops:[{itemId:'hard_magic_stone',baseRate:0.6,minAmount:1,maxAmount:1}] },
+  izo:             { id:'izo',            name:'以蔵',              description:'鋭い斬撃で急所を狙う裏火山城の精鋭。', icon:'dagger', maxHp:170, attack:32, defense:10, baseExp:130, baseGold:55, dungeonIds:['volcano'], specialAttack:'急所突き', drops:[{itemId:'hard_magic_stone',baseRate:0.6,minAmount:1,maxAmount:1}] },
+  destroyer:       { id:'destroyer',      name:'デストロイヤー',    description:'重装甲の破壊者。物理攻撃で押しつぶしてくる。', icon:'ore_dark', maxHp:220, attack:25, defense:25, baseExp:140, baseGold:60, dungeonIds:['volcano'], drops:[{itemId:'hard_magic_stone',baseRate:0.7,minAmount:1,maxAmount:2}] },
+  jack_bomber:     { id:'jack_bomber',    name:'ジャック・ザ・ボマー', description:'爆弾を投げてくるジャック系の強敵。裏火山城3階に出現。', icon:'bomb', maxHp:200, attack:45, defense:12, baseExp:200, baseGold:80, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'爆弾連射', drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:1,maxAmount:3}] },
+  last_wizard:     { id:'last_wizard',    name:'ラストウィザード',  description:'通称サンドバッグ。高位魔法には注意。倒しても無視してもよい。', icon:'mage', maxHp:400, attack:10, defense:2, baseExp:250, baseGold:100, dungeonIds:['volcano'], specialAttack:'高位魔法', drops:[{itemId:'hard_magic_stone',baseRate:0.5,minAmount:1,maxAmount:2}] },
+  lich_road:       { id:'lich_road',      name:'リッチ',            description:'裏火山城3階に他の強敵と並んで出現する上位個体。単体ボスではなく道中の圧の一部。', icon:'skull', maxHp:300, attack:50, defense:18, baseExp:300, baseGold:120, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'死霊召喚', drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:2,maxAmount:3}] },
+  lich_boss:       { id:'lich_boss',      name:'リッチ[ボス]',      description:'CP3ルート終端に単体で待ち構えるリッチ。道中個体より格段に強く、独立したボス戦となる。', icon:'skull', maxHp:3500, attack:65, defense:22, baseExp:1200, baseGold:600, dungeonIds:['volcano'], isBoss:true, specialAttack:'大死霊爆発', drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:3,maxAmount:5},{itemId:'magma_stone',baseRate:1.0,minAmount:5,maxAmount:10}] },
+  volcano_boss:    { id:'volcano_boss',   name:'獄炎帝',            description:'裏火山城最上階に待つ最終ボス。ただしボスより道中の方が本体。', icon:'volcano', maxHp:5000, attack:80, defense:30, baseExp:2000,baseGold:1000, dungeonIds:['volcano'], isBoss:true, specialAttack:'業火爆発', drops:[{itemId:'extreme_flame_aura',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'volcano_crown',baseRate:0.5,minAmount:1,maxAmount:1},{itemId:'hard_magic_stone',baseRate:1.0,minAmount:5,maxAmount:10}] },
+  volcano_boss_ex: { id:'volcano_boss_ex',name:'絶炎帝',            description:'獄炎帝の後に現れる真の最終ボス。極限の炎を纏う。', icon:'volcano', maxHp:8000, attack:110, defense:40, baseExp:3500, baseGold:1800, dungeonIds:['volcano'], isBoss:true, specialAttack:'絶炎爆砕', drops:[{itemId:'extreme_flame_aura',baseRate:1.0,minAmount:2,maxAmount:3},{itemId:'volcano_crown',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'hard_magic_stone',baseRate:1.0,minAmount:8,maxAmount:15}] },
   // 汎用
   slime:  { id:'slime',  name:'スライム', description:'初歩的なモンスター。', icon:'bubbles', maxHp:30,  attack:5,  defense:2,  baseExp:15,  baseGold:8,   dungeonIds:['beginner_cave'], drops:[{itemId:'slime_gel',baseRate:0.8,minAmount:1,maxAmount:3}] },
   goblin: { id:'goblin', name:'ゴブリン', description:'小さいが油断できない。', icon:'goblin', maxHp:60,  attack:12, defense:5,  baseExp:35,  baseGold:20,  dungeonIds:['goblin_den'], drops:[{itemId:'goblin_ear',baseRate:0.6,minAmount:1,maxAmount:2}] },
@@ -1975,19 +2005,426 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
     ],
   },
   volcano: {
-    id:'volcano', name:'火山', description:'総スポナー数999個。ステインポット対策必須。最難関クラスのダンジョン。',
-    icon:'volcano', tier:'volcano', requiredLevel:15, floors:12, expBonus:5.0, goldBonus:4.5,
-    monsterIds:['dwarf_leather','dwarf_iron','dwarf_diamond','dwarf_red','dwarf_black','stain_pot','ragnalok'],
+    id:'volcano', name:'火山', description:'総面積400万・スポナー数999個。前難易度の闇森とは桁違いの規模。ステインポット対策・黒ドワーフ対策・ラグナロク対策が生存の鍵。CP3で裏火山ルートへの分岐あり。',
+    icon:'volcano', tier:'volcano', requiredLevel:15, floors:50, expBonus:5.0, goldBonus:4.5,
+    monsterIds:['dwarf_leather','dwarf_gold','dwarf_iron','dwarf_diamond','dwarf_crossbow','dwarf_red','dwarf_black','dwarf_ancient','dwarf_ancient_awakened','stain_pot','stain_kid','ragnalok','bannerman','lumberjack','hunter','hunter_trainee','assassin','defender','super_defender','alchemist','evil_summoner','hell_summoner','danger_crown','buster','green_beret','scout','suppression_squad','seal_god','blue_zombie','ryuma','izo','destroyer','jack_bomber','last_wizard','lich_road','lich_boss','volcano_boss','volcano_boss_ex'],
     bossId:'volcano_boss',
     unlockCondition: { dungeonId:'fortress', clearedCount:3, requiredLevel:15 },
+    // ──────────────────────────────────────────────────
+    // routes: ノードベース分岐ルート
+    //  main  → 共通区間（スタート〜大橋地帯）
+    //  lich  → CP3分岐A：リッチ単体ボスルート（大橋地帯クリア後に選択）
+    //  back  → CP3分岐B：裏火山本線（CP4→CP5→極炎帝・絶炎帝）
+    // ──────────────────────────────────────────────────
+    routes: {
+      // ═══════════════ 共通区間 ═══════════════
+      main: [
+        // ── 1. 小屋〜火口（敵なし・導入）──
+        {
+          name:'小屋〜火口',
+          description:'広い森を抜けた先に火山がそびえる。敵は一切湧かない観賞用の区間。頂上からの景色は森ばかりで絶景とは言えない。これから始まる長い戦いの前の静寂。',
+          monsters:[],
+        },
+        // ── 2. 火山内部〜侵入者撃退路（ステインポット初登場）──
+        {
+          name:'火山内部〜侵入者撃退路',
+          description:'らせん状の通路。ステインポットが初登場。最下層には赤ドワーフが1体だけ出現する。ダイヤドワーフが飛び道具で溶岩に叩き落としてくるので注意。',
+          monsters:[
+            {monsterId:'dwarf_leather', count:2},
+            {monsterId:'dwarf_gold',    count:2},
+            {monsterId:'dwarf_iron',    count:1},
+            {monsterId:'dwarf_crossbow',count:2},
+            {monsterId:'dwarf_red',     count:1},
+            {monsterId:'stain_pot',     count:6},
+          ],
+        },
+        // ── 3. 石材加工場〜木材加工場（CP1・バナーマン初登場）──
+        {
+          name:'石材加工場〜木材加工場',
+          description:'生活感のある区間。ステインポットの所見殺しがある。木材加工場の奥にCP1あり・必ず回収！バナーマンが周囲の敵を強化し、ステインポットが猛スピードで突進してくる。',
+          monsters:[
+            {monsterId:'dwarf_leather', count:3},
+            {monsterId:'dwarf_gold',    count:2},
+            {monsterId:'dwarf_iron',    count:2},
+            {monsterId:'dwarf_diamond', count:1},
+            {monsterId:'dwarf_crossbow',count:2},
+            {monsterId:'dwarf_red',     count:1},
+            {monsterId:'stain_pot',     count:8},
+            {monsterId:'bannerman',     count:1},
+            {monsterId:'lumberjack',    count:2},
+            {monsterId:'dwarf_black',   count:1},
+          ],
+          isCheckpoint:true, checkpointLabel:'CP1',
+        },
+        // ── 4. ポータル街〜鍛冶場（黒ドワーフ初接敵・ハンター初登場）──
+        {
+          name:'ポータル街〜鍛冶場',
+          description:'黒ドワーフとの初接敵。ダイヤドワーフが大量に出現しカオスフレアが飛び交う。黒ドワーフを真っ先に排除せよ。鍛冶場ではハンターが初登場、遠距離狙撃とトラップが非常に鬱陶しい。',
+          monsters:[
+            {monsterId:'dwarf_diamond', count:4},
+            {monsterId:'dwarf_crossbow',count:3},
+            {monsterId:'dwarf_red',     count:3},
+            {monsterId:'stain_pot',     count:6},
+            {monsterId:'hunter',        count:3},
+            {monsterId:'dwarf_black',   count:2},
+          ],
+          isHardArea:true,
+        },
+        // ── 5. 炭鉱[難所]（CP2・ラグナロク・アサシン初登場）──
+        {
+          name:'炭鉱[難所]',
+          description:'不規則な洞窟。薄暗く足場も悪い。入場してすぐ右に温泉とCP2あり・必ず回収！100個近いステインポットがあらゆる場所から特攻。黒ドワーフ3体・アサシン・ラグナロクが初登場。安置？そんなものはない。ゾンビ戦法で強引に突破せよ。',
+          monsters:[
+            {monsterId:'dwarf_leather', count:2},
+            {monsterId:'dwarf_gold',    count:2},
+            {monsterId:'dwarf_iron',    count:2},
+            {monsterId:'dwarf_diamond', count:2},
+            {monsterId:'dwarf_crossbow',count:2},
+            {monsterId:'dwarf_red',     count:2},
+            {monsterId:'stain_pot',     count:15},
+            {monsterId:'hunter',        count:3},
+            {monsterId:'assassin',      count:2},
+            {monsterId:'dwarf_black',   count:3},
+            {monsterId:'ragnalok',      count:1},
+          ],
+          isHardArea:true, isCheckpoint:true, checkpointLabel:'CP2',
+        },
+        // ── 6. 赤岩回廊〜出店（CP3・後半戦・ステインキッド初登場）──
+        {
+          name:'赤岩回廊〜出店',
+          description:'「後半戦」と称される赤ネザーレンガのエリア。2個目のワープゲートを直進でCP3あり・必ず回収！ステインキッド初登場（小型で倒しにくいが自爆は3割程度）。ディフェンサー・アルケミスト・エビルサマナーが初登場し嫌め手でこちらを翻弄。出店ではデンジャークラウンも初登場。エビルサマナーが極稀にBUSTERを召喚する場合あり・湧いたらデスルーラ推奨。',
+          monsters:[
+            {monsterId:'dwarf_iron',    count:2},
+            {monsterId:'dwarf_diamond', count:3},
+            {monsterId:'dwarf_crossbow',count:2},
+            {monsterId:'dwarf_red',     count:3},
+            {monsterId:'stain_pot',     count:10},
+            {monsterId:'stain_kid',     count:5},
+            {monsterId:'hunter',        count:2},
+            {monsterId:'assassin',      count:2},
+            {monsterId:'defender',      count:2},
+            {monsterId:'alchemist',     count:2},
+            {monsterId:'evil_summoner', count:2},
+            {monsterId:'danger_crown',  count:1},
+            {monsterId:'dwarf_black',   count:2},
+            {monsterId:'ragnalok',      count:1},
+          ],
+          isHardArea:true, isCheckpoint:true, checkpointLabel:'CP3', isBranchPoint:true,
+        },
+        // ── 7. 火山街[難所]（大門破壊必須・ラグナロク2体）──
+        {
+          name:'火山街[難所]',
+          description:'赤ネザーレンガの「街」。次のエリアには大門を破壊しなければ進めない。エビルサマナーが大量のドワーフ・ステインポットを召喚。大門前にラグナロク2体が配置。高威力な範囲攻撃武器が必須。ラグナロクを沸かせてデスルーラしCP3から復帰する戦術も有効。',
+          monsters:[
+            {monsterId:'dwarf_red',     count:4},
+            {monsterId:'hunter',        count:3},
+            {monsterId:'assassin',      count:2},
+            {monsterId:'defender',      count:2},
+            {monsterId:'evil_summoner', count:4},
+            {monsterId:'alchemist',     count:2},
+            {monsterId:'danger_crown',  count:1},
+            {monsterId:'ragnalok',      count:2},
+          ],
+          isHardArea:true,
+        },
+        // ── 8. 細い通路（ステインポット＋ディフェンサーの所見殺し）──
+        {
+          name:'細い通路',
+          description:'地獄の火山街を抜けた先の狭い通路。ステインポットとディフェンサーが湧きまくる。通路横の穴のステインポットを倒したと思ったらもう一回湧いてくることがある。耐性Ⅵで耐えるのも手。',
+          monsters:[
+            {monsterId:'stain_pot',  count:12},
+            {monsterId:'defender',   count:4},
+          ],
+          isHardArea:true,
+        },
+        // ── 9. 祭壇（黒ドワーフ大量湧き）──
+        {
+          name:'祭壇',
+          description:'黒ドワーフが8体も湧く発狂地帯。しかし遮蔽物が少なく道は平坦。ぐるぐる逃げて叩けば比較的楽に殲滅可能。大橋地帯へ続く階段にステインポットが湧くので注意。',
+          monsters:[
+            {monsterId:'stain_pot',  count:8},
+            {monsterId:'dwarf_black',count:8},
+          ],
+          isHardArea:true,
+        },
+        // ── 10. 大橋地帯[最難関]（1層目：ドワーフ中心）──
+        {
+          name:'大橋地帯・1層目',
+          description:'火山に登場する全ての敵モンスターが本気でプレイヤーを殺しに来る最終エリア。敵密度は全エリア中最高峰。1層目は大量のドワーフがメイン。大門を破壊して突破せよ。',
+          monsters:[
+            {monsterId:'dwarf_leather', count:3},
+            {monsterId:'dwarf_gold',    count:3},
+            {monsterId:'dwarf_iron',    count:3},
+            {monsterId:'dwarf_diamond', count:4},
+            {monsterId:'dwarf_crossbow',count:3},
+            {monsterId:'dwarf_red',     count:3},
+            {monsterId:'dwarf_black',   count:3},
+            {monsterId:'stain_pot',     count:10},
+            {monsterId:'hunter',        count:3},
+          ],
+          isHardArea:true,
+        },
+        // ── 11. 大橋地帯[最難関]（2層目：職業系スケルトン中心）──
+        {
+          name:'大橋地帯・2層目',
+          description:'2層目は職業系スケルトンがメイン編成。物理ピッキングツールを使って大門を強引に突破する戦術も有効。突破できるかは運・技量・装備・人数による。',
+          monsters:[
+            {monsterId:'assassin',      count:3},
+            {monsterId:'hunter',        count:4},
+            {monsterId:'defender',      count:3},
+            {monsterId:'alchemist',     count:2},
+            {monsterId:'evil_summoner', count:3},
+            {monsterId:'danger_crown',  count:2},
+            {monsterId:'ragnalok',      count:2},
+            {monsterId:'stain_pot',     count:8},
+            {monsterId:'stain_kid',     count:5},
+          ],
+          isHardArea:true,
+        },
+        // ── 12. 大橋地帯（3層目：エンシェントドワーフ）──
+        {
+          name:'大橋地帯・3層目',
+          description:'エンシェントドワーフとのタイマン。大門を殴り続けることでスキップ可能（むしろスキップ強く推奨）。圧倒的射程と範囲武器があれば制圧できる。',
+          monsters:[
+            {monsterId:'dwarf_ancient', count:1, isMidBoss:true},
+            {monsterId:'stain_pot',     count:5},
+          ],
+          isHardArea:true,
+        },
+      ],
+
+      // ═══════════════ 分岐A：CP3リッチルート（大橋攻略後に選択可能）═══════════════
+      lich: [
+        // ── A1. リッチ前哨（道中リッチではなくボス専用導入）──
+        {
+          name:'リッチの間・前哨',
+          description:'大橋を攻略した先に続く、リッチが単体で待ち受ける異空間への入口。道中個体とは別格の存在感を放つ。',
+          monsters:[
+            {monsterId:'stain_pot',  count:4},
+            {monsterId:'ragnalok',   count:1},
+            {monsterId:'dwarf_black',count:2},
+          ],
+          isHardArea:true,
+        },
+        // ── A2. リッチ[ボス]（CP3ルート終点・単体ボス戦）──
+        {
+          name:'リッチ討伐[ボス]',
+          description:'CP3ルートの終端。単体で待ち構えるリッチとの独立したボス戦。裏火山城3階に出る道中個体とは明確に別物。大死霊爆発に注意。倒せばCP3ルートはここで完結。',
+          monsters:[
+            {monsterId:'lich_boss', count:1, isBoss:true},
+          ],
+          isHardArea:true,
+        },
+      ],
+
+      // ═══════════════ 分岐B：裏火山本線（CP4→CP5→極炎帝・絶炎帝）═══════════════
+      back: [
+        // ── B1. 裏火山入口〜エヴァンスの家（CP4）──
+        {
+          name:'裏火山入口',
+          description:'祭壇と大橋の間から続く裏火山への入口。角にあるので泳いで行くこと。狭い通路に黒ドワーフが大量。これくらい処理できるものが裏火山への挑戦権を得る。ジャック・ザ・ステインも出現。',
+          monsters:[
+            {monsterId:'dwarf_black', count:6},
+            {monsterId:'stain_pot',   count:8},
+            {monsterId:'stain_kid',   count:4},
+          ],
+          isHardArea:true,
+        },
+        // ── B2. エヴァンスの家（CP4・唯一の休憩地帯）──
+        {
+          name:'エヴァンスの家[CP4]',
+          description:'裏火山唯一の休憩地帯。敵は一切湧かない。固有NPCのエヴァンスがお菓子と交換でいろいろ話してくれる。ここで息を整えてから裏火山大橋へ挑め。',
+          monsters:[],
+          isCheckpoint:true, checkpointLabel:'CP4',
+        },
+        // ── B3. 裏火山大橋2節目（黒ドワーフ＋ステインキッド＋ハンター＋バナーマン）──
+        {
+          name:'裏火山大橋・2節目',
+          description:'CP4の先。黒ドワーフ・ステインキッド・ハンター・バナーマンの4点セットが襲いかかる。ステインキッドはここが最も効率よく狩れる地帯。大門があるのでアサシンを倒してから突破すること。',
+          monsters:[
+            {monsterId:'dwarf_black',  count:4},
+            {monsterId:'stain_kid',    count:8},
+            {monsterId:'stain_pot',    count:5},
+            {monsterId:'hunter',       count:3},
+            {monsterId:'assassin',     count:3},
+            {monsterId:'bannerman',    count:2},
+            {monsterId:'ragnalok',     count:1},
+          ],
+          isHardArea:true,
+        },
+        // ── B4. 裏火山大橋3節目移行（ポリュートオーラ・デンクラ3体・スーパーディフェンサー）──
+        {
+          name:'裏火山大橋・3節目移行',
+          description:'大門を破壊するとポリュートオーラが来る。見えたエンダーパールに攻撃すること（しないと多分死ぬ）。奥にデンジャークラウン3体とスーパーディフェンサー1体。螺旋階段を上るとアルケミストが盲目のお出迎え。左の階段から登ること。鎮圧戦隊が登場し、倒せないなら先に進めない。',
+          monsters:[
+            {monsterId:'danger_crown',    count:3, isMidBoss:true},
+            {monsterId:'super_defender',  count:1, isMidBoss:true},
+            {monsterId:'alchemist',       count:3},
+            {monsterId:'evil_summoner',   count:3},
+            {monsterId:'assassin',        count:2},
+            {monsterId:'suppression_squad',count:2},
+            {monsterId:'blue_zombie',     count:2},
+            {monsterId:'stain_kid',       count:4},
+            {monsterId:'dwarf_black',     count:2},
+            {monsterId:'seal_god',        count:1, isMidBoss:true},
+            {monsterId:'last_wizard',     count:1},
+            {monsterId:'hunter_trainee',  count:3},
+            {monsterId:'scout',           count:2},
+          ],
+          isHardArea:true,
+        },
+        // ── B5. 終焉の大橋（CP5）──
+        {
+          name:'(CP5)終焉の大橋',
+          description:'CP5地点。バナーマン・スカウトから始まる。スカウトはノックバック耐性なしだと奈落落とし確定。アスレチック地帯あり・スターストームとステインに注意。ここを越えればプレイヤーに大きな区切り。',
+          monsters:[
+            {monsterId:'bannerman',    count:2},
+            {monsterId:'scout',        count:3},
+            {monsterId:'hunter_trainee',count:4},
+            {monsterId:'stain_pot',    count:8},
+            {monsterId:'stain_kid',    count:6},
+            {monsterId:'defender',     count:3},
+            {monsterId:'alchemist',    count:4},
+            {monsterId:'evil_summoner',count:2},
+          ],
+          isHardArea:true, isCheckpoint:true, checkpointLabel:'CP5',
+        },
+        // ── B6. 終焉の大橋・平地地帯（ヘルサマナー初登場）──
+        {
+          name:'終焉の大橋・平地地帯',
+          description:'アスレ要素終了。エビルサマナー3体・デンクラ1体から始まる。奥に黒ドワ2体・デンクラ2体。鎮圧戦隊はVortex Hurricaneで奈落落としが圧倒的に楽。大階段でヘルサマナーが初登場。15×15の人口太陽で貫通5555ダメージの即死技を放つ。近づかずに倒すこと。',
+          monsters:[
+            {monsterId:'evil_summoner',  count:3},
+            {monsterId:'danger_crown',   count:2, isMidBoss:true},
+            {monsterId:'dwarf_black',    count:2},
+            {monsterId:'suppression_squad',count:3},
+            {monsterId:'hell_summoner',  count:2, isMidBoss:true},
+            {monsterId:'super_defender', count:2, isMidBoss:true},
+            {monsterId:'blue_zombie',    count:3},
+            {monsterId:'hunter',         count:4},
+            {monsterId:'green_beret',    count:2, isMidBoss:true},
+          ],
+          isHardArea:true,
+        },
+        // ── B7. 裏火山城入口前大広場（以蔵・デストロイヤー・リューマ・グリーンベレー以外は無視可）──
+        {
+          name:'裏火山城入口前大広場',
+          description:'以蔵・デストロイヤー・リューマが大量に沸く。グリーンベレー以外は無視すれば関係ない。ヘルサマナーが城の入口に沸くのでしっかり倒してから入ること。',
+          monsters:[
+            {monsterId:'izo',          count:3},
+            {monsterId:'destroyer',    count:3},
+            {monsterId:'ryuma',        count:3},
+            {monsterId:'last_wizard',  count:1},
+            {monsterId:'green_beret',  count:2, isMidBoss:true},
+            {monsterId:'hell_summoner',count:1, isMidBoss:true},
+          ],
+          isHardArea:true,
+        },
+        // ── B8. 裏火山城・1階（覚醒エンシェントドワーフ・アルケミスト・封印邪神）──
+        {
+          name:'裏火山城・1階',
+          description:'[覚醒]エンシェントドワーフ3体（超存在にはならないので脅威は限定的）。アルケミスト8体のうち4体は即湧きなので1回倒したら無視。見習いハンター2体。封印邪神は特攻しない限り無視安定。',
+          monsters:[
+            {monsterId:'dwarf_ancient_awakened', count:3, isMidBoss:true},
+            {monsterId:'alchemist',              count:5},
+            {monsterId:'hunter_trainee',         count:2},
+            {monsterId:'seal_god',               count:1, isMidBoss:true},
+          ],
+          isHardArea:true,
+        },
+        // ── B9. 裏火山城・1階→2階の階段（ラグナロク・アサシン）──
+        {
+          name:'裏火山城・1階〜2階の階段',
+          description:'階段前にハンター1体・ヘルサマナー1体。途中のラグナロクは無視可能。2階との接続部でエビルサマナーが即湧きするが無視してアサシン4体を先に倒すこと。アサシンを無視するとアサシネイションの餌食になる。',
+          monsters:[
+            {monsterId:'hunter',       count:1},
+            {monsterId:'hell_summoner',count:1, isMidBoss:true},
+            {monsterId:'ragnalok',     count:1, isMidBoss:true},
+            {monsterId:'evil_summoner',count:2},
+            {monsterId:'assassin',     count:4, isMidBoss:true},
+          ],
+          isHardArea:true,
+        },
+        // ── B10. 裏火山城・2階（リューマ・以蔵・デストロイヤー・スーパーディフェンサー）──
+        {
+          name:'裏火山城・2階',
+          description:'正面にリューマ・以蔵・デストロイヤー・スーパーディフェンサー・ブルーゾンビが沸く。3階への階段にエビルサマナー2体と鎮圧戦隊。これらが合わさると並みの武器防具では死ぬ。十二分に対策を。',
+          monsters:[
+            {monsterId:'ryuma',          count:1},
+            {monsterId:'izo',            count:1},
+            {monsterId:'destroyer',      count:1},
+            {monsterId:'super_defender', count:1, isMidBoss:true},
+            {monsterId:'blue_zombie',    count:1},
+            {monsterId:'evil_summoner',  count:2},
+            {monsterId:'suppression_squad',count:3},
+          ],
+          isHardArea:true,
+        },
+        // ── B11. 裏火山城・3階（リッチ道中個体・ジャック・ザ・ボマー）──
+        {
+          name:'裏火山城・3階',
+          description:'ディフェンサー各1体。中央にジャック・ザ・ボマー、リッチ（道中個体・CP3ルートのボス個体とは別物）、ラストウィザード（サンドバッグ）が並ぶ。単体ボス戦ではなく道中の圧の一部として扱うこと。3階→4階の階段前にヘルサマナー。',
+          monsters:[
+            {monsterId:'defender',    count:2},
+            {monsterId:'jack_bomber', count:1, isMidBoss:true},
+            {monsterId:'lich_road',   count:1, isMidBoss:true},
+            {monsterId:'last_wizard', count:1},
+            {monsterId:'hell_summoner',count:1, isMidBoss:true},
+          ],
+          isHardArea:true,
+        },
+        // ── B12. 裏火山城・3階→4階の階段（アサシン・ラグナロク・デンジャークラウン・黒ドワーフ）──
+        {
+          name:'裏火山城・3階〜4階の階段',
+          description:'左側の部屋にスーパーディフェンサー・ディフェンサー。右の螺旋階段にアサシン・ラグナロク・エビルサマナー（即湧き）・黒ドワーフ。螺旋階段の先にデンジャークラウンとエビルサマナー（即湧き）。',
+          monsters:[
+            {monsterId:'super_defender', count:1, isMidBoss:true},
+            {monsterId:'defender',       count:1},
+            {monsterId:'assassin',       count:1, isMidBoss:true},
+            {monsterId:'ragnalok',       count:1, isMidBoss:true},
+            {monsterId:'evil_summoner',  count:4},
+            {monsterId:'dwarf_black',    count:1},
+            {monsterId:'danger_crown',   count:1, isMidBoss:true},
+          ],
+          isHardArea:true,
+        },
+        // ── B13. 裏火山城・4階（ラグナロク3体・黒ドワーフ・デンジャークラウン・アサシン）──
+        {
+          name:'裏火山城・4階',
+          description:'スーパーディフェンサー1体。右にデンジャークラウン、その奥にラグナロク3体（攻撃しないか近寄らなければ無害なので無視して進める）。黒ドワーフ2体。最後のフロアへの階段前にアサシン1体とデンジャークラウン2体。',
+          monsters:[
+            {monsterId:'super_defender', count:1, isMidBoss:true},
+            {monsterId:'danger_crown',   count:3, isMidBoss:true},
+            {monsterId:'ragnalok',       count:3, isMidBoss:true},
+            {monsterId:'dwarf_black',    count:2},
+            {monsterId:'assassin',       count:1, isMidBoss:true},
+          ],
+          isHardArea:true,
+        },
+        // ── B14. 裏火山城・最上階（獄炎帝・絶炎帝）──
+        {
+          name:'裏火山城・最上階',
+          description:'特に何もないので奥に進み獄炎帝と戦え。獄炎帝を倒すと絶炎帝が出現する。ただしボスより道中を本体として設計されたダンジョン——ここまで来れたなら実力は本物だ。',
+          monsters:[
+            {monsterId:'volcano_boss',    count:1, isBoss:true},
+            {monsterId:'volcano_boss_ex', count:1, isBoss:true},
+          ],
+          isHardArea:true,
+        },
+      ],
+    },
+    // areasは互換性のために共通ルートのエイリアスとして維持（routes.mainと同じ内容）
     areas:[
-      { name:'火山内部', description:'ステインポットが多い。最初の難所。', monsters:[{monsterId:'dwarf_leather',count:2},{monsterId:'stain_pot',count:8}] },
-      { name:'石材加工場', description:'ドワーフの密度が増加。', monsters:[{monsterId:'dwarf_iron',count:2},{monsterId:'dwarf_leather',count:3},{monsterId:'stain_pot',count:6}] },
-      { name:'ポータル街', description:'黒ドワーフとの初接敵！', monsters:[{monsterId:'dwarf_diamond',count:3},{monsterId:'dwarf_red',count:2},{monsterId:'dwarf_black',count:1}], isHardArea:true },
-      { name:'炭鉱[難所]', description:'ラグナロクが初登場！黒ドワーフも複数湧く。', monsters:[{monsterId:'dwarf_black',count:3},{monsterId:'ragnalok',count:1},{monsterId:'stain_pot',count:10}], isHardArea:true },
-      { name:'赤岩回廊', description:'後半戦の始まり。難易度が大幅上昇。', monsters:[{monsterId:'dwarf_red',count:3},{monsterId:'dwarf_black',count:2},{monsterId:'ragnalok',count:1},{monsterId:'stain_pot',count:8}], isHardArea:true },
-      { name:'火山街[難所]', description:'全ての敵が総動員。ラグナロク2体が大門前に待つ。', monsters:[{monsterId:'ragnalok',count:2},{monsterId:'dwarf_black',count:4},{monsterId:'stain_pot',count:12}], isHardArea:true },
-      { name:'大橋地帯[最難関]', description:'全モンスターが本気でプレイヤーを殺しに来る最終エリア。', monsters:[{monsterId:'volcano_boss',count:1,isBoss:true},{monsterId:'dwarf_black',count:5},{monsterId:'ragnalok',count:3}], isHardArea:true },
+      { name:'小屋〜火口', description:'敵なし・観賞用の導入区間。', monsters:[] },
+      { name:'火山内部〜侵入者撃退路', description:'ステインポット初登場。', monsters:[{monsterId:'dwarf_leather',count:2},{monsterId:'dwarf_crossbow',count:2},{monsterId:'stain_pot',count:6}] },
+      { name:'石材加工場〜木材加工場[CP1]', description:'バナーマン初登場。CP1あり。', monsters:[{monsterId:'dwarf_iron',count:2},{monsterId:'stain_pot',count:8},{monsterId:'bannerman',count:1},{monsterId:'dwarf_black',count:1}], isCheckpoint:true, checkpointLabel:'CP1' },
+      { name:'ポータル街〜鍛冶場', description:'黒ドワーフ初接敵・ハンター初登場。', monsters:[{monsterId:'dwarf_diamond',count:4},{monsterId:'hunter',count:3},{monsterId:'dwarf_black',count:2}], isHardArea:true },
+      { name:'炭鉱[難所][CP2]', description:'ラグナロク・アサシン初登場。CP2あり。安置なし。', monsters:[{monsterId:'stain_pot',count:15},{monsterId:'assassin',count:2},{monsterId:'dwarf_black',count:3},{monsterId:'ragnalok',count:1}], isHardArea:true, isCheckpoint:true, checkpointLabel:'CP2' },
+      { name:'赤岩回廊〜出店[CP3・分岐点]', description:'CP3あり。ここで裏火山ルートかリッチルートか選択。', monsters:[{monsterId:'stain_kid',count:5},{monsterId:'evil_summoner',count:2},{monsterId:'defender',count:2},{monsterId:'danger_crown',count:1},{monsterId:'ragnalok',count:1}], isHardArea:true, isCheckpoint:true, checkpointLabel:'CP3', isBranchPoint:true },
+      { name:'火山街[難所]', description:'大門破壊が必要。ラグナロク2体が大門前。', monsters:[{monsterId:'ragnalok',count:2},{monsterId:'evil_summoner',count:4},{monsterId:'stain_pot',count:12}], isHardArea:true },
+      { name:'細い通路', description:'ステインポット＋ディフェンサーの所見殺し。', monsters:[{monsterId:'stain_pot',count:12},{monsterId:'defender',count:4}], isHardArea:true },
+      { name:'祭壇', description:'黒ドワーフ8体の発狂地帯。平坦なので動ければ突破可能。', monsters:[{monsterId:'stain_pot',count:8},{monsterId:'dwarf_black',count:8}], isHardArea:true },
+      { name:'大橋地帯[最難関]', description:'全敵が本気でプレイヤーを殺しに来る。', monsters:[{monsterId:'dwarf_black',count:5},{monsterId:'ragnalok',count:3},{monsterId:'assassin',count:3},{monsterId:'stain_pot',count:10},{monsterId:'dwarf_ancient',count:1,isMidBoss:true}], isHardArea:true },
     ],
   },
   // ── フリーフィールド(FFGG)ダンジョン ──
