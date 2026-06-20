@@ -676,13 +676,13 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   mana_rod: {
     id: 'mana_rod',
     name: 'Mana Rod',
-    description: '使用時にManaを120回復する（クールダウンなし）。',
+    description: '使用時にManaを120回復する（クールダウン3ターン）。',
     category: 'weapon', itemType: 'Weapon', rarity: 'uncommon',
     sellPrice: 0, buyPrice: 0, maxStack: 1, icon: 'mana_rod_png',
     weaponAtk: 0,
     nonconsumable: true,
     weaponSkills: [
-      { type: 'mana_restore_on_use' as const, amount: 120 },
+      { type: 'mana_restore_on_use' as const, amount: 120, cooldownTurns: 3 },
     ],
     useEffect: { attackBonus: 0, message: 'Mana Rodを掲げた！Manaが満ちていく...', attackType: 'physical' },
   },
