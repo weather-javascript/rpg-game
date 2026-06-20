@@ -189,13 +189,13 @@ function getVolcanoAreas(dungeon: DungeonMaster, volcanoRoute?: string): Dungeon
   return dungeon.routes.main; // デフォルトは共通ルート
 }
 
-// 敵グループをスポーンする（ボス除外、1〜3体ランダム）
+// 敵グループをスポーンする（BOSSのみ単体、それ以外は複数体ランダム）
 function spawnEnemies(dungeon: DungeonMaster, areaIdx: number, _kxPhase?: number, volcanoRoute?: string): EnemyState[] {
   const areas = getVolcanoAreas(dungeon, volcanoRoute) ?? dungeon.areas;
   let pool: string[] = [];
   if (areas && areas[areaIdx]) {
     const area = areas[areaIdx];
-    // ボスエリアはボスのみ単体
+    // ボスエリアはボスのみ単体（BOSSは例外的にソロ出現）
     const bossEntry = area.monsters.find(m => {
       const mon = getMergedMonster(m.monsterId);
       return mon?.isBoss;
@@ -204,24 +204,17 @@ function spawnEnemies(dungeon: DungeonMaster, areaIdx: number, _kxPhase?: number
       const m = getMergedMonster(bossEntry.monsterId);
       return [{ monsterId: bossEntry.monsterId, hp: m?.maxHp ?? 50, maxHp: m?.maxHp ?? 50 }];
     }
-    // 中ボスエリアは中ボスのみ単体（複数体禁止）
-    const midBossEntry = area.monsters.find(m => {
-      const mon = getMergedMonster(m.monsterId);
-      return mon?.isMidBoss;
-    });
-    if (midBossEntry) {
-      const m = getMergedMonster(midBossEntry.monsterId);
-      return [{ monsterId: midBossEntry.monsterId, hp: m?.maxHp ?? 50, maxHp: m?.maxHp ?? 50 }];
-    }
+    // 中ボス(isMidBoss)は単体固定にしない：通常モブと同じプールに混ぜ、複数体・同時出現を許可する
     pool = area.monsters.flatMap(m => Array(m.count).fill(m.monsterId));
   } else {
     pool = (dungeon.monsterIds ?? []).filter(id => !getMergedMonster(id)?.isBoss);
   }
   if (pool.length === 0) return [];
-  // ボス・中ボス含まれていれば除外
-  const nonBossPool = pool.filter(id => !getMergedMonster(id)?.isBoss && !getMergedMonster(id)?.isMidBoss);
+  // ボスのみプールから除外（中ボスは含めたままにする）
+  const nonBossPool = pool.filter(id => !getMergedMonster(id)?.isBoss);
   const finalPool = nonBossPool.length > 0 ? nonBossPool : pool;
-  const maxEnemies = dungeon.id === 'sky_castle_ex' ? 15 : 3;
+  // 同時出現数の上限：火山は群れ・複数中ボス同時出現を前提にした難度のため引き上げる
+  const maxEnemies = dungeon.id === 'sky_castle_ex' ? 15 : dungeon.id === 'volcano' ? 6 : 3;
   const count = Math.min(finalPool.length, randomIntRange(1, maxEnemies));
   // ランダムにcount体選ぶ（重複可）
   const result: EnemyState[] = [];
