@@ -424,7 +424,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     });
   }, [updateEquipment]);
 
-  // Fix 6: effective player defense including equipped item bonuses
+  // Fix 6: effective player defense including equipped item bonuses（バフ由来の倍率は除く：軽減式の上限でかき消されないよう別計算する）
   const getPlayerDef = useCallback((equip: EquipmentSlots = localEquip) => {
     let def = player.stats.defense;
     const allSlots: (string | null)[] = [
@@ -442,11 +442,17 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       const item = ITEM_MASTER[itemId];
       if (item?.defenseMultiplier) defMultiplier *= item.defenseMultiplier;
     }
-    for (const buff of battle.buffs ?? []) {
-      if (buff.type === 'def_mult' && buff.turns > 0) defMultiplier *= buff.value;
-    }
     return Math.round(def * defMultiplier);
-  }, [player.stats.defense, localEquip, battle.buffs]);
+  }, [player.stats.defense, localEquip]);
+
+  // バフによる防御力倍率（jewelry caneなど）。軽減式の上限(20)に埋もれず常に効果が出るよう、最終ダメージに直接掛ける
+  const getBuffDefMultiplier = useCallback(() => {
+    let mult = 1;
+    for (const buff of battle.buffs ?? []) {
+      if (buff.type === 'def_mult' && buff.turns > 0) mult *= buff.value;
+    }
+    return mult;
+  }, [battle.buffs]);
 
   // 防具強度の合計（ダメージ軽減計算用）
   const getPlayerArmorToughness = useCallback((equip: EquipmentSlots = localEquip) => {
@@ -483,8 +489,10 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     const totalDef = getPlayerDef(equip);
     const totalToughness = getPlayerArmorToughness(equip);
     const totalEpf = getPlayerEPF(equip);
-    return calcArmorReducedDamage(rawDamage, totalDef, totalToughness, totalEpf);
-  }, [getPlayerDef, getPlayerArmorToughness, getPlayerEPF, localEquip]);
+    const baseReduced = calcArmorReducedDamage(rawDamage, totalDef, totalToughness, totalEpf);
+    const buffMult = getBuffDefMultiplier();
+    return buffMult > 1 ? Math.max(1, Math.round(baseReduced / buffMult)) : baseReduced;
+  }, [getPlayerDef, getPlayerArmorToughness, getPlayerEPF, getBuffDefMultiplier, localEquip]);
 
 
   // 生存敵リスト（未使用だが将来用に保持）
@@ -623,27 +631,46 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           newLog.push({ text: `⚠️ HPが${buff.value}%以下に固定されている！`, color: '#9b6df0' });
         }
       }
-      // ===== 遅延複数ヒット発動（Emerald Crusadeなど） =====
+      // ===== 遅延複数ヒット発動（Emerald Crusadeなど・0.1秒間隔で段階発動） =====
       if (buff.type === 'delayed_multihit' && buff.turns - 1 === 0) {
         const hits = buff.meta?.hits ?? [];
         const weaponName = buff.meta?.weaponName ?? '武器';
-        const targetIdx = newBattle.enemies.findIndex(e => e.hp > 0);
-        if (targetIdx >= 0) {
-          let totalDmg = 0;
-          for (const h of hits) {
-            for (let i = 0; i < h.count; i++) {
-              const cur = newBattle.enemies[targetIdx];
-              if (cur.hp <= 0) break;
+        const weaponIdForCd = buff.meta?.weaponId;
+        const cdTurns = buff.meta?.cooldownTurns ?? 7;
+        if (weaponIdForCd) {
+          newBattle = { ...newBattle, itemCooldowns: { ...newBattle.itemCooldowns, [weaponIdForCd]: cdTurns } };
+        }
+        // 1ヒットずつフラット化し、0.1秒間隔で段階的に反映する
+        const flatHits: { dmg: number; penetrate?: boolean }[] = [];
+        for (const h of hits) {
+          for (let i = 0; i < h.count; i++) flatHits.push({ dmg: h.dmg, penetrate: h.penetrate });
+        }
+        if (flatHits.length > 0) {
+          newLog.push({ text: `💥 ${weaponName}の遅延発動！（0.1秒間隔で${flatHits.length}連続ヒット）`, color: '#9b6df0' });
+          const applyStagedHit = (hitIdx: number) => {
+            setBattle(prev => {
+              const tIdx = prev.enemies.findIndex(e => e.hp > 0);
+              if (tIdx < 0 || hitIdx >= flatHits.length) return prev;
+              const h = flatHits[hitIdx];
+              const cur = prev.enemies[tIdx];
               const mon = getMergedMonster(cur.monsterId);
               const dmg = h.penetrate ? h.dmg : calcDamage(h.dmg, mon?.defense ?? 0);
-              totalDmg += dmg;
-              newBattle.enemies = newBattle.enemies.map((e2, i2) => i2 === targetIdx ? { ...e2, hp: Math.max(0, e2.hp - dmg) } : e2);
+              const prevHp = cur.hp;
+              const newHp = Math.max(0, prevHp - dmg);
+              const newEnemiesArr = prev.enemies.map((e, i) => i === tIdx ? { ...e, hp: newHp } : e);
+              combatFx.triggerEnemyFx(weaponIdForCd ?? null, [{ idx: tIdx, damage: dmg, isCritical: false }]);
+              if (prevHp > 0 && newHp <= 0) combatFx.triggerDefeatFx(tIdx);
+              return {
+                ...prev,
+                enemies: newEnemiesArr,
+                log: [...prev.log, { text: `💥 ${weaponName} ${hitIdx + 1}/${flatHits.length}撃目！ ${dmg}ダメージ！`, color: '#9b6df0' }],
+              };
+            });
+            if (hitIdx + 1 < flatHits.length) {
+              setTimeout(() => applyStagedHit(hitIdx + 1), 100);
             }
-          }
-          newLog.push({ text: `💥 ${weaponName}の遅延発動！合計${totalDmg}ダメージ！`, color: '#9b6df0' });
-        }
-        if (buff.meta?.weaponId) {
-          newBattle = { ...newBattle, itemCooldowns: { ...newBattle.itemCooldowns, [buff.meta.weaponId]: buff.meta.cooldownTurns ?? 7 } };
+          };
+          setTimeout(() => applyStagedHit(0), 100);
         }
       }
       // ===== 遅延自己回復（Damage-to-healなど） =====
@@ -655,6 +682,9 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       if (buff.turns - 1 > 0) remainBuffs.push({ ...buff, turns: buff.turns - 1 });
     }
     newBattle = { ...newBattle, buffs: remainBuffs };
+
+    // ===== HP固定中（Emerald Crusadeなど）は敵の攻撃ダメージを完全カット =====
+    const hpCapActive = remainBuffs.some(b => b.type === 'hp_cap_pct' && b.turns > 0);
 
     // ===== 敵スタンターン数デクリメント（Amethyst Storeakなど） =====
     if (newBattle.enemyStunTurns && Object.keys(newBattle.enemyStunTurns).length > 0) {
@@ -706,9 +736,10 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       // 覚醒KXは普通に攻撃（防具で軽減可能な物理攻撃）
       if (kx.isAwakened) {
         const rawDmg = 30 + Math.floor(secureRandom() * 40);
-        const dmg = newBattle.isDefending ? Math.floor(getArmorReducedDamage(rawDmg) * 0.5) : getArmorReducedDamage(rawDmg);
+        let dmg = newBattle.isDefending ? Math.floor(getArmorReducedDamage(rawDmg) * 0.5) : getArmorReducedDamage(rawDmg);
+        if (hpCapActive) dmg = 0;
         changeHp(-dmg);
-        newLog.push({ text: `⚡ KX-G21[ライフエナジー]の攻撃！${dmg}ダメージ！`, color: '#ff00ff' });
+        newLog.push({ text: hpCapActive ? `⚡ KX-G21[ライフエナジー]の攻撃！HP固定により無効化！` : `⚡ KX-G21[ライフエナジー]の攻撃！${dmg}ダメージ！`, color: '#ff00ff' });
         if (player.stats.hp - dmg <= 0) {
           return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
         }
@@ -728,25 +759,29 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       if (action === 'slash') {
         const rawDmg = 15 + Math.floor(secureRandom() * 20);
         dmg = newBattle.isDefending ? Math.floor(getArmorReducedDamage(rawDmg) * 0.5) : getArmorReducedDamage(rawDmg);
-        logText = `⚔️ 「貴様など叩き切ってくれるわ！」 KX-G21の斬撃！${dmg}ダメ！`;
+        if (hpCapActive) dmg = 0;
+        logText = hpCapActive ? `⚔️ 「貴様など叩き切ってくれるわ！」 KX-G21の斬撃！HP固定により無効化！` : `⚔️ 「貴様など叩き切ってくれるわ！」 KX-G21の斬撃！${dmg}ダメ！`;
         changeHp(-dmg);
       } else if (action === 'chaos_flare') {
         const rawDmg = 20 + Math.floor(secureRandom() * 15);
         dmg = newBattle.isDefending ? Math.floor(getArmorReducedDamage(rawDmg) * 0.5) : getArmorReducedDamage(rawDmg);
-        newKxBurnTurns = 4;
-        logText = `🔥 カオスフレア！${dmg}ダメ＋燃焼4ターン！`;
+        if (hpCapActive) dmg = 0;
+        newKxBurnTurns = hpCapActive ? kx.burnTurns : 4;
+        logText = hpCapActive ? `🔥 カオスフレア！HP固定により無効化！` : `🔥 カオスフレア！${dmg}ダメ＋燃焼4ターン！`;
         changeHp(-dmg);
         logColor = '#ff6b00';
       } else if (action === 'lightning_bolt') {
         const rawDmg = 60 + Math.floor(secureRandom() * 40);
         dmg = newBattle.isDefending ? Math.floor(getArmorReducedDamage(rawDmg) * 0.5) : getArmorReducedDamage(rawDmg);
-        logText = `⚡ ライトニングボルト！超高火力${dmg}ダメ！`;
+        if (hpCapActive) dmg = 0;
+        logText = hpCapActive ? `⚡ ライトニングボルト！HP固定により無効化！` : `⚡ ライトニングボルト！超高火力${dmg}ダメ！`;
         changeHp(-dmg);
         logColor = '#f0f000';
       } else if (action === 'summon_tech_snipe') {
         const rawDmg = 10;
         dmg = newBattle.isDefending ? Math.floor(getArmorReducedDamage(rawDmg) * 0.5) : getArmorReducedDamage(rawDmg);
-        logText = `🎯 サモンテックスナイプ！${dmg}ダメ＋エクス＆雷4体ずつ召喚！`;
+        if (hpCapActive) dmg = 0;
+        logText = hpCapActive ? `🎯 サモンテックスナイプ！HP固定により無効化＋エクス＆雷4体ずつ召喚！` : `🎯 サモンテックスナイプ！${dmg}ダメ＋エクス＆雷4体ずつ召喚！`;
         changeHp(-dmg);
         extraEnemies = [
           ...Array(4).fill(null).map(() => ({ monsterId: 'exs_minion', hp: 100, maxHp: 100 })),
@@ -772,10 +807,10 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
 
       // 燃焼ダメージ
       if (kx.burnTurns > 0) {
-        const bDmg = 8;
+        const bDmg = hpCapActive ? 0 : 8;
         changeHp(-bDmg);
         newKxBurnTurns = kx.burnTurns - 1;
-        logText += ` 🔥燃焼${bDmg}ダメ(残${newKxBurnTurns}T)`;
+        logText += hpCapActive ? ` 🔥燃焼はHP固定により無効化(残${newKxBurnTurns}T)` : ` 🔥燃焼${bDmg}ダメ(残${newKxBurnTurns}T)`;
       }
       newLog.push({ text: logText, color: logColor });
 
@@ -820,10 +855,11 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         // 物理攻撃ターン（防具で軽減可能）
         if (newSkillTurn % penetrateInterval === 0 && newSkillTurn > 0) {
           const rawPenDmg = 10000;
-          const penDmg = newBattle.isDefending ? Math.floor(getArmorReducedDamage(rawPenDmg) * 0.5) : getArmorReducedDamage(rawPenDmg);
+          let penDmg = newBattle.isDefending ? Math.floor(getArmorReducedDamage(rawPenDmg) * 0.5) : getArmorReducedDamage(rawPenDmg);
+          if (hpCapActive) penDmg = 0;
           changeHp(-penDmg);
           const newPlayerHp = Math.max(0, player.stats.hp - penDmg);
-          newLog.push({ text: `💀 ${monster.name}の強力な一撃！ 防具ごと${penDmg}ダメージ！`, color: '#ff0055' });
+          newLog.push({ text: hpCapActive ? `💀 ${monster.name}の強力な一撃！ HP固定により無効化！` : `💀 ${monster.name}の強力な一撃！ 防具ごと${penDmg}ダメージ！`, color: '#ff0055' });
           if (newPlayerHp <= 0) {
             return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
           }
@@ -831,10 +867,11 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         }
         // 通常攻撃
         const mDmg = getArmorReducedDamage(monster.attack);
-        const reducedDmg = newBattle.isDefending ? Math.floor(mDmg * 0.5) : mDmg;
+        let reducedDmg = newBattle.isDefending ? Math.floor(mDmg * 0.5) : mDmg;
+        if (hpCapActive) reducedDmg = 0;
         changeHp(-reducedDmg);
         const newPlayerHp2 = Math.max(0, player.stats.hp - reducedDmg);
-        newLog.push({ text: `🐉 ${monster.name}の攻撃！ あなたに${reducedDmg}ダメージ${newBattle.isDefending ? '（防御中）' : ''}`, color: '#e05555' });
+        newLog.push({ text: hpCapActive ? `🐉 ${monster.name}の攻撃！ HP固定により無効化！` : `🐉 ${monster.name}の攻撃！ あなたに${reducedDmg}ダメージ${newBattle.isDefending ? '（防御中）' : ''}`, color: '#e05555' });
         if (newPlayerHp2 <= 0) {
           return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
         }
@@ -856,10 +893,11 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       if (newBattle.goliathShieldTurns > 0) {
         mDmg = Math.max(1, Math.floor(mDmg * 0.15));
       }
-      const reducedDmg = newBattle.isDefending ? Math.floor(mDmg * 0.5) : mDmg;
+      const reducedDmg0 = newBattle.isDefending ? Math.floor(mDmg * 0.5) : mDmg;
+      const reducedDmg = hpCapActive ? 0 : reducedDmg0;
       // Goliathシールド：HP以上のダメージが来たらHP10残して耐える
       const currentHp = player.stats.hp;
-      if (newBattle.goliathShieldTurns > 0 && reducedDmg >= currentHp && currentHp > 10) {
+      if (!hpCapActive && newBattle.goliathShieldTurns > 0 && reducedDmg >= currentHp && currentHp > 10) {
         changeHp(-(currentHp - 10));
         newLog.push({ text: `🛡️ Goliathが致命打を受けた！HP10で耐えた！`, color: '#00e5ff' });
         newLog.push(isSpecial
@@ -870,9 +908,11 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       }
       changeHp(-reducedDmg);
       const newPlayerHp = Math.max(0, player.stats.hp - reducedDmg);
-      newLog.push(isSpecial
-        ? { text: `💥 ${monster.name}の特殊攻撃！ あなたに${reducedDmg}ダメージ！`, color: '#e05555' }
-        : { text: `🐉 ${monster.name}の攻撃！ あなたに${reducedDmg}ダメージ${newBattle.isDefending ? '（防御中）' : ''}`, color: '#e05555' }
+      newLog.push(hpCapActive
+        ? { text: `🐉 ${monster.name}の攻撃！ HP固定により無効化！`, color: '#e05555' }
+        : isSpecial
+          ? { text: `💥 ${monster.name}の特殊攻撃！ あなたに${reducedDmg}ダメージ！`, color: '#e05555' }
+          : { text: `🐉 ${monster.name}の攻撃！ あなたに${reducedDmg}ダメージ${newBattle.isDefending ? '（防御中）' : ''}`, color: '#e05555' }
       );
       if (newPlayerHp <= 0) {
         return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
@@ -1042,25 +1082,58 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     const fxHits: { idx: number; damage: number; isCritical: boolean }[] = [];
     const perWeaponLogs: { text: string; color: string }[] = [];
     const newEnemies = battle.enemies.map((e) => ({ ...e }));
+    const newEnemyStunTurns: Record<number, number> = { ...battle.enemyStunTurns };
 
     for (const w of weapons) {
-      const atkBase = w.weaponAtk ?? player.stats.attack;
+      // 選んだ武器固有のスキルを取得（=冷海の覇魚=, Amethyst Storeakなど）
+      const frostbiteSkill = w.weaponSkills?.find(s => s.type === 'frostbite_self_damage') as import('../../types/game').WeaponFrostbiteSelfDamageSkill | undefined;
+      const penetrateChanceSkill = w.weaponSkills?.find(s => s.type === 'penetrate_on_use_chance') as import('../../types/game').WeaponPenetrateOnUseChanceSkill | undefined;
+      const scalingSkill = w.weaponSkills?.find(s => s.type === 'scaling_attack') as import('../../types/game').WeaponScalingAttackSkill | undefined;
+      const stunSkill = w.weaponSkills?.find(s => s.type === 'random_stun') as import('../../types/game').WeaponRandomStunSkill | undefined;
+
+      // =冷海の覇魚= の凍傷自傷
+      if (frostbiteSkill) {
+        changeHp(-frostbiteSkill.selfDamage);
+        combatFx.triggerSelfFx(w.id, 'self');
+        perWeaponLogs.push({ text: `🥶 ${w.name}の凍傷で自分に${frostbiteSkill.selfDamage}ダメージ！`, color: '#5b8dee' });
+      }
+      // =冷海の覇魚= の貫通追加発動チャンス
+      let extraPenetrateDmg = 0;
+      if (penetrateChanceSkill && secureRandom() < penetrateChanceSkill.chance) {
+        extraPenetrateDmg = penetrateChanceSkill.penetrateDamage;
+        perWeaponLogs.push({ text: `❄️ ${w.name}が発動！貫通${extraPenetrateDmg}ダメージ追加！`, color: '#9b6df0' });
+      }
+      // Amethyst Storeak のスケーリング攻撃（生存数依存）
+      const aliveCountNow = newEnemies.filter(e => e.hp > 0).length;
+      const atkBase = scalingSkill ? (scalingSkill.base + aliveCountNow * scalingSkill.perEnemy) : (w.weaponAtk ?? player.stats.attack);
+      const areaPen = scalingSkill ? scalingSkill.penetrate : (w.areaPenetrate ?? 0);
       const isArea = !!w.isAreaWeapon || anyArea;
-      const areaPen = w.areaPenetrate ?? 0;
+
       let weaponTotal = 0;
       for (let i = 0; i < newEnemies.length; i++) {
         const e = newEnemies[i];
         if (e.hp <= 0) continue;
         if (!isArea && i !== targetIdx) continue;
         const mon = getMergedMonster(e.monsterId);
-        const dmg = areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0);
+        const dmg = (areaPen > 0 ? areaPen : calcDamage(atkBase, mon?.defense ?? 0)) + extraPenetrateDmg;
         weaponTotal += dmg;
         const prevHp = e.hp;
         e.hp = Math.max(0, e.hp - dmg);
-        fxHits.push({ idx: i, damage: dmg, isCritical: false });
+        fxHits.push({ idx: i, damage: dmg, isCritical: extraPenetrateDmg > 0 });
         if (prevHp > 0 && e.hp <= 0) combatFx.triggerDefeatFx(i);
       }
       perWeaponLogs.push({ text: `⚔️ ${w.name}で攻撃！ ${weaponTotal}ダメージ！`, color: '#4caf87' });
+
+      // Amethyst Storeak のランダムスタン
+      if (stunSkill) {
+        const aliveIdxs = newEnemies.reduce<number[]>((acc, e, i) => e.hp > 0 ? [...acc, i] : acc, []);
+        if (aliveIdxs.length > 0) {
+          const stunIdx = aliveIdxs[Math.floor(secureRandom() * aliveIdxs.length)];
+          newEnemyStunTurns[stunIdx] = stunSkill.stunTurns;
+          const stunName = getMergedMonster(newEnemies[stunIdx].monsterId)?.name ?? '敵';
+          perWeaponLogs.push({ text: `💫 ${w.name}が${stunName}を拘束した！(${stunSkill.stunTurns}ターン攻撃不可)`, color: '#9b6df0' });
+        }
+      }
     }
     if (fxHits.length > 0) combatFx.triggerEnemyFx(itemIds[0] ?? null, fxHits);
 
@@ -1138,7 +1211,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         finalEnemies = spawnKxMinions(newPhase);
       }
       const updatedKx: KxState = { ...battle.kx, hp: newKxHp, phase: newPhase };
-      setBattle(b => ({ ...b, enemies: finalEnemies, log: newLog, turn: 'monster', isDefending: false, pendingAction: null, pendingMultiCast: null, kx: updatedKx, weaponMana: finalMana, itemCooldowns: newCooldowns }));
+      setBattle(b => ({ ...b, enemies: finalEnemies, log: newLog, turn: 'monster', isDefending: false, pendingAction: null, pendingMultiCast: null, kx: updatedKx, weaponMana: finalMana, itemCooldowns: newCooldowns, enemyStunTurns: newEnemyStunTurns }));
       setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
       return;
     }
@@ -1169,7 +1242,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       setBattle(b => ({ ...b, enemies: newEnemies, log: [...newLog, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, pendingAction: null, pendingMultiCast: null, weaponMana: finalMana, itemCooldowns: newCooldowns }));
       return;
     }
-    setBattle(b => ({ ...b, enemies: newEnemies, log: newLog, turn: 'monster', isDefending: false, pendingAction: null, pendingMultiCast: null, weaponMana: finalMana, itemCooldowns: newCooldowns }));
+    setBattle(b => ({ ...b, enemies: newEnemies, log: newLog, turn: 'monster', isDefending: false, pendingAction: null, pendingMultiCast: null, weaponMana: finalMana, itemCooldowns: newCooldowns, enemyStunTurns: newEnemyStunTurns }));
     setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
   };
 
@@ -1506,30 +1579,31 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
         return;
       }
-      // Gread Strophea特別処理：マナを消費しながら連続攻撃＋満腹度上昇
+      // Gread Strophea特別処理：マナを消費しながら連続攻撃＋満腹度上昇（0.1秒間隔で段階発動）
       const manaDrainSkill = item.weaponSkills?.find(s => s.type === 'mana_drain_repeat') as import('../../types/game').WeaponManaDrainRepeatSkill | undefined;
       if (manaDrainSkill) {
         const satietySkill = item.weaponSkills?.find(s => s.type === 'satiety_from_damage_pct') as import('../../types/game').WeaponSatietyFromDamageSkill | undefined;
         let mana = battle.weaponMana;
         let budgetUsed = 0;
-        let totalDmgDealt = 0;
-        const newEnemies = battle.enemies.map(e => ({ ...e }));
-        const fxHits: { idx: number; damage: number; isCritical: boolean }[] = [];
+        let enemiesSim = battle.enemies.map(e => ({ ...e }));
         let guard = 0;
-        while (mana >= manaDrainSkill.perHitManaCost && budgetUsed < manaDrainSkill.manaBudget && newEnemies.some(e => e.hp > 0) && guard < 200) {
+
+        // 事前に各ヒットの結果を計算しておく（表示は0.1秒間隔で段階的に行う）
+        const hitResults: { enemies: typeof enemiesSim; tIdx: number; dmg: number }[] = [];
+        while (mana >= manaDrainSkill.perHitManaCost && budgetUsed < manaDrainSkill.manaBudget && enemiesSim.some(e => e.hp > 0) && guard < 200) {
           guard++;
-          const tIdx = newEnemies.findIndex(e => e.hp > 0);
-          const mon = getMergedMonster(newEnemies[tIdx].monsterId);
+          const tIdx = enemiesSim.findIndex(e => e.hp > 0);
+          const mon = getMergedMonster(enemiesSim[tIdx].monsterId);
           const dmg = calcDamage(manaDrainSkill.perHitDamage, mon?.defense ?? 0);
-          newEnemies[tIdx] = { ...newEnemies[tIdx], hp: Math.max(0, newEnemies[tIdx].hp - dmg) };
-          fxHits.push({ idx: tIdx, damage: dmg, isCritical: false });
-          totalDmgDealt += dmg;
+          enemiesSim = enemiesSim.map((e, i) => i === tIdx ? { ...e, hp: Math.max(0, e.hp - dmg) } : e);
+          hitResults.push({ enemies: enemiesSim.map(e => ({ ...e })), tIdx, dmg });
           mana -= manaDrainSkill.perHitManaCost;
           budgetUsed += manaDrainSkill.perHitManaCost;
         }
-        if (fxHits.length > 0) combatFx.triggerEnemyFx(itemId, fxHits);
+
+        const totalDmgDealt = hitResults.reduce((acc, h) => acc + h.dmg, 0);
         const totalEnemyMaxHp = battle.enemies.reduce((acc, e) => acc + e.maxHp, 0);
-        let satietyLog: { text: string; color: string }[] = [];
+        const satietyLog: { text: string; color: string }[] = [];
         if (satietySkill && totalEnemyMaxHp > 0) {
           const pct = (totalDmgDealt / totalEnemyMaxHp) * 100;
           const target = Math.min(100, pct + satietySkill.bonusFlat);
@@ -1539,24 +1613,53 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
             satietyLog.push({ text: `🍖 満腹度が${Math.round(target)}まで上昇した！`, color: '#f0a830' });
           }
         }
+        const finalMana = mana;
         const newCooldowns5 = { ...battle.itemCooldowns, [itemId]: manaDrainSkill.cooldownTurns };
         const logMsg5 = item.useEffect?.message ?? `${item.name}を発動！`;
-        const alive = newEnemies.filter(e => e.hp > 0);
-        if (alive.length === 0) {
-          const { exp, gold, drops } = calcWinRewards(newEnemies);
-          setBattle(b => ({ ...b, enemies: newEnemies, log: [...b.log, { text: `⚔️ ${logMsg5} 合計${totalDmgDealt}ダメージ！`, color: '#f0c060' }, ...satietyLog, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, weaponMana: mana, itemCooldowns: newCooldowns5, equippedWeaponId: itemId }));
+
+        if (hitResults.length === 0) {
+          setBattle(b => ({ ...b, log: [...b.log, { text: `⚔️ ${logMsg5} しかしマナが足りず発動しなかった！`, color: '#8a92b2' }], turn: 'monster', isDefending: false, weaponMana: finalMana, itemCooldowns: newCooldowns5, equippedWeaponId: itemId }));
+          setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
           return;
         }
-        setBattle(b => ({ ...b, enemies: newEnemies, log: [...b.log, { text: `⚔️ ${logMsg5} 合計${totalDmgDealt}ダメージ！`, color: '#f0c060' }, ...satietyLog], turn: 'monster', isDefending: false, weaponMana: mana, itemCooldowns: newCooldowns5, equippedWeaponId: itemId }));
-        setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+
+        const applyHit = (hitIdx: number, prevState: TurnBattleState) => {
+          if (hitIdx >= hitResults.length) {
+            setBattle(prev => {
+              const manaLog = [...prev.log, ...satietyLog];
+              const alive = prev.enemies.filter(e => e.hp > 0);
+              if (alive.length === 0) {
+                const { exp, gold, drops } = calcWinRewards(prev.enemies);
+                return { ...prev, log: [...manaLog, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, weaponMana: finalMana, itemCooldowns: newCooldowns5 };
+              }
+              return { ...prev, log: manaLog, turn: 'monster', isDefending: false, weaponMana: finalMana, itemCooldowns: newCooldowns5 };
+            });
+            setTimeout(() => setBattle(prev => prev.turn === 'monster' ? doMonsterTurn(prev) : prev), 600);
+            return;
+          }
+          const hr = hitResults[hitIdx];
+          const prevEnemyHp = prevState.enemies[hr.tIdx]?.hp ?? 0;
+          const newEnemiesArr = prevState.enemies.map((e, i) => i === hr.tIdx ? { ...e, hp: hr.enemies[hr.tIdx].hp } : e);
+          combatFx.triggerEnemyFx(itemId, [{ idx: hr.tIdx, damage: hr.dmg, isCritical: false }], { shake: hitIdx === 0 });
+          if (prevEnemyHp > 0 && hr.enemies[hr.tIdx].hp <= 0) combatFx.triggerDefeatFx(hr.tIdx);
+          const nextState: TurnBattleState = {
+            ...prevState,
+            enemies: newEnemiesArr,
+            log: [...prevState.log, { text: `⚔️ ${item.name} ${hitIdx + 1}/${hitResults.length}撃目！ ${hr.dmg}ダメージ！`, color: '#f0c060' }],
+          };
+          setBattle(nextState);
+          setTimeout(() => applyHit(hitIdx + 1, nextState), 100);
+        };
+        applyHit(0, { ...battle, equippedWeaponId: itemId });
         return;
       }
-      // Mana Rod特別処理：使用時Mana回復のみ（攻撃判定なし・CT無し）
+      // Mana Rod特別処理：使用時Mana回復のみ（攻撃判定なし）
       const manaRestoreSkill = item.weaponSkills?.find(s => s.type === 'mana_restore_on_use') as import('../../types/game').WeaponManaRestoreOnUseSkill | undefined;
       if (manaRestoreSkill) {
         combatFx.triggerSelfFx(itemId, 'self');
         const newMana = Math.min(battle.weaponMana + manaRestoreSkill.amount, battle.weaponManaMax);
         const logMsg6 = item.useEffect?.message ?? `${item.name}を発動！`;
+        const newCooldowns6 = manaRestoreSkill.cooldownTurns ? { ...battle.itemCooldowns, [itemId]: manaRestoreSkill.cooldownTurns } : battle.itemCooldowns;
         setBattle(b => ({
           ...b,
           log: [...b.log, { text: `💠 ${logMsg6} Mana+${manaRestoreSkill.amount}！（${newMana}/${b.weaponManaMax}）`, color: '#4fc3f7' }],
@@ -1564,6 +1667,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           isDefending: false,
           weaponMana: newMana,
           ultimateReady: newMana >= b.weaponManaMax,
+          itemCooldowns: newCooldowns6,
           equippedWeaponId: itemId,
         }));
         setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
@@ -2111,6 +2215,28 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         <div style={{ height: 6, background: '#2d3752', borderRadius: 3, overflow: 'hidden', marginTop: 2 }}>
           <div style={{ height: '100%', background: hpPct > 50 ? '#4caf87' : hpPct > 25 ? '#f0a830' : '#e05555', width: `${hpPct}%`, transition: 'width 0.3s' }} />
         </div>
+        {/* アクティブなバフ・デバフ表示（防御力強化・HP固定など発動確認用） */}
+        {battle.buffs && battle.buffs.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+            {battle.buffs.filter(b => b.turns > 0).map((b, i) => {
+              const labelMap: Record<string, { text: string; color: string }> = {
+                def_mult: { text: `🛡️ 防御力${b.value}倍`, color: '#00e5ff' },
+                self_dmg_pct_hp: { text: `🩸 自傷${b.value}%/turn`, color: '#e05555' },
+                hp_cap_pct: { text: `⚠️ HP${b.value}%固定`, color: '#9b6df0' },
+                no_heal: { text: `🚫 回復不可`, color: '#9b6df0' },
+                delayed_multihit: { text: `⏳ ${b.meta?.weaponName ?? '武器'}発動待ち`, color: '#9b6df0' },
+                delayed_heal_pct: { text: `⏳ ${b.meta?.weaponName ?? '武器'}回復待ち`, color: '#4caf87' },
+                poison: { text: `☠️ 毒`, color: '#9b6df0' },
+              };
+              const info = labelMap[b.type] ?? { text: b.type, color: '#8a92b2' };
+              return (
+                <span key={`${b.type}-${i}`} style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: `1px solid ${info.color}`, color: info.color }}>
+                  {info.text}（残{b.turns}T）
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ログ */}
