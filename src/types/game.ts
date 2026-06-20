@@ -437,6 +437,8 @@ export interface MonsterMaster {
   isMidBoss?: boolean;
   specialAttack?: string;
   defensePct?: number; // ダメージ軽減率 (0.0〜1.0)、貫通攻撃で無効化
+  skills?: string[]; // 保有スキル名一覧（フレーバー表示・参照用。各スキルの詳細効果はdescription/specialAttackで補足）
+  traits?: string[]; // 出現時無敵・属性無効・ブロック率など特殊耐性・特徴のフレーバー表示用
 }
 
 export interface DungeonMaster {
