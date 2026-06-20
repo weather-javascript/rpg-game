@@ -171,9 +171,17 @@ function TargetSelectModal({ enemies, onSelect, onCancel }: {
   );
 }
 
+// 火山の分岐ルートに対応したエリアリストを返す
+function getVolcanoAreas(dungeon: DungeonMaster, volcanoRoute?: string): DungeonArea[] | undefined {
+  if (dungeon.id !== 'volcano' || !dungeon.routes) return dungeon.areas;
+  if (volcanoRoute === 'lich') return dungeon.routes.lich;
+  if (volcanoRoute === 'back') return dungeon.routes.back;
+  return dungeon.routes.main; // デフォルトは共通ルート
+}
+
 // 敵グループをスポーンする（ボス除外、1〜3体ランダム）
-function spawnEnemies(dungeon: DungeonMaster, areaIdx: number, _kxPhase?: number): EnemyState[] {
-  const areas = dungeon.areas;
+function spawnEnemies(dungeon: DungeonMaster, areaIdx: number, _kxPhase?: number, volcanoRoute?: string): EnemyState[] {
+  const areas = getVolcanoAreas(dungeon, volcanoRoute) ?? dungeon.areas;
   let pool: string[] = [];
   if (areas && areas[areaIdx]) {
     const area = areas[areaIdx];
@@ -364,7 +372,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     const areaIdx = runState.currentAreaIdx ?? 0;
     const enemies = kxConfig
       ? spawnKxMinions(1)
-      : spawnEnemies(dungeon, areaIdx);
+      : spawnEnemies(dungeon, areaIdx, undefined, runState.volcanoRoute);
     const hotbarWeaponId = equipment.hotbar.find(id => id && ITEM_MASTER[id]?.itemType === 'Weapon') ?? null;
     const weaponItem = hotbarWeaponId ? ITEM_MASTER[hotbarWeaponId] : null;
     const manaSkill = weaponItem?.weaponSkills?.find((s): s is WeaponManaSkill => s.type === 'mana_charge');
@@ -2842,6 +2850,8 @@ export function DungeonScreen() {
   const [kxBossMode, setKxBossMode] = useState(false);
   const [showDevilArmorChoice, setShowDevilArmorChoice] = useState(false);
   const [showZeroChoice, setShowZeroChoice] = useState(false);
+  const [showVolcanoRouteChoice, setShowVolcanoRouteChoice] = useState(false); // 火山CP3分岐UI
+  const [volcanoRoutePending, setVolcanoRoutePending] = useState<'lich'|'back'|null>(null); // 大橋突破後に切り替えるルート
   const [autoBattle, setAutoBattle] = useState(false);
   // 0=なし, 1=デビルアーマー戦, 2=デッドアーマー戦
   const [devilArmorPhase, setDevilArmorPhase] = useState(0);
@@ -2864,7 +2874,9 @@ export function DungeonScreen() {
     }
     if (!isDungeonUnlocked(selectedId)) { addNotification('error', '🔒 このダンジョンはまだ解放されていません'); return; }
     if (player.stats.hp <= 0) { addNotification('error', 'HPが0です。回復してから挑戦してください。'); return; }
-    setRunState({ dungeonId: selectedId, currentFloor: 1, currentAreaName: getDungeon(selectedId)?.areas?.[0]?.name ?? 'エリア1', monstersDefeated: 0, totalExp: 0, totalGold: 0, totalDrops: [], isComplete: false, isFailed: false, currentAreaIdx: 0 });
+    const _dg = getDungeon(selectedId);
+    const _firstAreaName = (_dg as any)?.routes?.main?.[0]?.name ?? _dg?.areas?.[0]?.name ?? 'エリア1';
+    setRunState({ dungeonId: selectedId, currentFloor: 1, currentAreaName: _firstAreaName, monstersDefeated: 0, totalExp: 0, totalGold: 0, totalDrops: [], isComplete: false, isFailed: false, currentAreaIdx: 0, volcanoRoute: selectedId === 'volcano' ? undefined : undefined });
     setRunLog([`⚔️ ${dungeon.name} に突入！`]);
     setInBattle(false);
     setDungeonMana(0);
@@ -2930,7 +2942,14 @@ export function DungeonScreen() {
     }
 
     const areaThreshold = 5;
-    const areas = dungeon?.areas;
+    // 火山の場合はvolcanoRouteに応じたエリアリストを使用
+    const volcanoMaster = dungeon?.id === 'volcano' ? dungeon as any : null;
+    const currentVolcanoRoute = runState.volcanoRoute;
+    const areas = dungeon?.id === 'volcano' && volcanoMaster?.routes
+      ? (currentVolcanoRoute === 'lich' ? volcanoMaster.routes.lich
+        : currentVolcanoRoute === 'back' ? volcanoMaster.routes.back
+        : volcanoMaster.routes.main)
+      : dungeon?.areas;
     let nextAreaIdx = runState.currentAreaIdx ?? 0;
     let isComplete = false;
 
@@ -2954,8 +2973,22 @@ export function DungeonScreen() {
     if (newDefeated % areaThreshold === 0 && areas) {
       if (nextAreaIdx < areas.length - 1) {
         nextAreaIdx = nextAreaIdx + 1;
-        addNotification('info', `✅ ${areas[nextAreaIdx].name} に進んだ！`);
-        setRunLog(prev => [...prev, `📍 ${areas[nextAreaIdx].name} へ進んだ！`]);
+        const nextArea = areas[nextAreaIdx] as any;
+        addNotification('info', `✅ ${nextArea.name} に進んだ！`);
+        setRunLog(prev => [...prev, `📍 ${nextArea.name} へ進んだ！`]);
+
+        // ── 火山CP3分岐：共通ルートのisBranchPointエリアに進んだ時に分岐選択UIを出す ──
+        if (runState.dungeonId === 'volcano' && !currentVolcanoRoute && nextArea.isBranchPoint) {
+          setRunState(prev => prev ? {
+            ...prev, currentAreaIdx: nextAreaIdx,
+            currentAreaName: nextArea.name,
+            monstersDefeated: newDefeated, totalExp: newExp, totalGold: newGold,
+            totalDrops: allDrops, currentFloor: Math.min(prev.currentFloor + 1, dungeon?.floors ?? 1),
+          } : null);
+          setShowVolcanoRouteChoice(true);
+          return;
+        }
+
         // 天空城の最上部（ボスエリア）に進む直前でデビルアーマーに挑戦するか選択
         if (runState.dungeonId === 'sky_castle' && nextAreaIdx === areas.length - 1) {
           setRunState(prev => prev ? {
@@ -2968,6 +3001,32 @@ export function DungeonScreen() {
           return;
         }
       } else {
+        // ── 火山：mainルート最終エリア（大橋地帯3層目）突破 → pendingルートへ切り替え ──
+        if (runState.dungeonId === 'volcano' && currentVolcanoRoute === 'main' && volcanoRoutePending) {
+          const pendingRoute = volcanoRoutePending;
+          const volcanoMasterForRoute = dungeon as any;
+          const nextRouteAreas = pendingRoute === 'lich'
+            ? volcanoMasterForRoute?.routes?.lich
+            : volcanoMasterForRoute?.routes?.back;
+          const firstAreaName = nextRouteAreas?.[0]?.name ?? (pendingRoute === 'lich' ? 'リッチの間・前哨' : '裏火山入口');
+          const routeLabel = pendingRoute === 'lich' ? '🔮 リッチ討伐ルート' : '🏯 裏火山本線';
+          addNotification('success', `${routeLabel} へ突入！`);
+          setRunLog(prev => [...prev, `🌋 大橋地帯を突破！${routeLabel} へ切り替え`, `📍 ${firstAreaName} へ進んだ！`]);
+          // monstersDefeatedを次のエリア進行のために5の倍数-1に調整
+          const cur = newDefeated;
+          const aligned = Math.ceil((cur + 1) / 5) * 5 - 1;
+          setRunState(prev => prev ? {
+            ...prev, volcanoRoute: pendingRoute, currentAreaIdx: 0,
+            currentAreaName: firstAreaName,
+            monstersDefeated: aligned, totalExp: newExp, totalGold: newGold,
+            totalDrops: allDrops, currentFloor: Math.min(prev.currentFloor + 1, dungeon?.floors ?? 1),
+          } : null);
+          setVolcanoRoutePending(null);
+          setBattleKey(k => k + 1);
+          setInBattle(true);
+          return;
+        }
+
         // ボスエリア最終撃破 → 初級ダンジョンのみ継続選択、他はクリア
         recordDungeonClear(runState.dungeonId);
         const gachaCoinReward = ({ beginner:1, intermediate:2, advanced:3, super:4, extreme:5, volcano:4 } as Record<string,number>)[dungeon?.tier ?? 'beginner'] ?? 1;
@@ -3021,7 +3080,7 @@ export function DungeonScreen() {
       monstersDefeated: newDefeated, totalExp: newExp, totalGold: newGold,
       totalDrops: allDrops, isComplete, currentFloor: Math.min(prev.currentFloor + 1, dungeon?.floors ?? 1),
     } : null);
-  }, [runState, player, changeSatiety, addExp, addSkillExp, changeGold, addItems, addNotification, recordDungeonClear]);
+  }, [runState, player, changeSatiety, addExp, addSkillExp, changeGold, addItems, addNotification, recordDungeonClear, volcanoRoutePending]);
 
   const handleEscapeBattle = useCallback(() => {
     setInBattle(false);
@@ -3068,7 +3127,7 @@ export function DungeonScreen() {
 
   // オートバトル：戦闘終了後に自動で次の戦闘を開始
   useEffect(() => {
-    if (!autoBattle || inBattle || !runState || runState.isComplete || runState.isFailed || showBossChoice || showZeroChoice || showDevilArmorChoice || kxBossMode) return;
+    if (!autoBattle || inBattle || !runState || runState.isComplete || runState.isFailed || showBossChoice || showZeroChoice || showDevilArmorChoice || showVolcanoRouteChoice || kxBossMode) return;
     if (player && player.stats.hp <= 0) return;
     const timer = setTimeout(() => {
       setBattleKey(k => k + 1);
@@ -3116,7 +3175,7 @@ export function DungeonScreen() {
 
   const escape = useCallback(() => {
     addNotification('info', '🏃 ダンジョンから離脱した。');
-    setRunState(null); setInBattle(false); setRunLog([]); setShowBossChoice(false); setShowDevilArmorChoice(false); setDevilArmorPhase(0);
+    setRunState(null); setInBattle(false); setRunLog([]); setShowBossChoice(false); setShowDevilArmorChoice(false); setDevilArmorPhase(0); setShowVolcanoRouteChoice(false);
   }, [addNotification]);
 
   if (!player) return null;
@@ -3236,7 +3295,25 @@ export function DungeonScreen() {
               <span style={{ color: '#f0c060', fontWeight: 700 }}>{DUNGEON_MASTER[runState.dungeonId]?.name}</span>
               <span style={{ color: '#8a92b2', fontSize: '0.85rem' }}>B{runState.currentFloor}F</span>
             </div>
-            <div style={{ fontSize: '0.8rem', color: '#5b8dee', marginBottom: 6 }}>📍 {runState.currentAreaName}</div>
+            <div style={{ fontSize: '0.8rem', color: '#5b8dee', marginBottom: 6 }}>
+              📍 {runState.currentAreaName}
+              {/* CP・難所・ルートバッジ */}
+              {(() => {
+                const _vm = DUNGEON_MASTER[runState.dungeonId] as any;
+                const _vr = runState.volcanoRoute;
+                const _areas = (_vm?.routes && runState.dungeonId === 'volcano')
+                  ? (_vr === 'lich' ? _vm.routes.lich : _vr === 'back' ? _vm.routes.back : _vm.routes.main)
+                  : _vm?.areas;
+                const _area = _areas?.[runState.currentAreaIdx ?? 0] as any;
+                return <>
+                  {_area?.checkpointLabel && <span style={{ marginLeft: 6, fontSize:'0.7rem', background:'#1a6640', color:'#4caf87', borderRadius:4, padding:'1px 6px', fontWeight:700 }}>{_area.checkpointLabel}</span>}
+                  {_area?.isHardArea && !_area?.checkpointLabel && <span style={{ marginLeft: 6, fontSize:'0.7rem', background:'#4a1a1a', color:'#e05555', borderRadius:4, padding:'1px 6px', fontWeight:700 }}>⚠ 難所</span>}
+                  {_area?.isBranchPoint && <span style={{ marginLeft: 6, fontSize:'0.7rem', background:'#3a2a00', color:'#ff9900', borderRadius:4, padding:'1px 6px', fontWeight:700 }}>🔀 分岐点</span>}
+                  {runState.volcanoRoute === 'lich' && <span style={{ marginLeft: 6, fontSize:'0.7rem', background:'#2a0050', color:'#cc88ff', borderRadius:4, padding:'1px 6px', fontWeight:700 }}>🔮 リッチルート</span>}
+                  {runState.volcanoRoute === 'back' && <span style={{ marginLeft: 6, fontSize:'0.7rem', background:'#500000', color:'#ff6666', borderRadius:4, padding:'1px 6px', fontWeight:700 }}>🏯 裏火山本線</span>}
+                </>;
+              })()}
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: '0.8rem', marginBottom: 8 }}>
               <div style={{ textAlign: 'center' }}><div style={{ color: '#8a92b2' }}>撃破数</div><div style={{ color: '#e8e6ff', fontWeight: 700 }}>{runState.monstersDefeated}</div></div>
               <div style={{ textAlign: 'center' }}><div style={{ color: '#8a92b2' }}>獲得EXP</div><div style={{ color: '#5b8dee', fontWeight: 700 }}>{runState.totalExp}</div></div>
@@ -3350,6 +3427,53 @@ export function DungeonScreen() {
                   setInBattle(true);
                 }} style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg,#0088ff,#0044aa)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
                   ⚡ 零と戦う
+                </button>
+              </div>
+            </div>
+          ) : showVolcanoRouteChoice ? (
+            /* ── 火山CP3ルート分岐UI ── */
+            <div style={{ background: '#161b26', border: '2px solid #ff6600', borderRadius: 12, padding: 18, textAlign: 'center' }}>
+              <div style={{ fontSize: '1.6rem', marginBottom: 6 }}>🌋</div>
+              <div style={{ color: '#ff6600', fontWeight: 700, fontSize: '1.05rem', marginBottom: 6 }}>
+                赤岩回廊を制圧。CP3取得！
+              </div>
+              <div style={{ color: '#e8d4b0', fontSize: '0.85rem', marginBottom: 4 }}>
+                大橋地帯を越えた先に<strong style={{ color: '#ff9900' }}>2つのルート</strong>が待ち受ける。
+              </div>
+              <div style={{ color: '#8a92b2', fontSize: '0.78rem', marginBottom: 16, lineHeight: 1.6 }}>
+                <span style={{ color: '#cc88ff' }}>🔮 リッチ討伐ルート</span> ─ 大橋攻略後、単体ボス「リッチ」と決戦。ここで完結。<br/>
+                <span style={{ color: '#ff4444' }}>🏯 裏火山本線</span> ─ CP4（エヴァンスの家）→ CP5（終焉の大橋）→ 獄炎帝・絶炎帝。真の終点へ。
+              </div>
+              <div style={{ color: '#666', fontSize: '0.72rem', marginBottom: 14 }}>
+                ※ まず大橋地帯（共通ルート）を突破してからルートが確定します。引き続き大橋地帯の攻略を続けてください。
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button onClick={() => {
+                  setShowVolcanoRouteChoice(false);
+                  setVolcanoRoutePending('lich');
+                  setRunState(prev => prev ? { ...prev, volcanoRoute: 'main' } : null);
+                  setBattleKey(k => k + 1);
+                  setInBattle(true);
+                }} style={{ padding: '11px', background: 'linear-gradient(135deg,#cc88ff,#8800cc)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+                  🔮 リッチ討伐ルートへ（大橋突破後にリッチ単体ボス）
+                </button>
+                <button onClick={() => {
+                  setShowVolcanoRouteChoice(false);
+                  setVolcanoRoutePending('back');
+                  setRunState(prev => prev ? { ...prev, volcanoRoute: 'main' } : null);
+                  setBattleKey(k => k + 1);
+                  setInBattle(true);
+                }} style={{ padding: '11px', background: 'linear-gradient(135deg,#ff4444,#cc0000)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+                  🏯 裏火山本線へ（CP4→CP5→獄炎帝・絶炎帝）
+                </button>
+                <button onClick={() => {
+                  setShowVolcanoRouteChoice(false);
+                  setVolcanoRoutePending(null);
+                  setRunState(prev => prev ? { ...prev, volcanoRoute: undefined } : null);
+                  setBattleKey(k => k + 1);
+                  setInBattle(true);
+                }} style={{ padding: '8px', background: '#2a2f3f', color: '#8a92b2', border: '1px solid #3a3f52', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem' }}>
+                  ⚔️ 今は選ばず戦闘を続ける（CP3エリアで鍛える）
                 </button>
               </div>
             </div>
