@@ -482,16 +482,16 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   goliath_shield: {
     id: 'goliath_shield',
     name: '魔造壊盾=Goliath=',
-    description: '発動後3ターン、敵からのダメージを85%カット。自分のHP以上の攻撃が来た場合、HPを10残して耐える。出現敵の1体を次フェーズ攻撃不可にする。発動後7ターンは使用不可。',
+    description: '発動後4ターン、敵からの被ダメージを1に固定（実質無敵）。無敵終了時にHP+20回復。出現敵の1体を次フェーズ攻撃不可にする。発動後7ターンは使用不可。',
     category: 'weapon', itemType: 'Weapon', rarity: 'legendary',
     sellPrice: 0, buyPrice: 0, maxStack: 1, icon: 'goliath_shield_png',
     weaponAtk: 0,
     cooldownTurns: 7,
     nonconsumable: true,
     weaponSkills: [
-      { type: 'goliath_shield' as const, cutPercent: 85, shieldTurns: 3, cooldownTurns: 7 },
+      { type: 'goliath_shield' as const, shieldTurns: 4, cooldownTurns: 7 },
     ],
-    useEffect: { attackBonus: 0, message: '魔造壊盾=Goliath=を発動！3ターン間ダメージ85%カット！', attackType: 'physical' },
+    useEffect: { attackBonus: 0, message: '魔造壊盾=Goliath=を発動！4ターン無敵（被ダメージ1）！終了時HP+20回復！', attackType: 'physical' },
   },
   // ============================================================
   // =001 Silvers eye= 関連素材・武器
