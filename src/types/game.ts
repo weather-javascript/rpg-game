@@ -44,15 +44,14 @@ export interface WeaponShieldSkill {
   cutPercent: number;
 }
 /**
- * goliath_shield: 発動後3ターン敵からのダメージを85%カット、
- * 自分のHP以上の攻撃が来た場合HP10残して耐える、
+ * goliath_shield: 発動後shieldTurns分の敵の攻撃を全て被ダメージ1に固定（実質無敵）、
+ * 無敵終了時にHP+20回復、
  * 出現している敵の1体を次のフェーズ攻撃不可にする
- * 発動後7ターンはクールダウン
+ * 発動後cooldownTurnsはクールダウン
  */
 export interface WeaponGoliathSkill {
   type: 'goliath_shield';
-  cutPercent: number;      // 85
-  shieldTurns: number;     // 3
+  shieldTurns: number;     // 4（無敵ターン数）
   cooldownTurns: number;   // 7
 }
 /**
