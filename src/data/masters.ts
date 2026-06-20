@@ -1817,8 +1817,8 @@ export const MONSTER_MASTER: Record<string, MonsterMaster> = {
   pool_ghost:   { id:'pool_ghost',name:'池ノ亡霊',description:'毒矢を放つ骨。',      icon:'skull', maxHp:10,    attack:3,  defense:0,   baseExp:5,    baseGold:3,    dungeonIds:['garden'], drops:[{itemId:'ancient_shard',baseRate:0.05,minAmount:1,maxAmount:1}] },
   ice_spirit:   { id:'ice_spirit',name:'氷霊',    description:'鈍足付与の弱い敵。',  icon:'snowflake', maxHp:10,    attack:3,  defense:0,   baseExp:5,    baseGold:3,    dungeonIds:['garden'], drops:[{itemId:'spirit_ice',baseRate:0.4,minAmount:1,maxAmount:1}] },
   reicho:       { id:'reicho',    name:'冷焦',    description:'ボス（2体）。',        icon:'flame', maxHp:200,   attack:20, defense:10,  baseExp:150,  baseGold:80,   dungeonIds:['garden'], isBoss:true, specialAttack:'炎上+鈍足', drops:[{itemId:'spirit_ice',baseRate:0.5,minAmount:1,maxAmount:2},{itemId:'ancient_shard',baseRate:0.2,minAmount:1,maxAmount:1}] },
-  extreme_cold: { id:'extreme_cold',name:'極冷',  description:'炎系攻撃で即死。',     icon:'blizzard', maxHp:2180,  attack:25, defense:20,  baseExp:400,  baseGold:200,  dungeonIds:['frozen_cave'], isMidBoss:true, specialAttack:'アイスビーム', drops:[{itemId:'spirit_ice',baseRate:0.5,minAmount:2,maxAmount:3},{itemId:'ancient_shard',baseRate:0.3,minAmount:1,maxAmount:2}] },
-  extreme_fire: { id:'extreme_fire',name:'極焦',  description:'氷系攻撃で即死。',     icon:'volcano', maxHp:2180,  attack:25, defense:20,  baseExp:400,  baseGold:200,  dungeonIds:['frozen_cave'], isMidBoss:true, specialAttack:'ラバクロップ', drops:[{itemId:'ancient_shard',baseRate:0.5,minAmount:2,maxAmount:3}] },
+  extreme_cold: { id:'extreme_cold',name:'極冷',  description:'高耐久の中ボス。属性武器は未実装のため通常ダメージで地道に削る必要がある。', icon:'blizzard', maxHp:2180,  attack:25, defense:20,  baseExp:400,  baseGold:200,  dungeonIds:['frozen_cave'], isMidBoss:true, specialAttack:'アイスビーム', drops:[{itemId:'spirit_ice',baseRate:0.5,minAmount:2,maxAmount:3},{itemId:'ancient_shard',baseRate:0.3,minAmount:1,maxAmount:2}] },
+  extreme_fire: { id:'extreme_fire',name:'極焦',  description:'高耐久の中ボス。属性武器は未実装のため通常ダメージで地道に削る必要がある。', icon:'volcano', maxHp:2180,  attack:25, defense:20,  baseExp:400,  baseGold:200,  dungeonIds:['frozen_cave'], isMidBoss:true, specialAttack:'ラバクロップ', drops:[{itemId:'ancient_shard',baseRate:0.5,minAmount:2,maxAmount:3}] },
   gokureicho:   { id:'gokureicho',name:'極冷焦', description:'極の試練を超えた者が挑む冷焦洞穴の真のボス。防御力75%カット。貫通攻撃が必要。', icon:'blizzard', maxHp:800, attack:35, defense:0, baseExp:1000, baseGold:500, dungeonIds:['frozen_cave'], isBoss:true, specialAttack:'極氷炎撃', defensePct:0.75, drops:[{itemId:'spirit_ice',baseRate:1.0,minAmount:3,maxAmount:5},{itemId:'ancient_shard',baseRate:0.8,minAmount:2,maxAmount:3},{itemId:'stalactite',baseRate:0.5,minAmount:1,maxAmount:2}] },
   zero_boss:    { id:'zero_boss', name:'零',      description:'洞窟そのもの。冷焦洞穴の裏ボス。',       icon:'lightning', maxHp:100000,attack:1,  defense:99,  baseExp:5000, baseGold:3000, dungeonIds:['frozen_cave'], isBoss:true, drops:[{itemId:'stalactite',baseRate:1.0,minAmount:8,maxAmount:8}] },
   roam_armor:   { id:'roam_armor', name:'ロウムアーマー',description:'打ち上げスキル。', icon:'robot', maxHp:60,  attack:20, defense:10,  baseExp:50,   baseGold:30,   dungeonIds:['sky_castle','sky_castle_ex'], drops:[{itemId:'mech_armor_oparts',baseRate:1.0,minAmount:1,maxAmount:1}] },
@@ -1973,14 +1973,14 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
     ],
   },
   frozen_cave: {
-    id:'frozen_cave', name:'冷焦洞穴', description:'属性攻撃システムあり。極冷焦討伐後に零への挑戦が可能。',
+    id:'frozen_cave', name:'冷焦洞穴', description:'極冷・極焦は高耐久の中ボス。属性武器は未実装のため通常攻撃で削る。極冷焦討伐後に零への挑戦が可能。',
     icon:'snowflake', tier:'advanced', requiredLevel:30, floors:4, expBonus:3.0, goldBonus:2.5,
     monsterIds:['ice_spirit','extreme_cold','extreme_fire','gokureicho'],
     bossId:'gokureicho',
     unlockCondition: { dungeonId:'garden', clearedCount:1 },
     areas:[
       { name:'洞窟1層', monsters:[{monsterId:'ice_spirit',count:5}] },
-      { name:'極の試練', description:'極冷・極焦が出現。属性攻撃が必須。', monsters:[{monsterId:'extreme_cold',count:1},{monsterId:'extreme_fire',count:1}], isHardArea:true },
+      { name:'極の試練', description:'極冷・極焦が出現。高HPの中ボス2体、通常攻撃でじっくり削ろう。', monsters:[{monsterId:'extreme_cold',count:1},{monsterId:'extreme_fire',count:1}], isHardArea:true },
       { name:'極冷焦の間', description:'冷焦洞穴の真のボス。防御力75%カット、貫通攻撃必須。', monsters:[{monsterId:'gokureicho',count:1,isBoss:true}], isHardArea:true },
       { name:'零の間', description:'零は洞窟そのもの。裏ボス。', monsters:[{monsterId:'zero_boss',count:1,isBoss:true}], isHardArea:true },
     ],
@@ -2025,10 +2025,10 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
   },
   volcano: {
     id:'volcano', name:'火山', description:'総面積400万・スポナー数999個。前難易度の闇森とは桁違いの規模。ステインポット対策・黒ドワーフ対策・ラグナロク対策が生存の鍵。CP3で裏火山ルートへの分岐あり。',
-    icon:'volcano', tier:'volcano', requiredLevel:15, floors:50, expBonus:5.0, goldBonus:4.5,
+    icon:'volcano', tier:'volcano', requiredLevel:40, floors:50, expBonus:5.0, goldBonus:4.5,
     monsterIds:['dwarf_leather','dwarf_gold','dwarf_iron','dwarf_diamond','dwarf_crossbow','dwarf_crossbow_diamond','dwarf_red','dwarf_black','dwarf_ancient','dwarf_ancient_awakened','stain_pot','stain_kid','ragnalok','bannerman','lumberjack','hunter','hunter_trainee','assassin','defender','super_defender','alchemist','evil_summoner','hell_summoner','danger_crown','buster','green_beret','scout','suppression_squad','seal_god','blue_zombie','ryuma','izo','destroyer','jack_bomber','last_wizard','lich_road','lich_boss','volcano_boss','volcano_boss_ex'],
     bossId:'volcano_boss',
-    unlockCondition: { dungeonId:'fortress', clearedCount:3, requiredLevel:15 },
+    unlockCondition: { dungeonId:'sky_castle', clearedCount:1, requiredLevel:40 },
     // ──────────────────────────────────────────────────
     // routes: ノードベース分岐ルート
     //  main  → 共通区間（スタート〜大橋地帯）
