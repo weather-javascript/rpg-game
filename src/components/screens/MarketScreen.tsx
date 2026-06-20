@@ -64,6 +64,14 @@ const DEFAULT_TRADE_RECIPES: TradeRecipe[] = [
     outputItemId: 'gyouen_no_ken',
     outputAmount: 1,
   },
+  {
+    id: 'trade_ryugan_no_maken',
+    name: '竜眼の魔剣と交換',
+    description: 'オーロラスピネル4個、ネザードルビー4個、古代の欠片3個を納めると竜眼の魔剣と交換してもらえる。',
+    inputs: [{ itemId: 'aurora_spinel', amount: 4 }, { itemId: 'nether_ruby', amount: 4 }, { itemId: 'ancient_shard', amount: 3 }],
+    outputItemId: 'ryugan_no_maken',
+    outputAmount: 1,
+  },
 ];
 
 // 満腹度上限購入価格: 600 * 1.3^n
