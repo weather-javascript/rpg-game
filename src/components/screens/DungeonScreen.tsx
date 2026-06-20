@@ -540,6 +540,9 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
   const doMonsterTurn = useCallback((prevBattle: TurnBattleState): TurnBattleState => {
     let newLog = [...prevBattle.log];
     let newBattle = { ...prevBattle, enemies: prevBattle.enemies.map(e => ({ ...e })) };
+    // Goliathシールド：このターンの被弾が無敵対象かどうかは、デクリメント前（=今ターン開始時点）の残ターン数で判定する。
+    // こうすることで「発動後4ターン無敵」が文字どおり4回分の被弾を完全カバーし、4ターン目の被弾後に回復処理に入る。
+    const goliathProtectedThisTurn = prevBattle.goliathShieldTurns > 0;
 
     // ===== 共通ターン処理：クールダウンデクリメント =====
     const newSkillTurn = prevBattle.skillTurn + 1;
@@ -719,9 +722,11 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       newGoliathTurns--;
       newBattle = { ...newBattle, goliathShieldTurns: newGoliathTurns };
       if (newGoliathTurns === 0) {
-        newLog.push({ text: '🛡️ 魔造壊盾=Goliath=のシールド効果が切れた。', color: '#aaaaaa' });
+        const goliathHealAmt = 20;
+        changeHp(goliathHealAmt);
+        newLog.push({ text: `🛡️ 魔造壊盾=Goliath=の無敵が切れた！HP+${goliathHealAmt}回復！`, color: '#4caf87' });
       } else {
-        newLog.push({ text: `🛡️ Goliathシールド有効（残${newGoliathTurns}ターン）`, color: '#00e5ff' });
+        newLog.push({ text: `🛡️ Goliath無敵発動中（残${newGoliathTurns}ターン）`, color: '#00e5ff' });
       }
     }
 
@@ -910,30 +915,21 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           mDmg = Math.max(1, Math.floor(mDmg * (1 - cut)));
         }
       }
-      // Goliathシールド：85%カット
-      if (newBattle.goliathShieldTurns > 0) {
-        mDmg = Math.max(1, Math.floor(mDmg * 0.15));
+      let reducedDmg0 = newBattle.isDefending ? Math.floor(mDmg * 0.5) : mDmg;
+      // Goliathシールド：発動中はどんな攻撃を食らっても被ダメージ1に固定（実質無敵）
+      if (goliathProtectedThisTurn) {
+        reducedDmg0 = 1;
       }
-      const reducedDmg0 = newBattle.isDefending ? Math.floor(mDmg * 0.5) : mDmg;
       const reducedDmg = hpCapActive ? 0 : reducedDmg0;
-      // Goliathシールド：HP以上のダメージが来たらHP10残して耐える
-      const currentHp = player.stats.hp;
-      if (!hpCapActive && newBattle.goliathShieldTurns > 0 && reducedDmg >= currentHp && currentHp > 10) {
-        changeHp(-(currentHp - 10));
-        newLog.push({ text: `🛡️ Goliathが致命打を受けた！HP10で耐えた！`, color: '#00e5ff' });
-        newLog.push(isSpecial
-          ? { text: `💥 ${monster.name}の「${monster.specialAttack ?? '特殊攻撃'}」！ しかしGoliathが守った！`, color: '#e05555' }
-          : { text: `🐉 ${monster.name}の攻撃！ Goliathが守った！${newBattle.isDefending ? '（防御中）' : ''}`, color: '#e05555' }
-        );
-        continue;
-      }
       changeHp(-reducedDmg);
       const newPlayerHp = Math.max(0, player.stats.hp - reducedDmg);
       newLog.push(hpCapActive
         ? { text: `🐉 ${monster.name}の攻撃！ HP固定により無効化！`, color: '#e05555' }
-        : isSpecial
-          ? { text: `💥 ${monster.name}の「${monster.specialAttack ?? '特殊攻撃'}」！ あなたに${reducedDmg}ダメージ！`, color: '#e05555' }
-          : { text: `🐉 ${monster.name}の攻撃！ あなたに${reducedDmg}ダメージ${newBattle.isDefending ? '（防御中）' : ''}`, color: '#e05555' }
+        : goliathProtectedThisTurn
+          ? { text: `🛡️ ${monster.name}の攻撃！ Goliathの加護で1ダメージに軽減！（無敵 残${newBattle.goliathShieldTurns}ターン）`, color: '#00e5ff' }
+          : isSpecial
+            ? { text: `💥 ${monster.name}の「${monster.specialAttack ?? '特殊攻撃'}」！ あなたに${reducedDmg}ダメージ！`, color: '#e05555' }
+            : { text: `🐉 ${monster.name}の攻撃！ あなたに${reducedDmg}ダメージ${newBattle.isDefending ? '（防御中）' : ''}`, color: '#e05555' }
       );
       if (newPlayerHp <= 0) {
         return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
@@ -1446,7 +1442,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           ...battle,
           log: [...battle.log,
             { text: `🛡️ ${logMsg}`, color: '#00e5ff' },
-            { text: `🛡️ 3ターン間ダメージ85%カット！${stunnedMsg}`, color: '#00e5ff' },
+            { text: `🛡️ ${goliathSkill.shieldTurns}ターン無敵（被ダメージ1に軽減）！終了時HP+20回復！${stunnedMsg}`, color: '#00e5ff' },
           ],
           turn: 'monster',
           isDefending: false,
