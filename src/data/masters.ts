@@ -98,8 +98,8 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   // ============================================================
   emerald_sword:  { id:'emerald_sword',  name:'エメラルドの剣', description:'エメラルドから作れる剣。攻撃力+9、防御力+5、HP+10。', category:'weapon', itemType:'Weapon', rarity:'epic',     sellPrice:900,  buyPrice:0, maxStack:1, icon:'emerald_sword_png', weaponDef:5, weaponHpBonus:10,  useEffect:{attackBonus:9,  message:'エメラルドの剣で斬りつけた！', attackType:'physical'} },
   netherite_sword:{ id:'netherite_sword',name:'ネザライトの剣', description:'ネザライトインゴットから作れる剣。攻撃力+10、防御力+8、HP+15。', category:'weapon', itemType:'Weapon', rarity:'legendary', sellPrice:1200, buyPrice:0, maxStack:1, icon:'netherite_sword_png', weaponDef:8, weaponHpBonus:15, useEffect:{attackBonus:10, message:'ネザライトの剣で斬りつけた！', attackType:'physical'} },
-  shinen_dan_ken: { id:'shinen_dan_ken', name:'深淵の断魔剣', description:'ネザライトの剣を深淵の素材で更に鍛え上げた中堅クラスの剣。攻撃力+22、防御力+8。3ターンに1度、全体に貫通12ダメージ。被ダメージ30%カット。', category:'weapon', itemType:'Weapon', rarity:'epic', sellPrice:0, buyPrice:0, maxStack:1, icon:'shinen_dan_ken_png', weaponAtk:22, weaponDef:8, weaponSkills:[{type:'penetrate_per_turn', value:12},{type:'hotbar_shield', cutPercent:30}], useEffect:{attackBonus:22, message:'深淵の断魔剣で斬りつけた！', attackType:'physical'} },
-  ryugan_no_maken: { id:'ryugan_no_maken', name:'竜眼の魔剣', description:'竜の眼を宿した魔剣。深淵の断魔剣よりも更に上位の中堅クラス武器。攻撃力+35、HP+15。毎ターンHP8回復、満腹度3回復。', category:'weapon', itemType:'Weapon', rarity:'legendary', sellPrice:0, buyPrice:0, maxStack:1, icon:'ryugan_no_maken_png', weaponAtk:35, weaponHpBonus:15, weaponSkills:[{type:'regen_per_turn', hpRestore:8, satietyRestore:3}], useEffect:{attackBonus:35, message:'竜眼の魔剣で斬りつけた！', attackType:'physical'} },
+  shinen_dan_ken: { id:'shinen_dan_ken', name:'深淵の断魔剣', description:'攻撃+26、防御+10、被ダメ-25%。攻撃時に敵へ「刻印」を付与（最大3スタック）。3ターンごとに全体へ「刻印数×貫通15」ダメージを与える。', category:'weapon', itemType:'Weapon', rarity:'epic', sellPrice:0, buyPrice:0, maxStack:1, icon:'shinen_dan_ken_png', weaponAtk:26, weaponDef:10, weaponSkills:[{type:'hotbar_shield', cutPercent:25},{type:'mark_on_hit', maxStacks:3},{type:'mark_burst', interval:3, penetratePerStack:15}], useEffect:{attackBonus:26, message:'深淵の断魔剣で斬りつけた！', attackType:'physical'} },
+  ryugan_no_maken: { id:'ryugan_no_maken', name:'竜眼の魔剣', description:'攻撃+32、HP+20。毎ターンHP+10回復（竜血再生）。HP80%以上時は攻撃+8（覚醒）。HP50%以下時は攻撃するたびに追加で貫通20ダメージ（竜の怒り）。', category:'weapon', itemType:'Weapon', rarity:'legendary', sellPrice:0, buyPrice:0, maxStack:1, icon:'ryugan_no_maken_png', weaponAtk:32, weaponHpBonus:20, weaponSkills:[{type:'regen_per_turn', hpRestore:10, satietyRestore:0},{type:'conditional_atk_bonus', condition:'hp_above_pct', threshold:80, bonus:8},{type:'conditional_penetrate_on_hit', condition:'hp_below_pct', threshold:50, penetrate:20}], useEffect:{attackBonus:32, message:'竜眼の魔剣で斬りつけた！', attackType:'physical'} },
   iron_sacrifice_staff:      { id:'iron_sacrifice_staff',      name:'アイアンサクリファイス',     description:'鉄の剣と圧縮鉄ブロックから作られた杖。範囲攻撃貫通8。毎ターンHP5・満腹度2回復。',         category:'weapon', itemType:'Weapon', rarity:'rare',      sellPrice:1500,   buyPrice:0, maxStack:1, icon:'wand', isAreaWeapon:true, areaPenetrate:8,  weaponSkills:[{type:'regen_per_turn', hpRestore:5, satietyRestore:2}], useEffect:{attackBonus:0, message:'アイアンサクリファイスで全体攻撃！', attackType:'area'} },
   gold_sacrifice_staff:      { id:'gold_sacrifice_staff',      name:'ゴールドサクリファイス',     description:'金の剣と圧縮金ブロックから作られた杖。範囲攻撃貫通10。3ターンに1度、全体に貫通6ダメージ。',       category:'weapon', itemType:'Weapon', rarity:'rare',      sellPrice:3000,   buyPrice:0, maxStack:1, icon:'wand', isAreaWeapon:true, areaPenetrate:10, weaponSkills:[{type:'penetrate_per_turn', value:6}], useEffect:{attackBonus:0, message:'ゴールドサクリファイスで全体攻撃！', attackType:'area'} },
   diamond_sacrifice_staff:   { id:'diamond_sacrifice_staff',   name:'ダイヤモンドサクリファイス', description:'ダイヤの剣と圧縮ダイヤブロックから作られた杖。範囲攻撃貫通14。被ダメージ20%カット。', category:'weapon', itemType:'Weapon', rarity:'epic',      sellPrice:8000,   buyPrice:0, maxStack:1, icon:'wand', isAreaWeapon:true, areaPenetrate:14, weaponSkills:[{type:'hotbar_shield', cutPercent:20}], useEffect:{attackBonus:0, message:'ダイヤモンドサクリファイスで全体攻撃！', attackType:'area'} },
@@ -408,7 +408,7 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
       postBuffTurns: 10,
       postBuffPoisonDmg: 5,
     },
-    useEffect: { attackBonus: 52, message: '変幻始動す原初の剣斧で攻撃！', attackType: 'physical' },
+    useEffect: { attackBonus: 52, message: '変幻始動す原初の剣斧で攻撃！', attackType: 'physical', areaAttack: true },
   },
   // ========== ガチャ限定アイテム ==========
   revolution_sword: {
@@ -640,37 +640,32 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   cataclysm_spear_lv1: {
     id: 'cataclysm_spear_lv1',
     name: '=-=Cataclysm Spear-Level1=-=',
-    description: 'ホットバーに入れている時HP+20、今つけている防具の防御力を1.15倍にする。発動すると攻撃判定にはならず、この武器と追加で2つの武器を選択して同時に攻撃・スキル発動できる（クールタイム3ターン）。発動後Mana120回復。',
+    description: '攻撃+10、HP+20。他の武器スキルを「完全発動」し、同時発動武器のダメージ+30%（共鳴強化）。1ダメ問題を修正・スキル発動を保証。発動すると攻撃判定にはならず、この武器と追加で2つの武器を選択して同時に攻撃・スキル発動できる（クールタイム3ターン）。発動後Mana120回復。',
     category: 'weapon', itemType: 'Weapon', rarity: 'legendary',
     sellPrice: 0, buyPrice: 0, maxStack: 1, icon: 'cataclysm_spear_png',
-    weaponAtk: 0,
+    weaponAtk: 10,
     weaponHpBonus: 20,
     defenseMultiplier: 1.15,
     cooldownTurns: 3,
     nonconsumable: true,
     weaponSkills: [
-      { type: 'multi_weapon_cast' as const, selectCount: 2, manaRestore: 120, cooldownTurns: 3 },
+      { type: 'multi_weapon_cast' as const, selectCount: 2, manaRestore: 120, cooldownTurns: 3, guaranteedSkillProc: true, linkedDmgBonus: 30 },
     ],
-    useEffect: { attackBonus: 0, message: '=-=Cataclysm Spear-Level1=-=を発動！武器を選んでください。', attackType: 'physical' },
+    useEffect: { attackBonus: 10, message: '=-=Cataclysm Spear-Level1=-=を発動！武器リンク発動！', attackType: 'physical' },
   },
 
   emerald_crusade: {
     id: 'emerald_crusade',
     name: 'Emerald Crusade',
-    description: '使用後6ターン後に貫通含む複数ヒットダメージ（物理16×8、貫通10×8、貫通20×2）を与える（発動後クールダウン7ターン）。使用時から2ターンは回復不可＋HPが25%以下に固定される。',
+    description: '攻撃+18。毎ターン自動でチャージが蓄積（最大8スタック）。任意のタイミングで発動すると物理20×スタック数＋貫通15×スタック数のダメージを与え、スタックをリセット。発動後HP-20%。',
     category: 'weapon', itemType: 'Weapon', rarity: 'epic',
     sellPrice: 0, buyPrice: 0, maxStack: 1, icon: 'emerald_crusade_png',
-    weaponAtk: 0,
+    weaponAtk: 18,
     nonconsumable: true,
     weaponSkills: [
-      { type: 'delayed_multihit' as const, delayTurns: 6, hits: [
-        { dmg: 16, count: 8, penetrate: false },
-        { dmg: 10, count: 8, penetrate: true },
-        { dmg: 20, count: 2, penetrate: true },
-      ], cooldownTurns: 7 },
-      { type: 'self_lock' as const, noHealTurns: 2, hpCapPct: 25, capTurns: 2 },
+      { type: 'charge_and_fire' as const, chargePerTurn: 1, maxCharge: 8, physPerCharge: 20, penetratePerCharge: 15, selfDmgPctOnFire: 20 },
     ],
-    useEffect: { attackBonus: 0, message: 'Emerald Crusadeを発動！刃に魔力を込めた...', attackType: 'physical' },
+    useEffect: { attackBonus: 18, message: 'Emerald Crusadeを発動！蓄えた魔力を解放！', attackType: 'physical' },
   },
   amethyst_storeak: {
     id: 'amethyst_storeak',
@@ -689,15 +684,16 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   jewelry_cane: {
     id: 'jewelry_cane',
     name: 'jewelry cane',
-    description: '自身の防御力を5ターンの間1.5倍にする（発動後クールダウン8ターン）。発動後5ターンは自分のHPに比例した5%の割合ダメージを受ける。',
+    description: '防御力1.4倍。3ターンごとに「宝石結界」を発動：被ダメ-40%＋受けたダメージの20%を反射。発動中は攻撃力-30%。',
     category: 'weapon', itemType: 'Weapon', rarity: 'rare',
     sellPrice: 0, buyPrice: 0, maxStack: 1, icon: 'jewelry_cane_png',
     weaponAtk: 0,
+    defenseMultiplier: 1.4,
     nonconsumable: true,
     weaponSkills: [
-      { type: 'def_buff_self_dmg' as const, defMultiplier: 1.5, buffTurns: 5, selfDmgPct: 5, selfDmgTurns: 5, cooldownTurns: 8 },
+      { type: 'periodic_barrier' as const, interval: 3, dmgReductPct: 40, reflectPct: 20, atkPenaltyPct: 30 },
     ],
-    useEffect: { attackBonus: 0, message: 'jewelry caneを構えた！防御力が上昇する...', attackType: 'physical' },
+    useEffect: { attackBonus: 0, message: 'jewelry caneを構えた！宝石結界が展開される...', attackType: 'physical' },
   },
   damage_to_heal: {
     id: 'damage_to_heal',
