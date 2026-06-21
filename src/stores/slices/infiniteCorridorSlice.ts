@@ -1,14 +1,16 @@
 // src/stores/slices/infiniteCorridorSlice.ts
 // 無限深層回廊：周回ループ（進入→戦闘→続行/帰還→確定/離脱）の状態管理
+// 戦闘自体は他ダンジョンと同じTurnBattle（ホットバー/武器選択UI）に委譲する。
 // ステージ1: 初級（1〜10階）のみ対応。中級以降は敵データ追加後に自動的に動作する設計。
 
 import type { StateCreator } from 'zustand';
 import type { GameState } from '../gameStore';
 import { randomIntRange, randomPick, secureRandom } from '../../utils/random';
+import { MONSTER_MASTER, DUNGEON_MASTER } from '../../data/masters';
 import {
   IC_ALL_BEGINNER_ENEMIES, IC_ENEMIES_BEGINNER, IC_BOSS_CAVE_OGRE,
-  getICMultiplier, getICEliteRate, getICScaledStats, getICThreatStars,
-  rollICEvent, IC_MULTIPLIER_JUMP_WARNING_FLOORS, type ICEnemy,
+  getICMultiplier, getICEliteRate, getICThreatStars,
+  rollICEvent, icEnemyToMonsterMaster, IC_MULTIPLIER_JUMP_WARNING_FLOORS, type ICEnemy,
 } from '../../data/infiniteCorridorMaster';
 
 export interface ICRunLogEntry { message: string; kind: 'info' | 'combat' | 'event' | 'danger' | 'success'; }
@@ -20,9 +22,19 @@ export interface InfiniteCorridorSlice {
   icRunLog: ICRunLogEntry[];
   icRunFailed: boolean;
   icFloorResolved: boolean;
+  // 実戦闘（ホットバー/武器選択TurnBattle）の進行管理
+  icBattleActive: boolean;
+  icBattleKey: number;
+  icBattleEnemyId: string | null;
+  icBattleFloor: number;
+  icBattleMana: number;
 
   icStartRun: () => void;
-  icEncounterFloor: () => void; // 現在階層のイベント/戦闘を解決する
+  icStartFloorBattle: () => void;   // 現在階層の敵を確定し、TurnBattleを開始する
+  icResolveBattleWin: () => void;   // TurnBattle勝利後：素材ドロップ・イベント確定
+  icResolveBattleLose: () => void;  // TurnBattle敗北後：周回失敗
+  icCancelBattle: () => void;       // TurnBattle逃走：階層は未解決のまま戦闘のみ終了
+  icSetBattleMana: (mana: number) => void;
   icContinueDeeper: () => void; // 続行：次の階層へ
   icReturnSafely: () => void;   // 帰還：素材を確定して周回終了
   icAbandonRun: () => void;     // 死亡などで周回を破棄（素材は失われる）
@@ -38,6 +50,21 @@ function pickFloorEnemy(floor: number): ICEnemy {
   return randomPick(candidates);
 }
 
+/** 指定階層の敵をMONSTER_MASTERへ登録し、infinite_corridorダンジョンのエリアを
+ *  その敵1体だけのエリアに差し替える。TurnBattle側の既存スポーン処理（spawnEnemies）を
+ *  そのまま使い回すための橋渡し。同一(敵×階層)組み合わせの再登録はスキップする。 */
+function registerICEncounter(enemy: ICEnemy, floor: number): string {
+  const monsterId = `${enemy.id}_f${floor}`;
+  if (!MONSTER_MASTER[monsterId]) {
+    MONSTER_MASTER[monsterId] = icEnemyToMonsterMaster(enemy, floor);
+  }
+  const dungeon = DUNGEON_MASTER.infinite_corridor;
+  if (dungeon) {
+    dungeon.areas = [{ name: `B${floor}F`, monsters: [{ monsterId, count: 1, isBoss: enemy.isBoss ?? false }] }];
+  }
+  return monsterId;
+}
+
 export const createInfiniteCorridorSlice: StateCreator<GameState, [], [], InfiniteCorridorSlice> = (set, get) => ({
   icRunActive: false,
   icCurrentFloor: 1,
@@ -45,38 +72,47 @@ export const createInfiniteCorridorSlice: StateCreator<GameState, [], [], Infini
   icRunLog: [],
   icRunFailed: false,
   icFloorResolved: false,
+  icBattleActive: false,
+  icBattleKey: 0,
+  icBattleEnemyId: null,
+  icBattleFloor: 1,
+  icBattleMana: 0,
 
   icStartRun: () => {
-    set({ icRunActive: true, icCurrentFloor: 1, icPendingMaterials: {}, icRunFailed: false, icFloorResolved: false, icRunLog: [{ message: '無限深層回廊に突入した。', kind: 'info' }] });
+    set({
+      icRunActive: true, icCurrentFloor: 1, icPendingMaterials: {}, icRunFailed: false, icFloorResolved: false,
+      icBattleActive: false, icBattleEnemyId: null, icBattleMana: 0,
+      icRunLog: [{ message: '無限深層回廊に突入した。', kind: 'info' }],
+    });
   },
 
-  icEncounterFloor: () => {
-    const { player, icCurrentFloor } = get();
-    if (!player || !get().icRunActive) return;
-
+  icStartFloorBattle: () => {
+    const { player, icCurrentFloor, icRunActive } = get();
+    if (!player || !icRunActive) return;
     const floor = icCurrentFloor;
-    const multiplier = getICMultiplier(floor);
     const eliteRate = getICEliteRate(floor);
-    const log: ICRunLogEntry[] = [];
-
-    // エリート抽選（6〜9階のみ、ステージ1時点で実装済みのエリートは狂暴なオーガのみ）
     const isEliteFloor = floor >= 6 && floor <= 9 && secureRandom() < eliteRate;
     const enemy = isEliteFloor ? IC_ENEMIES_BEGINNER.ic_enraged_ogre : pickFloorEnemy(floor);
-    const { hp, atk, def } = getICScaledStats(enemy.baseHp, enemy.baseAttack, enemy.baseDefense, floor);
+    registerICEncounter(enemy, floor);
+    set(state => ({
+      icBattleActive: true,
+      icBattleKey: state.icBattleKey + 1,
+      icBattleEnemyId: enemy.id,
+      icBattleFloor: floor,
+      icBattleMana: 0,
+    }));
+  },
 
-    // 簡易戦闘解決（ステージ1: プレイヤーステータスとの簡易比較。詳細な戦闘UIは次ステージで実装）
-    const playerPower = (player.stats.attack ?? 10) + (player.skillLevels?.combat ?? 1) * 2;
-    const enemyPower = atk + def * 0.5;
-    const winChance = Math.max(0.55, Math.min(0.97, 0.85 + (playerPower - enemyPower) / 200));
-    const won = secureRandom() < winChance;
+  icResolveBattleWin: () => {
+    const { icBattleEnemyId, icBattleFloor } = get();
+    const enemy = icBattleEnemyId ? IC_ALL_BEGINNER_ENEMIES[icBattleEnemyId] : null;
+    set({ icBattleActive: false, icBattleEnemyId: null });
+    if (!enemy) return;
 
-    if (!won) {
-      log.push({ message: `${enemy.name}に敗北した…！未確定の素材は持ち帰れない。`, kind: 'danger' });
-      set((state) => ({ icRunLog: [...state.icRunLog, ...log], icRunFailed: true, icRunActive: false, icFloorResolved: false }));
-      return;
-    }
-
-    log.push({ message: `${enemy.name}（HP${hp}/ATK${atk}/DEF${def}）を撃破した！`, kind: 'combat' });
+    const floor = icBattleFloor;
+    const multiplier = getICMultiplier(floor);
+    const log: ICRunLogEntry[] = [];
+    log.push({ message: `${enemy.name}を撃破した！`, kind: 'combat' });
 
     // ドロップ計算（続行倍率を乗算）
     const gained: Record<string, number> = {};
@@ -112,6 +148,29 @@ export const createInfiniteCorridorSlice: StateCreator<GameState, [], [], Infini
     });
   },
 
+  icResolveBattleLose: () => {
+    const { icBattleEnemyId } = get();
+    const enemy = icBattleEnemyId ? IC_ALL_BEGINNER_ENEMIES[icBattleEnemyId] : null;
+    set((state) => ({
+      icBattleActive: false,
+      icBattleEnemyId: null,
+      icRunLog: [...state.icRunLog, { message: `${enemy?.name ?? '敵'}に敗北した…！未確定の素材は持ち帰れない。`, kind: 'danger' }],
+      icRunFailed: true,
+      icRunActive: false,
+      icFloorResolved: false,
+    }));
+  },
+
+  icCancelBattle: () => {
+    set((state) => ({
+      icBattleActive: false,
+      icBattleEnemyId: null,
+      icRunLog: [...state.icRunLog, { message: '🏃 戦闘から逃走した。', kind: 'info' }],
+    }));
+  },
+
+  icSetBattleMana: (mana: number) => set({ icBattleMana: mana }),
+
   icContinueDeeper: () => {
     set((state) => ({ icCurrentFloor: state.icCurrentFloor + 1, icFloorResolved: false }));
   },
@@ -128,7 +187,7 @@ export const createInfiniteCorridorSlice: StateCreator<GameState, [], [], Infini
   },
 
   icAbandonRun: () => {
-    set({ icRunActive: false, icPendingMaterials: {}, icRunFailed: false });
+    set({ icRunActive: false, icPendingMaterials: {}, icRunFailed: false, icBattleActive: false, icBattleEnemyId: null });
   },
 
   icGetNextFloorWarning: () => {
