@@ -110,9 +110,9 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   // 天空城関連アイテム
   sky_pass:        { id:'sky_pass',         name:'天空城通行書',   description:'天空城5ターン目に使用するとKXに挑戦できる。洞窟王の宝石64個+ダイヤモンド64個から作成。', category:'material', itemType:'Item', rarity:'legendary', sellPrice:0, buyPrice:0, maxStack:1, icon:'scroll' },
   mech_armor_oparts:{ id:'mech_armor_oparts',name:'機械鎧のオーパーツ',description:'ロウムアーマーが落とす。', category:'material', itemType:'Item', rarity:'rare', sellPrice:100, buyPrice:0, maxStack:-1, icon:'robot' },
-  rusty_mystery_obj:{ id:'rusty_mystery_obj',name:'錆びついた謎の物体',description:'デスアーマーが落とす。', category:'material', itemType:'Item', rarity:'rare', sellPrice:120, buyPrice:0, maxStack:-1, icon:'sword_iron' },
+  rusty_mystery_obj:{ id:'rusty_mystery_obj',name:'錆びついた謎の物体',description:'デスアーマーが落とす。', category:'material', itemType:'Item', rarity:'rare', sellPrice:120, buyPrice:0, maxStack:-1, icon:'rusty_mystery_obj_item' },
   upper_magic_book: { id:'upper_magic_book', name:'上級魔導書',    description:'ウィザード、マッドガイボットが落とす。', category:'material', itemType:'Item', rarity:'rare', sellPrice:300, buyPrice:0, maxStack:-1, icon:'scroll' },
-  devil_reactor:    { id:'devil_reactor',    name:'सैतान अणुभट्टी（デビルリアクター）',description:'デビルアーマーが落とす。', category:'material', itemType:'Item', rarity:'epic', sellPrice:500, buyPrice:0, maxStack:-1, icon:'gem_red' },
+  devil_reactor:    { id:'devil_reactor',    name:'सैतान अणुभट्टी（デビルリアクター）',description:'デビルアーマーが落とす。', category:'material', itemType:'Item', rarity:'epic', sellPrice:500, buyPrice:0, maxStack:-1, icon:'devil_reactor_item' },
   chaos_reactor:    { id:'chaos_reactor',    name:'カオスリアクター', description:'デッドアーマーが落とす。', category:'material', itemType:'Item', rarity:'epic', sellPrice:600, buyPrice:0, maxStack:-1, icon:'flame' },
   makai_bihin:      { id:'makai_bihin',      name:'魔改備品',       description:'エクス、マッドガイボットが落とす。KX討伐報酬にも。', category:'material', itemType:'Item', rarity:'rare', sellPrice:200, buyPrice:0, maxStack:-1, icon:'hammer' },
   super_spanner:    { id:'super_spanner',    name:'超鋼低工学改戯万能スパナ', description:'マッドガイボット・KX-G21が落とす。', category:'material', itemType:'Item', rarity:'epic', sellPrice:800, buyPrice:0, maxStack:-1, icon:'pickaxe_hammer' },
@@ -145,9 +145,9 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   // 火山ドワーフ系 追加ドロップ（敵ステータスデータ準拠）
   forged_iron_fragment:    { id:'forged_iron_fragment',    name:'鍛鉄の欠片',          description:'ドワーフ[皮]が落とす鍛えられた鉄の欠片。', category:'material', itemType:'Item', rarity:'common',    sellPrice:12,  buyPrice:0, maxStack:-1, icon:'pickaxe_hammer' },
   volcano_mystery_item:    { id:'volcano_mystery_item',    name:'???',                 description:'正体不明の物体。何に使えるのかは判明していない。', category:'material', itemType:'Item', rarity:'epic', sellPrice:0, buyPrice:0, maxStack:99, icon:'gem' },
-  faint_magic_gold_fragment:{ id:'faint_magic_gold_fragment',name:'薄い魔力が宿った金の欠片', description:'ドワーフ[金]が落とす、わずかに魔力を帯びた金の欠片。', category:'material', itemType:'Item', rarity:'common', sellPrice:18, buyPrice:0, maxStack:-1, icon:'gold' },
+  faint_magic_gold_fragment:{ id:'faint_magic_gold_fragment',name:'薄い魔力が宿った金の欠片', description:'ドワーフ[金]が落とす、わずかに魔力を帯びた金の欠片。', category:'material', itemType:'Item', rarity:'common', sellPrice:18, buyPrice:0, maxStack:-1, icon:'faint_gold_fragment_item' },
   magic_copper_fragment:   { id:'magic_copper_fragment',   name:'魔力が宿った銅の欠片', description:'ドワーフ[鉄]が落とす、魔力を帯びた銅の欠片。', category:'material', itemType:'Item', rarity:'uncommon', sellPrice:25, buyPrice:0, maxStack:-1, icon:'ore_red' },
-  empty_crossbow:          { id:'empty_crossbow',          name:'弾切れクロスボウ',     description:'ドワーフ[赤]が低確率で落とす、弾の切れたクロスボウ。', category:'material', itemType:'Item', rarity:'rare', sellPrice:150, buyPrice:0, maxStack:10, icon:'arrow' },
+  empty_crossbow:          { id:'empty_crossbow',          name:'弾切れクロスボウ',     description:'ドワーフ[赤]が低確率で落とす、弾の切れたクロスボウ。', category:'material', itemType:'Item', rarity:'rare', sellPrice:150, buyPrice:0, maxStack:10, icon:'empty_crossbow_item' },
   champion_sword:          { id:'champion_sword',          name:'覇者の剣',            description:'ドワーフ[黒]が低確率で落とす剣。並の使い手では扱えない。', category:'material', itemType:'Item', rarity:'epic', sellPrice:3000, buyPrice:0, maxStack:5, icon:'sword' },
   stain_pot_aura:          { id:'stain_pot_aura',          name:'ステインポットオーラ', description:'ステインポットを撃破すると稀に手に入る不快な気配。', category:'material', itemType:'Item', rarity:'common', sellPrice:10, buyPrice:0, maxStack:-1, icon:'bomb' },
   empty_crossbow_hunter:   { id:'empty_crossbow_hunter',   name:'弾切れクロスボウ（ハンター）', description:'ハンターが愛用していた、弾の切れたクロスボウ。', category:'material', itemType:'Item', rarity:'rare', sellPrice:180, buyPrice:0, maxStack:10, icon:'arrow' },
