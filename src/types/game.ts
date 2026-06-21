@@ -312,7 +312,7 @@ export interface MissionProgress {
   // claimed mission reward ids (separate from completed)
   claimedMissions: string[];
 }
-export type DungeonTier = 'beginner' | 'intermediate' | 'advanced' | 'super' | 'extreme' | 'volcano';
+export type DungeonTier = 'beginner' | 'intermediate' | 'advanced' | 'super' | 'extreme' | 'volcano' | 'infinite';
 
 // ============================================================
 // マスターデータ型
