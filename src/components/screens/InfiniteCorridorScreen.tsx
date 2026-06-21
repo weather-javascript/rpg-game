@@ -16,7 +16,8 @@ export function InfiniteCorridorScreen({ onExit }: { onExit: () => void }) {
   const icRunFailed = useGameStore(s => s.icRunFailed);
   const icFloorResolved = useGameStore(s => s.icFloorResolved);
   const icStartRun = useGameStore(s => s.icStartRun);
-  const icEncounterFloor = useGameStore(s => s.icEncounterFloor);
+  const icStartFloorBattle = useGameStore(s => s.icStartFloorBattle);
+  const icBattleActive = useGameStore(s => s.icBattleActive);
   const icContinueDeeper = useGameStore(s => s.icContinueDeeper);
   const icReturnSafely = useGameStore(s => s.icReturnSafely);
   const icAbandonRun = useGameStore(s => s.icAbandonRun);
@@ -87,8 +88,8 @@ export function InfiniteCorridorScreen({ onExit }: { onExit: () => void }) {
           {icRunActive && (
             <>
               {!icFloorResolved ? (
-                <button onClick={icEncounterFloor}
-                  disabled={player.stats.hp <= 0}
+                <button onClick={icStartFloorBattle}
+                  disabled={player.stats.hp <= 0 || icBattleActive}
                   style={{ width: '100%', padding: '12px', fontWeight: 700, background: 'linear-gradient(135deg,#e05555,#c03030)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
                   ⚔️ B{icCurrentFloor}Fの敵と戦う
                 </button>

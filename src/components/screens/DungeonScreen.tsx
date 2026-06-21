@@ -2867,6 +2867,15 @@ export function DungeonScreen() {
   const [ffBattleRunState, setFfBattleRunState] = useState<DungeonRunState | null>(null);
   const [ffBattleKey, setFfBattleKey] = useState(0);
   const [ffBattleMana, setFfBattleMana] = useState(0);
+  // 無限深層回廊：実戦闘（ホットバー/武器選択TurnBattle）
+  const icCurrentFloor = useGameStore(s => s.icCurrentFloor);
+  const icBattleActive = useGameStore(s => s.icBattleActive);
+  const icBattleKey = useGameStore(s => s.icBattleKey);
+  const icBattleMana = useGameStore(s => s.icBattleMana);
+  const icResolveBattleWin = useGameStore(s => s.icResolveBattleWin);
+  const icResolveBattleLose = useGameStore(s => s.icResolveBattleLose);
+  const icCancelBattle = useGameStore(s => s.icCancelBattle);
+  const icSetBattleMana = useGameStore(s => s.icSetBattleMana);
 
   const HIDDEN_DUNGEON_IDS = ['devil_armor_fight', 'dead_armor_fight', 'sky_castle_ex', 'dragons_lair', 'ff_forest', 'ff_plain', 'ff_desert', 'ff_snow', 'ff_savanna', 'ff_pirate'];
   const dungeons = Object.values(DUNGEON_MASTER).filter(d => !HIDDEN_DUNGEON_IDS.includes(d.id));
@@ -2884,9 +2893,19 @@ export function DungeonScreen() {
     if (!isDungeonUnlocked(selectedId)) { addNotification('error', '🔒 このダンジョンはまだ解放されていません'); return; }
     if (player.stats.hp <= 0) { addNotification('error', 'HPが0です。回復してから挑戦してください。'); return; }
     const _dg = getDungeon(selectedId);
-    const _firstAreaName = (_dg as any)?.routes?.main?.[0]?.name ?? _dg?.areas?.[0]?.name ?? 'エリア1';
-    setRunState({ dungeonId: selectedId, currentFloor: 1, currentAreaName: _firstAreaName, monstersDefeated: 0, totalExp: 0, totalGold: 0, totalDrops: [], isComplete: false, isFailed: false, currentAreaIdx: 0, volcanoRoute: selectedId === 'volcano' ? undefined : undefined });
-    setRunLog([`⚔️ ${dungeon.name} に突入！`]);
+    const _entryAreas = (_dg as any)?.routes?.main ?? _dg?.areas;
+    // 敵が一切いない通過専用エリア（観賞用の導入区間など）は戦闘なしで自動的に通過する
+    let _startAreaIdx = 0;
+    const _skipLog: string[] = [];
+    if (_entryAreas) {
+      while (_startAreaIdx < _entryAreas.length - 1 && (_entryAreas[_startAreaIdx] as any)?.monsters?.length === 0) {
+        _skipLog.push(`📍 ${(_entryAreas[_startAreaIdx] as any).name} を通過した（敵なし）。`);
+        _startAreaIdx++;
+      }
+    }
+    const _firstAreaName = _entryAreas?.[_startAreaIdx]?.name ?? 'エリア1';
+    setRunState({ dungeonId: selectedId, currentFloor: 1, currentAreaName: _firstAreaName, monstersDefeated: 0, totalExp: 0, totalGold: 0, totalDrops: [], isComplete: false, isFailed: false, currentAreaIdx: _startAreaIdx, volcanoRoute: selectedId === 'volcano' ? undefined : undefined });
+    setRunLog([`⚔️ ${dungeon.name} に突入！`, ..._skipLog]);
     setInBattle(false);
     setDungeonMana(0);
     // プレイヤー状態更新（画面遷移時のみ）
@@ -2982,9 +3001,15 @@ export function DungeonScreen() {
     if (newDefeated % areaThreshold === 0 && areas) {
       if (nextAreaIdx < areas.length - 1) {
         nextAreaIdx = nextAreaIdx + 1;
+        // 敵が一切いない通過専用エリア（休憩地帯など）は戦闘なしで自動的に通過する
+        const skipMsgs: string[] = [];
+        while (nextAreaIdx < areas.length - 1 && (areas[nextAreaIdx] as any)?.monsters?.length === 0) {
+          skipMsgs.push(`📍 ${(areas[nextAreaIdx] as any).name} を通過した（敵なし）。`);
+          nextAreaIdx++;
+        }
         const nextArea = areas[nextAreaIdx] as any;
         addNotification('info', `✅ ${nextArea.name} に進んだ！`);
-        setRunLog(prev => [...prev, `📍 ${nextArea.name} へ進んだ！`]);
+        setRunLog(prev => [...prev, ...skipMsgs, `📍 ${nextArea.name} へ進んだ！`]);
 
         // ── 火山CP3分岐：共通ルートのisBranchPointエリアに進んだ時に分岐選択UIを出す ──
         if (runState.dungeonId === 'volcano' && !currentVolcanoRoute && nextArea.isBranchPoint) {
@@ -3649,6 +3674,24 @@ export function DungeonScreen() {
         </>
       )}
       </>}
+      {icActive && icBattleActive && (
+        <div style={{ position: 'fixed', inset: 0, background: '#0a0d14', zIndex: 1000, overflowY: 'auto' }}>
+          <div style={{ maxWidth: 520, margin: '0 auto', padding: '12px 12px 80px' }}>
+            <div style={{ background: 'rgba(224,85,85,0.10)', border: '1px solid #2d3752', borderRadius: 8, padding: '6px 12px', marginBottom: 10, fontSize: '0.72rem', color: '#e05555', fontWeight: 700 }}>
+              🌀 無限深層回廊 — B{icCurrentFloor}F
+            </div>
+            <TurnBattle
+              key={icBattleKey}
+              runState={{ dungeonId: 'infinite_corridor', currentFloor: icCurrentFloor, currentAreaName: `B${icCurrentFloor}F`, currentAreaIdx: 0, monstersDefeated: 0, totalExp: 0, totalGold: 0, totalDrops: [], isComplete: false, isFailed: false }}
+              equipment={player?.equipment ?? defaultEquipmentSlots()}
+              onBattleEnd={(won) => { if (won) icResolveBattleWin(); else icResolveBattleLose(); }}
+              onEscape={icCancelBattle}
+              initialMana={icBattleMana}
+              onManaUpdate={icSetBattleMana}
+            />
+          </div>
+        </div>
+      )}
       {icActive && <InfiniteCorridorScreen onExit={() => setIcActive(false)} />}
     </div>
   );
