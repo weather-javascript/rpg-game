@@ -1325,6 +1325,45 @@ const ICONS: Record<string, SvgDef> = {
   // ──────────────────────────────────────────
   // 未登録アイテム補完（武器・素材）
   // ──────────────────────────────────────────
+  empty_crossbow_item: { content: `
+    <path d="M6 10 Q16 4 26 10" fill="none" stroke="${C.wood}" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M6 10 Q16 5.5 26 10" fill="none" stroke="${C.woodDk}" stroke-width="1" opacity="0.6"/>
+    <rect x="14.5" y="9" width="3" height="18" rx="1" fill="${C.woodDk}"/>
+    <rect x="13.5" y="24" width="5" height="3.5" rx="1" fill="${C.steelDk}"/>
+    <circle cx="6" cy="10" r="1.6" fill="${C.steel}"/>
+    <circle cx="26" cy="10" r="1.6" fill="${C.steel}"/>
+    <line x1="9" y1="14" x2="23" y2="14" stroke="${C.dimWhite}" stroke-width="0.6" stroke-dasharray="1.5 1.5" opacity="0.5"/>
+  ` },
+
+  faint_gold_fragment_item: { content: `
+    <path d="M9 12 L18 7 L25 12 L21 21 L11 21 Z" fill="${C.gold}"/>
+    <path d="M9 12 L18 7 L18 16 L11 21 Z" fill="${C.goldDk}" opacity="0.85"/>
+    <path d="M18 7 L25 12 L21 21 L18 16 Z" fill="${C.gold}" opacity="0.7"/>
+    <circle cx="17" cy="13" r="2.4" fill="${C.magic}" opacity="0.55"/>
+    <circle cx="17" cy="13" r="1" fill="${C.white}" opacity="0.8"/>
+    <path d="M14 9 L15 11 M21 10 L20 12" stroke="rgba(255,255,255,0.5)" stroke-width="0.8"/>
+  ` },
+
+  devil_reactor_item: { content: `
+    <circle cx="16" cy="16" r="10" fill="#2a0810"/>
+    <circle cx="16" cy="16" r="8.5" fill="#5a1020"/>
+    <path d="M16 8 L19 14 L16 16 L13 14 Z" fill="${C.fireDk}"/>
+    <path d="M24 16 L18 19 L16 16 L18 13 Z" fill="#c83040"/>
+    <path d="M16 24 L13 18 L16 16 L19 18 Z" fill="${C.fireDk}"/>
+    <path d="M8 16 L14 13 L16 16 L14 19 Z" fill="#c83040"/>
+    <circle cx="16" cy="16" r="3.4" fill="#ff5060"/>
+    <circle cx="16" cy="16" r="1.6" fill="${C.white}" opacity="0.9"/>
+  ` },
+
+  rusty_mystery_obj_item: { content: `
+    <path d="M11 5 L21 5 L24 9 L24 23 L8 23 L8 9 Z" fill="${C.rust}"/>
+    <path d="M11 5 L21 5 L24 9 L20 9 L17 6 L11 6 Z" fill="#8a4828" opacity="0.8"/>
+    <circle cx="13" cy="13" r="1.6" fill="#5a3018"/>
+    <circle cx="19" cy="17" r="1.3" fill="#5a3018"/>
+    <path d="M9 9 L23 9 M9 16 L23 16" stroke="#6a3818" stroke-width="0.8" opacity="0.6"/>
+    <text x="16" y="21" font-size="9" text-anchor="middle" fill="rgba(232,240,255,0.55)">?</text>
+  ` },
+
   sword: { content: `
     <path d="M16 4 L19 7 L12 24 L8 22 Z" fill="${C.blade}" opacity="0.95"/>
     <path d="M16 4 L17.5 5.5 L11.5 22 L10 21.3 Z" fill="rgba(255,255,255,0.45)"/>
