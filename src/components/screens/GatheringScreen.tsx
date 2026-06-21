@@ -75,6 +75,7 @@ export function GatheringScreen() {
   const updateToolAcquisitionStats = useGameStore(s => s.updateToolAcquisitionStats);
   const updateGatherCombo = useGameStore(s => s.updateGatherCombo);
   const updateGatherCollection = useGameStore(s => s.updateGatherCollection);
+  const setOfflineMining = useGameStore(s => s.setOfflineMining);
   const setGatheringLocked = useGameStore((s: any) => s.setGatheringLocked);
 
   const [cooldowns, setCooldowns] = useState<Record<string, number>>({});
@@ -535,6 +536,46 @@ export function GatheringScreen() {
               </div>
             </div>
           )}
+
+          {/* 採掘委任（オフライン採掘） */}
+          {(() => {
+            const om = player?.offlineMining ?? { enabled: false, category: activeCategory, startedAt: 0, lastSettledAt: 0 };
+            const isOnForThisCategory = om.enabled && om.category === activeCategory;
+            return (
+              <div style={{background:'#1c2235',border:`1px solid ${om.enabled?'#4caf87':'#2d3752'}`,borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:'0.78rem'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <div>
+                    <div style={{color:om.enabled?'#4caf87':'#8a92b2',fontWeight:700}}>
+                      🏕️ 採掘委任：{om.enabled?'採掘中':'停止中'}
+                    </div>
+                    <div style={{fontSize:'0.68rem',color:'#8a92b2',marginTop:2}}>
+                      留守中に採掘を行います（最大30個まで）
+                    </div>
+                    {om.enabled && (
+                      <div style={{fontSize:'0.68rem',color:'#5b8dee',marginTop:2}}>
+                        対象カテゴリ: {CATEGORY_CONFIG[om.category as GatherCategory]?.icon} {CATEGORY_CONFIG[om.category as GatherCategory]?.label}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setOfflineMining(!(om.enabled), activeCategory)}
+                    style={{
+                      minWidth:60, padding:'6px 14px', borderRadius:20, border:'none', cursor:'pointer',
+                      fontWeight:700, fontSize:'0.76rem', color:'#fff',
+                      background: om.enabled ? 'linear-gradient(135deg,#4caf87,#2f8a5f)' : '#2d3752',
+                    }}
+                  >
+                    {om.enabled ? 'ON' : 'OFF'}
+                  </button>
+                </div>
+                {!isOnForThisCategory && om.enabled && (
+                  <div style={{fontSize:'0.66rem',color:'#f0a830',marginTop:6}}>
+                    ※ 現在は「{CATEGORY_CONFIG[om.category as GatherCategory]?.label}」が対象です。このカテゴリに切り替えるには一度OFFにしてから再度ONにしてください。
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* 通常ノード */}
           <div style={{display:'grid',gap:10,gridTemplateColumns:'1fr 1fr'}}>
