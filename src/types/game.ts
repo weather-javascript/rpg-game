@@ -568,6 +568,13 @@ export interface PlayerData {
   // 採取ツール所持・解放
   ownedToolIds?: string[];
   unlockedToolIds?: string[]; // 条件解放済みグループID ('unlock_basic','unlock_combo',...)
+  // オフライン採掘（採掘委任）：ログアウト中に進む採取の代行
+  offlineMining?: {
+    enabled: boolean;
+    category: GatherCategory;
+    startedAt: number;
+    lastSettledAt: number;
+  };
   toolAcquisitionStats?: {
     totalGatherCount: number;
     maxCombo: number;
