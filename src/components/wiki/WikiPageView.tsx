@@ -35,6 +35,7 @@ export function WikiPageView({ pageId, uid, onNavigateToPage, onEdit, onHistory,
   const [notFound, setNotFound] = useState(false);
   const [liked, setLiked] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [sideOpen, setSideOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -166,8 +167,19 @@ export function WikiPageView({ pageId, uid, onNavigateToPage, onEdit, onHistory,
       </div>
 
       {/* 本文＋右カラム（目次・関連ページ） */}
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 0', minWidth: 0 }}>
+      <div className="wiki-page-content-row" style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <button
+          className="wiki-page-side-toggle"
+          onClick={() => setSideOpen(v => !v)}
+          style={{
+            display: 'none', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)',
+            background: 'var(--bg-card)', color: 'var(--text-secondary)', fontSize: '0.74rem', width: '100%',
+          }}
+        >
+          {sideOpen ? '✕ 目次・関連ページを閉じる' : '☰ 目次・関連ページ'}
+        </button>
+
+        <div className="wiki-page-main" style={{ flex: '1 1 0', minWidth: 0 }}>
           {page.contentBlocks.length === 0 ? (
             <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: 16, textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 8 }}>本文はまだありません</div>
           ) : (
@@ -175,7 +187,7 @@ export function WikiPageView({ pageId, uid, onNavigateToPage, onEdit, onHistory,
           )}
         </div>
 
-        <div style={{ flex: '0 0 220px', minWidth: 200, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className={`wiki-page-side ${sideOpen ? 'wiki-page-side-open' : ''}`} style={{ flex: '0 0 220px', minWidth: 200, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {outline.length > 0 && (
             <SidePanel title="目次">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -212,6 +224,20 @@ export function WikiPageView({ pageId, uid, onNavigateToPage, onEdit, onHistory,
           </SidePanel>
         </div>
       </div>
+
+      <style>{`
+        @media (max-width: 700px) {
+          .wiki-page-content-row { flex-direction: column; }
+          .wiki-page-side-toggle { display: block !important; }
+          .wiki-page-main { flex: 1 1 100% !important; width: 100%; }
+          .wiki-page-side { display: none !important; }
+          .wiki-page-side-open {
+            display: flex !important;
+            width: 100%;
+            flex: 1 1 100% !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
