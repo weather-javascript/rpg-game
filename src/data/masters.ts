@@ -4,6 +4,7 @@ import type {
   ItemMaster, SkillMaster, GatherNodeMaster,
   MonsterMaster, DungeonMaster, GambleMaster, CraftRecipe,
 } from '../types/game';
+import { IC_ITEMS, IC_CRAFT_RECIPES, IC_ALL_BEGINNER_ENEMIES } from './infiniteCorridorMaster';
 
 // ============================================================
 // アイテムマスター
@@ -738,6 +739,8 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
     ],
     useEffect: { attackBonus: 0, message: 'Mana Rodを掲げた！Manaが満ちていく...', attackType: 'physical' },
   },
+  // 無限深層回廊 専用素材・クラフト品
+  ...IC_ITEMS,
 };
 
 // ============================================================
@@ -1829,6 +1832,8 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     requiredCraftingLevel: 45,
     craftingExpGain: 1200,
   },
+  // 無限深層回廊 専用クラフトレシピ
+  ...IC_CRAFT_RECIPES,
 ];
 
 // ============================================================
@@ -2795,6 +2800,11 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
       { name:'甲板',         monsters:[{monsterId:'ff_pirates_captain',count:1},{monsterId:'ff_soul_attack',count:1}], isHardArea:true },
       { name:'船長室',       description:'ブルートリーダーの間。', monsters:[{monsterId:'ff_brute_leader',count:1,isBoss:true}], isHardArea:true },
     ],
+  },
+  infinite_corridor: {
+    id:'infinite_corridor', name:'無限深層回廊', description:'1階ずつ潜り、続行/帰還を選びながら素材を集める周回特化ダンジョン。専用画面で進行する。',
+    icon:'infinite_spiral', tier:'infinite', requiredLevel:1, floors:100, expBonus:1.0, goldBonus:1.0,
+    monsterIds:Object.keys(IC_ALL_BEGINNER_ENEMIES),
   },
 };
 
