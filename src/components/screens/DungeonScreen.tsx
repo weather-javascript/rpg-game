@@ -1,6 +1,7 @@
 // src/components/screens/DungeonScreen.tsx
 import { FreeFieldScreen } from './FreeFieldScreen';
 import type { FFBattleRequest } from './FreeFieldScreen';
+import { InfiniteCorridorScreen } from './InfiniteCorridorScreen';
 import { GameIcon } from '../icons';
 import { useState, useCallback, useEffect } from 'react';
 import { useGameStore } from '../../stores/gameStore';
@@ -2840,6 +2841,7 @@ export function DungeonScreen() {
   void monsterOverrides; // suppress unused warning
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [icActive, setIcActive] = useState(false);
   const [runState, setRunState] = useState<DungeonRunState | null>(null);
   const [inBattle, setInBattle] = useState(false);
   const [battleKey, setBattleKey] = useState(0); // バトルコンポーネント再生成用
@@ -2868,6 +2870,7 @@ export function DungeonScreen() {
 
   const startDungeon = useCallback(() => {
     if (!player || !selectedId) return;
+    if (selectedId === 'infinite_corridor') { setIcActive(true); return; }
     const dungeon = getDungeon(selectedId);
     const combatLv = player.skillLevels['combat'] ?? 1;
     if (!dungeon || combatLv < dungeon.requiredLevel) {
@@ -3231,7 +3234,7 @@ export function DungeonScreen() {
           </div>
         </div>
       )}
-      {!gachaTabActive && !trapTabActive && !freeFieldTabActive && <>
+      {!gachaTabActive && !trapTabActive && !freeFieldTabActive && !icActive && <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <h2 style={{ fontFamily: 'Cinzel,serif', color: '#f0c060', borderBottom: '1px solid #2d3752', paddingBottom: 8, flex: 1 }}>⚔️ ダンジョン</h2>
         {lockedDungeons.length > 0 && (
@@ -3642,6 +3645,7 @@ export function DungeonScreen() {
         </>
       )}
       </>}
+      {icActive && <InfiniteCorridorScreen onExit={() => setIcActive(false)} />}
     </div>
   );
 }
