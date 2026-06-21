@@ -6,7 +6,7 @@ import { GameIcon } from '../icons';
 import { useState, useCallback, useEffect } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { secureRandom, randomInt, randomIntRange, randomChance } from '../../utils/random';
-import { DUNGEON_MASTER, MONSTER_MASTER, ITEM_MASTER } from '../../data/masters';
+import { DUNGEON_MASTER, MONSTER_MASTER, ITEM_MASTER, BOSS_TITLE_MASTER, KILL_LOG_MASTER } from '../../data/masters';
 import type { MonsterMaster, DungeonRunState, DungeonMaster, DungeonArea, WeaponPassiveSkill, WeaponRegenSkill, WeaponShieldSkill, WeaponManaSkill, PlayerData } from '../../types/game';
 import type { EquipmentSlots } from '../../types/game';
 import { defaultEquipmentSlots } from '../../types/game';
@@ -149,6 +149,35 @@ function getMergedMonster(id: string): MonsterMaster {
     specialAttack: ov.specialAttack ?? base.specialAttack,
     drops: ov.drops ?? base.drops,
   };
+}
+
+// 撃破した敵の中に称号対象がいればワールドニュースへ通知（1戦闘内で同一個体は1回まで）
+function postBossTitleIfAny(enemies: EnemyState[], uid: string, displayName: string): void {
+  const seen = new Set<string>();
+  for (const e of enemies) {
+    const t = BOSS_TITLE_MASTER[e.monsterId];
+    if (!t || seen.has(e.monsterId)) continue;
+    seen.add(e.monsterId);
+    postActivityFeed({ uid, displayName, type: 'boss_title', message: `が称号「${t.title}」を獲得しました！`, color: t.color, title: t.title }).catch(() => {});
+  }
+}
+
+// 敵に倒された際、固有のキルログをナチュラルニュースへ通知
+function postKillLog(enemies: EnemyState[], uid: string, displayName: string): void {
+  const alive = enemies.filter(e => e.hp > 0);
+  const pool = alive.length > 0 ? alive : enemies;
+  if (pool.length === 0) return;
+  // 生存している敵の中で最も攻撃力が高い個体を「致命傷を与えた敵」とみなす
+  const killer = pool.reduce((strongest, cur) => {
+    const a = getMergedMonster(cur.monsterId)?.attack ?? 0;
+    const b = getMergedMonster(strongest.monsterId)?.attack ?? 0;
+    return a > b ? cur : strongest;
+  }, pool[0]);
+  const log = KILL_LOG_MASTER[killer.monsterId];
+  const mon = getMergedMonster(killer.monsterId);
+  const text = log?.text ?? `は${mon?.name ?? '謎の敵'}に敗れた。`;
+  const color = log?.color ?? '#e05555';
+  postActivityFeed({ uid, displayName, type: 'kill_log', message: text, color }).catch(() => {});
 }
 
 // ターゲット選択モーダル
@@ -2042,13 +2071,21 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       if (kxConfig) {
         kxConfig.onVictory(battle.kx?.isAwakened ?? false);
       } else {
+        postBossTitleIfAny(battle.enemies, player.uid, player.displayName);
         onBattleEnd(true, battle.expGained, battle.goldGained, battle.drops, 0);
       }
     } else if (battle.result === 'lose') {
       onManaUpdate?.(0);
       if (kxConfig) {
+        const kxId = battle.kx?.isAwakened ? 'kx_g21_awake' : 'kx_g21';
+        postActivityFeed({
+          uid: player.uid, displayName: player.displayName, type: 'kill_log',
+          message: KILL_LOG_MASTER[kxId]?.text ?? 'はKX-G21に敗れた。',
+          color: KILL_LOG_MASTER[kxId]?.color ?? '#e05555',
+        }).catch(() => {});
         kxConfig.onDefeat();
       } else {
+        postKillLog(battle.enemies, player.uid, player.displayName);
         onBattleEnd(false, 0, 0, [], 0);
       }
     } else if (battle.result === 'escaped') {
@@ -3562,7 +3599,7 @@ export function DungeonScreen() {
                     });
                     setTimeout(() => {
                       addNotification('success', '🌟 裏超上級クリア！「生命の超越」を達成！');
-                      postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'dungeon_clear', message: `が「生命の超越」を達成しました！` }).catch(() => {});
+                      postActivityFeed({ uid: player.uid, displayName: player.displayName, type: 'boss_title', message: `が称号「${BOSS_TITLE_MASTER.kx_g21_awake.title}」を獲得しました！`, color: BOSS_TITLE_MASTER.kx_g21_awake.color, title: BOSS_TITLE_MASTER.kx_g21_awake.title }).catch(() => {});
                       setRunState(prev => prev ? { ...prev, isComplete: true, kxAwakened: true } : null);
                     }, delay);
                   } else {

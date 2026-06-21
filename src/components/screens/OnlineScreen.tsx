@@ -35,7 +35,7 @@ type ActivitySubTab = 'world_news' | 'player_status' | 'world_status' | 'gamble_
 // ─── ワールドニュース ────────────────────────────────────────
 const WORLD_NEWS_TYPES = new Set([
   'dungeon_clear','sky_castle_clear','sky_castle_ex_clear','volcano_clear',
-  'boss_kx','boss_rei','boss_ragnarok','boss_hard',
+  'boss_kx','boss_rei','boss_ragnarok','boss_hard','boss_title',
   'super_jackpot','jackpot','gamble_rank_up',
   'level_50','level_100','level_200',
   'event_clear','admin_event',
@@ -52,6 +52,7 @@ const NEWS_STYLE: Record<string, { emoji: string; color: string }> = {
   boss_rei:             { emoji: '💀', color: '#cc44cc' },
   boss_ragnarok:        { emoji: '🌪️', color: '#ff4444' },
   boss_hard:            { emoji: '⚔️', color: '#e05555' },
+  boss_title:           { emoji: '🏆', color: '#f0c060' },
   super_jackpot:        { emoji: '🌟', color: '#ffd700' },
   jackpot:              { emoji: '💰', color: '#f0c060' },
   gamble_rank_up:       { emoji: '🎖️', color: '#9b6df0' },
@@ -65,11 +66,26 @@ const NEWS_STYLE: Record<string, { emoji: string; color: string }> = {
 // ─── ワールドニュース ランクテーブル ────────────────────────
 const NEWS_RANK: Record<string, number> = {
   super_jackpot: 5, sky_castle_ex_clear: 5, level_200: 5,
-  volcano_clear: 4, boss_kx: 4, boss_rei: 4, boss_ragnarok: 4,
+  volcano_clear: 4, boss_kx: 4, boss_rei: 4, boss_ragnarok: 4, boss_title: 4,
   jackpot: 3, sky_castle_clear: 3, boss_hard: 3, level_100: 3,
   dungeon_clear: 2, gamble_rank_up: 2, level_50: 2, event_clear: 2,
   admin_event: 1,
 };
+
+// ─── 称号テキスト専用カラー表示（ALT:#色1,#色2 の場合は1文字ごと交互配色） ───
+function TitleColorText({ text, color }: { text: string; color?: string }) {
+  if (color && color.startsWith('ALT:')) {
+    const [c1, c2] = color.slice(4).split(',');
+    return (
+      <span style={{fontWeight:800, fontSize:'0.82rem'}}>
+        {text.split('').map((ch, idx) => (
+          <span key={idx} style={{color: idx % 2 === 0 ? c1 : c2}}>{ch}</span>
+        ))}
+      </span>
+    );
+  }
+  return <span style={{fontWeight:800, fontSize:'0.82rem', color: color ?? '#f0c060'}}>{text}</span>;
+}
 
 function WorldNewsPanel() {
   const [entries, setEntries] = useState<ActivityFeedEntry[]>([]);
@@ -108,6 +124,29 @@ function WorldNewsPanel() {
             : diff < 3_600_000 ? `${Math.floor(diff/60_000)}分前`
             : diff < 86_400_000 ? `${Math.floor(diff/3_600_000)}時間前`
             : new Date(e.timestamp).toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' });
+
+          // boss_title: 称号獲得（称号テキストは専用カラーで強調表示）
+          if (e.type === 'boss_title') {
+            const titleText = e.title ?? '';
+            return (
+              <div key={i} style={{
+                borderRadius:8,
+                background:'rgba(255,255,255,0.03)',
+                border:'1px solid #f0c06088',
+                padding:'7px 10px',
+                display:'flex', alignItems:'center', gap:8,
+              }}>
+                <span style={{fontSize:'1.05rem'}}>🏆</span>
+                <div style={{flex:1, minWidth:0, wordBreak:'break-word', overflowWrap:'anywhere'}}>
+                  <span style={{fontSize:'0.82rem', fontWeight:700, color:'#e8e6ff'}}>{e.displayName}</span>
+                  <span style={{fontSize:'0.8rem', color:'#c0bcd8'}}>が称号「</span>
+                  <TitleColorText text={titleText} color={e.color} />
+                  <span style={{fontSize:'0.8rem', color:'#c0bcd8'}}>」を獲得しました！</span>
+                </div>
+                <span style={{fontSize:'0.62rem', color:'#4a5070', whiteSpace:'nowrap'}}>{timeLabel}</span>
+              </div>
+            );
+          }
 
           // rank5: super jackpot / sky_castle_ex / lv200
           if (rank >= 5) return (
@@ -394,6 +433,7 @@ const NATURAL_TYPE_LABELS: Record<string, string> = {
   pvp_win: '⚔️',
   pvp_lose: '💀',
   treasure: '🎁',
+  kill_log: '☠️',
 };
 
 function NaturalNewsPanel() {
@@ -409,7 +449,7 @@ function NaturalNewsPanel() {
   }, []);
 
   const natural = entries.filter(e =>
-    ['mining','fishing','auction','crafting','level_up','dungeon_clear'].includes(e.type) && !WORLD_NEWS_TYPES.has(e.type)
+    ['mining','fishing','auction','crafting','level_up','dungeon_clear','kill_log'].includes(e.type) && !WORLD_NEWS_TYPES.has(e.type)
   );
 
   return (
@@ -434,7 +474,7 @@ function NaturalNewsPanel() {
               <span style={{fontSize:'1rem', minWidth:20, textAlign:'center'}}>{icon}</span>
               <div style={{flex:1, minWidth:0}}>
                 <span style={{fontSize:'0.8rem', color:'#c0bcd8', fontWeight:600}}>{e.displayName}</span>
-                <span style={{fontSize:'0.78rem', color:'#8a92b2'}}>{e.message.replace(e.displayName,'')}</span>
+                <span style={{fontSize:'0.78rem', color: e.type === 'kill_log' && e.color ? e.color : '#8a92b2'}}>{e.message.replace(e.displayName,'')}</span>
               </div>
               <span style={{fontSize:'0.62rem', color:'#4a5070', whiteSpace:'nowrap'}}>{timeLabel}</span>
             </div>
