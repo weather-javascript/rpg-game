@@ -5,7 +5,7 @@
 // 実装ステージ1: 初級（1〜10階）+ 共通システム設定（続行倍率・敵強化倍率・イベント表など）
 // 中級/上級/超上級の敵・ボス・素材・クラフトは後続ステージで追加予定。
 
-import type { ItemMaster, CraftRecipe } from '../types/game';
+import type { ItemMaster, CraftRecipe, MonsterMaster } from '../types/game';
 
 // ============================================================
 // 階層帯 (Tier) 設定
@@ -287,6 +287,33 @@ export const IC_CRAFT_RECIPES: CraftRecipe[] = [
     requiredCraftingLevel: 1, craftingExpGain: 5,
   },
 ];
+
+// ============================================================
+// ICEnemy → MonsterMaster ブリッジ
+// 他ダンジョンと同じTurnBattle（ホットバー/武器選択UI）でICEnemyを戦わせるための変換。
+// 階層スケーリング済みのHP/ATK/DEFを持つ専用MonsterMasterエントリを生成する。
+// drops/baseExp/baseGoldはTurnBattle側の汎用ドロップ計算と二重取得しないよう0/空に固定し、
+// 素材ドロップ・続行倍率・イベント抽選は引き続きinfiniteCorridorSlice側で処理する。
+// ============================================================
+export function icEnemyToMonsterMaster(enemy: ICEnemy, floor: number): MonsterMaster {
+  const { hp, atk, def } = getICScaledStats(enemy.baseHp, enemy.baseAttack, enemy.baseDefense, floor);
+  return {
+    id: `${enemy.id}_f${floor}`,
+    name: enemy.name,
+    description: enemy.dexEntry,
+    icon: enemy.icon,
+    maxHp: hp,
+    attack: atk,
+    defense: def,
+    baseExp: 0,
+    baseGold: 0,
+    drops: [],
+    dungeonIds: ['infinite_corridor'],
+    isBoss: enemy.isBoss ?? false,
+    skills: enemy.skills.map(s => s.name),
+    specialAttack: enemy.skills[enemy.skills.length - 1]?.name,
+  };
+}
 
 // ============================================================
 // 素材昇格（商人交換）：下位素材5個→上位素材1個
