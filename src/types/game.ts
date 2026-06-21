@@ -130,6 +130,8 @@ export interface WeaponMultiCastSkill {
   selectCount: number;     // 追加で選択できる武器数
   manaRestore: number;     // 発動後に回復するMana量
   cooldownTurns: number;   // 発動後のクールダウンターン数
+  guaranteedSkillProc?: boolean;  // trueの場合、リンクした武器のスキル発動を確定させる
+  linkedDmgBonus?: number;        // リンクした武器の合計ダメージに対するボーナス(%)
 }
 /**
  * delayed_multihit: 使用後delayTurnsターン後に複数ヒットのダメージを与える（Emerald Crusadeなど）。
@@ -215,7 +217,64 @@ export interface WeaponManaRestoreOnUseSkill {
   amount: number;
   cooldownTurns?: number;
 }
-export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill | WeaponGoliathSkill | WeaponSilversEyeSkill | WeaponFrostbiteSelfDamageSkill | WeaponPenetrateOnUseChanceSkill | WeaponBurnPerTurnSkill | WeaponMultiCastSkill | WeaponDelayedMultiHitSkill | WeaponSelfLockSkill | WeaponScalingAttackSkill | WeaponRandomStunSkill | WeaponDefBuffSelfDamageSkill | WeaponDelayedSelfHealSkill | WeaponManaDrainRepeatSkill | WeaponSatietyFromDamageSkill | WeaponManaRestoreOnUseSkill;
+/**
+ * mark_on_hit: 攻撃時に敵へ「刻印」スタックを付与する（最大maxStacks）（深淵の断魔剣など）。
+ */
+export interface WeaponMarkOnHitSkill {
+  type: 'mark_on_hit';
+  maxStacks: number;
+}
+/**
+ * mark_burst: intervalターンごとに、付与済みの「刻印」スタック数×penetratePerStackの貫通ダメージを全体に与える（深淵の断魔剣など）。
+ */
+export interface WeaponMarkBurstSkill {
+  type: 'mark_burst';
+  interval: number;
+  penetratePerStack: number;
+}
+/**
+ * conditional_atk_bonus: HPが条件（hp_above_pct/hp_below_pct）を満たす間、攻撃力にbonusを加算する（竜眼の魔剣など）。
+ */
+export interface WeaponConditionalAtkBonusSkill {
+  type: 'conditional_atk_bonus';
+  condition: 'hp_above_pct' | 'hp_below_pct';
+  threshold: number;
+  bonus: number;
+}
+/**
+ * conditional_penetrate_on_hit: HPが条件（hp_above_pct/hp_below_pct）を満たす間、攻撃時に追加で貫通ダメージを与える（竜眼の魔剣など）。
+ */
+export interface WeaponConditionalPenetrateOnHitSkill {
+  type: 'conditional_penetrate_on_hit';
+  condition: 'hp_above_pct' | 'hp_below_pct';
+  threshold: number;
+  penetrate: number;
+}
+/**
+ * charge_and_fire: 毎ターンchargePerTurnずつ蓄積（最大maxCharge）し、任意のタイミングで発動すると
+ * 物理physPerCharge×スタック数＋貫通penetratePerCharge×スタック数のダメージを与え、スタックをリセットする。
+ * 発動後、自身の最大HPのselfDmgPctOnFire%分の自傷ダメージを受ける（Emerald Crusadeなど）。
+ */
+export interface WeaponChargeAndFireSkill {
+  type: 'charge_and_fire';
+  chargePerTurn: number;
+  maxCharge: number;
+  physPerCharge: number;
+  penetratePerCharge: number;
+  selfDmgPctOnFire: number;
+}
+/**
+ * periodic_barrier: intervalターンごとに結界を発動し、dmgReductPct%の被ダメージ軽減＋受けたダメージの
+ * reflectPct%を反射する。発動中は攻撃力がatkPenaltyPct%減少する（jewelry caneなど）。
+ */
+export interface WeaponPeriodicBarrierSkill {
+  type: 'periodic_barrier';
+  interval: number;
+  dmgReductPct: number;
+  reflectPct: number;
+  atkPenaltyPct: number;
+}
+export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill | WeaponGoliathSkill | WeaponSilversEyeSkill | WeaponFrostbiteSelfDamageSkill | WeaponPenetrateOnUseChanceSkill | WeaponBurnPerTurnSkill | WeaponMultiCastSkill | WeaponDelayedMultiHitSkill | WeaponSelfLockSkill | WeaponScalingAttackSkill | WeaponRandomStunSkill | WeaponDefBuffSelfDamageSkill | WeaponDelayedSelfHealSkill | WeaponManaDrainRepeatSkill | WeaponSatietyFromDamageSkill | WeaponManaRestoreOnUseSkill | WeaponMarkOnHitSkill | WeaponMarkBurstSkill | WeaponConditionalAtkBonusSkill | WeaponConditionalPenetrateOnHitSkill | WeaponChargeAndFireSkill | WeaponPeriodicBarrierSkill;
 
 export interface WeaponUltimate {
   name: string;
@@ -361,6 +420,7 @@ export interface ItemMaster {
     attackType?: string;
     buffType?: string;
     buffDuration?: number;
+    areaAttack?: boolean;   // 範囲攻撃フラグ（変幻始動す原初の剣斧など）
   };
 }
 
