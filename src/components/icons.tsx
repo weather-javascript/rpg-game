@@ -1323,6 +1323,79 @@ const ICONS: Record<string, SvgDef> = {
   ` },
 
   // ──────────────────────────────────────────
+  // 未登録アイテム補完（武器・素材）
+  // ──────────────────────────────────────────
+  sword: { content: `
+    <path d="M16 4 L19 7 L12 24 L8 22 Z" fill="${C.blade}" opacity="0.95"/>
+    <path d="M16 4 L17.5 5.5 L11.5 22 L10 21.3 Z" fill="rgba(255,255,255,0.45)"/>
+    <rect x="6" y="20" width="9" height="3" rx="1" transform="rotate(-65,10.5,21.5)" fill="${C.goldDk}"/>
+    <circle cx="7" cy="27" r="2.3" fill="${C.gold}"/>
+    <rect x="6" y="25" width="2.5" height="4" rx="1" fill="${C.steelDk}"/>
+  ` },
+
+  sword_iron: { content: `
+    <path d="M16 4 L19 7 L12 24 L8 22 Z" fill="${C.iron}" opacity="0.95"/>
+    <path d="M16 4 L17.5 5.5 L11.5 22 L10 21.3 Z" fill="rgba(255,255,255,0.3)"/>
+    <rect x="6" y="20" width="9" height="3" rx="1" transform="rotate(-65,10.5,21.5)" fill="${C.steelDk}"/>
+    <circle cx="7" cy="27" r="2.3" fill="${C.steel}"/>
+    <rect x="6" y="25" width="2.5" height="4" rx="1" fill="${C.stoneDk}"/>
+    <line x1="13" y1="9" x2="9.5" y2="20" stroke="rgba(0,0,30,0.25)" stroke-width="1"/>
+  ` },
+
+  arrow: { content: `
+    <line x1="6" y1="26" x2="24" y2="8" stroke="${C.wood}" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M24 8 L18 9 L23 14 Z" fill="${C.steel}"/>
+    <path d="M24 8 L17 7 L18 9 Z" fill="${C.steelDk}"/>
+    <path d="M7 25 L4 22 L8 23 Z" fill="${C.leaf}"/>
+    <path d="M8 24 L5 27 L9 26 Z" fill="${C.leafDk}"/>
+  ` },
+
+  bullet: { content: `
+    <path d="M16 4 Q21 4 21 10 L21 20 L11 20 L11 10 Q11 4 16 4 Z" fill="${C.gold}"/>
+    <path d="M16 4 Q19 4 19 10 L19 18 L13 18 L13 10 Q13 4 16 4 Z" fill="${C.goldDk}" opacity="0.85"/>
+    <rect x="11" y="20" width="10" height="6" rx="1" fill="${C.steelDk}"/>
+    <rect x="11" y="20" width="10" height="2" fill="${C.steel}" opacity="0.6"/>
+    <ellipse cx="16" cy="9" rx="2" ry="3" fill="rgba(255,255,255,0.4)"/>
+  ` },
+
+  gem_red: { content: `
+    <path d="M16 5 L25 13 L20 27 L12 27 L7 13 Z" fill="#e85060"/>
+    <path d="M16 5 L25 13 L16 17 Z" fill="#ff8a90" opacity="0.9"/>
+    <path d="M7 13 L16 5 L16 17 Z" fill="#c83040"/>
+    <path d="M7 13 L16 17 L12 27 Z" fill="#a82030"/>
+    <path d="M25 13 L16 17 L20 27 Z" fill="#d83848"/>
+    <path d="M16 5 L16 17 L20 27 L25 13 Z" fill="#e85060" opacity="0.5"/>
+    <path d="M13 9 L16 5 L18 8" stroke="rgba(255,255,255,0.6)" stroke-width="1" fill="none"/>
+  ` },
+
+  gold: { content: `
+    <ellipse cx="16" cy="22" rx="11" ry="5" fill="${C.goldDk}"/>
+    <ellipse cx="16" cy="19" rx="11" ry="5" fill="${C.gold}"/>
+    <ellipse cx="16" cy="19" rx="7" ry="3" fill="rgba(255,255,255,0.25)"/>
+    <ellipse cx="16" cy="13" rx="9" ry="4.5" fill="${C.goldDk}"/>
+    <ellipse cx="16" cy="11" rx="9" ry="4.5" fill="${C.gold}"/>
+    <ellipse cx="13" cy="9.5" rx="3" ry="1.5" fill="rgba(255,255,255,0.5)"/>
+  ` },
+
+  potion: { content: `
+    <path d="M14 4 L18 4 L18 9 L21 14 L21 26 Q21 28 19 28 L13 28 Q11 28 11 26 L11 14 Z" fill="rgba(232,240,255,0.18)" stroke="${C.steel}" stroke-width="1"/>
+    <path d="M12.5 17 L19.5 17 L19.5 26 Q19.5 27 18.5 27 L13.5 27 Q12.5 27 12.5 26 Z" fill="#d84060"/>
+    <path d="M12.5 17 L19.5 17 L19.5 19.5 L12.5 19.5 Z" fill="#f06080" opacity="0.8"/>
+    <rect x="13.5" y="2.5" width="5" height="2.5" rx="1" fill="${C.goldDk}"/>
+    <circle cx="15" cy="21" r="1" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="17.5" cy="23.5" r="0.7" fill="rgba(255,255,255,0.4)"/>
+  ` },
+
+  goliath_shield: { content: `
+    <path d="M16 3 L28 8 L28 17 Q28 25 16 29 Q4 25 4 17 L4 8 Z" fill="${C.steelDk}"/>
+    <path d="M16 5 L26 9 L26 17 Q26 23 16 27 Q6 23 6 17 L6 9 Z" fill="${C.iron}"/>
+    <path d="M16 5 L26 9 L26 17 Q26 23 16 27 Z" fill="rgba(255,255,255,0.08)"/>
+    <path d="M16 8 L22 11 L22 17 Q22 21 16 24 Q10 21 10 17 L10 11 Z" fill="${C.steel}" opacity="0.9"/>
+    <path d="M16 11 L16 22 M11.5 16.5 L20.5 16.5" stroke="${C.goldDk}" stroke-width="1.8"/>
+    <circle cx="16" cy="16.5" r="2.2" fill="${C.gold}"/>
+  ` },
+
+  // ──────────────────────────────────────────
   // フォールバック（未定義IDの場合）
   // ──────────────────────────────────────────
   _fallback: { content: `
