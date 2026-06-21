@@ -2124,6 +2124,10 @@ export const MONSTER_MASTER: Record<string, MonsterMaster> = {
   lich_boss:       { id:'lich_boss',      name:'リッチ[ボス]',      description:'CP3ルート最奥に待つ単体ボス。一切その場から動かず、指定地点へテレポートしながら飛び道具で牽制する特殊な立ち回りを取る。被ダメージ無効はカマ系統のみで実質殴り放題だが、通常攻撃は尋常でなく痛いため近づきすぎ注意。弱攻撃2〜3回→鳴き声→強攻撃→弱攻撃のループで行動し、強攻撃後に召喚するスケルトンに殴られるとリッチのHPが100回復するため処理を優先すること。', icon:'skull', maxHp:2500, attack:2500, defense:22, baseExp:1200, baseGold:600, dungeonIds:['volcano'], isBoss:true, specialAttack:'レインボーショット', skills:['生気吸収','ダメージショット','ポイズンショット','衰弱','衝撃波','レインボーショット','テレポートショット','ライフスティール','眷属召喚'], traits:['移動速度0・その場から動かずテレポートで位置取り','被ダメージ無効はカマ系統のみ(物理に弱い)','召喚スケルトンの攻撃命中でリッチHPが100回復'], drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:3,maxAmount:5},{itemId:'magma_stone',baseRate:1.0,minAmount:5,maxAmount:10}] },
   volcano_boss:    { id:'volcano_boss',   name:'獄炎帝',            description:'裏火山城最上階に待つ表PVEのラスボス的存在。12秒間隔でスキルを発動し、被ダメージ時に発動するカウンタースキルは一切持たない。「攻撃スキル」発動時は歴代ダンジョンボスのスキルからランダムで4つ（HP1万以下では6つ）を使用し、「召喚スキル」発動時は対応するモブを召喚する。攻撃と召喚が同時に重なることはなく、「ボーっとしている…」を引いた場合は完全な隙となり殴り放題。足が速く距離を詰められやすいため、鈍足を活用しつつ遠距離主体で攻めるのが定石。', icon:'volcano', maxHp:25000, attack:120, defense:30, baseExp:2000,baseGold:1000, dungeonIds:['volcano'], isBoss:true, specialAttack:'マジカルブラストファンタジア', skills:['ボーっとしている…','ゴッデスビーム','クリットショット[スーパーアリーナ]','神風特攻(他人任せ)','職業スケルトン召喚','死極召喚','マジカルブラストファンタジア','シュレッダー'], traits:['スキル発動間隔12秒・被ダメージ時カウンター無し','攻撃スキルと召喚スキルは同時発動しない','「ボーっとしている…」発動時は完全な隙(殴り放題)','HP1万以下で攻撃スキルの選択数が4→6に増加'], drops:[{itemId:'extreme_flame_aura',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'volcano_crown',baseRate:0.5,minAmount:1,maxAmount:1},{itemId:'hard_magic_stone',baseRate:1.0,minAmount:5,maxAmount:10}] },
   volcano_boss_ex: { id:'volcano_boss_ex',name:'絶炎帝',            description:'獄炎帝の覚醒版にあたる、裏火山の真のラスボス。立ち回りとスキル構成は獄炎帝と全く同一だが、唯一スキル発動間隔が12秒→7秒に短縮されており、行動の密度が大幅に増している。獄炎帝を倒せても絶炎帝には及ばないことも多い、文句なしの最難関。', icon:'volcano', maxHp:25000, attack:120, defense:40, baseExp:3500, baseGold:1800, dungeonIds:['volcano'], isBoss:true, specialAttack:'マジカルブラストファンタジア', skills:['ボーっとしている…','ゴッデスビーム','クリットショット[スーパーアリーナ]','神風特攻(他人任せ)','職業スケルトン召喚','死極召喚','マジカルブラストファンタジア','シュレッダー'], traits:['スキル発動間隔7秒(獄炎帝の12秒より短縮)・被ダメージ時カウンター無し','攻撃スキルと召喚スキルは同時発動しない','「ボーっとしている…」発動時は完全な隙(殴り放題)','HP1万以下で攻撃スキルの選択数が4→6に増加'], drops:[{itemId:'zetsugoku_aura',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'volcano_crown',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'hard_magic_stone',baseRate:1.0,minAmount:8,maxAmount:15}] },
+  // ── 裏火山追加個体（ジャック・ザ・ステイン／元グリーンベレーゾンビ／KOSAC BUSTER）──
+  jack_the_stain:    { id:'jack_the_stain',    name:'ジャック・ザ・ステイン',      description:'ステインポットを遠隔操作する謎の道化師。裏火山入口に陣取り、周囲のステインポットを強制起爆させてくる。', icon:'bomb', maxHp:260, attack:55, defense:14, baseExp:170, baseGold:70, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'リモート自爆', skills:['リモート自爆(周囲のステインポットを強制起爆)','投げナイフ'], drops:[{itemId:'stain_pot_aura',baseRate:0.5,minAmount:1,maxAmount:2},{itemId:'hard_magic_stone',baseRate:0.6,minAmount:1,maxAmount:2}] },
+  green_beret_zombie: { id:'green_beret_zombie', name:'元グリーンベレーゾンビ[雷槌]', description:'かつて精鋭部隊グリーンベレーに所属していた者の成れの果て。雷を纏った大槌「雷槌」を振り回す不死の戦士。裏火山城入口前大広場に出現。', icon:'skull', maxHp:480, attack:88, defense:30, baseExp:260, baseGold:110, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'雷槌', skills:['雷槌(範囲雷撃)','死兵突撃'], drops:[{itemId:'hard_magic_stone',baseRate:0.8,minAmount:2,maxAmount:3},{itemId:'magma_stone',baseRate:0.6,minAmount:2,maxAmount:3}] },
+  kosac_buster:       { id:'kosac_buster',       name:'KOSAC BUSTER',                description:'BUSTERの上位個体。特殊部隊仕込みの連携技で隙を作らない超危険個体。終焉の大橋・平地地帯に極稀に出現。', icon:'bomb', maxHp:1300, attack:160, defense:55, baseExp:700, baseGold:400, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'デュアルバスタービーム', drops:[{itemId:'hard_magic_stone',baseRate:1.0,minAmount:4,maxAmount:6},{itemId:'volcano_crown',baseRate:0.15,minAmount:1,maxAmount:1}] },
   // 汎用
   slime:  { id:'slime',  name:'スライム', description:'初歩的なモンスター。', icon:'bubbles', maxHp:30,  attack:5,  defense:2,  baseExp:15,  baseGold:8,   dungeonIds:['beginner_cave'], drops:[{itemId:'slime_gel',baseRate:0.8,minAmount:1,maxAmount:3}] },
   goblin: { id:'goblin', name:'ゴブリン', description:'小さいが油断できない。', icon:'goblin', maxHp:60,  attack:12, defense:5,  baseExp:35,  baseGold:20,  dungeonIds:['goblin_den'], drops:[{itemId:'goblin_ear',baseRate:0.6,minAmount:1,maxAmount:2}] },
@@ -2180,6 +2184,122 @@ export const MONSTER_MASTER: Record<string, MonsterMaster> = {
   ff_soul_wind:      { id:'ff_soul_wind',      name:'ウィンドソール',       description:'ソウル系の俊敏個体。風刃で全体を斬り、自身は浮遊して攻撃を躱す。', icon:'wave', maxHp:135, defense:14, attack:9, baseExp:70, baseGold:40, dungeonIds:['ff_forest','ff_desert','ff_snow','ff_savanna','ff_pirate'], skills:['風刃(全体攻撃)','浮遊(回避率上昇)'], drops:[{itemId:'ancient_shard',baseRate:0.2,minAmount:1,maxAmount:1}] },
   ff_mahadoryuasu:   { id:'ff_mahadoryuasu',   name:'マハドリュアス',       description:'自由の大地の深部に座す古代の番人。壊世賜杖で全てを薙ぎ払い、追い詰められるほど力を増す。', icon:'crystal_ball', maxHp:420, defense:32, attack:22, baseExp:1200, baseGold:800, dungeonIds:[], isBoss:true, specialAttack:'壊世賜杖レクイエム', skills:['壊世賜杖レクイエム(全体超火力攻撃)','破壊加速(ターン毎ATK上昇)','古代暴走(HP30%以下で全能力強化)'], drops:[{itemId:'cosmonium',baseRate:0.3,minAmount:1,maxAmount:2},{itemId:'hard_magic_stone',baseRate:1.0,minAmount:3,maxAmount:5}] },
   ff_houru_kyojin:   { id:'ff_houru_kyojin',   name:'屠る巨人',             description:'自由の大地の最果てに立つ巨人。踏み潰しと無慈悲な一撃を併せ持つ最終関門。瀕死になるほど攻撃回数が増えていく。', icon:'skull', maxHp:520, defense:40, attack:26, baseExp:1500, baseGold:1000, dungeonIds:[], isBoss:true, specialAttack:'無慈悲な一撃', skills:['踏み潰し(全体攻撃)','無慈悲な一撃(単体即死級攻撃)','シュヴァリエプレッジ(HP50%以下で攻撃回数+1)'], drops:[{itemId:'cosmonium',baseRate:0.4,minAmount:1,maxAmount:2},{itemId:'hard_magic_stone',baseRate:1.0,minAmount:4,maxAmount:6}] },
+};
+
+// ============================================================
+// 称号達成（ボス討伐タイトル）マスター
+// 対象モンスターを討伐すると、ワールドニュースに称号獲得として表示される。
+// color: 通常は単色HEX。"ALT:#色1,#色2" の形式の場合は称号テキストを
+//        1文字ごとに2色交互で表示する（BUSTER系専用）。
+// ============================================================
+export const BOSS_TITLE_MASTER: Record<string, { title: string; color: string }> = {
+  biomancer:          { title: '大魔術の超越', color: '#4caf50' },
+  zero_boss:          { title: 'earth destruction', color: '#aab0c0' },
+  kx_g21_awake:       { title: '生命の超越', color: '#5ddcff' },
+  dead_armor:         { title: '防護要塞', color: '#c9a0ff' },
+  dwarf_ancient:      { title: '橋上の決戦', color: '#ffd76b' },
+  lich_boss:          { title: '覇者', color: '#ff9933' },
+  jack_the_stain:     { title: '焦地を超えて', color: '#ff4444' },
+  last_wizard:        { title: '最高の魔術師', color: '#cc2222' },
+  green_beret_zombie: { title: '元グリーンベレーなんかに負けるもんか', color: '#2ecc71' },
+  buster:             { title: 'BUSTER HUNTED', color: 'ALT:#a855f7,#22d3ee' },
+  kosac_buster:       { title: 'KOSAC BUSTER HUNTED', color: 'ALT:#3b82f6,#22c55e' },
+  volcano_boss_ex:    { title: '帝王討伐', color: '#6a1b9a' },
+};
+
+// ============================================================
+// キルログマスター
+// ダンジョンで敵に倒された際、ナチュラルニュースに表示する敵固有の一言。
+// text は「は」から始まる文（プレイヤー名の直後に連結して表示される）。
+// ============================================================
+export const KILL_LOG_MASTER: Record<string, { text: string; color?: string }> = {
+  // 初級（洞窟王）
+  cave_minion: { text: 'はすばしっこい洞窟王の手下に転がされて気絶した。', color: '#8a92b2' },
+  minion_end: { text: 'は「弱いくせに」と思った瞬間に足払いを食らった。', color: '#8a92b2' },
+  cave_right: { text: 'は洞窟王の右腕に殴り飛ばされて壁に激突した。', color: '#cc8855' },
+  cave_left: { text: 'は洞窟王の左腕の盾で弾かれ、そのまま転倒した。', color: '#7799cc' },
+  cave_king: { text: 'は洞窟王の風格に圧倒されたまま叩き伏せられた。', color: '#f0c060' },
+  // 中級（要塞）
+  rookie_soldier: { text: 'は下っ端戦士にすら反応できず突き刺された。', color: '#8a92b2' },
+  gold_soldier: { text: 'は成金戦士の金装備に見入っている間に斬られた。', color: '#ffd700' },
+  veteran_soldier: { text: 'はいっぱし戦士の堂々とした一撃で沈められた。', color: '#8a92b2' },
+  iron_soldier: { text: 'は鉄戦士の硬い拳に殴られ、骨まで響いた。', color: '#b0b0b0' },
+  strong_soldier: { text: 'は強戦士のフルダイヤ装備にひるんだ隙を突かれた。', color: '#66ddee' },
+  archer: { text: 'は弓兵の矢が思った以上に痛くて膝をついた。', color: '#8a92b2' },
+  crusher: { text: 'はクラッシャーの衝撃波で防御もろとも吹き飛んだ。', color: '#ffaa33' },
+  blast_archer: { text: 'は炸裂矢で空高く打ち上げられ、着地に失敗した。', color: '#ff8844' },
+  spearman: { text: 'は槍兵の長い槍の餌食になった。', color: '#8a92b2' },
+  ultimate_crusher: { text: 'はアルティメイトクラッシャーの強烈な衝撃波で意識を失った。', color: '#ff5500' },
+  special_spearman: { text: 'は特殊戦闘槍兵の槍投擲を喉元で受け止めてしまった。', color: '#8a92b2' },
+  biomancer: { text: 'はバイオマンサーが召喚した手下たちに囲まれて力尽きた。', color: '#4caf50' },
+  // 上級（庭園・冷焦洞穴）
+  doryu: { text: 'は地中から突き上げる昇土竜拳でひっくり返された。', color: '#cc9966' },
+  pool_ghost: { text: 'は池の亡霊が放った毒矢で気を失った。', color: '#66cc66' },
+  ice_spirit: { text: 'は氷霊の冷気で動きを封じられ、そのまま倒れた。', color: '#66ccff' },
+  reicho: { text: 'は冷焦の「炎上+鈍足」コンボに焼かれながら凍りつくという矛盾した最期を迎えた。', color: '#ff7744' },
+  extreme_cold: { text: 'は極冷のアイスビームでまるごと氷漬けにされた。', color: '#55ccff' },
+  extreme_fire: { text: 'は極焦のラバクロップに飲み込まれ蒸発した。', color: '#ff6622' },
+  gokureicho: { text: 'は極氷炎撃を貫通で食らい、為す術なく崩れ落ちた。', color: '#33bbff' },
+  zero_boss: { text: 'は洞窟そのものである零に、なすすべもなく押し潰された。', color: '#aab0c0' },
+  // 天空城
+  roam_armor: { text: 'はロウムアーマーの打ち上げを食らって空の旅に出た。', color: '#8a92b2' },
+  death_armor: { text: 'はデスアーマーの5連斬に切り刻まれた。', color: '#cccccc' },
+  devil_armor: { text: 'はデビルアーマーの貫通一撃でなす術なく光になった。', color: '#cc44ff' },
+  dead_armor: { text: 'はDEAD ARMORの貫通一撃で防御を無視され沈んだ。', color: '#c9a0ff' },
+  mad_guy_bot: { text: 'はマッドガイボットにスパナでフルボッコにされた。', color: '#88ccff' },
+  kx_g21: { text: 'はKX-G21の規格外の防御の前に何もできなかった。', color: '#888888' },
+  kx_g21_awake: { text: 'は覚醒したKX-G21の最後の力に呑み込まれた。', color: '#5ddcff' },
+  cannon_zombie: { text: 'はキャノン付きゾンビに攻撃を吸収され、逆に撃ち返された。', color: '#8a92b2' },
+  combat_minion: { text: 'はコンバットと正面から殴り合って敗れた。', color: '#8a92b2' },
+  exs_minion: { text: 'はエクスの魔改造攻撃でショートした。', color: '#ffcc00' },
+  lightning_minion: { text: 'はライトニングボルトの雷撃で黒焦げになった。', color: '#ffee44' },
+  // 火山・裏火山
+  dwarf_leather: { text: 'はドワーフ[皮]の剛撃で見た目以上の威力に驚いた。', color: '#8a92b2' },
+  dwarf_gold: { text: 'はドワーフ[金]の槍投擲に貫かれた。', color: '#ffd700' },
+  dwarf_iron: { text: 'はドワーフ[鉄]の薙ぎ払いに薙ぎ倒された。', color: '#aaaaaa' },
+  dwarf_diamond: { text: 'はドワーフ[ダイヤ]のカオスフレア連打で消し炭になった。', color: '#88eeff' },
+  dwarf_crossbow_diamond: { text: 'はクロスボウドワーフ[ダイヤ]の連射に視界を奪われたまま倒れた。', color: '#88eeff' },
+  dwarf_crossbow: { text: 'はドワーフ[クロスボウ]に溶岩の上から狙撃された。', color: '#ffaa55' },
+  dwarf_red: { text: 'はドワーフ[赤]の開幕ギガブレードを正面から受けた。', color: '#ff4422' },
+  dwarf_black: { text: 'は黒ドワーフのブラッディインパクトで爆散した。', color: '#444444' },
+  dwarf_ancient: { text: 'はエンシェントドワーフの「古代の怒り」に飲み込まれた。', color: '#ffd76b' },
+  dwarf_ancient_awakened: { text: 'は[覚醒]エンシェントドワーフの覚醒の業火に焼かれた。', color: '#ff8800' },
+  stain_pot: { text: 'はステインポットの自爆に巻き込まれて黒焦げにされた。', color: '#ff7744' },
+  stain_kid: { text: 'は小さなステインキッドの自爆を侮った結果、痛い目を見た。', color: '#ff9966' },
+  ragnalok: { text: 'はラグナロクのアサシネイションに不意を突かれて即死した。', color: '#cc4444' },
+  bannerman: { text: 'はバナーマンに強化された雑魚の群れにまとめて殴られた。', color: '#8a92b2' },
+  lumberjack: { text: 'はランバージャックの斧で木材のように切られた。', color: '#8a92b2' },
+  hunter: { text: 'はハンターのトラップに足を取られ、狙撃でハチの巣にされた。', color: '#8a92b2' },
+  hunter_trainee: { text: 'は見習いハンターの牽制射撃にすら油断して倒れた。', color: '#8a92b2' },
+  assassin: { text: 'はアサシンのアサシネイションで一瞬で命を散らした。', color: '#aa2244' },
+  defender: { text: 'はディフェンサーの視点変更で混乱した隙に殴られた。', color: '#8a92b2' },
+  super_defender: { text: 'はスーパーディフェンサーの鉄壁の盾に延々と削られ続けた末に力尽きた。', color: '#6699cc' },
+  alchemist: { text: 'はアルケミストのデバフポーションで毒され、盲目のまま転落した。', color: '#66cc88' },
+  evil_summoner: { text: 'はエビルサマナーが召喚したモブの大軍に押し潰された。', color: '#884488' },
+  hell_summoner: { text: 'はヘルサマナーの人口太陽で何も見えないまま消滅した。', color: '#ff2200' },
+  danger_crown: { text: 'はデンジャークラウンのカウンターで自分の攻撃が跳ね返ってきた。', color: '#ffaa00' },
+  buster: { text: 'はBUSTERのバスタービームで跡形もなく消し飛んだ。', color: '#ff33cc' },
+  green_beret: { text: 'はグリーンベレーの精鋭突撃にまるごと吹き飛ばされた。', color: '#557733' },
+  scout: { text: 'はスカウトの320%剛撃で奈落の底まで吹っ飛ばされた。', color: '#dd3333' },
+  suppression_squad: { text: 'は鎮圧戦隊に組織的に包囲され、なすすべなく制圧された。', color: '#8a92b2' },
+  seal_god: { text: 'は油断して封印邪神に特攻し、自爆気味に散った。', color: '#9966cc' },
+  blue_zombie: { text: 'は青い死霊の群れにじわじわと囲まれて力尽きた。', color: '#3366cc' },
+  ryuma: { text: 'はリューマのアトミック閃に一閃された。', color: '#dd4444' },
+  izo: { text: 'は以蔵の爪装乱舞でズタズタにされた。', color: '#883344' },
+  destroyer: { text: 'はデストロイヤーの波動砲で正面から消し炭にされた。', color: '#555555' },
+  jack_bomber: { text: 'はジャック・ザ・ボマーの爆弾連射に巻き込まれて吹き飛んだ。', color: '#ff6600' },
+  last_wizard: { text: 'は「サンドバッグ」と侮ったラストウィザードの高位魔法で全焼した。', color: '#cc2222' },
+  lich_road: { text: 'はリッチの死霊召喚に取り囲まれて生気を吸われた。', color: '#8844cc' },
+  lich_boss: { text: 'はリッチのレインボーショットに虹色に染め上げられて散った。', color: '#ff9933' },
+  volcano_boss: { text: 'は獄炎帝のマジカルブラストファンタジアで盛大に散った。', color: '#ff5500' },
+  volcano_boss_ex: { text: 'は絶炎帝の高速スキルローテーションになす術なく蒸発した。', color: '#6a1b9a' },
+  jack_the_stain: { text: 'はジャック・ザ・ステインのリモート自爆に周囲のステインポットごと黒焦げにされた。', color: '#ff4444' },
+  green_beret_zombie: { text: 'は元グリーンベレーゾンビの雷槌に撃たれ、感電しながら倒れた。', color: '#2ecc71' },
+  kosac_buster: { text: 'はKOSAC BUSTERのデュアルバスタービームになす術なく消し飛んだ。', color: '#3b82f6' },
+  // 汎用
+  slime: { text: 'はスライムにベチャっとされて足を滑らせ転んだ。', color: '#8a92b2' },
+  goblin: { text: 'はゴブリンの不意打ちで油断していたところを刺された。', color: '#8a92b2' },
+  dragon: { text: 'はドラゴンの咆哮一つで戦意を失い、燃やされた。', color: '#ff3300' },
 };
 
 // ============================================================
@@ -2297,7 +2417,7 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
   volcano: {
     id:'volcano', name:'火山', description:'総面積400万・スポナー数999個。前難易度の闇森とは桁違いの規模。ステインポット対策・黒ドワーフ対策・ラグナロク対策が生存の鍵。CP3で裏火山ルートへの分岐あり。',
     icon:'volcano', tier:'volcano', requiredLevel:40, floors:50, expBonus:5.0, goldBonus:4.5,
-    monsterIds:['dwarf_leather','dwarf_gold','dwarf_iron','dwarf_diamond','dwarf_crossbow','dwarf_crossbow_diamond','dwarf_red','dwarf_black','dwarf_ancient','dwarf_ancient_awakened','stain_pot','stain_kid','ragnalok','bannerman','lumberjack','hunter','hunter_trainee','assassin','defender','super_defender','alchemist','evil_summoner','hell_summoner','danger_crown','buster','green_beret','scout','suppression_squad','seal_god','blue_zombie','ryuma','izo','destroyer','jack_bomber','last_wizard','lich_road','lich_boss','volcano_boss','volcano_boss_ex'],
+    monsterIds:['dwarf_leather','dwarf_gold','dwarf_iron','dwarf_diamond','dwarf_crossbow','dwarf_crossbow_diamond','dwarf_red','dwarf_black','dwarf_ancient','dwarf_ancient_awakened','stain_pot','stain_kid','ragnalok','bannerman','lumberjack','hunter','hunter_trainee','assassin','defender','super_defender','alchemist','evil_summoner','hell_summoner','danger_crown','buster','green_beret','scout','suppression_squad','seal_god','blue_zombie','ryuma','izo','destroyer','jack_bomber','last_wizard','lich_road','lich_boss','volcano_boss','volcano_boss_ex','jack_the_stain','green_beret_zombie','kosac_buster'],
     bossId:'volcano_boss',
     unlockCondition: { dungeonId:'sky_castle', clearedCount:1, requiredLevel:40 },
     // ──────────────────────────────────────────────────
@@ -2516,11 +2636,12 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
         // ── B1. 裏火山入口〜エヴァンスの家（CP4）──
         {
           name:'裏火山入口',
-          description:'祭壇と大橋の間から続く裏火山への入口。角にあるので泳いで行くこと。狭い通路に黒ドワーフが大量。これくらい処理できるものが裏火山への挑戦権を得る。ジャック・ザ・ステインも出現。',
+          description:'祭壇と大橋の間から続く裏火山への入口。角にあるので泳いで行くこと。狭い通路に黒ドワーフが大量。これくらい処理できるものが裏火山への挑戦権を得る。ステインポットを操る道化師「ジャック・ザ・ステイン」も出現し、リモート自爆で周囲のステインポットを巻き込んでくる。',
           monsters:[
             {monsterId:'dwarf_black', count:6},
             {monsterId:'stain_pot',   count:8},
             {monsterId:'stain_kid',   count:4},
+            {monsterId:'jack_the_stain', count:1, isMidBoss:true},
           ],
           isHardArea:true,
         },
@@ -2586,7 +2707,7 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
         // ── B6. 終焉の大橋・平地地帯（ヘルサマナー初登場）──
         {
           name:'終焉の大橋・平地地帯',
-          description:'アスレ要素終了。エビルサマナー3体・デンクラ1体から始まる。奥に黒ドワ2体・デンクラ2体。鎮圧戦隊はVortex Hurricaneで奈落落としが圧倒的に楽。大階段でヘルサマナーが初登場。15×15の人口太陽で貫通5555ダメージの即死技を放つ。近づかずに倒すこと。',
+          description:'アスレ要素終了。エビルサマナー3体・デンクラ1体から始まる。奥に黒ドワ2体・デンクラ2体。鎮圧戦隊はVortex Hurricaneで奈落落としが圧倒的に楽。大階段でヘルサマナーが初登場。15×15の人口太陽で貫通5555ダメージの即死技を放つ。近づかずに倒すこと。極稀にBUSTER・さらに上位のKOSAC BUSTERが出現する場合あり・湧いたらデスルーラ推奨。',
           monsters:[
             {monsterId:'evil_summoner',  count:3},
             {monsterId:'danger_crown',   count:2, isMidBoss:true},
@@ -2597,19 +2718,22 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
             {monsterId:'blue_zombie',    count:3},
             {monsterId:'hunter',         count:4},
             {monsterId:'green_beret',    count:2, isMidBoss:true},
+            {monsterId:'buster',         count:1, isMidBoss:true},
+            {monsterId:'kosac_buster',   count:1, isMidBoss:true},
           ],
           isHardArea:true,
         },
         // ── B7. 裏火山城入口前大広場（以蔵・デストロイヤー・リューマ・グリーンベレー以外は無視可）──
         {
           name:'裏火山城入口前大広場',
-          description:'以蔵・デストロイヤー・リューマが大量に沸く。グリーンベレー以外は無視すれば関係ない。ヘルサマナーが城の入口に沸くのでしっかり倒してから入ること。',
+          description:'以蔵・デストロイヤー・リューマが大量に沸く。グリーンベレー以外は無視すれば関係ない。元グリーンベレーゾンビ[雷槌]も極稀に紛れ込み、雷を纏った大槌で範囲雷撃を放ってくる。ヘルサマナーが城の入口に沸くのでしっかり倒してから入ること。',
           monsters:[
             {monsterId:'izo',          count:3},
             {monsterId:'destroyer',    count:3},
             {monsterId:'ryuma',        count:3},
             {monsterId:'last_wizard',  count:1},
             {monsterId:'green_beret',  count:2, isMidBoss:true},
+            {monsterId:'green_beret_zombie', count:1, isMidBoss:true},
             {monsterId:'hell_summoner',count:1, isMidBoss:true},
           ],
           isHardArea:true,
@@ -3094,6 +3218,16 @@ export const DEFAULT_PLAYER_STATS = {
 // フォーマット: { version: 'x.x.x', date: 'YYYY-MM-DD', changes: ['変更内容...'] }
 // ============================================================
 export const VERSION_PATCHES = [
+  {
+    version: '2.24.0',
+    date: '2026-06-22',
+    changes: [
+      '🏆 ボス討伐称号システムを実装！「大魔術の超越」「earth destruction」「生命の超越」「防護要塞」「橋上の決戦」「覇者」「焦地を超えて」「最高の魔術師」「元グリーンベレーなんかに負けるもんか」「BUSTER HUNTED」「KOSAC BUSTER HUNTED」「帝王討伐」の12種を追加。対象ボス討伐時にワールドニュースへ専用カラー（一部は2色交互表示）の太字で表示',
+      '💀 ダンジョンのキルログ機能を実装。敵に倒された際、撃破した敵に応じた固有のユーモラスな一言をナチュラルニュースに色付きで表示（対象モンスター81種すべてに個別ログを用意）',
+      '🆕 新モンスター3種を追加：「ジャック・ザ・ステイン」（裏火山入口、説明文のみで未実装だった個体を実装）「元グリーンベレーゾンビ[雷槌]」（裏火山城入口前大広場）「KOSAC BUSTER」（終焉の大橋・平地地帯に極稀出現）',
+      '🐛 BUSTERが召喚スキルの説明文にしか存在せず実際には一切出現しなかった不具合を修正。終焉の大橋・平地地帯に低確率で実際に出現するよう修正',
+    ],
+  },
   {
     version: '2.23.0',
     date: '2026-06-21',
