@@ -5,12 +5,13 @@ import { create } from 'zustand';
 import type { PlayerData, Notification, TabId } from '../types/game';
 import { savePlayer } from '../services/database';
 import { randomInt } from '../utils/random';
-import { ITEM_MASTER } from '../data/masters';
+import { ITEM_MASTER, SKILL_EXP_TABLE } from '../data/masters';
 import { DEFAULT_MINING_TOOL_ID, DEFAULT_WOODCUTTING_TOOL_ID } from '../data/toolsMaster';
 import { createPlayerSlice, type PlayerSlice } from './slices/playerSlice';
 import { createDungeonSlice, type DungeonSlice } from './slices/dungeonSlice';
 import { createFishingSlice, type FishingSlice } from './slices/fishingSlice';
 import { createReliefSlice, type ReliefSlice } from './slices/reliefSlice';
+import { calcOfflineMiningResult } from '../systems/offlineMining';
 
 // ============================================================
 // GameState の型定義（スライス型を合成）
@@ -83,6 +84,7 @@ function ensureDefaults(player: PlayerData): PlayerData {
     lifetimeStats: player.lifetimeStats ?? { totalDamageDealt: 0, totalGoldEarned: 0, maxCombo: 0, monstersDefeated: 0 },
     unlockedAchievements: player.unlockedAchievements ?? [],
     totalWagered: player.totalWagered ?? 0,
+    offlineMining: player.offlineMining ?? { enabled: false, category: 'mining', startedAt: 0, lastSettledAt: 0 },
     missionProgress: player.missionProgress ?? {
       dailySlotPlays:0, dailyChohanWins:0, dailyChinchiroWins:0, dailyCoinFlipWins:0,
       dailyHighlowWins:0, dailyPokerWins:0, dailyGamblePlays:0,
@@ -108,6 +110,70 @@ function ensureDefaults(player: PlayerData): PlayerData {
 }
 
 // ============================================================
+// オフライン採掘（採掘委任）の精算
+// ログイン時/プレイヤーデータ読み込み直後の1回のみ実行する。
+// setIntervalによるリアルタイム進行は行わない。
+// ============================================================
+function settleOfflineMiningOnLoad(
+  player: PlayerData,
+  addNotification: (type: Notification['type'], message: string) => void
+): PlayerData {
+  const om = player.offlineMining;
+  if (!om || !om.enabled) return player;
+
+  const now = Date.now();
+  const elapsedMs = now - (om.lastSettledAt || om.startedAt || now);
+  if (elapsedMs < 60000) {
+    // 1分未満なら精算スキップ（次回ログイン時にまとめて精算）
+    return player;
+  }
+
+  const result = calcOfflineMiningResult(player, om.category, elapsedMs);
+
+  // 精算済みとして最終精算時刻を必ず更新（結果が0件でも進行を無駄にしない）
+  const updatedOfflineMining = { ...om, lastSettledAt: now };
+
+  if (!result || result.drops.length === 0) {
+    return { ...player, offlineMining: updatedOfflineMining };
+  }
+
+  // インベントリ反映
+  const inventory = { ...player.inventory };
+  for (const d of result.drops) inventory[d.itemId] = (inventory[d.itemId] ?? 0) + d.amount;
+
+  // 経験値反映（スキル経験値・レベルアップ判定はaddSkillExpと同一ロジック）
+  const skillExp = { ...player.skillExp };
+  const skillLevels = { ...player.skillLevels };
+  skillExp[result.skillId] = (skillExp[result.skillId] ?? 0) + result.expGained;
+  let lv = skillLevels[result.skillId] ?? 1;
+  while (lv < 100000 && SKILL_EXP_TABLE[lv + 1] !== undefined && skillExp[result.skillId] >= SKILL_EXP_TABLE[lv + 1]) lv++;
+  skillLevels[result.skillId] = lv;
+
+  // 採取図鑑更新（既存のupdateGatherCollectionと同じロジック）
+  const prevCollection = player.gatherCollection ?? { discoveredItems: [], itemCounts: {} };
+  const discovered = new Set(prevCollection.discoveredItems);
+  const counts = { ...prevCollection.itemCounts };
+  for (const d of result.drops) {
+    discovered.add(d.itemId);
+    counts[d.itemId] = (counts[d.itemId] ?? 0) + d.amount;
+  }
+
+  const msg = result.capped
+    ? '🪨 採掘隊が資源を満載で持ち帰りました'
+    : `🪨 採掘隊が資源を持ち帰りました（${result.totalAmount}個）`;
+  setTimeout(() => addNotification('success', msg), 800);
+
+  return {
+    ...player,
+    inventory,
+    skillExp,
+    skillLevels,
+    gatherCollection: { discoveredItems: [...discovered], itemCounts: counts },
+    offlineMining: updatedOfflineMining,
+  };
+}
+
+// ============================================================
 // Store 本体（スライスを合成）
 // ============================================================
 export const useGameStore = create<GameState>((set, get, api) => ({
@@ -124,7 +190,14 @@ export const useGameStore = create<GameState>((set, get, api) => ({
 
   setUid: (uid) => set({ uid }),
   setAuthLoading: (loading) => set({ isAuthLoading: loading }),
-  setPlayer: (player) => set({ player: ensureDefaults(player) }),
+  setPlayer: (player) => {
+    const isInitialLoad = get().player === null;
+    let merged = ensureDefaults(player);
+    if (isInitialLoad) {
+      merged = settleOfflineMiningOnLoad(merged, get().addNotification);
+    }
+    set({ player: merged });
+  },
 
   setActiveTab: (tab) => set({ activeTab: tab }),
   setFishingLocked: (locked) => set({ isFishingLocked: locked }),
