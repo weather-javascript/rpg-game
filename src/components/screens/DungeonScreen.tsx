@@ -42,7 +42,11 @@ function applyDefensePct(dmg: number, mon: MonsterMaster | null | undefined): nu
 // ============================================================
 function calcArmorReducedDamage(rawDamage: number, totalDef: number, totalToughness: number, totalEpf: number): number {
   const reductionPoint = Math.min(20, Math.max(totalDef / 5, totalDef - (4 * rawDamage) / (totalToughness + 8)));
-  const reduced = rawDamage * (1 - reductionPoint / 25) * (1 - totalEpf / 25);
+  // 【修正】EPF合計が25以上になると (1 - totalEpf/25) が0以下（負数）になり、
+  // 軽減後ダメージが必ず1まで潰れてしまうバグがあった（AEGISフルセット等、装備のEPF合計が25を超えるケースで発生）。
+  // reductionPoint と同様に上限20でクランプし、軽減倍率が0未満にならないようにする。
+  const cappedEpf = Math.min(20, totalEpf);
+  const reduced = rawDamage * (1 - reductionPoint / 25) * (1 - cappedEpf / 25);
   return Math.max(1, Math.round(reduced));
 }
 
