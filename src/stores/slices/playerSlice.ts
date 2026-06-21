@@ -3,7 +3,7 @@
 
 import type { StateCreator } from 'zustand';
 import type { GameState } from '../gameStore';
-import type { IdMap, EquipmentSlots } from '../../types/game';
+import type { IdMap, EquipmentSlots, GatherCategory } from '../../types/game';
 import { EXP_TABLE, SKILL_EXP_TABLE, ITEM_MASTER } from '../../data/masters';
 
 export interface PlayerSlice {
@@ -26,6 +26,7 @@ export interface PlayerSlice {
   updateToolAcquisitionStats: (patch: Partial<{ totalGatherCount: number; maxCombo: number; nightGatherCount: number; rainGatherCount: number; dangerSuccessCount: number }>) => void;
   updateGatherCombo:  (category: string, success: boolean) => void;
   updateGatherCollection: (itemIds: string[], amounts: Record<string, number>) => void;
+  setOfflineMining: (enabled: boolean, category: GatherCategory) => void;
 }
 
 export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (set, get) => ({
@@ -272,5 +273,21 @@ export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (
       }
       return { player: { ...state.player, gatherCollection: { discoveredItems: [...discovered], itemCounts: counts } } };
     });
+  },
+
+  // オフライン採掘（採掘委任）のON/OFF切り替え。
+  // ONにした瞬間: 対象カテゴリ・開始時刻・最終精算時刻を現在時刻で記録。
+  // OFFにした瞬間: enabledをfalseにするのみ（進行中の精算は次回ONまで行われない）。
+  setOfflineMining: (enabled, category) => {
+    set((state) => {
+      if (!state.player) return state;
+      const now = Date.now();
+      const offlineMining = enabled
+        ? { enabled: true, category, startedAt: now, lastSettledAt: now }
+        : { ...(state.player.offlineMining ?? { enabled: false, category, startedAt: 0, lastSettledAt: 0 }), enabled: false };
+      return { player: { ...state.player, offlineMining } };
+    });
+    // 保存頻度は増やさない：既存のqueueSave（15秒バッファ）に乗せるのみ
+    import('../../services/saveBuffer').then(({ queueSave }) => queueSave());
   },
 });
