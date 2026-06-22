@@ -2914,7 +2914,7 @@ export function DungeonScreen() {
   const icCancelBattle = useGameStore(s => s.icCancelBattle);
   const icSetBattleMana = useGameStore(s => s.icSetBattleMana);
 
-  const HIDDEN_DUNGEON_IDS = ['devil_armor_fight', 'dead_armor_fight', 'sky_castle_ex', 'dragons_lair', 'ff_forest', 'ff_plain', 'ff_desert', 'ff_snow', 'ff_savanna', 'ff_pirate'];
+  const HIDDEN_DUNGEON_IDS = ['devil_armor_fight', 'dead_armor_fight', 'sky_castle_ex', 'dragons_lair', 'ff_forest', 'ff_plain', 'ff_desert', 'ff_snow', 'ff_savanna', 'ff_pirate', 'chaite'];
   const dungeons = Object.values(DUNGEON_MASTER).filter(d => !HIDDEN_DUNGEON_IDS.includes(d.id));
   const lockedDungeons = dungeons.filter(d => !isDungeonUnlocked(d.id));
 
@@ -3162,6 +3162,29 @@ export function DungeonScreen() {
   // ── フリーフィールド戦闘ハンドラ ──
   const handleStartFFBattle = useCallback((req: FFBattleRequest) => {
     if (!player) return;
+    // チェイテ（chaite）は多階層ダンジョン → 通常のダンジョン実行フローで起動する
+    if (req.dungeonId === 'chaite') {
+      const dungeon = getDungeon('chaite');
+      if (!dungeon || !dungeon.areas) return;
+      const firstArea = dungeon.areas[0];
+      const rs: DungeonRunState = {
+        dungeonId: 'chaite',
+        currentFloor: 1,
+        currentAreaName: firstArea.name,
+        currentAreaIdx: 0,
+        monstersDefeated: 0,
+        totalExp: 0,
+        totalGold: 0,
+        totalDrops: [],
+        isComplete: false,
+        isFailed: false,
+      };
+      setRunState(rs);
+      setInBattle(true);
+      setBattleKey(k => k + 1);
+      setDungeonInnerTab('dungeon');
+      return;
+    }
     const rs: DungeonRunState = {
       dungeonId: req.dungeonId,
       currentFloor: 1,
@@ -3177,7 +3200,7 @@ export function DungeonScreen() {
     setFfBattleRunState(rs);
     setFfBattleKey(k => k + 1);
     setFfBattleMana(0);
-  }, [player]);
+  }, [player, getDungeon]);
 
   const handleFFBattleEnd = useCallback((won: boolean, expGained: number, goldGained: number, drops: {itemId:string;amount:number}[], _hpDelta: number) => {
     if (won) {

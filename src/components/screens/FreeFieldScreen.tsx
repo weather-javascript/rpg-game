@@ -1179,6 +1179,7 @@ const FF_AREA_TO_DUNGEON: Record<string, string> = {
   ffgg_snow:    'ff_snow',
   ffgg_savanna: 'ff_savanna',
   ffgg_pirate:  'ff_pirate',
+  ff2_start:    'chaite',
 };
 
 export interface FFBattleRequest {
