@@ -735,6 +735,15 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
     ],
     useEffect: { attackBonus: 0, message: 'Mana Rodを掲げた！Manaが満ちていく...', attackType: 'physical' },
   },
+  // ============================================================
+  // チェイテダンジョン 専用素材
+  // ============================================================
+  chaite_silver_emblem: { id:'chaite_silver_emblem', name:'銀装の紋章', description:'チェイテの銀装剣闘士が身につけていた紋章。', category:'material', itemType:'Item', rarity:'common', sellPrice:30, buyPrice:0, maxStack:99, icon:'ancient_shard' },
+  chaite_gold_emblem:   { id:'chaite_gold_emblem',   name:'金装の紋章', description:'チェイテの金装位の兵が身につけていた紋章。', category:'material', itemType:'Item', rarity:'uncommon', sellPrice:80, buyPrice:0, maxStack:99, icon:'gold_medal' },
+  chaite_black_emblem:  { id:'chaite_black_emblem',  name:'黒装の紋章', description:'チェイテの黒装位の兵が身につけていた紋章。', category:'material', itemType:'Item', rarity:'rare', sellPrice:180, buyPrice:0, maxStack:99, icon:'ore_black' },
+  chaite_hero_proof:    { id:'chaite_hero_proof',    name:'英雄の証',   description:'英雄騎士が遺した証。', category:'material', itemType:'Item', rarity:'rare', sellPrice:350, buyPrice:0, maxStack:99, icon:'gem_red' },
+  nightmare_shard:      { id:'nightmare_shard',      name:'暗黒の欠片', description:'暗黒騎士ナイト・メアの欠片。', category:'material', itemType:'Item', rarity:'epic', sellPrice:1200, buyPrice:0, maxStack:99, icon:'skull' },
+  shogun_crest:         { id:'shogun_crest',         name:'将軍の軍配', description:'第999代将軍徳川義和公が振るっていた軍配。TODO: 専用クラフトレシピは未確定。', category:'material', itemType:'Item', rarity:'legendary', sellPrice:5000, buyPrice:0, maxStack:99, icon:'castle_jp' },
   // 無限深層回廊 専用素材・クラフト品
   ...IC_ITEMS,
 };
@@ -2178,9 +2187,19 @@ export const MONSTER_MASTER: Record<string, MonsterMaster> = {
   ff_soul_heal:      { id:'ff_soul_heal',      name:'ヒールソール',         description:'ソウル系の回復個体。放置すると味方を継続的に立て直してくる。', icon:'bubbles', maxHp:130, defense:18, attack:6, baseExp:70, baseGold:40, dungeonIds:['ff_forest','ff_desert','ff_snow','ff_savanna','ff_pirate'], skills:['微回復(毎ターン回復)','癒魂(全体回復)'], drops:[{itemId:'ancient_shard',baseRate:0.2,minAmount:1,maxAmount:1}] },
   ff_soul_attack:    { id:'ff_soul_attack',    name:'アタックソール',       description:'ソウル系の攻撃特化個体。突進の威力が高く、優先的に処理したい。', icon:'swords', maxHp:145, defense:16, attack:15, baseExp:75, baseGold:42, dungeonIds:['ff_forest','ff_desert','ff_snow','ff_savanna','ff_pirate'], skills:['攻撃魂(ATK+10)','突進(高威力単体攻撃)'], drops:[{itemId:'ancient_shard',baseRate:0.25,minAmount:1,maxAmount:1}] },
   ff_soul_wind:      { id:'ff_soul_wind',      name:'ウィンドソール',       description:'ソウル系の俊敏個体。風刃で全体を斬り、自身は浮遊して攻撃を躱す。', icon:'wave', maxHp:135, defense:14, attack:9, baseExp:70, baseGold:40, dungeonIds:['ff_forest','ff_desert','ff_snow','ff_savanna','ff_pirate'], skills:['風刃(全体攻撃)','浮遊(回避率上昇)'], drops:[{itemId:'ancient_shard',baseRate:0.2,minAmount:1,maxAmount:1}] },
-  ff_mahadoryuasu:   { id:'ff_mahadoryuasu',   name:'マハドリュアス',       description:'自由の大地の深部に座す古代の番人。壊世賜杖で全てを薙ぎ払い、追い詰められるほど力を増す。', icon:'crystal_ball', maxHp:420, defense:32, attack:22, baseExp:1200, baseGold:800, dungeonIds:[], isBoss:true, specialAttack:'壊世賜杖レクイエム', skills:['壊世賜杖レクイエム(全体超火力攻撃)','破壊加速(ターン毎ATK上昇)','古代暴走(HP30%以下で全能力強化)'], drops:[{itemId:'cosmonium',baseRate:0.3,minAmount:1,maxAmount:2},{itemId:'hard_magic_stone',baseRate:1.0,minAmount:3,maxAmount:5}] },
-  ff_houru_kyojin:   { id:'ff_houru_kyojin',   name:'屠る巨人',             description:'自由の大地の最果てに立つ巨人。踏み潰しと無慈悲な一撃を併せ持つ最終関門。瀕死になるほど攻撃回数が増えていく。', icon:'skull', maxHp:520, defense:40, attack:26, baseExp:1500, baseGold:1000, dungeonIds:[], isBoss:true, specialAttack:'無慈悲な一撃', skills:['踏み潰し(全体攻撃)','無慈悲な一撃(単体即死級攻撃)','シュヴァリエプレッジ(HP50%以下で攻撃回数+1)'], drops:[{itemId:'cosmonium',baseRate:0.4,minAmount:1,maxAmount:2},{itemId:'hard_magic_stone',baseRate:1.0,minAmount:4,maxAmount:6}] },
+  // ============================================================
+  // チェイテダンジョン 敵
+  // ============================================================
+  chaite_silver_gladiator: { id:'chaite_silver_gladiator', name:'銀装剣闘士', description:'チェイテの銀装位。俊敏な連撃で攻め立てる。', icon:'sword', maxHp:140, attack:14, defense:8, baseExp:12, baseGold:6, dungeonIds:['chaite'], skills:['連撃(2回攻撃)'], drops:[{itemId:'chaite_silver_emblem',baseRate:0.5,minAmount:1,maxAmount:1},{itemId:'coin',baseRate:1.0,minAmount:3,maxAmount:8}] },
+  chaite_gold_gladiator:   { id:'chaite_gold_gladiator',   name:'金装剣闘士', description:'チェイテの金装位。突進からの連撃3回を得意とする。',   icon:'golden_knife', maxHp:190, attack:18, defense:11, baseExp:16, baseGold:8, dungeonIds:['chaite'], skills:['突進斬り(高ダメージ単体攻撃)','連撃(3回攻撃)'], drops:[{itemId:'chaite_gold_emblem',baseRate:0.4,minAmount:1,maxAmount:1},{itemId:'coin',baseRate:1.0,minAmount:5,maxAmount:12}] },
+  chaite_black_knight:     { id:'chaite_black_knight',     name:'黒装騎士',   description:'チェイテの黒装位。鉄壁の守りと反撃が厄介。',           icon:'shield', maxHp:260, attack:20, defense:18, baseExp:30, baseGold:14, dungeonIds:['chaite'], skills:['鉄壁(1ターン被ダメ軽減)','反撃(被弾時ダメージ返し)'], drops:[{itemId:'chaite_black_emblem',baseRate:0.35,minAmount:1,maxAmount:1},{itemId:'coin',baseRate:1.0,minAmount:8,maxAmount:18}] },
+  chaite_gold_mage:        { id:'chaite_gold_mage',        name:'金装魔導士', description:'チェイテの魔導師。鈍足と防御低下で削ってくる。',       icon:'scroll', maxHp:170, attack:22, defense:10, baseExp:24, baseGold:12, dungeonIds:['chaite'], skills:['鈍足(速度低下)','防御低下(DEF低下)','魔弾(魔法攻撃)'], drops:[{itemId:'chaite_gold_emblem',baseRate:0.3,minAmount:1,maxAmount:1},{itemId:'coin',baseRate:1.0,minAmount:5,maxAmount:10}] },
+  chaite_hero_knight:      { id:'chaite_hero_knight',      name:'英雄騎士',   description:'チェイテの精鋭。パリィとカウンターで手強い相手。HP50%以下で戦意高揚。', icon:'golden_chestplate', maxHp:480, attack:30, defense:24, baseExp:50, baseGold:28, dungeonIds:['chaite'], skills:['パリィ(ダメージ軽減)','カウンター(反撃)','戦意高揚(HP50%以下でATK上昇)'], drops:[{itemId:'chaite_hero_proof',baseRate:0.4,minAmount:1,maxAmount:1},{itemId:'coin',baseRate:1.0,minAmount:15,maxAmount:30}] },
+  chaite_black_gladiator:  { id:'chaite_black_gladiator',  name:'黒装剣闘士', description:'チェイテの猛者。出血と高速斬撃で一気に削る。',         icon:'swords', maxHp:300, attack:26, defense:16, baseExp:34, baseGold:18, dungeonIds:['chaite'], skills:['出血(継続ダメージ)','高速斬撃(多段攻撃)'], drops:[{itemId:'chaite_black_emblem',baseRate:0.45,minAmount:1,maxAmount:1},{itemId:'coin',baseRate:1.0,minAmount:10,maxAmount:20}] },
+  chaite_nightmare:        { id:'chaite_nightmare',        name:'暗黒騎士ナイト・メア', description:'チェイテの中ボス。ナイトメアブレードと闇霧が凶悪。HP30%以下で暴走する。', icon:'skull', maxHp:900, attack:36, defense:28, baseExp:180, baseGold:90, dungeonIds:['chaite'], isMidBoss:true, specialAttack:'ナイトメアブレード', skills:['ナイトメアブレード(高威力攻撃)','闇霧(被ダメ軽減)','暴走(HP30%以下で強化)'], drops:[{itemId:'nightmare_shard',baseRate:0.8,minAmount:1,maxAmount:2},{itemId:'chaite_hero_proof',baseRate:1.0,minAmount:2,maxAmount:3},{itemId:'coin',baseRate:1.0,minAmount:60,maxAmount:100}] },
+  chaite_tokugawa:         { id:'chaite_tokugawa',         name:'第999代将軍徳川義和公', description:'チェイテの最終ボス。物理攻撃をほぼ無効化する。貫通ダメージで削るべし。HP50%以下で無双発動。', icon:'castle_jp', maxHp:1800, attack:45, defense:35, baseExp:1200, baseGold:700, dungeonIds:['chaite'], isBoss:true, defensePct:0.85, specialAttack:'政宗', skills:['政宗(高威力単体攻撃)','居合一閃(範囲攻撃)','威圧(プレイヤーデバフ)','無双(HP50%以下で強化)'], drops:[{itemId:'shogun_crest',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'cosmonium',baseRate:0.3,minAmount:1,maxAmount:2},{itemId:'coin',baseRate:1.0,minAmount:400,maxAmount:700}] },
 };
+
 
 // ============================================================
 // 称号達成（ボス討伐タイトル）マスター
@@ -2925,6 +2944,25 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
     id:'infinite_corridor', name:'無限深層回廊', description:'1階ずつ潜り、続行/帰還を選びながら素材を集める周回特化ダンジョン。専用画面で進行する。',
     icon:'infinite_spiral', tier:'infinite', requiredLevel:1, floors:100, expBonus:1.0, goldBonus:1.0,
     monsterIds:Object.keys(IC_ALL_BEGINNER_ENEMIES),
+  },
+  chaite: {
+    id:'chaite', name:'チェイテダンジョン', description:'フリーフィールド2から入場できる城塞ダンジョン。第999代将軍徳川義和公が待ち受ける。通常攻撃はほぼ通らない——貫通ダメージで削れ。',
+    icon:'castle_jp', tier:'advanced', requiredLevel:1, floors:9, expBonus:2.0, goldBonus:2.0,
+    monsterIds:['chaite_silver_gladiator','chaite_gold_gladiator','chaite_black_knight','chaite_gold_mage','chaite_hero_knight','chaite_black_gladiator','chaite_nightmare','chaite_tokugawa'],
+    bossId:'chaite_tokugawa',
+    areas:[
+      { name:'1階　城門前',      description:'銀装と金装の剣闘士が守る正門。', monsters:[{monsterId:'chaite_silver_gladiator',count:2},{monsterId:'chaite_gold_gladiator',count:1}] },
+      { name:'2階　中庭',        description:'魔導士が支援する混成部隊。', monsters:[{monsterId:'chaite_silver_gladiator',count:1},{monsterId:'chaite_gold_mage',count:1},{monsterId:'chaite_black_knight',count:1}] },
+      { name:'3階　兵舎',        description:'精鋭部隊。英雄騎士が加わる。', monsters:[{monsterId:'chaite_silver_gladiator',count:1},{monsterId:'chaite_gold_gladiator',count:1},{monsterId:'chaite_gold_mage',count:1},{monsterId:'chaite_hero_knight',count:1}], isHardArea:true },
+      { name:'3.5階　英雄の間',  description:'英雄騎士のみが守る中継地点。', monsters:[{monsterId:'chaite_hero_knight',count:1}], isCheckpoint:true, checkpointLabel:'CP1' },
+      { name:'4階　武器庫',      description:'黒装兵が封鎖している。', monsters:[{monsterId:'chaite_silver_gladiator',count:1},{monsterId:'chaite_gold_mage',count:1},{monsterId:'chaite_black_knight',count:1}] },
+      { name:'5階　訓練場',      description:'英雄騎士4体が立ちはだかる。', monsters:[{monsterId:'chaite_gold_mage',count:1},{monsterId:'chaite_black_knight',count:1},{monsterId:'chaite_hero_knight',count:4}], isHardArea:true },
+      { name:'6階　回廊',        description:'銀装と金装の精鋭が迎え撃つ。', monsters:[{monsterId:'chaite_silver_gladiator',count:1},{monsterId:'chaite_gold_gladiator',count:1},{monsterId:'chaite_gold_mage',count:1}] },
+      { name:'7階　上層通路',    description:'英雄騎士4体と魔導士の布陣。', monsters:[{monsterId:'chaite_silver_gladiator',count:1},{monsterId:'chaite_gold_mage',count:1},{monsterId:'chaite_hero_knight',count:4}], isHardArea:true },
+      { name:'8階　城外広場',    description:'大軍が城外で待ち受ける。', monsters:[{monsterId:'chaite_gold_mage',count:1},{monsterId:'chaite_black_knight',count:1},{monsterId:'chaite_hero_knight',count:5}], isHardArea:true },
+      { name:'8階　城内　ナイト・メア', description:'暗黒騎士ナイト・メアとの中ボス戦。', monsters:[{monsterId:'chaite_gold_mage',count:1},{monsterId:'chaite_nightmare',count:1,isMidBoss:true}], isHardArea:true },
+      { name:'9階　将軍の間',    description:'第999代将軍徳川義和公との最終決戦。通常攻撃は無効に近い。貫通武器で挑め。', monsters:[{monsterId:'chaite_tokugawa',count:1,isBoss:true}], isHardArea:true },
+    ],
   },
 };
 
