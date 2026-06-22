@@ -595,6 +595,572 @@ const ICONS: Record<string, SvgDef> = {
     <line x1="8" y1="15" x2="24" y2="15" stroke="#708090" stroke-width="1"/>
   ` },
 
+  // ── カスタム防具アイコン（金防具ベース） ──
+
+  // スライムキング: 黄緑+深緑グラデーション
+  slime_king_chestplate: { content: `
+    <defs><linearGradient id="skG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a8e63c"/><stop offset="100%" stop-color="#1a6618"/></linearGradient></defs>
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="url(#skG)"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="#1a6618"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="#7dcc28"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="#7dcc28"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="#1a6618" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="#1a6618" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="22" x2="23" y2="22" stroke="#1a6618" stroke-width="1" opacity="0.4"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="#c8ff60" stroke-width="1"/>
+  ` },
+  slime_king_helmet: { content: `
+    <defs><linearGradient id="skHG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a8e63c"/><stop offset="100%" stop-color="#1a6618"/></linearGradient></defs>
+    <path d="M8 20 Q8 10 16 8 Q24 10 24 20 L22 20 Q22 14 16 12 Q10 14 10 20 Z" fill="url(#skHG)"/>
+    <path d="M8 20 L24 20 L23 24 L9 24 Z" fill="#1a6618"/>
+    <rect x="12" y="20" width="8" height="4" rx="1" fill="#7dcc28"/>
+    <path d="M11 12 Q12 10 16 10 Q20 10 21 12" fill="none" stroke="#c8ff60" stroke-width="1.5"/>
+  ` },
+  slime_king_leggings: { content: `
+    <defs><linearGradient id="skLG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a8e63c"/><stop offset="100%" stop-color="#1a6618"/></linearGradient></defs>
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="#1a6618"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="url(#skLG)"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="url(#skLG)"/>
+    <line x1="9" y1="14" x2="15" y2="14" stroke="#1a6618" stroke-width="1.5" opacity="0.5"/>
+    <line x1="17" y1="14" x2="23" y2="14" stroke="#1a6618" stroke-width="1.5" opacity="0.5"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="#c8ff60" stroke-width="1"/>
+  ` },
+  slime_king_boots: { content: `
+    <defs><linearGradient id="skBG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a8e63c"/><stop offset="100%" stop-color="#1a6618"/></linearGradient></defs>
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="url(#skBG)"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="url(#skBG)"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="#1a6618"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="#1a6618"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="#c8ff60" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="#c8ff60" stroke-width="1"/>
+  ` },
+
+  // 英雄騎士: 金色 + 騎士型ヘルメット
+  hero_knight_chestplate: { content: `
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="${C.gold}"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="${C.goldDk}"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="${C.gold}"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="${C.gold}"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="${C.goldDk}" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="${C.goldDk}" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="22" x2="23" y2="22" stroke="${C.goldDk}" stroke-width="1" opacity="0.4"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="#ffe08a" stroke-width="1"/>
+  ` },
+  hero_knight_helmet_icon: { content: `
+    <path d="M8 18 Q8 9 16 7 Q24 9 24 18 L22 19 Q22 12 16 10 Q10 12 10 19 Z" fill="${C.gold}"/>
+    <path d="M7 18 L25 18 L24 22 L8 22 Z" fill="${C.goldDk}"/>
+    <path d="M14 22 L12 26 L20 26 L18 22 Z" fill="${C.gold}"/>
+    <line x1="8" y1="15" x2="24" y2="15" stroke="#ffe08a" stroke-width="1"/>
+  ` },
+  hero_knight_leggings_icon: { content: `
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="${C.goldDk}"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="${C.gold}"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="${C.gold}"/>
+    <line x1="9" y1="14" x2="15" y2="14" stroke="${C.goldDk}" stroke-width="1.5" opacity="0.5"/>
+    <line x1="17" y1="14" x2="23" y2="14" stroke="${C.goldDk}" stroke-width="1.5" opacity="0.5"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="#ffe08a" stroke-width="1"/>
+  ` },
+  hero_knight_boots_icon: { content: `
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="${C.gold}"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="${C.gold}"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="${C.goldDk}"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="${C.goldDk}"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="#ffe08a" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="#ffe08a" stroke-width="1"/>
+  ` },
+
+  // タリスマン: 虹色
+  talisman_chestplate: { content: `
+    <defs><linearGradient id="rbG" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff4444"/><stop offset="25%" stop-color="#ffaa00"/><stop offset="50%" stop-color="#44ff44"/><stop offset="75%" stop-color="#4444ff"/><stop offset="100%" stop-color="#cc44ff"/></linearGradient></defs>
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="url(#rbG)"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="rgba(0,0,0,0.25)"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="rgba(255,255,255,0.5)"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="rgba(255,255,255,0.5)"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+    <line x1="9" y1="22" x2="23" y2="22" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="white" stroke-width="1"/>
+  ` },
+  talisman_helmet: { content: `
+    <defs><linearGradient id="rbHG" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff4444"/><stop offset="33%" stop-color="#44ff44"/><stop offset="66%" stop-color="#4444ff"/><stop offset="100%" stop-color="#cc44ff"/></linearGradient></defs>
+    <path d="M8 20 Q8 10 16 8 Q24 10 24 20 L22 20 Q22 14 16 12 Q10 14 10 20 Z" fill="url(#rbHG)"/>
+    <path d="M8 20 L24 20 L23 24 L9 24 Z" fill="rgba(0,0,0,0.3)"/>
+    <rect x="12" y="20" width="8" height="4" rx="1" fill="rgba(255,255,255,0.4)"/>
+    <path d="M11 12 Q12 10 16 10 Q20 10 21 12" fill="none" stroke="white" stroke-width="1.5"/>
+  ` },
+  talisman_leggings: { content: `
+    <defs><linearGradient id="rbLG" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff4444"/><stop offset="50%" stop-color="#44ff44"/><stop offset="100%" stop-color="#4444ff"/></linearGradient></defs>
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="rgba(0,0,0,0.3)"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="url(#rbLG)"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="url(#rbLG)"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="white" stroke-width="1"/>
+  ` },
+  talisman_boots: { content: `
+    <defs><linearGradient id="rbBG" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ffaa00"/><stop offset="50%" stop-color="#44ff44"/><stop offset="100%" stop-color="#cc44ff"/></linearGradient></defs>
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="url(#rbBG)"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="url(#rbBG)"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="rgba(0,0,0,0.3)"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="rgba(0,0,0,0.3)"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="white" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="white" stroke-width="1"/>
+  ` },
+
+  // 複合宝石各レベル (+2〜+9): 赤→紫（青方偏移）
+  // +2: 赤橙
+  compound_gem_p2_chestplate: { content: `
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="#e84400"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="#b83300"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="#ff6622"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="#ff6622"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="#b83300" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="#b83300" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="22" x2="23" y2="22" stroke="#b83300" stroke-width="1" opacity="0.4"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="#ffaa88" stroke-width="1"/>
+  ` },
+  compound_gem_p2_helmet: { content: `
+    <path d="M8 20 Q8 10 16 8 Q24 10 24 20 L22 20 Q22 14 16 12 Q10 14 10 20 Z" fill="#e84400"/>
+    <path d="M8 20 L24 20 L23 24 L9 24 Z" fill="#b83300"/>
+    <rect x="12" y="20" width="8" height="4" rx="1" fill="#ff6622"/>
+    <path d="M11 12 Q12 10 16 10 Q20 10 21 12" fill="none" stroke="#ffaa88" stroke-width="1.5"/>
+  ` },
+  compound_gem_p2_leggings: { content: `
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="#b83300"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="#e84400"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="#e84400"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="#ffaa88" stroke-width="1"/>
+  ` },
+  compound_gem_p2_boots: { content: `
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="#e84400"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="#e84400"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="#b83300"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="#b83300"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="#ffaa88" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="#ffaa88" stroke-width="1"/>
+  ` },
+  // +3: 赤
+  compound_gem_p3_chestplate: { content: `
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="#dd1111"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="#aa0000"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="#ee3333"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="#ee3333"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="#aa0000" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="#aa0000" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="22" x2="23" y2="22" stroke="#aa0000" stroke-width="1" opacity="0.4"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="#ff8888" stroke-width="1"/>
+  ` },
+  compound_gem_p3_helmet: { content: `
+    <path d="M8 20 Q8 10 16 8 Q24 10 24 20 L22 20 Q22 14 16 12 Q10 14 10 20 Z" fill="#dd1111"/>
+    <path d="M8 20 L24 20 L23 24 L9 24 Z" fill="#aa0000"/>
+    <rect x="12" y="20" width="8" height="4" rx="1" fill="#ee3333"/>
+    <path d="M11 12 Q12 10 16 10 Q20 10 21 12" fill="none" stroke="#ff8888" stroke-width="1.5"/>
+  ` },
+  compound_gem_p3_leggings: { content: `
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="#aa0000"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="#dd1111"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="#dd1111"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="#ff8888" stroke-width="1"/>
+  ` },
+  compound_gem_p3_boots: { content: `
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="#dd1111"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="#dd1111"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="#aa0000"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="#aa0000"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="#ff8888" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="#ff8888" stroke-width="1"/>
+  ` },
+  // +4: 深赤〜クリムゾン
+  compound_gem_p4_chestplate: { content: `
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="#cc0033"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="#990022"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="#dd2244"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="#dd2244"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="#990022" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="#990022" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="22" x2="23" y2="22" stroke="#990022" stroke-width="1" opacity="0.4"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="#ff6688" stroke-width="1"/>
+  ` },
+  compound_gem_p4_helmet: { content: `
+    <path d="M8 20 Q8 10 16 8 Q24 10 24 20 L22 20 Q22 14 16 12 Q10 14 10 20 Z" fill="#cc0033"/>
+    <path d="M8 20 L24 20 L23 24 L9 24 Z" fill="#990022"/>
+    <rect x="12" y="20" width="8" height="4" rx="1" fill="#dd2244"/>
+    <path d="M11 12 Q12 10 16 10 Q20 10 21 12" fill="none" stroke="#ff6688" stroke-width="1.5"/>
+  ` },
+  compound_gem_p4_leggings: { content: `
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="#990022"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="#cc0033"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="#cc0033"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="#ff6688" stroke-width="1"/>
+  ` },
+  compound_gem_p4_boots: { content: `
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="#cc0033"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="#cc0033"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="#990022"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="#990022"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="#ff6688" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="#ff6688" stroke-width="1"/>
+  ` },
+  // +5: 赤紫
+  compound_gem_p5_chestplate: { content: `
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="#bb0044"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="#880033"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="#cc1155"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="#cc1155"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="#880033" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="#880033" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="22" x2="23" y2="22" stroke="#880033" stroke-width="1" opacity="0.4"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="#ff55aa" stroke-width="1"/>
+  ` },
+  compound_gem_p5_helmet: { content: `
+    <path d="M8 20 Q8 10 16 8 Q24 10 24 20 L22 20 Q22 14 16 12 Q10 14 10 20 Z" fill="#bb0044"/>
+    <path d="M8 20 L24 20 L23 24 L9 24 Z" fill="#880033"/>
+    <rect x="12" y="20" width="8" height="4" rx="1" fill="#cc1155"/>
+    <path d="M11 12 Q12 10 16 10 Q20 10 21 12" fill="none" stroke="#ff55aa" stroke-width="1.5"/>
+  ` },
+  compound_gem_p5_leggings: { content: `
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="#880033"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="#bb0044"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="#bb0044"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="#ff55aa" stroke-width="1"/>
+  ` },
+  compound_gem_p5_boots: { content: `
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="#bb0044"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="#bb0044"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="#880033"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="#880033"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="#ff55aa" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="#ff55aa" stroke-width="1"/>
+  ` },
+
+  compound_gem_p6_chestplate: { content: `
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="#cc2200"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="#991500"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="#dd3300"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="#dd3300"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="#991500" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="#991500" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="22" x2="23" y2="22" stroke="#991500" stroke-width="1" opacity="0.4"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="#ff7766" stroke-width="1"/>
+  ` },
+  compound_gem_p6_helmet: { content: `
+    <path d="M8 20 Q8 10 16 8 Q24 10 24 20 L22 20 Q22 14 16 12 Q10 14 10 20 Z" fill="#cc2200"/>
+    <path d="M8 20 L24 20 L23 24 L9 24 Z" fill="#991500"/>
+    <rect x="12" y="20" width="8" height="4" rx="1" fill="#dd3300"/>
+    <path d="M11 12 Q12 10 16 10 Q20 10 21 12" fill="none" stroke="#ff7766" stroke-width="1.5"/>
+  ` },
+  compound_gem_p6_leggings: { content: `
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="#991500"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="#cc2200"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="#cc2200"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="#ff7766" stroke-width="1"/>
+  ` },
+  compound_gem_p6_boots: { content: `
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="#cc2200"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="#cc2200"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="#991500"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="#991500"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="#ff7766" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="#ff7766" stroke-width="1"/>
+  ` },
+  compound_gem_p7_chestplate: { content: `
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="#aa0055"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="#770033"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="#cc0066"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="#cc0066"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="#770033" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="#770033" stroke-width="1" opacity="0.5"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="#ff55aa" stroke-width="1"/>
+  ` },
+  compound_gem_p7_helmet: { content: `
+    <path d="M8 20 Q8 10 16 8 Q24 10 24 20 L22 20 Q22 14 16 12 Q10 14 10 20 Z" fill="#aa0055"/>
+    <path d="M8 20 L24 20 L23 24 L9 24 Z" fill="#770033"/>
+    <rect x="12" y="20" width="8" height="4" rx="1" fill="#cc0066"/>
+    <path d="M11 12 Q12 10 16 10 Q20 10 21 12" fill="none" stroke="#ff55aa" stroke-width="1.5"/>
+  ` },
+  compound_gem_p7_leggings: { content: `
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="#770033"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="#aa0055"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="#aa0055"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="#ff55aa" stroke-width="1"/>
+  ` },
+  compound_gem_p7_boots: { content: `
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="#aa0055"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="#aa0055"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="#770033"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="#770033"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="#ff55aa" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="#ff55aa" stroke-width="1"/>
+  ` },
+  compound_gem_p8_chestplate: { content: `
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="#5500aa"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="#330077"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="#6600cc"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="#6600cc"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="#330077" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="#330077" stroke-width="1" opacity="0.5"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="#bb77ff" stroke-width="1"/>
+  ` },
+  compound_gem_p8_helmet: { content: `
+    <path d="M8 20 Q8 10 16 8 Q24 10 24 20 L22 20 Q22 14 16 12 Q10 14 10 20 Z" fill="#5500aa"/>
+    <path d="M8 20 L24 20 L23 24 L9 24 Z" fill="#330077"/>
+    <rect x="12" y="20" width="8" height="4" rx="1" fill="#6600cc"/>
+    <path d="M11 12 Q12 10 16 10 Q20 10 21 12" fill="none" stroke="#bb77ff" stroke-width="1.5"/>
+  ` },
+  compound_gem_p8_leggings: { content: `
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="#330077"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="#5500aa"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="#5500aa"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="#bb77ff" stroke-width="1"/>
+  ` },
+  compound_gem_p8_boots: { content: `
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="#5500aa"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="#5500aa"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="#330077"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="#330077"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="#bb77ff" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="#bb77ff" stroke-width="1"/>
+  ` },
+  compound_gem_p9_chestplate: { content: `
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="#7700cc"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="#550099"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="#8800ee"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="#8800ee"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="#550099" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="#550099" stroke-width="1" opacity="0.5"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="#dd99ff" stroke-width="1"/>
+  ` },
+  compound_gem_p9_helmet: { content: `
+    <path d="M8 20 Q8 10 16 8 Q24 10 24 20 L22 20 Q22 14 16 12 Q10 14 10 20 Z" fill="#7700cc"/>
+    <path d="M8 20 L24 20 L23 24 L9 24 Z" fill="#550099"/>
+    <rect x="12" y="20" width="8" height="4" rx="1" fill="#8800ee"/>
+    <path d="M11 12 Q12 10 16 10 Q20 10 21 12" fill="none" stroke="#dd99ff" stroke-width="1.5"/>
+  ` },
+  compound_gem_p9_leggings: { content: `
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="#550099"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="#7700cc"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="#7700cc"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="#dd99ff" stroke-width="1"/>
+  ` },
+  compound_gem_p9_boots: { content: `
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="#7700cc"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="#7700cc"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="#550099"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="#550099"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="#dd99ff" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="#dd99ff" stroke-width="1"/>
+  ` },
+
+  // 黒装騎士: 灰色 + 騎士型ヘルメット
+  black_knight_chestplate_icon: { content: `
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="#888888"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="#555555"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="#999999"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="#999999"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="#555555" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="#555555" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="22" x2="23" y2="22" stroke="#555555" stroke-width="1" opacity="0.4"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="#cccccc" stroke-width="1"/>
+  ` },
+  black_knight_helmet_icon: { content: `
+    <path d="M8 18 Q8 9 16 7 Q24 9 24 18 L22 19 Q22 12 16 10 Q10 12 10 19 Z" fill="#888888"/>
+    <path d="M7 18 L25 18 L24 22 L8 22 Z" fill="#555555"/>
+    <path d="M14 22 L12 26 L20 26 L18 22 Z" fill="#888888"/>
+    <line x1="8" y1="15" x2="24" y2="15" stroke="#cccccc" stroke-width="1"/>
+  ` },
+  black_knight_leggings_icon: { content: `
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="#555555"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="#888888"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="#888888"/>
+    <line x1="9" y1="14" x2="15" y2="14" stroke="#555555" stroke-width="1.5" opacity="0.5"/>
+    <line x1="17" y1="14" x2="23" y2="14" stroke="#555555" stroke-width="1.5" opacity="0.5"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="#cccccc" stroke-width="1"/>
+  ` },
+  black_knight_boots_icon: { content: `
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="#888888"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="#888888"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="#555555"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="#555555"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="#cccccc" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="#cccccc" stroke-width="1"/>
+  ` },
+
+  // 金装魔道士: オレンジ+赤グラデーション + 騎士型ヘルメット
+  gold_mage_chestplate_icon: { content: `
+    <defs><linearGradient id="gmG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ff8800"/><stop offset="100%" stop-color="#cc2200"/></linearGradient></defs>
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="url(#gmG)"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="#aa1100"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="#ff9922"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="#ff9922"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="#aa1100" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="#aa1100" stroke-width="1" opacity="0.5"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="#ffcc66" stroke-width="1"/>
+  ` },
+  gold_mage_helmet_icon: { content: `
+    <defs><linearGradient id="gmHG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ff8800"/><stop offset="100%" stop-color="#cc2200"/></linearGradient></defs>
+    <path d="M8 18 Q8 9 16 7 Q24 9 24 18 L22 19 Q22 12 16 10 Q10 12 10 19 Z" fill="url(#gmHG)"/>
+    <path d="M7 18 L25 18 L24 22 L8 22 Z" fill="#aa1100"/>
+    <path d="M14 22 L12 26 L20 26 L18 22 Z" fill="#ff8800"/>
+    <line x1="8" y1="15" x2="24" y2="15" stroke="#ffcc66" stroke-width="1"/>
+  ` },
+  gold_mage_leggings_icon: { content: `
+    <defs><linearGradient id="gmLG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ff8800"/><stop offset="100%" stop-color="#cc2200"/></linearGradient></defs>
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="#aa1100"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="url(#gmLG)"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="url(#gmLG)"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="#ffcc66" stroke-width="1"/>
+  ` },
+  gold_mage_boots_icon: { content: `
+    <defs><linearGradient id="gmBG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ff8800"/><stop offset="100%" stop-color="#cc2200"/></linearGradient></defs>
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="url(#gmBG)"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="url(#gmBG)"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="#aa1100"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="#aa1100"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="#ffcc66" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="#ffcc66" stroke-width="1"/>
+  ` },
+
+  // 銀装剣闘士: 銀色 + 騎士型ヘルメット
+  silver_gladiator_chestplate_icon: { content: `
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="#c0c0c0"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="#909090"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="#d8d8d8"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="#d8d8d8"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="#909090" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="#909090" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="22" x2="23" y2="22" stroke="#909090" stroke-width="1" opacity="0.4"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="#f0f0f0" stroke-width="1"/>
+  ` },
+  silver_gladiator_helmet_icon: { content: `
+    <path d="M8 18 Q8 9 16 7 Q24 9 24 18 L22 19 Q22 12 16 10 Q10 12 10 19 Z" fill="#c0c0c0"/>
+    <path d="M7 18 L25 18 L24 22 L8 22 Z" fill="#909090"/>
+    <path d="M14 22 L12 26 L20 26 L18 22 Z" fill="#c0c0c0"/>
+    <line x1="8" y1="15" x2="24" y2="15" stroke="#f0f0f0" stroke-width="1"/>
+  ` },
+  silver_gladiator_leggings_icon: { content: `
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="#909090"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="#c0c0c0"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="#c0c0c0"/>
+    <line x1="9" y1="14" x2="15" y2="14" stroke="#909090" stroke-width="1.5" opacity="0.5"/>
+    <line x1="17" y1="14" x2="23" y2="14" stroke="#909090" stroke-width="1.5" opacity="0.5"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="#f0f0f0" stroke-width="1"/>
+  ` },
+  silver_gladiator_boots_icon: { content: `
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="#c0c0c0"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="#c0c0c0"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="#909090"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="#909090"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="#f0f0f0" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="#f0f0f0" stroke-width="1"/>
+  ` },
+
+  // マナセージ G1/G2: 水色
+  mana_sage_chestplate: { content: `
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="#44ccee"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="#229999"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="#66ddff"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="#66ddff"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="#229999" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="#229999" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="22" x2="23" y2="22" stroke="#229999" stroke-width="1" opacity="0.4"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="#aaf0ff" stroke-width="1"/>
+  ` },
+  mana_sage_helmet: { content: `
+    <path d="M8 20 Q8 10 16 8 Q24 10 24 20 L22 20 Q22 14 16 12 Q10 14 10 20 Z" fill="#44ccee"/>
+    <path d="M8 20 L24 20 L23 24 L9 24 Z" fill="#229999"/>
+    <rect x="12" y="20" width="8" height="4" rx="1" fill="#66ddff"/>
+    <path d="M11 12 Q12 10 16 10 Q20 10 21 12" fill="none" stroke="#aaf0ff" stroke-width="1.5"/>
+  ` },
+  mana_sage_leggings: { content: `
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="#229999"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="#44ccee"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="#44ccee"/>
+    <line x1="9" y1="14" x2="15" y2="14" stroke="#229999" stroke-width="1.5" opacity="0.5"/>
+    <line x1="17" y1="14" x2="23" y2="14" stroke="#229999" stroke-width="1.5" opacity="0.5"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="#aaf0ff" stroke-width="1"/>
+  ` },
+  mana_sage_boots: { content: `
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="#44ccee"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="#44ccee"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="#229999"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="#229999"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="#aaf0ff" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="#aaf0ff" stroke-width="1"/>
+  ` },
+
+  // ブルー装備: ターコイズブルー
+  blue_armor_helmet: { content: `
+    <path d="M8 20 Q8 10 16 8 Q24 10 24 20 L22 20 Q22 14 16 12 Q10 14 10 20 Z" fill="#00bcd4"/>
+    <path d="M8 20 L24 20 L23 24 L9 24 Z" fill="#0097a7"/>
+    <rect x="12" y="20" width="8" height="4" rx="1" fill="#00bcd4"/>
+    <path d="M11 12 Q12 10 16 10 Q20 10 21 12" fill="none" stroke="#80deea" stroke-width="1.5"/>
+  ` },
+
+  // パープル装備: 紫
+  purple_armor_helmet: { content: `
+    <path d="M8 20 Q8 10 16 8 Q24 10 24 20 L22 20 Q22 14 16 12 Q10 14 10 20 Z" fill="#9c27b0"/>
+    <path d="M8 20 L24 20 L23 24 L9 24 Z" fill="#6a1b9a"/>
+    <rect x="12" y="20" width="8" height="4" rx="1" fill="#9c27b0"/>
+    <path d="M11 12 Q12 10 16 10 Q20 10 21 12" fill="none" stroke="#ce93d8" stroke-width="1.5"/>
+  ` },
+
+  // マシン装備: 光沢のある白
+  machine_armor_helmet: { content: `
+    <defs><linearGradient id="machG" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ffffff"/><stop offset="50%" stop-color="#dddddd"/><stop offset="100%" stop-color="#bbbbbb"/></linearGradient></defs>
+    <path d="M8 20 Q8 10 16 8 Q24 10 24 20 L22 20 Q22 14 16 12 Q10 14 10 20 Z" fill="url(#machG)"/>
+    <path d="M8 20 L24 20 L23 24 L9 24 Z" fill="#aaaaaa"/>
+    <rect x="12" y="20" width="8" height="4" rx="1" fill="#e0e0e0"/>
+    <path d="M11 12 Q12 10 16 10 Q20 10 21 12" fill="none" stroke="white" stroke-width="1.5"/>
+    <circle cx="16" cy="10" r="2" fill="white" opacity="0.8"/>
+  ` },
+
+  // デスアーマー: アンティーク（茶色）
+  death_armor_helmet_icon: { content: `
+    <path d="M8 20 Q8 10 16 8 Q24 10 24 20 L22 20 Q22 14 16 12 Q10 14 10 20 Z" fill="#7d5a3c"/>
+    <path d="M8 20 L24 20 L23 24 L9 24 Z" fill="#5a3e28"/>
+    <rect x="12" y="20" width="8" height="4" rx="1" fill="#8b6347"/>
+    <path d="M11 12 Q12 10 16 10 Q20 10 21 12" fill="none" stroke="#c4956a" stroke-width="1.5"/>
+    <circle cx="12" cy="16" r="1.5" fill="#c4956a" opacity="0.7"/>
+    <circle cx="20" cy="16" r="1.5" fill="#c4956a" opacity="0.7"/>
+  ` },
+
+  // トレントアーマー: 緑色 + 原木頭
+  trent_armor_helmet: { content: `
+    <rect x="6" y="6" width="20" height="16" rx="2" fill="#8b5e3c"/>
+    <rect x="8" y="6" width="16" height="4" fill="#5d4037"/>
+    <rect x="8" y="18" width="16" height="4" fill="#5d4037"/>
+    <line x1="6" y1="10" x2="26" y2="10" stroke="#5d4037" stroke-width="1"/>
+    <line x1="6" y1="14" x2="26" y2="14" stroke="#5d4037" stroke-width="1"/>
+    <line x1="6" y1="18" x2="26" y2="18" stroke="#5d4037" stroke-width="1"/>
+    <line x1="12" y1="6" x2="12" y2="22" stroke="#5d4037" stroke-width="1"/>
+    <line x1="18" y1="6" x2="18" y2="22" stroke="#5d4037" stroke-width="1"/>
+    <path d="M8 22 L24 22 L22 26 L10 26 Z" fill="#5d4037"/>
+  ` },
+  trent_armor_chestplate: { content: `
+    <path d="M11 7 L21 7 L23 9 L23 25 L9 25 L9 9 Z" fill="#2e7d32"/>
+    <path d="M11 7 L21 7 L23 9 L23 13 L9 13 L9 9 Z" fill="#1b5e20"/>
+    <path d="M9 9 L13 7 L13 5 L11 5 Z" fill="#388e3c"/>
+    <path d="M23 9 L19 7 L19 5 L21 5 Z" fill="#388e3c"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="#1b5e20" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="18" x2="23" y2="18" stroke="#1b5e20" stroke-width="1" opacity="0.5"/>
+    <line x1="9" y1="22" x2="23" y2="22" stroke="#1b5e20" stroke-width="1" opacity="0.4"/>
+    <path d="M11 9 Q16 8 21 9" fill="none" stroke="#81c784" stroke-width="1"/>
+  ` },
+  trent_armor_leggings: { content: `
+    <rect x="9" y="6" width="14" height="5" rx="1" fill="#1b5e20"/>
+    <rect x="9" y="10" width="6" height="16" rx="1" fill="#2e7d32"/>
+    <rect x="17" y="10" width="6" height="16" rx="1" fill="#2e7d32"/>
+    <line x1="9" y1="14" x2="15" y2="14" stroke="#1b5e20" stroke-width="1.5" opacity="0.5"/>
+    <line x1="17" y1="14" x2="23" y2="14" stroke="#1b5e20" stroke-width="1.5" opacity="0.5"/>
+    <path d="M9 8 Q16 7 23 8" fill="none" stroke="#81c784" stroke-width="1"/>
+  ` },
+  trent_armor_boots: { content: `
+    <rect x="8" y="9" width="6" height="13" rx="1" fill="#2e7d32"/>
+    <rect x="18" y="9" width="6" height="13" rx="1" fill="#2e7d32"/>
+    <rect x="7" y="20" width="9" height="4" rx="1" fill="#1b5e20"/>
+    <rect x="17" y="20" width="9" height="4" rx="1" fill="#1b5e20"/>
+    <path d="M8 11 Q11 10 14 11" fill="none" stroke="#81c784" stroke-width="1"/>
+    <path d="M18 11 Q21 10 24 11" fill="none" stroke="#81c784" stroke-width="1"/>
+  ` },
+
   bow_arrow: { content: `
     <path d="M8 6 Q14 12 14 16 Q14 20 8 26" fill="none" stroke="${C.wood}" stroke-width="3" stroke-linecap="round"/>
     <line x1="8" y1="6" x2="8" y2="26" stroke="${C.wood}" stroke-width="1" stroke-dasharray="2 2"/>
