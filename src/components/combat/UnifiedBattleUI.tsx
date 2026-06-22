@@ -5,6 +5,7 @@
 
 // react import is used for JSX and React.ReactNode in props type
 import type React from 'react';
+import { useState } from 'react';
 
 // ────────────────────────────────────────────
 // 共通型定義
@@ -119,6 +120,8 @@ export function UnifiedBattleUI({
 }: UnifiedBattleUIProps) {
   const hpPct = playerMaxHp > 0 ? (playerHp / playerMaxHp) * 100 : 0;
   const isResult = result !== null;
+  // 戦闘ログの高さ可変（デフォルト220px、拡大時400px）
+  const [logExpanded, setLogExpanded] = useState(false);
 
   // 攻撃ボタンラベル（外部から上書き可能）
   const resolvedAttackLabel = attackLabel ?? '⚔️ 攻撃';
@@ -259,12 +262,29 @@ export function UnifiedBattleUI({
         </div>
 
         {/* ──── 戦闘ログ ──── */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 2 }}>
+          <button
+            onClick={() => setLogExpanded(v => !v)}
+            style={{
+              background: 'none',
+              border: '1px solid #2d3752',
+              borderRadius: 4,
+              color: '#7a82aa',
+              cursor: 'pointer',
+              padding: '1px 8px',
+              fontSize: '0.65rem',
+            }}
+          >
+            {logExpanded ? '⤡ ログを縮小' : '⤢ ログを拡大'}
+          </button>
+        </div>
         <div
           style={{
             background: '#0e1220',
             borderRadius: 6,
             padding: '6px 8px',
-            height: 160,
+            height: logExpanded ? 400 : 220,
+            transition: 'height 0.2s',
             overflowY: 'auto',
             marginBottom: 10,
             fontSize: '0.75rem',
