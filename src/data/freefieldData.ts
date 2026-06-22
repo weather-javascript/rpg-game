@@ -915,18 +915,16 @@ export const FF2_WORLD: FreeFieldWorld = {
   id: 'ff2',
   name: 'ff2',
   displayName: 'FF2',
-  description: 'フリーフィールド2。(データ準備中)',
+  description: 'フリーフィールド2。チェイテダンジョンへの入口がある。',
   areaIds: ['ff2_start'],
-  notes: 'TODO: FF2 エリア・ノードを追加する。FFGG ⑧ FF2エリアから遷移する想定。',
 };
 
 export const FF2_AREAS: Record<string, FreeFieldArea> = {
   ff2_start: {
     id: 'ff2_start',
     name: 'ff2_start',
-    displayName: '開始エリア',
-    nodeIds: ['ff2_node_entrance'],
-    notes: 'TODO: FF2 ノードを追加する。',
+    displayName: 'チェイテ前広場',
+    nodeIds: ['ff2_node_entrance', 'ff2_node_chaite'],
   },
 };
 
@@ -937,9 +935,26 @@ export const FF2_NODES: Record<string, FreeFieldNode> = {
     displayName: 'FF2 入口',
     type: 'entrance',
     areaId: 'ff2_start',
-    position: { x: 0.5, y: 0.5 },
-    connections: [],
-    notes: 'TODO: FF2 マップ実装時に差し替える。FFGG ⑧ から接続される想定。',
+    position: { x: 0.15, y: 0.5 },
+    connections: ['ff2_node_chaite'],
+  },
+  ff2_node_chaite: {
+    id: 'ff2_node_chaite',
+    name: 'chaite_gate',
+    displayName: 'チェイテ城門',
+    type: 'boss',
+    areaId: 'ff2_start',
+    position: { x: 0.6, y: 0.5 },
+    connections: ['ff2_node_entrance'],
+    description: '第999代将軍徳川義和公が治める難攻不落の城塞。通常攻撃はほぼ通らない——貫通武器を用意せよ。',
+    actions: [
+      {
+        type: 'battleTrigger',
+        label: 'チェイテに突入',
+        description: '9階層・最終ボス「徳川義和公」を目指す。物理はほぼ無効。貫通ダメージ必須。',
+        systemTargetId: 'chaite',
+      },
+    ],
   },
 };
 
