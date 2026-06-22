@@ -247,9 +247,10 @@ function spawnEnemies(dungeon: DungeonMaster, areaIdx: number, _kxPhase?: number
   // ボスのみプールから除外（中ボスは含めたままにする）
   const nonBossPool = pool.filter(id => !getMergedMonster(id)?.isBoss);
   const finalPool = nonBossPool.length > 0 ? nonBossPool : pool;
-  // 同時出現数の上限：火山は群れ・複数中ボス同時出現を前提にした難度のため引き上げる
-  const maxEnemies = dungeon.id === 'sky_castle_ex' ? 15 : dungeon.id === 'volcano' ? 6 : 3;
-  const count = Math.min(finalPool.length, randomIntRange(1, maxEnemies));
+  // 同時出現数の上限：火山は群れ・複数中ボス同時出現を前提にした難度のため引き上げる。チェイテは敵量3倍仕様。
+  const maxEnemies = dungeon.id === 'sky_castle_ex' ? 15 : dungeon.id === 'volcano' ? 6 : dungeon.id === 'chaite' ? 9 : 3;
+  const minEnemies = dungeon.id === 'chaite' ? 3 : 1;
+  const count = Math.min(finalPool.length, randomIntRange(minEnemies, maxEnemies));
   // ランダムにcount体選ぶ（重複可）
   const result: EnemyState[] = [];
   for (let i = 0; i < count; i++) {
@@ -403,6 +404,8 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
 
   const dungeon = { ...DUNGEON_MASTER[runState.dungeonId], areas: _dungeonOverrideCache[runState.dungeonId]?.areas ?? DUNGEON_MASTER[runState.dungeonId]?.areas };
   const combatLv = player.skillLevels['combat'] ?? 1;
+  // 戦闘ログの高さ可変（デフォルト220px、拡大時400px）
+  const [logExpanded, setLogExpanded] = useState(false);
 
   // 初期敵グループ生成
   const [battle, setBattle] = useState<TurnBattleState>(() => {
@@ -2327,14 +2330,22 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       {/* ログ */}
       {(() => {
         return (
-          <div
-            style={{ background: '#0e1220', borderRadius: 6, padding: '6px 8px', height: 160, overflowY: 'auto', marginBottom: 10, fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: 1 }}
-            ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}
-          >
-            {battle.log.map((l, i) => (
-              <div key={i} style={{ color: l.color, padding: '1px 0', lineHeight: 1.4 }}>{l.text}</div>
-            ))}
-          </div>
+          <>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 2 }}>
+              <button onClick={() => setLogExpanded(v => !v)}
+                style={{ background: 'none', border: '1px solid #2d3752', borderRadius: 4, color: '#7a82aa', cursor: 'pointer', padding: '1px 8px', fontSize: '0.65rem' }}>
+                {logExpanded ? '⤡ ログを縮小' : '⤢ ログを拡大'}
+              </button>
+            </div>
+            <div
+              style={{ background: '#0e1220', borderRadius: 6, padding: '6px 8px', height: logExpanded ? 400 : 220, transition: 'height 0.2s', overflowY: 'auto', marginBottom: 10, fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: 1 }}
+              ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}
+            >
+              {battle.log.map((l, i) => (
+                <div key={i} style={{ color: l.color, padding: '1px 0', lineHeight: 1.4 }}>{l.text}</div>
+              ))}
+            </div>
+          </>
         );
       })()}
 
@@ -2455,6 +2466,29 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
 // ============================================================
 // 解放条件バッジ
 // ============================================================
+// ダンジョンの推奨装備ヒントを判定（複数敵が多いか、ボスが高防御か等のヒューリスティック）
+function getEquipmentHint(dungeon: DungeonMaster): string | null {
+  const areas = dungeon.areas ?? dungeon.routes?.main;
+  if (!areas || areas.length === 0) return null;
+  let totalCount = 0, areaCount = 0, bossDefPct = 0;
+  for (const area of areas) {
+    if (!area.monsters || area.monsters.length === 0) continue;
+    totalCount += area.monsters.reduce((s, m) => s + (m.count ?? 1), 0);
+    areaCount++;
+    for (const m of area.monsters) {
+      if (m.isBoss) {
+        const mm = MONSTER_MASTER[m.monsterId];
+        if (mm?.defensePct) bossDefPct = Math.max(bossDefPct, mm.defensePct);
+      }
+    }
+  }
+  const avgPerArea = areaCount > 0 ? totalCount / areaCount : 0;
+  if (avgPerArea >= 3) return '👥 範囲武器が有効（多数の敵が同時出現）';
+  if (bossDefPct >= 0.5) return '🛡️ 貫通武器がおすすめ（ボスは高防御）';
+  if (dungeon.tier === 'volcano' || dungeon.tier === 'extreme') return '⚔️ 火力・防御を両立した装備で挑もう';
+  return null;
+}
+
 function UnlockBadge({ dungeon, clearedCount }: { dungeon: DungeonMaster; clearedCount: number }) {
   const uc = (dungeon as any).unlockCondition as { dungeonId: string; clearedCount: number } | undefined;
   if (!uc) return <span style={{ fontSize: '0.7rem', color: '#4caf87' }}>🔓 最初から解放</span>;
@@ -2482,9 +2516,9 @@ function UnlockBadge({ dungeon, clearedCount }: { dungeon: DungeonMaster; cleare
 // ============================================================
 // ダンジョン選択カード
 // ============================================================
-function DungeonCard({ dungeon, selected, onSelect, playerLevel, clearedCount, isUnlocked }: {
+function DungeonCard({ dungeon, selected, onSelect, playerLevel, clearedCount, isUnlocked, isRecommended }: {
   dungeon: DungeonMaster; selected: boolean; onSelect: () => void;
-  playerLevel: number; clearedCount: number; isUnlocked: boolean;
+  playerLevel: number; clearedCount: number; isUnlocked: boolean; isRecommended?: boolean;
 }) {
   const meetsLevel = playerLevel >= dungeon.requiredLevel;
   const canSelect = isUnlocked;
@@ -2494,15 +2528,17 @@ function DungeonCard({ dungeon, selected, onSelect, playerLevel, clearedCount, i
   };
   const color = tierColors[dungeon.tier] ?? '#5b8dee';
   const uc = (dungeon as any).unlockCondition as { dungeonId: string; clearedCount: number } | undefined;
+  const equipmentHint = getEquipmentHint(dungeon);
   return (
     <button onClick={() => canSelect && onSelect()}
       style={{
         display: 'flex', flexDirection: 'column', gap: 4,
         background: selected ? 'rgba(91,141,238,0.15)' : '#1c2235',
-        border: `2px solid ${selected ? color : meetsLevel && isUnlocked ? '#2d3752' : canSelect ? 'rgba(240,168,48,0.3)' : '#1c2235'}`,
+        border: `2px solid ${selected ? color : isRecommended && canSelect ? '#f0c060' : meetsLevel && isUnlocked ? '#2d3752' : canSelect ? 'rgba(240,168,48,0.3)' : '#1c2235'}`,
         borderRadius: 10, padding: '10px 14px', textAlign: 'left',
         color: '#e8e6ff', cursor: canSelect ? 'pointer' : 'not-allowed',
         opacity: canSelect ? 1 : 0.6, transition: 'all 0.2s', width: '100%',
+        boxShadow: isRecommended && canSelect && !selected ? '0 0 0 1px rgba(240,192,96,0.4)' : 'none',
       }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ fontSize: '1.8rem' }}><GameIcon id={dungeon.icon} size={36} /></span>
@@ -2510,6 +2546,7 @@ function DungeonCard({ dungeon, selected, onSelect, playerLevel, clearedCount, i
           <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 6 }}>
             {dungeon.name}
             {!isUnlocked && <span>🔒</span>}
+            {isRecommended && canSelect && <span style={{ fontSize: '0.65rem', color: '#1c2235', background: '#f0c060', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>🌟 おすすめ</span>}
             {!meetsLevel && isUnlocked && <span style={{ fontSize: '0.7rem', color: '#e05555', background: 'rgba(224,85,85,0.15)', padding: '1px 5px', borderRadius: 4 }}>戦闘Lv不足</span>}
           </div>
           <div style={{ fontSize: '0.72rem', color: '#8a92b2', marginTop: 2 }}>{dungeon.description}</div>
@@ -2519,6 +2556,7 @@ function DungeonCard({ dungeon, selected, onSelect, playerLevel, clearedCount, i
             <span style={{ color: '#f0c060' }}>EXP×{dungeon.expBonus} G×{dungeon.goldBonus}</span>
             {clearedCount > 0 && <span style={{ color: '#4caf87' }}>✓ {clearedCount}回クリア</span>}
           </div>
+          {equipmentHint && <div style={{ fontSize: '0.68rem', color: '#7fb3ff', marginTop: 3 }}>{equipmentHint}</div>}
         </div>
       </div>
       <UnlockBadge dungeon={dungeon} clearedCount={uc ? (useGameStore.getState().player?.dungeonClearedCount?.[uc.dungeonId] ?? 0) : 0} />
@@ -2950,6 +2988,20 @@ export function DungeonScreen() {
   const HIDDEN_DUNGEON_IDS = ['devil_armor_fight', 'dead_armor_fight', 'sky_castle_ex', 'dragons_lair', 'ff_forest', 'ff_plain', 'ff_desert', 'ff_snow', 'ff_savanna', 'ff_pirate', 'chaite'];
   const dungeons = Object.values(DUNGEON_MASTER).filter(d => !HIDDEN_DUNGEON_IDS.includes(d.id));
   const lockedDungeons = dungeons.filter(d => !isDungeonUnlocked(d.id));
+
+  // 戦闘Lvに最適な「おすすめ」ダンジョンを判定（解放済み＆Lv要件を満たす中で最も要求Lvが高いもの＝今の実力に最適）
+  const recommendedDungeonId = (() => {
+    const combatLvNow = player.skillLevels['combat'] ?? 1;
+    const unlockedDungeons = dungeons.filter(d => isDungeonUnlocked(d.id));
+    const eligible = unlockedDungeons.filter(d => combatLvNow >= d.requiredLevel);
+    if (eligible.length > 0) {
+      return eligible.reduce((best, d) => d.requiredLevel > best.requiredLevel ? d : best).id;
+    }
+    if (unlockedDungeons.length > 0) {
+      return unlockedDungeons.reduce((best, d) => d.requiredLevel < best.requiredLevel ? d : best).id;
+    }
+    return null;
+  })();
 
   const startDungeon = useCallback(() => {
     if (!player || !selectedId) return;
@@ -3398,7 +3450,8 @@ export function DungeonScreen() {
                 onSelect={() => setSelectedId(d.id)}
                 playerLevel={player.skillLevels['combat'] ?? 1}
                 clearedCount={player.dungeonClearedCount?.[d.id] ?? 0}
-                isUnlocked={isDungeonUnlocked(d.id)} />
+                isUnlocked={isDungeonUnlocked(d.id)}
+                isRecommended={d.id === recommendedDungeonId} />
             ))}
           </div>
           {selectedId && (() => {
@@ -3446,6 +3499,25 @@ export function DungeonScreen() {
               <div style={{ textAlign: 'center' }}><div style={{ color: '#8a92b2' }}>獲得EXP</div><div style={{ color: '#5b8dee', fontWeight: 700 }}>{runState.totalExp}</div></div>
               <div style={{ textAlign: 'center' }}><div style={{ color: '#8a92b2' }}>獲得G</div><div style={{ color: '#f0c060', fontWeight: 700 }}>{runState.totalGold}</div></div>
             </div>
+            {/* 総ドロップ一覧（このダンジョンで入手したアイテムを集計表示） */}
+            {runState.totalDrops.length > 0 && (
+              <div style={{ marginBottom: 8, paddingTop: 8, borderTop: '1px solid #2d3752' }}>
+                <div style={{ fontSize: '0.7rem', color: '#8a92b2', marginBottom: 4 }}>💎 総ドロップ一覧</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {runState.totalDrops.map(d => {
+                    const item = ITEM_MASTER[d.itemId];
+                    if (!item) return null;
+                    const rarity = item.rarity;
+                    const dcolor = rarity === 'legendary' ? '#ffd700' : rarity === 'epic' ? '#c97aff' : rarity === 'rare' ? '#5b8dee' : '#70c090';
+                    return (
+                      <span key={d.itemId} style={{ fontSize: '0.72rem', padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: `1px solid ${dcolor}`, color: dcolor, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <GameIcon id={item.icon} size={14} />{item.name} ×{d.amount}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {/* HP・満腹バー */}
             <div style={{ display: 'flex', gap: 8 }}>
               <div style={{ flex: 1 }}>
