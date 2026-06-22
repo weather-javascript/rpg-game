@@ -1448,7 +1448,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       setBattle(b => ({ ...b, enemies: newEnemies, log: [...b.log, ...logEntries], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, weaponMana: 0, ultimateReady: false }));
       return;
     }
-    setBattle(afterUlt);
+    setBattle(b => ({ ...b, enemies: newEnemies, log: [...b.log, ...logEntries], turn: 'monster', isDefending: false, weaponMana: 0, ultimateReady: false, poisonBuff: newPoisonBuff, poisonDmg: newPoisonDmg, buffs: newBuffsAfterUlt }));
     setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
   };
 
@@ -2991,7 +2991,7 @@ export function DungeonScreen() {
 
   // 戦闘Lvに最適な「おすすめ」ダンジョンを判定（解放済み＆Lv要件を満たす中で最も要求Lvが高いもの＝今の実力に最適）
   const recommendedDungeonId = (() => {
-    const combatLvNow = player.skillLevels['combat'] ?? 1;
+    const combatLvNow = player?.skillLevels['combat'] ?? 1;
     const unlockedDungeons = dungeons.filter(d => isDungeonUnlocked(d.id));
     const eligible = unlockedDungeons.filter(d => combatLvNow >= d.requiredLevel);
     if (eligible.length > 0) {
