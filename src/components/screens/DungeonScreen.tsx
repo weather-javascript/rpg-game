@@ -543,6 +543,22 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
   // 生存敵リスト（未使用だが将来用に保持）
   void battle.enemies.filter(e => e.hp > 0);
 
+  // ドロップアイテムをバトルログエントリに変換するヘルパー
+  const buildDropLogEntries = (drops: { itemId: string; amount: number }[]): { text: string; color: string }[] => {
+    if (drops.length === 0) return [];
+    const entries: { text: string; color: string }[] = [];
+    entries.push({ text: '💎 ドロップアイテム', color: '#7a82aa' });
+    for (const d of drops) {
+      const item = ITEM_MASTER[d.itemId];
+      if (!item) continue;
+      const rarity = item.rarity;
+      const color = rarity === 'legendary' ? '#ffd700' : rarity === 'epic' ? '#c97aff' : rarity === 'rare' ? '#5b8dee' : '#70c090';
+      const prefix = rarity === 'legendary' ? '🌟' : rarity === 'epic' ? '✨' : rarity === 'rare' ? '💠' : '▸';
+      entries.push({ text: `${prefix} ${item.name} × ${d.amount}`, color });
+    }
+    return entries;
+  };
+
   // 勝利チェック＆ドロップ計算
   const calcWinRewards = (enemies: EnemyState[]) => {
     let totalExp = 0, totalGold = 0;
@@ -776,6 +792,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       if (!newBattle.kx) {
         const { exp, gold, drops } = calcWinRewards(newBattle.enemies);
         newLog.push({ text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' });
+        newLog.push(...buildDropLogEntries(drops));
         return { ...newBattle, log: newLog, turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, isDefending: false };
       }
     }
@@ -1110,7 +1127,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     const alive = newEnemies.filter(e => e.hp > 0);
     if (alive.length === 0) {
       const { exp, gold, drops } = calcWinRewards(newEnemies);
-      setBattle(b => ({ ...b, enemies: newEnemies, log: [...newLog, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, pendingAction: null }));
+      setBattle(b => ({ ...b, enemies: newEnemies, log: [...newLog, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }, ...buildDropLogEntries(drops)], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, pendingAction: null }));
       return;
     }
     const after: TurnBattleState = { ...battle, enemies: newEnemies, log: newLog, turn: 'monster', isDefending: false, pendingAction: null };
@@ -1283,7 +1300,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     const alive = newEnemies.filter(e => e.hp > 0);
     if (alive.length === 0) {
       const { exp, gold, drops } = calcWinRewards(newEnemies);
-      setBattle(b => ({ ...b, enemies: newEnemies, log: [...newLog, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, pendingAction: null, pendingMultiCast: null, weaponMana: finalMana, itemCooldowns: newCooldowns }));
+      setBattle(b => ({ ...b, enemies: newEnemies, log: [...newLog, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }, ...buildDropLogEntries(drops)], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, pendingAction: null, pendingMultiCast: null, weaponMana: finalMana, itemCooldowns: newCooldowns }));
       return;
     }
     setBattle(b => ({ ...b, enemies: newEnemies, log: newLog, turn: 'monster', isDefending: false, pendingAction: null, pendingMultiCast: null, weaponMana: finalMana, itemCooldowns: newCooldowns, enemyStunTurns: newEnemyStunTurns }));
@@ -1424,10 +1441,10 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     if (alive.length === 0) {
       const { exp, gold, drops } = calcWinRewards(newEnemies);
       logEntries.push({ text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' });
+      logEntries.push(...buildDropLogEntries(drops));
       setBattle(b => ({ ...b, enemies: newEnemies, log: [...b.log, ...logEntries], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, weaponMana: 0, ultimateReady: false }));
       return;
     }
-    const afterUlt: TurnBattleState = { ...battle, enemies: newEnemies, log: [...battle.log, ...logEntries], turn: 'monster', isDefending: false, weaponMana: 0, ultimateReady: false, poisonBuff: newPoisonBuff, poisonDmg: newPoisonDmg, buffs: newBuffsAfterUlt };
     setBattle(afterUlt);
     setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
   };
@@ -1569,7 +1586,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
             const alive = newEnemies.filter(e => e.hp > 0);
             if (alive.length === 0) {
               const { exp, gold, drops } = calcWinRewards(newEnemies);
-              return { ...prev, enemies: newEnemies, log: [...prev.log, ...logEntries, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, equippedWeaponId: itemId };
+              return { ...prev, enemies: newEnemies, log: [...prev.log, ...logEntries, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }, ...buildDropLogEntries(drops)], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, equippedWeaponId: itemId };
             }
             return { ...prev, enemies: newEnemies, log: [...prev.log, ...logEntries], turn: 'monster', isDefending: false, equippedWeaponId: itemId,
               enemyStunTurns: stunIdx >= 0 ? { ...prev.enemyStunTurns, [stunIdx]: stunSkill!.stunTurns } : prev.enemyStunTurns,
@@ -1674,7 +1691,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
               const alive = prev.enemies.filter(e => e.hp > 0);
               if (alive.length === 0) {
                 const { exp, gold, drops } = calcWinRewards(prev.enemies);
-                return { ...prev, log: [...manaLog, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, weaponMana: finalMana, itemCooldowns: newCooldowns5 };
+                return { ...prev, log: [...manaLog, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }, ...buildDropLogEntries(drops)], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, weaponMana: finalMana, itemCooldowns: newCooldowns5 };
               }
               return { ...prev, log: manaLog, turn: 'monster', isDefending: false, weaponMana: finalMana, itemCooldowns: newCooldowns5 };
             });
@@ -1939,6 +1956,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           if (aliveAfter.length === 0) {
             const { exp, gold, drops } = calcWinRewards(newEnemies);
             logEntries.push({ text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' });
+            logEntries.push(...buildDropLogEntries(drops));
             return { ...newBattle, enemies: newEnemies, log: [...prev.log, ...logEntries], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops };
           }
           return { ...newBattle, enemies: newEnemies, log: [...prev.log, ...logEntries], turn: 'monster', isDefending: false };
@@ -2068,6 +2086,21 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     if (!battle.result) return;
     if (battle.result === 'win') {
       onManaUpdate?.(0);
+      // レアドロップ（epic/legendary）をナチュラルニュースに投稿
+      for (const d of battle.drops) {
+        const item = ITEM_MASTER[d.itemId];
+        if (!item) continue;
+        if (item.rarity === 'epic' || item.rarity === 'legendary') {
+          const prefix = item.rarity === 'legendary' ? '🌟' : '✨';
+          const color = item.rarity === 'legendary' ? '#ffd700' : '#c97aff';
+          postActivityFeed({
+            uid: player.uid, displayName: player.displayName,
+            type: 'dungeon_clear',
+            message: `がダンジョンで${prefix}【${item.name}】を入手した！`,
+            color,
+          }).catch(() => {});
+        }
+      }
       if (kxConfig) {
         kxConfig.onVictory(battle.kx?.isAwakened ?? false);
       } else {
@@ -2125,7 +2158,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
                   const alive = newEnemies.filter(e => e.hp > 0);
                   if (alive.length === 0) {
                     const { exp, gold, drops } = calcWinRewards(newEnemies);
-                    return { ...prev, enemies: newEnemies, log: [...prev.log, ...logEntries, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, equippedWeaponId: pending.itemId! };
+                    return { ...prev, enemies: newEnemies, log: [...prev.log, ...logEntries, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }, ...buildDropLogEntries(drops)], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, equippedWeaponId: pending.itemId! };
                   }
                   return { ...prev, enemies: newEnemies, log: [...prev.log, ...logEntries], turn: 'monster', isDefending: false, equippedWeaponId: pending.itemId! };
                 });
@@ -2148,7 +2181,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
                   const alive = newEnemies.filter(e => e.hp > 0);
                   if (alive.length === 0) {
                     const { exp, gold, drops } = calcWinRewards(newEnemies);
-                    return { ...prev, enemies: newEnemies, log: [...prev.log, ...logEntries, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, equippedWeaponId: pending.itemId! };
+                    return { ...prev, enemies: newEnemies, log: [...prev.log, ...logEntries, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }, ...buildDropLogEntries(drops)], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, equippedWeaponId: pending.itemId! };
                   }
                   const after: TurnBattleState = { ...prev, enemies: newEnemies, log: [...prev.log, ...logEntries], turn: 'monster', isDefending: false, equippedWeaponId: pending.itemId! };
                   return after;
