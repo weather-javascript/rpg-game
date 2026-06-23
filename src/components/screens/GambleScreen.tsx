@@ -24,7 +24,7 @@ import {
   STOCK_ID_LIST, getMarketStatus, MARKET_OPEN_HOUR, MARKET_CLOSE_HOUR,
 } from '../../services/multiplayer';
 import type { TreasureProbEntry, GambleRankingEntry, StockRankingEntry } from '../../services/multiplayer';
-import type { GambleResult, GambleMaster, PokerTable, BattleHistoryEntry as _BH, StockId, StockHolding, StockPricePoint, StockTrendData } from '../../types/game';
+import type { GambleResult, GambleMaster, PokerTable, BattleHistoryEntry as _BH, StockId, StockSector, StockHolding, StockPricePoint, StockTrendData } from '../../types/game';
 import type { PokerState } from '../../systems/minigames';
 import type { GambleBattle } from '../../types/game';
 
@@ -3675,7 +3675,7 @@ function ExchangePanel() {
 // ============================================================
 // 株式市場パネル（Wealth Exchange）
 // ============================================================
-const SECTOR_LABEL: Record<import('../../types/game').StockSector, string> = {
+const SECTOR_LABEL: Record<StockSector, string> = {
   tech: 'テック', industry: '工業', finance: '金融', consumer: '消費財', entertainment: '娯楽', energy: 'エネルギー',
 };
 
