@@ -93,6 +93,7 @@ function ensureDefaults(player: PlayerData): PlayerData {
     lifetimeStats: player.lifetimeStats ?? { totalDamageDealt: 0, totalGoldEarned: 0, maxCombo: 0, monstersDefeated: 0 },
     unlockedAchievements: player.unlockedAchievements ?? [],
     totalWagered: player.totalWagered ?? 0,
+    stockSplitLedger: player.stockSplitLedger ?? {},
     offlineMining: player.offlineMining ?? { enabled: false, category: 'mining', startedAt: 0, lastSettledAt: 0 },
     missionProgress: player.missionProgress ?? {
       dailySlotPlays:0, dailyChohanWins:0, dailyChinchiroWins:0, dailyCoinFlipWins:0,
