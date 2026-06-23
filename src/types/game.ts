@@ -396,6 +396,8 @@ export interface ItemMaster {
   defenseMultiplier?: number; // 装備時、合計防御力に乗算される倍率（ホットバー所持で発動）
   armorToughness?: number;  // 防具強度（ダメージ軽減計算に使用）
   epf?: number;             // 装備時EPF（ダメージ軽減Ⅱ等によるダメージ軽減ポイント）
+  armorAtkBonus?: number;   // 装備時攻撃力ボーナス（武器使用時に armorAtkBonus*0.5 の追加ダメージ）
+  blastResist?: number;     // 爆破耐性（爆発スキルからのダメージを減らす%）
   moveSpeedPct?: number;    // 装備時移動速度変化（%、負の値で低下）
   // 武器スキル（複数可）
   weaponSkills?: WeaponSkill[];
