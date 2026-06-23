@@ -16,7 +16,6 @@ import { AdminScreen }     from './components/screens/AdminScreen';
 import { CraftingScreen }   from './components/screens/CraftingScreen';
 import { NaviScreen }       from './components/screens/NaviScreen';
 import { AquariumScreen }  from './components/screens/AquariumScreen';
-import { FreeFieldScreen } from './components/screens/FreeFieldScreen';
 import { subscribeSoldNotifications, markSoldNotificationRead, subscribeMaintenanceStatus, setPlayerActivity, subscribeTabMaintenance } from './services/multiplayer';
 import type { TabMaintenanceConfig } from './services/multiplayer';
 import type { PlayerActivityCode } from './services/multiplayer';
@@ -31,7 +30,6 @@ const TAB_TO_ACTIVITY: Partial<Record<string, PlayerActivityCode>> = {
   status:    'home',
   navi:      'home',
   dungeon:   'other',
-  freefield: 'other',
 };
 import { onSnapshot, doc } from 'firebase/firestore';
 import { db } from './services/firebase';
@@ -42,7 +40,6 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
   { id:'gathering', label:'採取',     icon:'pickaxe' },
   { id:'fishing',   label:'釣り',     icon:'fishing_rod' },
   { id:'aquarium',  label:'水族館',   icon:'fishing_rod' },
-  { id:'freefield', label:'FF',       icon:'compass' },
   { id:'crafting',  label:'製作',     icon:'hammer' },
   { id:'market',    label:'市場',     icon:'market' },
   { id:'dungeon',   label:'ダンジョン', icon:'swords' },
@@ -562,7 +559,7 @@ function MaintenanceScreen({ startedAt, estimatedMinutes, message, uid, displayN
 const TAB_LABELS: Record<string, string> = {
   gathering: '採取', fishing: '釣り', crafting: '製作',
   market: '市場', dungeon: 'ダンジョン', gamble: 'ギャンブル',
-  online: 'オンライン', navi: '冒険ナビ', freefield: 'フリーフィールド',
+  online: 'オンライン', navi: '冒険ナビ',
 };
 function TabMaintenanceScreen({ tab, entry }: { tab: string; entry: { message?: string; startedAt?: number; estimatedMinutes?: number } }) {
   const startedAt = entry.startedAt ?? Date.now();
@@ -940,7 +937,6 @@ function ActiveScreen({ tab }: { tab: TabId }) {
     case 'gathering': return <GatheringScreen />;
     case 'fishing':   return <FishingScreen />;
     case 'aquarium':  return <AquariumScreen />;
-    case 'freefield': return <FreeFieldScreen />;
     case 'crafting':  return <CraftingScreen />;
     case 'market':    return <MarketScreen />;
     case 'dungeon':   return <DungeonScreen />;
@@ -963,6 +959,7 @@ export default function App() {
   const addNotification = useGameStore(s => s.addNotification);
   const changeGold = useGameStore(s => s.changeGold);
   const applyPassiveRegen = useGameStore(s => s.applyPassiveRegen);
+  const settleOfflineMining = useGameStore(s => s.settleOfflineMining);
 
   const addItems = useGameStore(s => s.addItems);
 
@@ -1033,6 +1030,16 @@ export default function App() {
       applyPassiveRegen();
     }, 5000);
     return () => clearInterval(interval);
+  }, [player?.uid]);
+
+  // 採掘委任（オフライン採掘）: ログイン時に加え、一定間隔でも経過分を精算する
+  useEffect(() => {
+    if (!player) return;
+    settleOfflineMining();
+    const miningInterval = setInterval(() => {
+      settleOfflineMining();
+    }, 60000);
+    return () => clearInterval(miningInterval);
   }, [player?.uid]);
 
   // 売却通知の購読
