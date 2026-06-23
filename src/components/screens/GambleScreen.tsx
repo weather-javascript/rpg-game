@@ -24,7 +24,7 @@ import {
   STOCK_ID_LIST, getMarketStatus, MARKET_OPEN_HOUR, MARKET_CLOSE_HOUR,
 } from '../../services/multiplayer';
 import type { TreasureProbEntry, GambleRankingEntry, StockRankingEntry } from '../../services/multiplayer';
-import type { GambleResult, GambleMaster, PokerTable, BattleHistoryEntry as _BH, StockId, StockHolding, StockPricePoint, StockTrendData, StockMarketStats } from '../../types/game';
+import type { GambleResult, GambleMaster, PokerTable, BattleHistoryEntry as _BH, StockId, StockSector, StockHolding, StockPricePoint, StockTrendData, StockMarketStats } from '../../types/game';
 import type { PokerState } from '../../systems/minigames';
 import type { GambleBattle } from '../../types/game';
 
@@ -3697,6 +3697,7 @@ function StockMarketPanel() {
   const [buyAmt, setBuyAmt] = useState(1);
   const [stockRanking, setStockRanking] = useState<StockRankingEntry[]>([]);
   const [rankTab, setRankTab] = useState<'profit' | 'assets'>('profit');
+  const [marketRankTab, setMarketRankTab] = useState<'mcap' | 'unitHigh' | 'unitLow' | 'gainers' | 'losers' | 'volume'>('mcap');
   const [stockView, setStockView] = useState<'overview' | 'market' | 'detail' | 'portfolio' | 'analysis' | 'ranking'>('overview');
   const [chartMode, setChartMode] = useState<'line' | 'candle'>('line');
   const [chartFrame, setChartFrame] = useState<'1m' | '5m' | '15m' | '1h' | '1d'>('15m');
@@ -3874,7 +3875,7 @@ function StockMarketPanel() {
     });
   }, [prices, history, marketStats, clockNow]);
 
-  const marketRanking = useMemo(() => {
+  const marketRanking = useMemo<MarketRankRow[]>(() => {
     const list = [...marketRankRows];
     switch (marketRankTab) {
       case 'mcap':
@@ -3894,7 +3895,6 @@ function StockMarketPanel() {
     }
   }, [marketRankRows, marketRankTab]);
 
-  };
 
   const handleBuy = () => {
     if (!player) return;
@@ -5160,4 +5160,5 @@ export function GambleScreen() {
       </div>
     </div>
   );
+}
 }
