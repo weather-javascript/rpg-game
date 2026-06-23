@@ -107,6 +107,13 @@ interface TurnBattleState {
   pendingMultiCast: { itemId: string; remaining: number; selectedIds: string[] } | null;
   // 敵インデックス→残りスタンターン数（Amethyst Storeakなど複数ターンスタン用）
   enemyStunTurns: Record<number, number>;
+  // ===== チェイテ専用バフ・デバフ =====
+  chaiteBleedTurns: number;
+  chaiteBleedDmg: number;
+  chaiteDefDownTurns: number;
+  chaiteSlowTurns: number;
+  chaiteEnragedIdx: number;
+  chaiteIronWallIdx: number;
 }
 
 // KXボス戦専用状態
@@ -454,6 +461,12 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       goliathStunnedEnemyIdx: -1,
       pendingMultiCast: null,
       enemyStunTurns: {},
+      chaiteBleedTurns: 0,
+      chaiteBleedDmg: 0,
+      chaiteDefDownTurns: 0,
+      chaiteSlowTurns: 0,
+      chaiteEnragedIdx: -1,
+      chaiteIronWallIdx: -1,
     };
   });
 
@@ -776,6 +789,21 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       }
     }
 
+    // ===== チェイテ出血ダメージ tick =====
+    if (newBattle.chaiteBleedTurns > 0) {
+      const bleedDmg = newBattle.chaiteBleedDmg;
+      changeHp(-bleedDmg);
+      const newBleedTurns = newBattle.chaiteBleedTurns - 1;
+      newBattle = { ...newBattle, chaiteBleedTurns: newBleedTurns, chaiteBleedDmg: newBleedTurns > 0 ? bleedDmg : 0 };
+      newLog.push({ text: `🩸 出血ダメージ！あなたに${bleedDmg}ダメージ！（残${newBleedTurns}ターン）`, color: '#c62828' });
+    }
+    // ===== チェイテ防御低下 tick =====
+    if (newBattle.chaiteDefDownTurns > 0) {
+      const newDefDownTurns = newBattle.chaiteDefDownTurns - 1;
+      newBattle = { ...newBattle, chaiteDefDownTurns: newDefDownTurns };
+      if (newDefDownTurns === 0) newLog.push({ text: `💔 防御低下が解除された！`, color: '#9b6df0' });
+    }
+
     // 後方互換：poisonBuff（旧来の直接変数も処理）
     if (newBattle.poisonBuff > 0) {
       newBattle.enemies = newBattle.enemies.map(e =>
@@ -951,6 +979,174 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         continue;
       }
 
+      // ===== チェイテ専用スキル処理 =====
+      const isChaiteMonster = ['chaite_silver_gladiator','chaite_gold_gladiator','chaite_black_knight','chaite_gold_mage','chaite_hero_knight','chaite_black_gladiator','chaite_nightmare'].includes(monster.id);
+      if (isChaiteMonster) {
+        // 防御低下デバフ: 被ダメ+30%
+        const defDownMult = newBattle.chaiteDefDownTurns > 0 ? 1.3 : 1.0;
+        // 鈍足: このターン攻撃不可（鈍足解除後に通常攻撃へ）
+        if (newBattle.chaiteSlowTurns > 0) {
+          newBattle = { ...newBattle, chaiteSlowTurns: newBattle.chaiteSlowTurns - 1 };
+          newLog.push({ text: `🐢 鈍足でプレイヤーは行動が遅れた！（残${newBattle.chaiteSlowTurns}ターン）`, color: '#9b6df0' });
+          continue;
+        }
+        // 鉄壁: 被ダメ50%軽減（1ターン、黒装騎士）
+        if (newBattle.chaiteIronWallIdx >= 0 && enemyIdx === newBattle.chaiteIronWallIdx) {
+          newBattle = { ...newBattle, chaiteIronWallIdx: -1 };
+          newLog.push({ text: `🛡️ ${monster.name}は鉄壁の構えで攻撃を受け止めた！プレイヤーの攻撃を50%軽減！`, color: '#00bcd4' });
+          // 鉄壁は「このターン被ダメ50%軽減」なので敵ターンには攻撃してくる
+        }
+        // 戦意高揚: HP50%以下で攻撃力1.5倍（英雄騎士・暗黒騎士）
+        const enragedMult = (newBattle.chaiteEnragedIdx === enemyIdx) ? 1.5 : 1.0;
+        // HP50%以下になったら戦意高揚発動
+        if (['chaite_hero_knight','chaite_nightmare'].includes(monster.id)) {
+          const enemyHpPct = enemy.hp / enemy.maxHp;
+          if (enemyHpPct <= 0.5 && newBattle.chaiteEnragedIdx !== enemyIdx) {
+            newBattle = { ...newBattle, chaiteEnragedIdx: enemyIdx };
+            newLog.push({ text: `💢 ${monster.name}の戦意が高揚した！攻撃力が1.5倍になった！`, color: '#ff6b00' });
+          }
+        }
+        // スキル抽選
+        const skillRoll = secureRandom();
+        // 銀装剣闘士: 30%で連撃2回
+        if (monster.id === 'chaite_silver_gladiator' && skillRoll < 0.30) {
+          let totalDmg = 0;
+          let died = false;
+          for (let hit = 0; hit < 2; hit++) {
+            const raw = Math.floor(realAtk * (0.6 + secureRandom() * 0.2));
+            const dmg = Math.max(1, Math.round(getArmorReducedDamage(raw) * defDownMult * enragedMult));
+            const fd = hpCapActive ? 0 : (newBattle.isDefending ? Math.floor(dmg * 0.5) : dmg);
+            changeHp(-fd); totalDmg += fd;
+            if (player.stats.hp - fd <= 0) { died = true; break; }
+          }
+          newLog.push({ text: `⚔️⚔️ ${monster.name}の【連撃】！2連続攻撃 合計${totalDmg}ダメージ！`, color: '#e05555' });
+          if (died) return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
+          continue;
+        }
+        // 金装剣闘士: 25%で突進斬り(1.8倍単体)、25%で連撃3回
+        if (monster.id === 'chaite_gold_gladiator') {
+          if (skillRoll < 0.25) {
+            const raw = Math.floor(realAtk * 1.8);
+            const dmg = Math.max(1, Math.round(getArmorReducedDamage(raw) * defDownMult * enragedMult));
+            const fd = hpCapActive ? 0 : (newBattle.isDefending ? Math.floor(dmg * 0.5) : dmg);
+            changeHp(-fd);
+            newLog.push({ text: `🏃 ${monster.name}の【突進斬り】！${fd}ダメージ！`, color: '#ff4444' });
+            if (player.stats.hp - fd <= 0) return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
+            continue;
+          } else if (skillRoll < 0.50) {
+            let totalDmg = 0; let died = false;
+            for (let hit = 0; hit < 3; hit++) {
+              const raw = Math.floor(realAtk * (0.5 + secureRandom() * 0.2));
+              const dmg = Math.max(1, Math.round(getArmorReducedDamage(raw) * defDownMult * enragedMult));
+              const fd = hpCapActive ? 0 : (newBattle.isDefending ? Math.floor(dmg * 0.5) : dmg);
+              changeHp(-fd); totalDmg += fd;
+              if (player.stats.hp - fd <= 0) { died = true; break; }
+            }
+            newLog.push({ text: `⚔️⚔️⚔️ ${monster.name}の【3連撃】！合計${totalDmg}ダメージ！`, color: '#e05555' });
+            if (died) return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
+            continue;
+          }
+        }
+        // 黒装騎士: 30%で鉄壁（次ターン被ダメ50%軽減）、30%で反撃準備
+        if (monster.id === 'chaite_black_knight' && skillRoll < 0.30) {
+          newBattle = { ...newBattle, chaiteIronWallIdx: enemyIdx };
+          newLog.push({ text: `🛡️ ${monster.name}が【鉄壁】の構えを取った！次の攻撃を50%軽減する！`, color: '#00bcd4' });
+          // 鉄壁発動ターンは通常攻撃も行う（fall through）
+        }
+        // 金装魔導士: 30%で鈍足(2T)、25%で防御低下(3T)、20%で魔弾(防具無効+epfのみ軽減)
+        if (monster.id === 'chaite_gold_mage') {
+          if (skillRoll < 0.30) {
+            newBattle = { ...newBattle, chaiteSlowTurns: 2 };
+            newLog.push({ text: `🐢 ${monster.name}の【鈍足】！プレイヤーは2ターン行動が遅くなった！`, color: '#9b6df0' });
+            continue;
+          } else if (skillRoll < 0.55) {
+            newBattle = { ...newBattle, chaiteDefDownTurns: 3 };
+            newLog.push({ text: `💔 ${monster.name}の【防御低下】！プレイヤーの被ダメージが3ターン+30%に！`, color: '#e040fb' });
+            // 防御低下発動ターンは魔弾も打つ（fall through）
+          } else if (skillRoll < 0.75) {
+            // 魔弾: EPFのみ軽減（防具の通常減少を無視）
+            const armorSlots = [localEquip.helmet, localEquip.chestplate, localEquip.leggings, localEquip.boots, ...(localEquip.hotbar.filter(id => id && ITEM_MASTER[id]?.isOffhand) as string[])];
+            const totalEpf = armorSlots.reduce((sum, id) => sum + (ITEM_MASTER[id ?? '']?.epf ?? 0), 0);
+            const cappedEpf = Math.min(20, totalEpf);
+            const rawMagic = realAtk;
+            const magicDmg = Math.max(1, Math.round(rawMagic * (1 - cappedEpf / 25) * defDownMult));
+            const fd = hpCapActive ? 0 : (newBattle.isDefending ? Math.floor(magicDmg * 0.7) : magicDmg);
+            changeHp(-fd);
+            newLog.push({ text: `✨ ${monster.name}の【魔弾】！防具を貫通する魔法攻撃${fd}ダメージ！(耐性のみ有効)`, color: '#ab47bc' });
+            if (player.stats.hp - fd <= 0) return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
+            continue;
+          }
+        }
+        // 黒装剣闘士: 35%で出血(3T,毎ターン実atk*0.15)、30%で高速斬撃(4回)
+        if (monster.id === 'chaite_black_gladiator') {
+          if (skillRoll < 0.35) {
+            const bleedDmg = Math.max(1, Math.floor(realAtk * 0.15));
+            newBattle = { ...newBattle, chaiteBleedTurns: 3, chaiteBleedDmg: bleedDmg };
+            newLog.push({ text: `🩸 ${monster.name}の【出血斬り】！プレイヤーは出血状態！3ターン毎ターン${bleedDmg}ダメージ！`, color: '#c62828' });
+            // 出血発動ターンも通常攻撃（fall through）
+          } else if (skillRoll < 0.65) {
+            let totalDmg = 0; let died = false;
+            for (let hit = 0; hit < 4; hit++) {
+              const raw = Math.floor(realAtk * (0.35 + secureRandom() * 0.15));
+              const dmg = Math.max(1, Math.round(getArmorReducedDamage(raw) * defDownMult * enragedMult));
+              const fd = hpCapActive ? 0 : (newBattle.isDefending ? Math.floor(dmg * 0.5) : dmg);
+              changeHp(-fd); totalDmg += fd;
+              if (player.stats.hp - fd <= 0) { died = true; break; }
+            }
+            newLog.push({ text: `⚡ ${monster.name}の【高速斬撃】！4連続攻撃 合計${totalDmg}ダメージ！`, color: '#e05555' });
+            if (died) return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
+            continue;
+          }
+        }
+        // 英雄騎士: 25%でパリィ警告、20%でカウンター準備
+        if (monster.id === 'chaite_hero_knight' && skillRoll < 0.25) {
+          // パリィ: 被ダメ40%カットして通常攻撃
+          const raw = Math.floor(realAtk * (1.0 + secureRandom() * 0.3) * enragedMult);
+          const dmg = Math.max(1, Math.round(getArmorReducedDamage(raw) * defDownMult));
+          const fd = hpCapActive ? 0 : (newBattle.isDefending ? Math.floor(dmg * 0.5) : dmg);
+          changeHp(-fd);
+          newLog.push({ text: `🗡️ ${monster.name}の【カウンター】！${fd}ダメージ！（戦意高揚: ${enragedMult > 1 ? 'ON' : 'OFF'}）`, color: '#ff8a65' });
+          if (player.stats.hp - fd <= 0) return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
+          continue;
+        }
+        // 暗黒騎士: 30%でナイトメアブレード(2倍ダメ+出血)、20%で暴走時3連撃
+        if (monster.id === 'chaite_nightmare') {
+          const nightmareEnraged = enemy.hp / enemy.maxHp <= 0.3;
+          if (skillRoll < 0.30) {
+            const raw = Math.floor(realAtk * 2.0 * enragedMult);
+            const dmg = Math.max(1, Math.round(getArmorReducedDamage(raw) * defDownMult));
+            const fd = hpCapActive ? 0 : (newBattle.isDefending ? Math.floor(dmg * 0.5) : dmg);
+            const bleedDmg2 = Math.max(1, Math.floor(realAtk * 0.2));
+            newBattle = { ...newBattle, chaiteBleedTurns: 2, chaiteBleedDmg: bleedDmg2 };
+            changeHp(-fd);
+            newLog.push({ text: `💀 ${monster.name}の【ナイトメアブレード】！${fd}ダメージ＋出血2ターン！`, color: '#7b1fa2' });
+            if (player.stats.hp - fd <= 0) return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
+            continue;
+          }
+          if (nightmareEnraged && skillRoll < 0.55) {
+            let totalDmg = 0; let died = false;
+            for (let hit = 0; hit < 3; hit++) {
+              const raw = Math.floor(realAtk * (0.7 + secureRandom() * 0.3) * 1.5);
+              const dmg = Math.max(1, Math.round(getArmorReducedDamage(raw) * defDownMult));
+              const fd = hpCapActive ? 0 : (newBattle.isDefending ? Math.floor(dmg * 0.5) : dmg);
+              changeHp(-fd); totalDmg += fd;
+              if (player.stats.hp - fd <= 0) { died = true; break; }
+            }
+            newLog.push({ text: `🌑 ${monster.name}の【暴走・3連斬】！HP30%以下で発動！合計${totalDmg}ダメージ！`, color: '#880e4f' });
+            if (died) return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
+            continue;
+          }
+        }
+        // チェイテ通常攻撃（スキル未発動 or fall-through）
+        const chRaw = Math.floor(realAtk * (0.85 + secureRandom() * 0.3) * enragedMult);
+        const chDmg = Math.max(1, Math.round(getArmorReducedDamage(chRaw) * defDownMult));
+        const chFd = hpCapActive ? 0 : (newBattle.isDefending ? Math.floor(chDmg * 0.5) : chDmg);
+        changeHp(-chFd);
+        newLog.push({ text: `⚔️ ${monster.name}の攻撃！あなたに${chFd}ダメージ${newBattle.chaiteDefDownTurns > 0 ? '（防御低下中）' : ''}${newBattle.isDefending ? '（防御中）' : ''}`, color: '#e05555' });
+        if (player.stats.hp - chFd <= 0) return { ...newBattle, log: [...newLog, { text: '💀 あなたは倒れた...', color: '#e05555' }], turn: 'result', result: 'lose', isDefending: false };
+        continue;
+      }
+
       const isSpecial = monster.isBoss && randomChance(0.2);
       let mDmg = isSpecial
         ? Math.floor(getArmorReducedDamage(realAtk) * 1.5)
@@ -993,6 +1189,11 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     const isArea = !!weaponItem?.isAreaWeapon;
     const areaPen = weaponItem?.areaPenetrate ?? 0;
     const weaponMsg = weaponItem ? weaponItem.name : '素手';
+    // パルヴァトス装備の攻撃力ボーナス（armorAtkBonus×0.5 追加ダメージ）
+    const armorSlotIds = [localEquip.helmet, localEquip.chestplate, localEquip.leggings, localEquip.boots];
+    const offhandArmorId = localEquip.offhand;
+    const totalArmorAtkBonus = [...armorSlotIds, offhandArmorId].reduce((sum, id) => sum + (ITEM_MASTER[id ?? '']?.armorAtkBonus ?? 0), 0);
+    const armorAtkExtraDmg = Math.floor(totalArmorAtkBonus * 0.5);
 
     // =冷海の覇魚=: 攻撃時凍傷ダメージ（自分） / 使用時15%で貫通300
     const frostbiteSkill = weaponItem?.weaponSkills?.find(s => s.type === 'frostbite_self_damage') as import('../../types/game').WeaponFrostbiteSelfDamageSkill | undefined;
@@ -1013,7 +1214,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       if (e.hp <= 0) return e;
       if (!isArea && i !== targetIdx) return e;
       const mon = getMergedMonster(e.monsterId);
-      const dmg = (areaPen > 0 ? areaPen : applyDefensePct(calcDamage(atkBase, mon?.defense ?? 0), mon)) + reitoumaguroPenetrateDmg;
+      const dmg = (areaPen > 0 ? areaPen : applyDefensePct(calcDamage(atkBase, mon?.defense ?? 0), mon)) + reitoumaguroPenetrateDmg + armorAtkExtraDmg;
       fxHits.push({ idx: i, damage: dmg, isCritical: reitoumaguroPenetrateDmg > 0 });
       return { ...e, hp: Math.max(0, e.hp - dmg) };
     });
@@ -2390,6 +2591,40 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
                   </button>
                 )}
               </div>
+            );
+          })()}
+
+          {/* パルヴァトス一式スキル：マナ回復 */}
+          {(() => {
+            const armorIds = [localEquip.helmet, localEquip.chestplate, localEquip.leggings, localEquip.boots, localEquip.offhand];
+            const parvatosCount = armorIds.filter(id => id && ['parvatos_helmet','parvatos_chest','parvatos_leggings','parvatos_boots','parvatos_offhand'].includes(id)).length;
+            const hasFullSet = parvatosCount >= 5;
+            const canActivate = hasFullSet && battle.weaponMana <= 800 && battle.turn === 'player' && !battle.result;
+            if (parvatosCount === 0) return null;
+            return (
+              <button
+                disabled={!canActivate}
+                onClick={() => {
+                  if (!canActivate) return;
+                  const newMana = Math.min(800, battle.weaponManaMax);
+                  setBattle(b => ({
+                    ...b,
+                    weaponMana: newMana,
+                    ultimateReady: newMana >= b.weaponManaMax,
+                    log: [...b.log, { text: `⚙️ パルヴァトス【マナ回復】発動！MANAを800まで回復した！(${newMana}/${b.weaponManaMax})`, color: '#00e5ff' }],
+                    turn: 'monster',
+                  }));
+                  setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+                }}
+                style={{
+                  width: '100%', padding: '7px', marginBottom: 8,
+                  background: canActivate ? 'linear-gradient(135deg,#006064,#00838f)' : '#1c2235',
+                  color: canActivate ? '#e0f7fa' : '#4a5070',
+                  border: `1px solid ${canActivate ? '#00e5ff' : '#2d3752'}`,
+                  borderRadius: 8, cursor: canActivate ? 'pointer' : 'not-allowed', fontWeight: 700, fontSize: '0.8rem',
+                }}>
+                ⚙️ パルヴァトス【マナ回復】{!hasFullSet ? `（一式装備で解放 ${parvatosCount}/5）` : battle.weaponMana > 800 ? `（MANA≤800で発動可）` : ''}
+              </button>
             );
           })()}
 
