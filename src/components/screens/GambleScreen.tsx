@@ -24,7 +24,7 @@ import {
   STOCK_ID_LIST, getMarketStatus, MARKET_OPEN_HOUR, MARKET_CLOSE_HOUR,
 } from '../../services/multiplayer';
 import type { TreasureProbEntry, GambleRankingEntry, StockRankingEntry } from '../../services/multiplayer';
-import type { GambleResult, GambleMaster, PokerTable, BattleHistoryEntry as _BH, StockId, StockSector, StockHolding, StockPricePoint, StockTrendData } from '../../types/game';
+import type { GambleResult, GambleMaster, PokerTable, BattleHistoryEntry as _BH, StockId, StockHolding, StockPricePoint, StockTrendData, StockMarketStats } from '../../types/game';
 import type { PokerState } from '../../systems/minigames';
 import type { GambleBattle } from '../../types/game';
 
@@ -3675,7 +3675,7 @@ function ExchangePanel() {
 // ============================================================
 // 株式市場パネル（Wealth Exchange）
 // ============================================================
-const SECTOR_LABEL: Record<StockSector, string> = {
+const SECTOR_LABEL: Record<import('../../types/game').StockSector, string> = {
   tech: 'テック', industry: '工業', finance: '金融', consumer: '消費財', entertainment: '娯楽', energy: 'エネルギー',
 };
 
@@ -3691,6 +3691,7 @@ function StockMarketPanel() {
   });
   const [history, setHistory] = useState<Record<StockId, StockPricePoint[]>>({} as Record<StockId, StockPricePoint[]>);
   const [trends, setTrends] = useState<Record<StockId, StockTrendData>>({} as Record<StockId, StockTrendData>);
+  const [marketStats, setMarketStats] = useState<Record<StockId, StockMarketStats>>({} as Record<StockId, StockMarketStats>);
   const [news, setNews] = useState<string[]>([]);
   const [selectedStock, setSelectedStock] = useState<StockId>('wealth_mining');
   const [buyAmt, setBuyAmt] = useState(1);
@@ -3698,6 +3699,7 @@ function StockMarketPanel() {
   const [rankTab, setRankTab] = useState<'profit' | 'assets'>('profit');
   const [stockView, setStockView] = useState<'overview' | 'market' | 'detail' | 'portfolio' | 'analysis' | 'ranking'>('overview');
   const [chartMode, setChartMode] = useState<'line' | 'candle'>('line');
+  const [chartFrame, setChartFrame] = useState<'1m' | '5m' | '15m' | '1h' | '1d'>('15m');
   const [_prevPrices, setPrevPrices] = useState<Record<StockId, number>>({} as Record<StockId, number>);
   const [clockNow, setClockNow] = useState(Date.now());
 
@@ -3707,7 +3709,7 @@ function StockMarketPanel() {
   }, []);
 
   useEffect(() => {
-    const unsub = subscribeStockPrices((p, h, t) => {
+    const unsub = subscribeStockPrices((p, h, t, s, splitEvents) => {
       setPrevPrices(prev => {
         const updated = { ...prev };
         for (const id of STOCK_ID_LIST) if (!updated[id]) updated[id] = STOCK_MASTERS[id].basePrice;
@@ -3718,6 +3720,39 @@ function StockMarketPanel() {
       setPrices(initPrices);
       setHistory({ ...h });
       setTrends({ ...t });
+      setMarketStats({ ...s });
+
+      if (splitEvents.length > 0) {
+        const latest = useGameStore.getState().player;
+        if (latest) {
+          const ledger = { ...(latest.stockSplitLedger ?? {}) };
+          const newHoldings = { ...(latest.stockHoldings ?? {}) };
+          let changed = false;
+          for (const ev of splitEvents) {
+            if (ledger[ev.stockId] === ev.timestamp) continue;
+            ledger[ev.stockId] = ev.timestamp;
+            changed = true;
+            const holding = newHoldings[ev.stockId];
+            if (holding && holding.amount > 0) {
+              newHoldings[ev.stockId] = {
+                ...holding,
+                amount: holding.amount * ev.ratio,
+                avgBuyPrice: Math.max(1, Math.round(holding.avgBuyPrice / ev.ratio)),
+              };
+              useGameStore.getState().addNotification('info', `📦 ${STOCK_MASTERS[ev.stockId].name} が 1:${ev.ratio} 分割されました`);
+            }
+          }
+          if (changed) {
+            useGameStore.setState({
+              player: {
+                ...latest,
+                stockHoldings: newHoldings,
+                stockSplitLedger: ledger,
+              },
+            });
+          }
+        }
+      }
     });
     return unsub;
   }, []);
@@ -3763,97 +3798,103 @@ function StockMarketPanel() {
     return t.haltedAt >= todayStart.getTime();
   };
 
-  type PortfolioRow = {
+  const CHART_TIMEFRAMES: Record<'1m' | '5m' | '15m' | '1h' | '1d', { label: string; ms: number }> = {
+    '1m': { label: '1分足', ms: 60_000 },
+    '5m': { label: '5分足', ms: 5 * 60_000 },
+    '15m': { label: '15分足', ms: 15 * 60_000 },
+    '1h': { label: '1時間足', ms: 60 * 60_000 },
+    '1d': { label: '日足', ms: 24 * 60 * 60_000 },
+  };
+
+  const aggregateChartHistory = (points: StockPricePoint[]): StockPricePoint[] => {
+    const bucketMs = CHART_TIMEFRAMES[chartFrame].ms;
+    if (points.length === 0) return [];
+    const buckets = new Map<number, StockPricePoint>();
+    for (const point of points) {
+      const bucketKey = Math.floor(point.timestamp / bucketMs);
+      const existing = buckets.get(bucketKey);
+      if (!existing) {
+        buckets.set(bucketKey, {
+          ...point,
+          open: point.open ?? point.price,
+          high: point.high ?? point.price,
+          low: point.low ?? point.price,
+          close: point.close ?? point.price,
+          volume: point.volume ?? 0,
+        });
+        continue;
+      }
+      existing.high = Math.max(existing.high ?? existing.price, point.high ?? point.price);
+      existing.low = Math.min(existing.low ?? existing.price, point.low ?? point.price);
+      existing.close = point.close ?? point.price;
+      existing.price = point.price;
+      existing.volume = (existing.volume ?? 0) + (point.volume ?? 0);
+      if (point.news && !existing.news) existing.news = point.news;
+      existing.timestamp = point.timestamp;
+    }
+    return [...buckets.entries()].sort((a, b) => a[0] - b[0]).map(([, p]) => p);
+
+
+  type MarketRankRow = {
     id: StockId;
     name: string;
     icon: string;
     sector: StockSector;
-    amount: number;
-    avgBuyPrice: number;
-    currentPrice: number;
-    bonus: number;
-    totalValue: number;
-    baseCost: number;
-    profit: number;
-    profitRate: number;
-    dayChange: number;
-    dayChangeRate: number;
-    weight: number;
+    price: number;
+    prevClose: number;
+    changePct: number;
+    marketCap: number;
+    unitLotValue: number;
+    volume: number;
     halted: boolean;
   };
 
-  const portfolioRows = useMemo<PortfolioRow[]>(() => {
-    const rows: PortfolioRow[] = STOCK_ID_LIST
-      .filter((id) => (holdings[id]?.amount ?? 0) > 0)
-      .map((id) => {
-        const h = holdings[id];
-        const m = STOCK_MASTERS[id];
-        const currentPrice = getPrice(id);
-        const bonus = getHoldBonus(id);
-        const totalValue = Math.round(currentPrice * h.amount * (1 + bonus));
-        const baseCost = h.avgBuyPrice * h.amount;
-        const profit = totalValue - baseCost;
-        const profitRate = baseCost > 0 ? profit / baseCost : 0;
-        const hist = history[id] ?? [];
-        const prevPoint = hist.length >= 2 ? hist[hist.length - 2] : hist[hist.length - 1];
-        const prevClose = prevPoint ? (prevPoint.close ?? prevPoint.price) : currentPrice;
-        const dayChange = currentPrice - prevClose;
-        const dayChangeRate = prevClose > 0 ? dayChange / prevClose : 0;
-        return {
-          id,
-          name: m.name,
-          icon: m.icon,
-          sector: m.sector,
-          amount: h.amount,
-          avgBuyPrice: h.avgBuyPrice,
-          currentPrice,
-          bonus,
-          totalValue,
-          baseCost,
-          profit,
-          profitRate,
-          dayChange,
-          dayChangeRate,
-          weight: 0,
-          halted: isHalted(id),
-        };
-      })
-      .sort((a, b) => b.totalValue - a.totalValue);
+  const marketRankRows = useMemo<MarketRankRow[]>(() => {
+    return STOCK_ID_LIST.map((id) => {
+      const master = STOCK_MASTERS[id];
+      const price = getPrice(id);
+      const stats = marketStats[id];
+      const hist = history[id] ?? [];
+      const fallbackPrev = hist.length > 1 ? (hist[hist.length - 2].close ?? hist[hist.length - 2].price) : master.basePrice;
+      const prevClose = stats?.prevClose ?? fallbackPrev;
+      const changePct = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
+      return {
+        id,
+        name: master.name,
+        icon: master.icon,
+        sector: master.sector,
+        price,
+        prevClose,
+        changePct,
+        marketCap: Math.round(price * (master.sharesOutstanding ?? 0)),
+        unitLotValue: Math.round(price * 100),
+        volume: stats?.dayVolume ?? 0,
+        halted: isHalted(id),
+      };
+    });
+  }, [prices, history, marketStats, clockNow]);
 
-    const totalValue = rows.reduce((sum, row) => sum + row.totalValue, 0);
-    for (const row of rows) row.weight = totalValue > 0 ? row.totalValue / totalValue : 0;
-    return rows;
-  }, [holdings, prices, trends, history, clockNow]);
+  const marketRanking = useMemo(() => {
+    const list = [...marketRankRows];
+    switch (marketRankTab) {
+      case 'mcap':
+        return list.sort((a, b) => b.marketCap - a.marketCap).slice(0, 12);
+      case 'unitHigh':
+        return list.sort((a, b) => b.unitLotValue - a.unitLotValue).slice(0, 12);
+      case 'unitLow':
+        return list.sort((a, b) => a.unitLotValue - b.unitLotValue).slice(0, 12);
+      case 'gainers':
+        return list.sort((a, b) => b.changePct - a.changePct).slice(0, 12);
+      case 'losers':
+        return list.sort((a, b) => a.changePct - b.changePct).slice(0, 12);
+      case 'volume':
+        return list.sort((a, b) => b.volume - a.volume).slice(0, 12);
+      default:
+        return list;
+    }
+  }, [marketRankRows, marketRankTab]);
 
-  const portfolioSummary = useMemo(() => {
-    const totalValue = portfolioRows.reduce((sum, row) => sum + row.totalValue, 0);
-    const totalCost = portfolioRows.reduce((sum, row) => sum + row.baseCost, 0);
-    const totalProfit = totalValue - totalCost;
-    const totalProfitRate = totalCost > 0 ? totalProfit / totalCost : 0;
-    const totalShares = portfolioRows.reduce((sum, row) => sum + row.amount, 0);
-    const winningCount = portfolioRows.filter(row => row.profit >= 0).length;
-    const losingCount = portfolioRows.length - winningCount;
-    const sectorValue: Record<StockSector, number> = {
-      tech: 0, industry: 0, finance: 0, consumer: 0, entertainment: 0, energy: 0,
-    };
-    for (const row of portfolioRows) sectorValue[row.sector] += row.totalValue;
-    const topGain = portfolioRows.reduce<PortfolioRow | null>((best, row) => (!best || row.profit > best.profit ? row : best), null);
-    const topLoss = portfolioRows.reduce<PortfolioRow | null>((worst, row) => (!worst || row.profit < worst.profit ? row : worst), null);
-    const largest = portfolioRows[0] ?? null;
-    return {
-      totalValue,
-      totalCost,
-      totalProfit,
-      totalProfitRate,
-      totalShares,
-      winningCount,
-      losingCount,
-      sectorValue,
-      topGain,
-      topLoss,
-      largest,
-    };
-  }, [portfolioRows]);
+  };
 
   const handleBuy = () => {
     if (!player) return;
@@ -3908,7 +3949,7 @@ function StockMarketPanel() {
 
   // 折れ線グラフ
   const renderLineChart = (id: StockId, compact = false) => {
-    const hist = history[id] ?? [];
+    const hist = aggregateChartHistory(history[id] ?? []);
     const currentPrice = getPrice(id);
     const h = compact ? 50 : 120;
     if (hist.length < 2) return (
@@ -3917,19 +3958,19 @@ function StockMarketPanel() {
       </svg>
     );
     const pts = hist.slice(-60);
-    const allPrices = pts.map(p => p.price); allPrices.push(currentPrice);
+    const allPrices = pts.map(p => p.close ?? p.price); allPrices.push(currentPrice);
     const maxP = Math.max(...allPrices), minP = Math.min(...allPrices);
     const range = maxP - minP || maxP * 0.01;
     const pad = compact ? 4 : 8;
     const chartH = h - pad * 2;
     const w = 100 / Math.max(pts.length - 1, 1);
     const toY = (price: number) => (pad + ((maxP - price) / range) * chartH).toFixed(1);
-    const points = pts.map((p, i) => `${(i * w).toFixed(1)},${toY(p.price)}`).join(' ');
-    const isUp = pts[pts.length-1].price >= pts[0].price;
+    const points = pts.map((p, i) => `${(i * w).toFixed(1)},${toY(p.close ?? p.price)}`).join(' ');
+    const isUp = (pts[pts.length-1].close ?? pts[pts.length-1].price) >= (pts[0].open ?? pts[0].price);
     const lineColor = isUp ? '#4caf87' : '#e05555';
     const fillColor = isUp ? 'rgba(76,175,135,0.12)' : 'rgba(224,85,85,0.12)';
     const lastX = ((pts.length - 1) * w).toFixed(1);
-    const lastY = toY(pts[pts.length-1].price);
+    const lastY = toY(pts[pts.length-1].close ?? pts[pts.length-1].price);
     const fillPts = `0,${h} ` + points + ` ${lastX},${h}`;
     // バブル点を強調
     return (
@@ -3937,7 +3978,7 @@ function StockMarketPanel() {
         <polygon points={fillPts} fill={fillColor} />
         <polyline points={points} fill="none" stroke={lineColor} strokeWidth={compact ? '1.2' : '1.5'} vectorEffect="non-scaling-stroke" />
         {!compact && pts.map((p, i) => p.news && p.news.includes('バブル') ? (
-          <circle key={i} cx={(i * w).toFixed(1)} cy={toY(p.price)} r="3" fill="#f0c060" vectorEffect="non-scaling-stroke" />
+          <circle key={i} cx={(i * w).toFixed(1)} cy={toY(p.close ?? p.price)} r="3" fill="#f0c060" vectorEffect="non-scaling-stroke" />
         ) : null)}
         <circle cx={lastX} cy={lastY} r={compact ? '1.5' : '2'} fill={lineColor} vectorEffect="non-scaling-stroke" />
       </svg>
@@ -3946,7 +3987,7 @@ function StockMarketPanel() {
 
   // ローソク足チャート
   const renderCandleChart = (id: StockId) => {
-    const hist = history[id] ?? [];
+    const hist = aggregateChartHistory(history[id] ?? []);
     if (hist.length < 2) return <svg viewBox="0 0 100 120" style={{width:'100%',height:'100%'}}></svg>;
     const pts = hist.slice(-40);
     const allPrices = pts.flatMap(p => [p.open ?? p.price, p.high ?? p.price, p.low ?? p.price, p.close ?? p.price]);
@@ -3990,9 +4031,11 @@ function StockMarketPanel() {
   };
 
   const selectedHistory = history[selectedStock] ?? [];
+  const selectedChartHistory = useMemo(() => aggregateChartHistory(selectedHistory), [selectedHistory, chartFrame]);
   const selectedPrice = getPrice(selectedStock);
   const selectedMaster = STOCK_MASTERS[selectedStock];
   const selectedTrend = trends[selectedStock];
+  const selectedStats = marketStats[selectedStock];
 
   const TAB_STYLE = (active: boolean) => ({
     flex: 1, padding: '6px 2px', fontSize: '0.68rem', fontWeight: 700,
@@ -4124,6 +4167,53 @@ function StockMarketPanel() {
               {news.slice(0,5).map((n,i) => <div key={i} style={{fontSize:'0.7rem', color:'#8a92b2', padding:'1px 0'}}>{n}</div>)}
             </div>
           )}
+
+          <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'10px 12px', marginBottom:10}}>
+            <div style={{display:'flex', gap:4, flexWrap:'wrap', marginBottom:8}}>
+              {([
+                ['mcap', '時価総額'],
+                ['unitHigh', '単元株 高'],
+                ['unitLow', '単元株 安'],
+                ['gainers', '値上がり'],
+                ['losers', '値下がり'],
+                ['volume', '出来高'],
+              ] as const).map(([key, label]) => (
+                <button key={key} onClick={() => setMarketRankTab(key)}
+                  style={{padding:'4px 8px', fontSize:'0.68rem', fontWeight:700, background: marketRankTab===key ? 'rgba(91,141,238,0.25)' : '#161b26',
+                    border:`1px solid ${marketRankTab===key ? '#5b8dee' : '#2d3752'}`, color: marketRankTab===key ? '#e8e6ff' : '#8a92b2', borderRadius:5, cursor:'pointer'}}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div style={{display:'grid', gap:6}}>
+              {marketRanking.map((r, idx) => (
+                <div key={r.id} onClick={() => { setSelectedStock(r.id); setStockView('detail'); }}
+                  style={{display:'grid', gridTemplateColumns:'auto 1fr auto', gap:8, alignItems:'center', padding:'7px 8px', borderRadius:6, cursor:'pointer',
+                    background: r.halted ? 'rgba(60,20,20,0.7)' : '#161b26', border:`1px solid ${r.halted ? '#e05555' : '#2d3752'}`}}>
+                  <div style={{width:24, textAlign:'center', fontWeight:700, color:'#f0c060'}}>#{idx+1}</div>
+                  <div style={{minWidth:0}}>
+                    <div style={{display:'flex', alignItems:'center', gap:6, flexWrap:'wrap'}}>
+                      <span>{r.icon}</span>
+                      <span style={{fontSize:'0.76rem', fontWeight:600}}>{r.name}</span>
+                      <span style={{fontSize:'0.58rem', color:'#4a5070', border:'1px solid #2d3752', borderRadius:3, padding:'0 4px'}}>{SECTOR_LABEL[r.sector]}</span>
+                    </div>
+                    <div style={{fontSize:'0.66rem', color:'#8a92b2', marginTop:2}}>
+                      価格 {r.price.toLocaleString()}WC / 単元 {r.unitLotValue.toLocaleString()}WC / 出来高 {r.volume.toLocaleString()}
+                    </div>
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontSize:'0.82rem', fontWeight:700, color: r.changePct >= 0 ? '#4caf87' : '#e05555'}}>
+                      {r.changePct >= 0 ? '▲' : '▼'} {Math.abs(r.changePct).toFixed(2)}%
+                    </div>
+                    <div style={{fontSize:'0.66rem', color:'#8a92b2'}}>
+                      時価総額 {r.marketCap.toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div style={{marginBottom:10}}>
             {STOCK_ID_LIST.map(id => {
               const m = STOCK_MASTERS[id];
@@ -4198,7 +4288,7 @@ function StockMarketPanel() {
               <div style={{marginLeft:'auto', textAlign:'right'}}>
                 <div style={{fontSize:'1.3rem', fontWeight:700, color:'#e8e6ff'}}>{selectedPrice.toLocaleString()}<span style={{fontSize:'0.75rem', color:'#4a5070'}}>WC</span></div>
                 {(() => {
-                  const hist = selectedHistory; const prev = hist.length > 1 ? hist[hist.length-2].price : selectedMaster.basePrice;
+                  const prev = selectedStats?.prevClose ?? (selectedHistory.length > 1 ? selectedHistory[selectedHistory.length-2].price : selectedMaster.basePrice);
                   const chg = selectedPrice - prev; const chgPct = prev > 0 ? chg/prev*100 : 0;
                   return <div style={{fontSize:'0.8rem', color: chg >= 0 ? '#4caf87' : '#e05555'}}>{chg >= 0 ? '▲' : '▼'} {Math.abs(chg).toLocaleString()}WC ({Math.abs(chgPct).toFixed(2)}%)</div>;
                 })()}
@@ -4206,13 +4296,23 @@ function StockMarketPanel() {
             </div>
 
             {/* チャートトグル */}
-            <div style={{display:'flex', gap:6, marginBottom:6}}>
+            <div style={{display:'flex', gap:6, marginBottom:6, flexWrap:'wrap'}}>
               {(['line','candle'] as const).map(m => (
                 <button key={m} onClick={() => setChartMode(m)} style={{padding:'3px 10px', fontSize:'0.7rem', fontWeight:700,
                   background: chartMode===m ? 'rgba(240,192,96,0.2)' : '#161b26',
                   border:`1px solid ${chartMode===m ? '#f0c060' : '#2d3752'}`,
                   color: chartMode===m ? '#f0c060' : '#8a92b2', borderRadius:4, cursor:'pointer'}}>
                   {m === 'line' ? '📈 折れ線' : '🕯️ ローソク足'}
+                </button>
+              ))}
+            </div>
+            <div style={{display:'flex', gap:6, marginBottom:8, flexWrap:'wrap'}}>
+              {(Object.entries(CHART_TIMEFRAMES) as Array<[typeof chartFrame, { label: string; ms: number }]>).map(([key, meta]) => (
+                <button key={key} onClick={() => setChartFrame(key)} style={{padding:'3px 10px', fontSize:'0.68rem', fontWeight:700,
+                  background: chartFrame===key ? 'rgba(91,141,238,0.22)' : '#161b26',
+                  border:`1px solid ${chartFrame===key ? '#5b8dee' : '#2d3752'}`,
+                  color: chartFrame===key ? '#e8e6ff' : '#8a92b2', borderRadius:4, cursor:'pointer'}}>
+                  {meta.label}
                 </button>
               ))}
             </div>
@@ -4223,14 +4323,14 @@ function StockMarketPanel() {
             </div>
 
             {/* 価格レンジ */}
-            {selectedHistory.length > 1 && (() => {
-              const pts = selectedHistory.slice(-60);
-              const maxP = Math.max(...pts.map(p => p.price));
-              const minP = Math.min(...pts.map(p => p.price));
+            {selectedChartHistory.length > 1 && (() => {
+              const pts = selectedChartHistory.slice(-60);
+              const maxP = Math.max(...pts.map(p => p.high ?? p.close ?? p.price));
+              const minP = Math.min(...pts.map(p => p.low ?? p.close ?? p.price));
               return (
-                <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.65rem', color:'#4a5070', marginBottom:8}}>
+                <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.65rem', color:'#4a5070', marginBottom:8, gap:6, flexWrap:'wrap'}}>
                   <span>最安: {minP.toLocaleString()}WC</span>
-                  <span style={{color:'#f0c060'}}>基準: {selectedMaster.basePrice.toLocaleString()}WC</span>
+                  <span style={{color:'#f0c060'}}>前日終値: {(selectedStats?.prevClose ?? selectedMaster.basePrice).toLocaleString()}WC</span>
                   <span>最高: {maxP.toLocaleString()}WC</span>
                 </div>
               );
@@ -4269,6 +4369,58 @@ function StockMarketPanel() {
               </div>
             );
           })()}
+
+          {selectedStats && (
+            <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'12px 14px', marginBottom:8}}>
+              <div style={{fontWeight:700, fontSize:'0.82rem', marginBottom:8}}>📋 株価データ</div>
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>前日終値</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedStats.prevClose.toLocaleString()} WC</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>始値</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedStats.dayOpen.toLocaleString()} WC</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>高値</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedStats.dayHigh.toLocaleString()} WC</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>安値</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedStats.dayLow.toLocaleString()} WC</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>終値</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedPrice.toLocaleString()} WC</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>出来高</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedStats.dayVolume.toLocaleString()} 株</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>値幅制限</div>
+                  <div style={{fontSize:'0.8rem', fontWeight:700}}>{Math.max(1, Math.round(selectedStats.prevClose * 0.9)).toLocaleString()}〜{Math.max(1, Math.round(selectedStats.prevClose * 1.1)).toLocaleString()} WC</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>発行株式数</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedMaster.sharesOutstanding.toLocaleString()} 株</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>時価総額</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{(selectedPrice * selectedMaster.sharesOutstanding).toLocaleString()} WC</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>年初来高値</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedStats.yearHigh.toLocaleString()} WC</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>年初来安値</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedStats.yearLow.toLocaleString()} WC</div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 最新ニュース */}
           {selectedHistory.filter(p => p.news).slice(-5).reverse().length > 0 && (
@@ -4401,120 +4553,50 @@ function StockMarketPanel() {
       {/* ========== 保有タブ ========== */}
       {stockView === 'portfolio' && (
         <div>
-          <div style={{fontSize:'0.82rem', color:'#8a92b2', marginBottom:10}}>保有株式の一覧と資産状況です</div>
-
-          {portfolioRows.length === 0 ? (
+          <div style={{fontSize:'0.82rem', color:'#8a92b2', marginBottom:10}}>保有株式の一覧です</div>
+          {STOCK_ID_LIST.filter(id => (holdings[id]?.amount ?? 0) > 0).length === 0 && (
             <p style={{color:'#4a5070', textAlign:'center', padding:20}}>保有株式がありません</p>
-          ) : (
-            <>
-              <div style={{display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:8, marginBottom:10}}>
-                <div style={{background:'linear-gradient(135deg, rgba(91,141,238,0.18), rgba(91,141,238,0.08))', border:'1px solid #2d3752', borderRadius:10, padding:'10px 12px'}}>
-                  <div style={{fontSize:'0.7rem', color:'#8a92b2'}}>総評価額</div>
-                  <div style={{fontSize:'1.05rem', fontWeight:800, color:'#e8e6ff'}}>{portfolioSummary.totalValue.toLocaleString()}WC</div>
-                  <div style={{fontSize:'0.72rem', color: portfolioSummary.totalProfit >= 0 ? '#4caf87' : '#e05555'}}>
-                    {portfolioSummary.totalProfit >= 0 ? '+' : ''}{portfolioSummary.totalProfit.toLocaleString()}WC / {portfolioSummary.totalProfitRate >= 0 ? '+' : ''}{(portfolioSummary.totalProfitRate * 100).toFixed(1)}%
-                  </div>
-                </div>
-                <div style={{background:'linear-gradient(135deg, rgba(240,192,96,0.15), rgba(240,192,96,0.06))', border:'1px solid #2d3752', borderRadius:10, padding:'10px 12px'}}>
-                  <div style={{fontSize:'0.7rem', color:'#8a92b2'}}>総取得額 / 保有株数</div>
-                  <div style={{fontSize:'1.05rem', fontWeight:800, color:'#e8e6ff'}}>{portfolioSummary.totalCost.toLocaleString()}WC</div>
-                  <div style={{fontSize:'0.72rem', color:'#8a92b2'}}>{portfolioSummary.totalShares.toLocaleString()}株 / {portfolioSummary.winningCount}勝 {portfolioSummary.losingCount}敗</div>
-                </div>
-              </div>
-
-              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8, marginBottom:12}}>
-                {([
-                  ['tech', 'テック'], ['industry', '工業'], ['finance', '金融'], ['consumer', '消費財'], ['entertainment', '娯楽'], ['energy', 'エネルギー'],
-                ] as const).map(([sector, label]) => {
-                  const value = portfolioSummary.sectorValue[sector] ?? 0;
-                  const ratio = portfolioSummary.totalValue > 0 ? value / portfolioSummary.totalValue : 0;
-                  return (
-                    <div key={sector} style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'8px 10px'}}>
-                      <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.72rem', color:'#8a92b2'}}>
-                        <span>{label}</span><span>{(ratio * 100).toFixed(0)}%</span>
-                      </div>
-                      <div style={{height:6, background:'#0f1320', borderRadius:999, overflow:'hidden', marginTop:6}}>
-                        <div style={{width:`${Math.max(3, ratio * 100)}%`, height:'100%', background:'linear-gradient(90deg, #5b8dee, #4caf87)'}} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:8, marginBottom:12}}>
-                <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'8px 10px'}}>
-                  <div style={{fontSize:'0.7rem', color:'#8a92b2'}}>最大保有銘柄</div>
-                  <div style={{fontWeight:700, color:'#e8e6ff'}}>{portfolioSummary.largest ? `${portfolioSummary.largest.icon} ${portfolioSummary.largest.name}` : '—'}</div>
-                </div>
-                <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'8px 10px'}}>
-                  <div style={{fontSize:'0.7rem', color:'#8a92b2'}}>最大含み益</div>
-                  <div style={{fontWeight:700, color:'#4caf87'}}>{portfolioSummary.topGain ? `${portfolioSummary.topGain.icon} ${portfolioSummary.topGain.name}` : '—'}</div>
-                </div>
-                <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'8px 10px'}}>
-                  <div style={{fontSize:'0.7rem', color:'#8a92b2'}}>最大含み損</div>
-                  <div style={{fontWeight:700, color:'#e05555'}}>{portfolioSummary.topLoss ? `${portfolioSummary.topLoss.icon} ${portfolioSummary.topLoss.name}` : '—'}</div>
-                </div>
-              </div>
-
-              <div style={{display:'flex', gap:8, flexWrap:'wrap', marginBottom:12}}>
-                <div style={{padding:'6px 10px', background:'rgba(76,175,135,0.1)', border:'1px solid rgba(76,175,135,0.25)', borderRadius:999, fontSize:'0.75rem', color:'#bff2d6'}}>
-                  含み損益 {portfolioSummary.totalProfit >= 0 ? '+' : ''}{portfolioSummary.totalProfit.toLocaleString()}WC
-                </div>
-                <div style={{padding:'6px 10px', background:'rgba(91,141,238,0.1)', border:'1px solid rgba(91,141,238,0.25)', borderRadius:999, fontSize:'0.75rem', color:'#d8e4ff'}}>
-                  前日比は各銘柄カードで確認できます
-                </div>
-                <div style={{padding:'6px 10px', background:'rgba(240,192,96,0.1)', border:'1px solid rgba(240,192,96,0.25)', borderRadius:999, fontSize:'0.75rem', color:'#fff0c4'}}>
-                  保有ボーナスは売却時評価に反映
-                </div>
-              </div>
-
-              {portfolioRows.map((row) => (
-                <div key={row.id} style={{background: row.halted ? 'rgba(60,20,20,0.6)' : '#1c2235', border:`1px solid ${row.halted ? '#e05555' : '#2d3752'}`, borderRadius:10, padding:'12px 14px', marginBottom:8}}>
-                  <div style={{display:'flex', alignItems:'center', gap:6, marginBottom:6, flexWrap:'wrap'}}>
-                    <span>{row.icon}</span>
-                    <span style={{fontWeight:700, fontSize:'0.88rem'}}>{row.name}</span>
-                    <span style={{fontSize:'0.62rem', color:'#8a92b2', border:'1px solid #2d3752', borderRadius:4, padding:'1px 5px'}}>{SECTOR_LABEL[row.sector]}</span>
-                    {row.halted && <span style={{fontSize:'0.6rem', color:'#e05555', border:'1px solid #e05555', borderRadius:3, padding:'0 4px'}}>🚫 停止</span>}
-                    <span style={{marginLeft:'auto', fontSize:'0.78rem', color:'#8a92b2'}}>{row.amount}株 / 構成比 {(row.weight * 100).toFixed(1)}%</span>
-                  </div>
-
-                  <div style={{height:40, marginBottom:6, background:'#161b26', borderRadius:4, overflow:'hidden'}}>
-                    {renderLineChart(row.id, true)}
-                  </div>
-
-                  <div style={{display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:6, fontSize:'0.76rem', marginBottom:6}}>
-                    <span style={{color:'#8a92b2'}}>取得均価: {row.avgBuyPrice.toLocaleString()}WC</span>
-                    <span style={{color:'#e8e6ff'}}>現在値: {row.currentPrice.toLocaleString()}WC</span>
-                    <span style={{color:'#8a92b2'}}>評価額: {row.totalValue.toLocaleString()}WC</span>
-                    <span style={{color: row.dayChangeRate >= 0 ? '#4caf87' : '#e05555'}}>前日比: {row.dayChangeRate >= 0 ? '+' : ''}{(row.dayChangeRate * 100).toFixed(1)}%</span>
-                    <span style={{color:'#8a92b2'}}>保有ボーナス: +{(row.bonus * 100).toFixed(0)}%</span>
-                    <span style={{color:'#8a92b2'}}>時価/取得比: {(row.currentPrice / Math.max(1, row.avgBuyPrice) * 100).toFixed(1)}%</span>
-                  </div>
-
-                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:4, flexWrap:'wrap'}}>
-                    <span style={{fontSize:'0.82rem', fontWeight:700, color: row.profit >= 0 ? '#4caf87' : '#e05555'}}>
-                      {row.profit >= 0 ? '+' : ''}{row.profit.toLocaleString()}WC
-                    </span>
-                    <span style={{fontSize:'0.72rem', color:'#8a92b2'}}>
-                      含み損益率 {row.profitRate >= 0 ? '+' : ''}{(row.profitRate * 100).toFixed(1)}%
-                    </span>
-                    <button onClick={() => handleSell(row.id)}
-                      style={{padding:'5px 12px', background:'linear-gradient(135deg,#e05555,#c03030)',
-                        color:'#fff', border:'none', borderRadius:5, cursor:'pointer', fontSize:'0.78rem', fontWeight:700}}>
-                      📉 全売却
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              <div style={{marginTop:12, padding:'10px 14px', background:'rgba(91,141,238,0.07)', border:'1px solid #2d3752', borderRadius:8}}>
-                <div style={{fontSize:'0.78rem', color:'#8a92b2'}}>累計投資利益: <strong style={{color:'#f0c060'}}>{(player?.totalStockProfit ?? 0).toLocaleString()}WC</strong></div>
-                <div style={{fontSize:'0.72rem', color:'#6e7696', marginTop:4}}>
-                  総評価額 {portfolioSummary.totalValue.toLocaleString()}WC / 総取得額 {portfolioSummary.totalCost.toLocaleString()}WC
-                </div>
-              </div>
-            </>
           )}
+          {STOCK_ID_LIST.filter(id => (holdings[id]?.amount ?? 0) > 0).map(id => {
+            const h = holdings[id];
+            const m = STOCK_MASTERS[id];
+            const currentPrice = getPrice(id);
+            const bonus = getHoldBonus(id);
+            const totalVal = Math.round(currentPrice * h.amount * (1 + bonus));
+            const profit = totalVal - h.avgBuyPrice * h.amount;
+            const halted = isHalted(id);
+            return (
+              <div key={id} style={{background: halted ? 'rgba(60,20,20,0.6)' : '#1c2235', border:`1px solid ${halted ? '#e05555' : '#2d3752'}`, borderRadius:8, padding:'12px 14px', marginBottom:8}}>
+                <div style={{display:'flex', alignItems:'center', gap:6, marginBottom:6}}>
+                  <span>{m.icon}</span>
+                  <span style={{fontWeight:700, fontSize:'0.88rem'}}>{m.name}</span>
+                  {halted && <span style={{fontSize:'0.6rem', color:'#e05555', border:'1px solid #e05555', borderRadius:3, padding:'0 4px'}}>🚫 停止</span>}
+                  <span style={{marginLeft:'auto', fontSize:'0.78rem', color:'#8a92b2'}}>{h.amount}株</span>
+                </div>
+                <div style={{height:40, marginBottom:6, background:'#161b26', borderRadius:4, overflow:'hidden'}}>
+                  {renderLineChart(id, true)}
+                </div>
+                <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.78rem', marginBottom:4}}>
+                  <span style={{color:'#8a92b2'}}>取得均価: {h.avgBuyPrice.toLocaleString()}WC</span>
+                  <span style={{color:'#e8e6ff'}}>評価額: {totalVal.toLocaleString()}WC</span>
+                </div>
+                {bonus > 0 && <div style={{fontSize:'0.7rem', color:'#4caf87', marginBottom:4}}>🎁 保有ボーナス +{(bonus*100).toFixed(0)}%</div>}
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                  <span style={{fontSize:'0.82rem', fontWeight:700, color: profit >= 0 ? '#4caf87' : '#e05555'}}>
+                    {profit >= 0 ? '+' : ''}{profit.toLocaleString()}WC
+                  </span>
+                  <button onClick={() => handleSell(id)}
+                    style={{padding:'5px 12px', background:'linear-gradient(135deg,#e05555,#c03030)',
+                      color:'#fff', border:'none', borderRadius:5, cursor:'pointer', fontSize:'0.78rem', fontWeight:700}}>
+                    📉 全売却
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{marginTop:12, padding:'10px 14px', background:'rgba(91,141,238,0.07)', border:'1px solid #2d3752', borderRadius:8}}>
+            <div style={{fontSize:'0.78rem', color:'#8a92b2'}}>累計投資利益: <strong style={{color:'#f0c060'}}>{(player?.totalStockProfit ?? 0).toLocaleString()}WC</strong></div>
+          </div>
         </div>
       )}
 
