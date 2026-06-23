@@ -44,7 +44,7 @@ export interface GameState extends PlayerSlice, DungeonSlice, FishingSlice, Reli
 // プレイヤーデータのデフォルト値補完
 // ============================================================
 function ensureDefaults(player: PlayerData): PlayerData {
-  // ホットバー・オフハンド内のweaponHpBonusを合算してmaxHpに反映
+  // ホットバー・オフハンド・防具スロット内のweaponHpBonusを合算してmaxHpに反映
   const hotbar = player.equipment?.hotbar ?? [];
   let hpBonus = 0;
   for (const itemId of hotbar) {
@@ -57,6 +57,14 @@ function ensureDefaults(player: PlayerData): PlayerData {
   if (offhandId) {
     const offItem = ITEM_MASTER[offhandId];
     if (offItem?.weaponHpBonus) hpBonus += offItem.weaponHpBonus;
+  }
+  // 防具スロット（helmet/chestplate/leggings/boots）のHPボーナスも加算
+  for (const slotKey of ['helmet', 'chestplate', 'leggings', 'boots'] as const) {
+    const slotId = player.equipment?.[slotKey];
+    if (slotId) {
+      const slotItem = ITEM_MASTER[slotId];
+      if (slotItem?.weaponHpBonus) hpBonus += slotItem.weaponHpBonus;
+    }
   }
   // baseMaxHpを保持（初回のみ設定、以降はbonusを加算）
   const baseMaxHp = player.stats?.baseMaxHp ?? player.stats?.maxHp ?? 100;
