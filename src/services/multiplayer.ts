@@ -2056,6 +2056,7 @@ const stockKey = (prefix: string, id: StockId): string => `${prefix}_${id}`;
 const stockDayKey = (id: StockId): string => stockKey(STOCK_DAY_PREFIX, id);
 const stockYearKey = (id: StockId): string => stockKey(STOCK_YEAR_PREFIX, id);
 const stockStatKey = (name: string, id: StockId): string => `${name}_${id}`;
+const STOCK_HISTORY_LIMIT = 2880;
 
 const defaultTrend = (sector: import('../types/game').StockSector): import('../types/game').StockTrendData => ({
   trend: 0,
@@ -2492,7 +2493,7 @@ export async function tickStockPrices(): Promise<{
           ...(newsText !== undefined ? { news: newsText } : {}),
         };
         hist.push(point);
-        if (hist.length > 96) hist.splice(0, hist.length - 96);
+        if (hist.length > STOCK_HISTORY_LIMIT) hist.splice(0, hist.length - STOCK_HISTORY_LIMIT);
         newData[histKey] = hist;
 
         if (newsText !== undefined) newsItems.push(newsText);
