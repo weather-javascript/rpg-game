@@ -5,7 +5,7 @@ import {
   arrayUnion, arrayRemove, runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, BattleHistoryEntry, PokerTable, PokerCard, PokerPlayer, PokerPhase, NpcQuest, QuestType, QuestRank, StockId, StockMaster, StockPricePoint, StockTrendData } from '../types/game';
+import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, BattleHistoryEntry, PokerTable, PokerCard, PokerPlayer, PokerPhase, NpcQuest, QuestType, QuestRank, StockId, StockMaster, StockMarketSnapshot, StockMarketStats, StockSplitEvent, StockPricePoint, StockTrendData } from '../types/game';
 import { calcJackpotContrib, rollJackpot } from '../systems/minigames';
 import { enqueueActivityFeed } from './activityFeedBuffer';
 
@@ -2056,7 +2056,6 @@ const stockKey = (prefix: string, id: StockId): string => `${prefix}_${id}`;
 const stockDayKey = (id: StockId): string => stockKey(STOCK_DAY_PREFIX, id);
 const stockYearKey = (id: StockId): string => stockKey(STOCK_YEAR_PREFIX, id);
 const stockStatKey = (name: string, id: StockId): string => `${name}_${id}`;
-const STOCK_HISTORY_LIMIT = 2880;
 
 const defaultTrend = (sector: import('../types/game').StockSector): import('../types/game').StockTrendData => ({
   trend: 0,
@@ -2178,6 +2177,8 @@ const MARKET_EVENTS: Array<{
   { text: '🛢️ 原油価格が急落', changePct: -0.14, targets: ['wealth_oil'], sectors: ['energy'] },
   { text: '📡 通信障害で大規模な信頼低下', changePct: -0.11, targets: ['wealth_telecom'], sectors: ['industry'] },
 ];
+
+const MARKET_EVENT_BIAS = MARKET_EVENTS.reduce((sum, ev) => sum + ev.changePct, 0) / MARKET_EVENTS.length;
 
 // トレンドラベル変換
 export function getTrendLabel(trend: number): { label: string; color: string; icon: string } {
@@ -2394,7 +2395,7 @@ export async function tickStockPrices(): Promise<{
         let changePct = newTrend + noise;
 
         let newsText: string | undefined;
-        const bubbleRoll = Math.random();
+        const specialRoll = Math.random();
         const isStopHigh = Math.random() < 0.002;
         const isStopLow = !isStopHigh && Math.random() < 0.002;
 
@@ -2406,23 +2407,27 @@ export async function tickStockPrices(): Promise<{
           changePct = -0.5;
           newsText = `📉 【ストップ安】${master.name} -50%！本日の取引終了`;
           trendData = { ...trendData, trend: newTrend, volatility: newVol, consecutiveTicks: newConsec, haltedAt: now };
-        } else if (bubbleRoll < 0.015) {
-          changePct = 1.0 + Math.random() * 1.0;
+        } else if (specialRoll < 0.012) {
+          changePct = 0.45 + Math.random() * 0.55;
           newsText = `🚀 【バブル発生！】${master.name} が急騰中！`;
           trendData = { ...trendData, trend: 0.05, volatility: Math.min(0.1, newVol * 1.5), consecutiveTicks: 0 };
+        } else if (specialRoll < 0.024) {
+          changePct = -(0.45 + Math.random() * 0.55);
+          newsText = `💥 【急落局面】${master.name} が投機売りで大幅下落`;
+          trendData = { ...trendData, trend: -0.05, volatility: Math.min(0.1, newVol * 1.5), consecutiveTicks: 0 };
         } else if (eventForTick) {
           const affects = eventForTick.allMarket ||
             (eventForTick.targets && eventForTick.targets.includes(id)) ||
             (eventForTick.sectors && eventForTick.sectors.includes(master.sector));
           if (affects) {
-            changePct = eventForTick.changePct + noise * 0.2;
+            changePct = (eventForTick.changePct - MARKET_EVENT_BIAS) + noise * 0.2;
             if (Math.sign(changePct) !== Math.sign(eventForTick.changePct) && eventForTick.changePct !== 0) {
-              changePct = eventForTick.changePct;
+              changePct = eventForTick.changePct - MARKET_EVENT_BIAS;
             }
             newsText = `📰 ${eventForTick.text}（${changePct > 0 ? '+' : ''}${(changePct * 100).toFixed(1)}%）`;
             trendData = {
               ...trendData,
-              trend: newTrend + eventForTick.changePct * 0.3,
+              trend: newTrend + (eventForTick.changePct - MARKET_EVENT_BIAS) * 0.3,
               volatility: newVol,
               consecutiveTicks: newConsec,
             };
@@ -2432,6 +2437,11 @@ export async function tickStockPrices(): Promise<{
         } else {
           trendData = { ...trendData, trend: newTrend, volatility: newVol, consecutiveTicks: newConsec };
         }
+
+        const anchorDrift = -((current - master.basePrice) / Math.max(master.basePrice, 1)) * 0.0025;
+        changePct += anchorDrift;
+        if (changePct > 4) changePct = 4;
+        if (changePct < -0.95) changePct = -0.95;
 
         let newPrice = Math.max(1, Math.round(current * (1 + changePct)));
         const candleOpen = current;
@@ -2493,7 +2503,7 @@ export async function tickStockPrices(): Promise<{
           ...(newsText !== undefined ? { news: newsText } : {}),
         };
         hist.push(point);
-        if (hist.length > STOCK_HISTORY_LIMIT) hist.splice(0, hist.length - STOCK_HISTORY_LIMIT);
+        if (hist.length > 96) hist.splice(0, hist.length - 96);
         newData[histKey] = hist;
 
         if (newsText !== undefined) newsItems.push(newsText);
