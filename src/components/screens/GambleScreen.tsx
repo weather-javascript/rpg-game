@@ -24,7 +24,7 @@ import {
   STOCK_ID_LIST, getMarketStatus, MARKET_OPEN_HOUR, MARKET_CLOSE_HOUR,
 } from '../../services/multiplayer';
 import type { TreasureProbEntry, GambleRankingEntry, StockRankingEntry } from '../../services/multiplayer';
-import type { GambleResult, GambleMaster, PokerTable, BattleHistoryEntry as _BH, StockId, StockHolding, StockPricePoint, StockTrendData } from '../../types/game';
+import type { GambleResult, GambleMaster, PokerTable, BattleHistoryEntry as _BH, StockId, StockHolding, StockPricePoint, StockTrendData, StockMarketStats } from '../../types/game';
 import type { PokerState } from '../../systems/minigames';
 import type { GambleBattle } from '../../types/game';
 
@@ -3691,6 +3691,7 @@ function StockMarketPanel() {
   });
   const [history, setHistory] = useState<Record<StockId, StockPricePoint[]>>({} as Record<StockId, StockPricePoint[]>);
   const [trends, setTrends] = useState<Record<StockId, StockTrendData>>({} as Record<StockId, StockTrendData>);
+  const [marketStats, setMarketStats] = useState<Record<StockId, StockMarketStats>>({} as Record<StockId, StockMarketStats>);
   const [news, setNews] = useState<string[]>([]);
   const [selectedStock, setSelectedStock] = useState<StockId>('wealth_mining');
   const [buyAmt, setBuyAmt] = useState(1);
@@ -3707,7 +3708,7 @@ function StockMarketPanel() {
   }, []);
 
   useEffect(() => {
-    const unsub = subscribeStockPrices((p, h, t) => {
+    const unsub = subscribeStockPrices((p, h, t, s, splitEvents) => {
       setPrevPrices(prev => {
         const updated = { ...prev };
         for (const id of STOCK_ID_LIST) if (!updated[id]) updated[id] = STOCK_MASTERS[id].basePrice;
@@ -3718,6 +3719,39 @@ function StockMarketPanel() {
       setPrices(initPrices);
       setHistory({ ...h });
       setTrends({ ...t });
+      setMarketStats({ ...s });
+
+      if (splitEvents.length > 0) {
+        const latest = useGameStore.getState().player;
+        if (latest) {
+          const ledger = { ...(latest.stockSplitLedger ?? {}) };
+          const newHoldings = { ...(latest.stockHoldings ?? {}) };
+          let changed = false;
+          for (const ev of splitEvents) {
+            if (ledger[ev.stockId] === ev.timestamp) continue;
+            ledger[ev.stockId] = ev.timestamp;
+            changed = true;
+            const holding = newHoldings[ev.stockId];
+            if (holding && holding.amount > 0) {
+              newHoldings[ev.stockId] = {
+                ...holding,
+                amount: holding.amount * ev.ratio,
+                avgBuyPrice: Math.max(1, Math.round(holding.avgBuyPrice / ev.ratio)),
+              };
+              useGameStore.getState().addNotification('info', `📦 ${STOCK_MASTERS[ev.stockId].name} が 1:${ev.ratio} 分割されました`);
+            }
+          }
+          if (changed) {
+            useGameStore.setState({
+              player: {
+                ...latest,
+                stockHoldings: newHoldings,
+                stockSplitLedger: ledger,
+              },
+            });
+          }
+        }
+      }
     });
     return unsub;
   }, []);
@@ -3901,6 +3935,7 @@ function StockMarketPanel() {
   const selectedPrice = getPrice(selectedStock);
   const selectedMaster = STOCK_MASTERS[selectedStock];
   const selectedTrend = trends[selectedStock];
+  const selectedStats = marketStats[selectedStock];
 
   const TAB_STYLE = (active: boolean) => ({
     flex: 1, padding: '6px 2px', fontSize: '0.68rem', fontWeight: 700,
@@ -4106,7 +4141,7 @@ function StockMarketPanel() {
               <div style={{marginLeft:'auto', textAlign:'right'}}>
                 <div style={{fontSize:'1.3rem', fontWeight:700, color:'#e8e6ff'}}>{selectedPrice.toLocaleString()}<span style={{fontSize:'0.75rem', color:'#4a5070'}}>WC</span></div>
                 {(() => {
-                  const hist = selectedHistory; const prev = hist.length > 1 ? hist[hist.length-2].price : selectedMaster.basePrice;
+                  const prev = selectedStats?.prevClose ?? (selectedHistory.length > 1 ? selectedHistory[selectedHistory.length-2].price : selectedMaster.basePrice);
                   const chg = selectedPrice - prev; const chgPct = prev > 0 ? chg/prev*100 : 0;
                   return <div style={{fontSize:'0.8rem', color: chg >= 0 ? '#4caf87' : '#e05555'}}>{chg >= 0 ? '▲' : '▼'} {Math.abs(chg).toLocaleString()}WC ({Math.abs(chgPct).toFixed(2)}%)</div>;
                 })()}
@@ -4138,7 +4173,7 @@ function StockMarketPanel() {
               return (
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.65rem', color:'#4a5070', marginBottom:8}}>
                   <span>最安: {minP.toLocaleString()}WC</span>
-                  <span style={{color:'#f0c060'}}>基準: {selectedMaster.basePrice.toLocaleString()}WC</span>
+                  <span style={{color:'#f0c060'}}>前日終値: {(selectedStats?.prevClose ?? selectedMaster.basePrice).toLocaleString()}WC</span>
                   <span>最高: {maxP.toLocaleString()}WC</span>
                 </div>
               );
@@ -4177,6 +4212,58 @@ function StockMarketPanel() {
               </div>
             );
           })()}
+
+          {selectedStats && (
+            <div style={{background:'#1c2235', border:'1px solid #2d3752', borderRadius:8, padding:'12px 14px', marginBottom:8}}>
+              <div style={{fontWeight:700, fontSize:'0.82rem', marginBottom:8}}>📋 株価データ</div>
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>前日終値</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedStats.prevClose.toLocaleString()} WC</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>始値</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedStats.dayOpen.toLocaleString()} WC</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>高値</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedStats.dayHigh.toLocaleString()} WC</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>安値</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedStats.dayLow.toLocaleString()} WC</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>終値</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedPrice.toLocaleString()} WC</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>出来高</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedStats.dayVolume.toLocaleString()} 株</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>値幅制限</div>
+                  <div style={{fontSize:'0.8rem', fontWeight:700}}>{Math.max(1, Math.round(selectedStats.prevClose * 0.9)).toLocaleString()}〜{Math.max(1, Math.round(selectedStats.prevClose * 1.1)).toLocaleString()} WC</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>発行株式数</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedMaster.sharesOutstanding.toLocaleString()} 株</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>時価総額</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{(selectedPrice * selectedMaster.sharesOutstanding).toLocaleString()} WC</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>年初来高値</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedStats.yearHigh.toLocaleString()} WC</div>
+                </div>
+                <div style={{background:'#161b26', borderRadius:6, padding:'8px 10px'}}>
+                  <div style={{fontSize:'0.65rem', color:'#4a5070'}}>年初来安値</div>
+                  <div style={{fontSize:'0.88rem', fontWeight:700}}>{selectedStats.yearLow.toLocaleString()} WC</div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 最新ニュース */}
           {selectedHistory.filter(p => p.news).slice(-5).reverse().length > 0 && (
