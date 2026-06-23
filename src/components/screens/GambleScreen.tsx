@@ -3834,7 +3834,7 @@ function StockMarketPanel() {
       existing.timestamp = point.timestamp;
     }
     return [...buckets.entries()].sort((a, b) => a[0] - b[0]).map(([, p]) => p);
-
+  };
 
   type MarketRankRow = {
     id: StockId;
@@ -5160,5 +5160,4 @@ export function GambleScreen() {
       </div>
     </div>
   );
-}
 }
