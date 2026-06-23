@@ -2375,9 +2375,9 @@ export function subscribeStockPrices(
 // 1日あたり約5件のニュースになるよう確率調整（1tickあたり）
 // 30秒tick × 120ticks/hour × 15hours(7-22) = 1800 ticks/day → 5/1800 ≈ 0.0028
 // ただしイベント自体はtick毎に複数銘柄を評価するので、全体発生率を0.003程度に
-const NEWS_PER_TICK_PROB = 0.003;
+const NEWS_PER_TICK_PROB = 0.0015;
 // 閉場中: 1日あたり約1件ペース（15h分のtick数に対し約1/15のニュース確率）
-const NEWS_PER_TICK_PROB_CLOSED = NEWS_PER_TICK_PROB / 15;
+const NEWS_PER_TICK_PROB_CLOSED = NEWS_PER_TICK_PROB / 20;
 
 export async function tickStockPrices(): Promise<{
   prices: Record<StockId, number>;
@@ -2511,9 +2511,9 @@ export async function tickStockPrices(): Promise<{
         let changePct = newTrend + noise;
 
         let newsText: string | undefined;
-        const specialRoll = Math.random();
-        const isStopHigh = Math.random() < 0.002;
-        const isStopLow = !isStopHigh && Math.random() < 0.002;
+        const specialRoll = Math.random(); // 特殊イベントはかなり低頻度に抑える
+        const isStopHigh = Math.random() < 0.0012;
+        const isStopLow = !isStopHigh && Math.random() < 0.0012;
 
         if (isStopHigh) {
           changePct = 0.5;
@@ -2523,14 +2523,14 @@ export async function tickStockPrices(): Promise<{
           changePct = -0.5;
           newsText = `📉 【ストップ安】${master.name} -50%！本日の取引終了`;
           trendData = { ...trendData, trend: newTrend, volatility: newVol, consecutiveTicks: newConsec, haltedAt: now };
-        } else if (specialRoll < 0.012) {
-          changePct = 0.45 + Math.random() * 0.55;
+        } else if (specialRoll < 0.004) {
+          changePct = 0.28 + Math.random() * 0.32;
           newsText = `🚀 【バブル発生！】${master.name} が急騰中！`;
-          trendData = { ...trendData, trend: 0.05, volatility: Math.min(0.1, newVol * 1.5), consecutiveTicks: 0 };
-        } else if (specialRoll < 0.024) {
-          changePct = -(0.45 + Math.random() * 0.55);
+          trendData = { ...trendData, trend: 0.03, volatility: Math.min(0.08, newVol * 1.2), consecutiveTicks: 0 };
+        } else if (specialRoll < 0.008) {
+          changePct = -(0.28 + Math.random() * 0.32);
           newsText = `💥 【急落局面】${master.name} が投機売りで大幅下落`;
-          trendData = { ...trendData, trend: -0.05, volatility: Math.min(0.1, newVol * 1.5), consecutiveTicks: 0 };
+          trendData = { ...trendData, trend: -0.03, volatility: Math.min(0.08, newVol * 1.2), consecutiveTicks: 0 };
         } else if (eventForTick) {
           const affects = eventForTick.allMarket ||
             (eventForTick.targets && eventForTick.targets.includes(id)) ||
