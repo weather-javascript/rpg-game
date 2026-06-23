@@ -3699,6 +3699,7 @@ function StockMarketPanel() {
   const [rankTab, setRankTab] = useState<'profit' | 'assets'>('profit');
   const [stockView, setStockView] = useState<'overview' | 'market' | 'detail' | 'portfolio' | 'analysis' | 'ranking'>('overview');
   const [chartMode, setChartMode] = useState<'line' | 'candle'>('line');
+  const [chartFrame, setChartFrame] = useState<'1m' | '5m' | '15m' | '1h' | '1d'>('15m');
   const [_prevPrices, setPrevPrices] = useState<Record<StockId, number>>({} as Record<StockId, number>);
   const [clockNow, setClockNow] = useState(Date.now());
 
@@ -3848,17 +3849,62 @@ function StockMarketPanel() {
     addNotification(profit >= 0 ? 'success' : 'info', `📉 ${STOCK_MASTERS[id].name} 全売却: ${total.toLocaleString()}WC（${profit >= 0 ? '+' : ''}${profit.toLocaleString()}WC）${bonusStr}`);
   };
 
+  type StockChartFrame = '1m' | '5m' | '15m' | '1h' | '1d';
+  const CHART_FRAME_OPTIONS: { value: StockChartFrame; label: string; bucketMs: number }[] = [
+    { value: '1m', label: '1分足', bucketMs: 60_000 },
+    { value: '5m', label: '5分足', bucketMs: 5 * 60_000 },
+    { value: '15m', label: '15分足', bucketMs: 15 * 60_000 },
+    { value: '1h', label: '1時間足', bucketMs: 60 * 60_000 },
+    { value: '1d', label: '1日足', bucketMs: 24 * 60 * 60_000 },
+  ];
+
+  const aggregateStockHistory = (points: StockPricePoint[], frame: StockChartFrame): StockPricePoint[] => {
+    const sorted = [...points].sort((a, b) => a.timestamp - b.timestamp);
+    if (sorted.length === 0) return [];
+    if (frame === '1m') return sorted.slice(-180);
+    const bucketMs = CHART_FRAME_OPTIONS.find(opt => opt.value === frame)?.bucketMs ?? 60_000;
+    const buckets = new Map<string, StockPricePoint[]>();
+    for (const p of sorted) {
+      const key = frame === '1d'
+        ? new Date(p.timestamp).toDateString()
+        : String(Math.floor(p.timestamp / bucketMs));
+      const arr = buckets.get(key) ?? [];
+      arr.push(p);
+      buckets.set(key, arr);
+    }
+    const result: StockPricePoint[] = [];
+    for (const arr of buckets.values()) {
+      const open = arr[0];
+      const close = arr[arr.length - 1];
+      const high = arr.reduce((mx, p) => Math.max(mx, p.high ?? p.price), -Infinity);
+      const low = arr.reduce((mn, p) => Math.min(mn, p.low ?? p.price), Infinity);
+      const volume = arr.reduce((sum, p) => sum + (p.volume ?? 0), 0);
+      const newsPoint = [...arr].reverse().find(p => p.news);
+      result.push({
+        timestamp: close.timestamp,
+        price: close.close ?? close.price,
+        open: open.open ?? open.price,
+        high: Number.isFinite(high) ? high : close.price,
+        low: Number.isFinite(low) ? low : close.price,
+        close: close.close ?? close.price,
+        volume,
+        ...(newsPoint?.news ? { news: newsPoint.news } : {}),
+      });
+    }
+    return result;
+  };
+
   // 折れ線グラフ
   const renderLineChart = (id: StockId, compact = false) => {
-    const hist = history[id] ?? [];
+    const source = history[id] ?? [];
+    const pts = compact ? source.slice(-60) : aggregateStockHistory(source, chartFrame);
     const currentPrice = getPrice(id);
     const h = compact ? 50 : 120;
-    if (hist.length < 2) return (
+    if (pts.length < 2) return (
       <svg viewBox={`0 0 100 ${h}`} preserveAspectRatio="none" style={{width:'100%',height:'100%'}}>
         <circle cx="50" cy={h*0.5} r="2" fill="#5b8dee" vectorEffect="non-scaling-stroke" />
       </svg>
     );
-    const pts = hist.slice(-60);
     const allPrices = pts.map(p => p.price); allPrices.push(currentPrice);
     const maxP = Math.max(...allPrices), minP = Math.min(...allPrices);
     const range = maxP - minP || maxP * 0.01;
@@ -3873,7 +3919,6 @@ function StockMarketPanel() {
     const lastX = ((pts.length - 1) * w).toFixed(1);
     const lastY = toY(pts[pts.length-1].price);
     const fillPts = `0,${h} ` + points + ` ${lastX},${h}`;
-    // バブル点を強調
     return (
       <svg viewBox={`0 0 100 ${h}`} preserveAspectRatio="none" style={{width:'100%',height:'100%'}}>
         <polygon points={fillPts} fill={fillColor} />
@@ -3888,9 +3933,9 @@ function StockMarketPanel() {
 
   // ローソク足チャート
   const renderCandleChart = (id: StockId) => {
-    const hist = history[id] ?? [];
-    if (hist.length < 2) return <svg viewBox="0 0 100 120" style={{width:'100%',height:'100%'}}></svg>;
-    const pts = hist.slice(-40);
+    const source = history[id] ?? [];
+    const pts = chartFrame === '1m' ? source.slice(-40) : aggregateStockHistory(source, chartFrame);
+    if (pts.length < 2) return <svg viewBox="0 0 100 120" style={{width:'100%',height:'100%'}}></svg>;
     const allPrices = pts.flatMap(p => [p.open ?? p.price, p.high ?? p.price, p.low ?? p.price, p.close ?? p.price]);
     const maxP = Math.max(...allPrices), minP = Math.min(...allPrices);
     const range = maxP - minP || maxP * 0.01;
@@ -3913,10 +3958,8 @@ function StockMarketPanel() {
           const isBubble = p.news && p.news.includes('バブル');
           return (
             <g key={i}>
-              {/* ヒゲ */}
               <line x1={cx.toFixed(1)} y1={toY(high).toFixed(1)} x2={cx.toFixed(1)} y2={toY(low).toFixed(1)}
                 stroke={color} strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
-              {/* ボディ */}
               <rect x={x.toFixed(1)} y={bodyTop.toFixed(1)} width={bw.toFixed(1)} height={bodyH.toFixed(1)}
                 fill={isBubble ? '#f0c060' : color} stroke={isBubble ? '#f0c060' : color} strokeWidth="0.3" vectorEffect="non-scaling-stroke" />
             </g>
@@ -3932,6 +3975,7 @@ function StockMarketPanel() {
   };
 
   const selectedHistory = history[selectedStock] ?? [];
+  const selectedChartHistory = useMemo(() => aggregateStockHistory(selectedHistory, chartFrame), [selectedHistory, chartFrame]);
   const selectedPrice = getPrice(selectedStock);
   const selectedMaster = STOCK_MASTERS[selectedStock];
   const selectedTrend = trends[selectedStock];
@@ -4148,6 +4192,18 @@ function StockMarketPanel() {
               </div>
             </div>
 
+            {/* 表示足 */}
+            <div style={{display:'flex', gap:6, marginBottom:6, flexWrap:'wrap'}}>
+              {CHART_FRAME_OPTIONS.map(opt => (
+                <button key={opt.value} onClick={() => setChartFrame(opt.value)} style={{padding:'3px 8px', fontSize:'0.68rem', fontWeight:700,
+                  background: chartFrame===opt.value ? 'rgba(91,141,238,0.22)' : '#161b26',
+                  border:`1px solid ${chartFrame===opt.value ? '#5b8dee' : '#2d3752'}`,
+                  color: chartFrame===opt.value ? '#e8e6ff' : '#8a92b2', borderRadius:4, cursor:'pointer'}}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
             {/* チャートトグル */}
             <div style={{display:'flex', gap:6, marginBottom:6}}>
               {(['line','candle'] as const).map(m => (
@@ -4160,16 +4216,36 @@ function StockMarketPanel() {
               ))}
             </div>
 
+            <div style={{fontSize:'0.64rem', color:'#4a5070', marginBottom:6}}>
+              表示区間: {CHART_FRAME_OPTIONS.find(opt => opt.value === chartFrame)?.label ?? '15分足'} / {chartMode === 'line' ? '折れ線' : 'ローソク足'}
+            </div>
+
             {/* チャート */}
             <div style={{height:120, background:'#161b26', borderRadius:6, overflow:'hidden', marginBottom:8}}>
               {renderChart(selectedStock, false)}
             </div>
+            <div style={{height:28, display:'flex', alignItems:'flex-end', gap:1, background:'#161b26', borderRadius:6, padding:'4px 6px', marginBottom:8, overflow:'hidden'}}>
+              {(() => {
+                const pts = selectedChartHistory.slice(-48);
+                const maxV = Math.max(...pts.map(p => p.volume ?? 0), 1);
+                return pts.map((p, i) => (
+                  <div key={i} title={`${new Date(p.timestamp).toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'})} / ${(p.volume ?? 0).toLocaleString()} 株`}
+                    style={{
+                      width: `${100 / Math.max(pts.length, 1)}%`,
+                      height: `${Math.max(8, ((p.volume ?? 0) / maxV) * 100)}%`,
+                      borderRadius: 2,
+                      background: p.news ? 'rgba(240,192,96,0.72)' : 'rgba(91,141,238,0.65)',
+                      minWidth: 2,
+                    }} />
+                ));
+              })()}
+            </div>
 
             {/* 価格レンジ */}
-            {selectedHistory.length > 1 && (() => {
-              const pts = selectedHistory.slice(-60);
-              const maxP = Math.max(...pts.map(p => p.price));
-              const minP = Math.min(...pts.map(p => p.price));
+            {selectedChartHistory.length > 1 && (() => {
+              const pts = selectedChartHistory.slice(-60);
+              const maxP = Math.max(...pts.map(p => Math.max(p.high ?? p.price, p.close ?? p.price, p.price)));
+              const minP = Math.min(...pts.map(p => Math.min(p.low ?? p.price, p.open ?? p.price, p.price)));
               return (
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.65rem', color:'#4a5070', marginBottom:8}}>
                   <span>最安: {minP.toLocaleString()}WC</span>
