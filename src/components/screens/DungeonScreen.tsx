@@ -418,7 +418,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
   const [battle, setBattle] = useState<TurnBattleState>(() => {
     const areaIdx = runState.currentAreaIdx ?? 0;
     const enemies = kxConfig
-      ? spawnKxMinions(1)
+      ? (kxConfig.initialAwakened ? [] : spawnKxMinions(1))
       : spawnEnemies(dungeon, areaIdx, undefined, runState.volcanoRoute);
     const hotbarWeaponId = equipment.hotbar.find(id => id && ITEM_MASTER[id]?.itemType === 'Weapon') ?? null;
     const weaponItem = hotbarWeaponId ? ITEM_MASTER[hotbarWeaponId] : null;
@@ -432,7 +432,9 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       playerHpSnapshot: player.stats.hp,
       turn: 'player',
       log: kxConfig
-        ? [{ text: '⚠️ KX-G21が現れた！眷属を倒してダメージを与えよ！', color: '#f0c060' }]
+        ? (kxConfig.initialAwakened
+          ? [{ text: '⚡ KX-G21[覚醒体]が立ちはだかる！直接攻撃せよ！', color: '#ff00ff' }]
+          : [{ text: '⚠️ KX-G21が現れた！眷属を倒してダメージを与えよ！', color: '#f0c060' }])
         : [{ text: `⚔️ ${names} が現れた！`, color: '#f0c060' }],
       result: null,
       expGained: 0, goldGained: 0, drops: [],
@@ -1267,17 +1269,10 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       if (newDrops.length > 0) addItems(newDrops);
 
       if (newKxHp <= 0) {
-        // KX撃破 → 20%で覚醒
-        if (secureRandom() < 0.2) {
-          newLog.push({ text: '「さぁ、延長戦の始まりだ！」 KX-G21が覚醒した！', color: '#ff00ff' });
-          const awakeKx: KxState = { ...battle.kx, hp: 0, isAwakened: true, awakeHp: battle.kx.awakeMaxHp, burnTurns: 0 };
-          const after: TurnBattleState = { ...battle, enemies: [], log: newLog, turn: 'player', kx: awakeKx, pendingAction: null };
-          setBattle(after);
-        } else {
-          newLog.push({ text: '🏆 KX-G21を討伐した！', color: '#f0c060' });
-          addItems([{ itemId: 'super_spanner', amount: 10 }, { itemId: 'makai_bihin', amount: 10 }, { itemId: 'kx_mech_track', amount: 1 }]);
-          setBattle(b => ({ ...b, enemies: newEnemies, log: [...newLog], turn: 'result', result: 'win', kx: { ...battle.kx!, hp: 0 }, pendingAction: null }));
-        }
+        // KX撃破（覚醒抽選は撃破後の演出が終わってからonVictoryで行う）
+        newLog.push({ text: '🏆 KX-G21を討伐した！', color: '#f0c060' });
+        addItems([{ itemId: 'super_spanner', amount: 10 }, { itemId: 'makai_bihin', amount: 10 }, { itemId: 'kx_mech_track', amount: 1 }]);
+        setBattle(b => ({ ...b, enemies: newEnemies, log: [...newLog], turn: 'result', result: 'win', kx: { ...battle.kx!, hp: 0 }, pendingAction: null }));
         return;
       }
 
@@ -1444,15 +1439,9 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       if (newDrops.length > 0) addItems(newDrops);
 
       if (newKxHp <= 0) {
-        if (secureRandom() < 0.2) {
-          newLog.push({ text: '「さぁ、延長戦の始まりだ！」 KX-G21が覚醒した！', color: '#ff00ff' });
-          const awakeKx: KxState = { ...battle.kx, hp: 0, isAwakened: true, awakeHp: battle.kx.awakeMaxHp, burnTurns: 0 };
-          setBattle(b => ({ ...b, enemies: [], log: newLog, turn: 'player', kx: awakeKx, pendingAction: null, pendingMultiCast: null, weaponMana: finalMana, itemCooldowns: newCooldowns }));
-        } else {
-          newLog.push({ text: '🏆 KX-G21を討伐した！', color: '#f0c060' });
-          addItems([{ itemId: 'super_spanner', amount: 10 }, { itemId: 'makai_bihin', amount: 10 }, { itemId: 'kx_mech_track', amount: 1 }]);
-          setBattle(b => ({ ...b, enemies: newEnemies, log: [...newLog], turn: 'result', result: 'win', kx: { ...battle.kx!, hp: 0 }, pendingAction: null, pendingMultiCast: null, weaponMana: finalMana, itemCooldowns: newCooldowns }));
-        }
+        newLog.push({ text: '🏆 KX-G21を討伐した！', color: '#f0c060' });
+        addItems([{ itemId: 'super_spanner', amount: 10 }, { itemId: 'makai_bihin', amount: 10 }, { itemId: 'kx_mech_track', amount: 1 }]);
+        setBattle(b => ({ ...b, enemies: newEnemies, log: [...newLog], turn: 'result', result: 'win', kx: { ...battle.kx!, hp: 0 }, pendingAction: null, pendingMultiCast: null, weaponMana: finalMana, itemCooldowns: newCooldowns }));
         return;
       }
 
@@ -1597,15 +1586,9 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         }
       }
       if (newKxHp <= 0) {
-        if (secureRandom() < 0.2) {
-          logEntries.push({ text: '「さぁ、延長戦の始まりだ！」 KX-G21が覚醒した！', color: '#ff00ff' });
-          const awakeKx: KxState = { ...battle.kx, hp: 0, isAwakened: true, awakeHp: battle.kx.awakeMaxHp, burnTurns: 0 };
-          setBattle(b => ({ ...b, enemies: [], log: [...b.log, ...logEntries], turn: 'player', kx: awakeKx, weaponMana: 0, ultimateReady: false }));
-        } else {
-          logEntries.push({ text: '🏆 KX-G21を討伐した！', color: '#f0c060' });
-          addItems([{ itemId: 'super_spanner', amount: 10 }, { itemId: 'makai_bihin', amount: 10 }, { itemId: 'kx_mech_track', amount: 1 }]);
-          setBattle(b => ({ ...b, enemies: newEnemies, log: [...b.log, ...logEntries], turn: 'result', result: 'win', kx: { ...battle.kx!, hp: 0 }, weaponMana: 0, ultimateReady: false }));
-        }
+        logEntries.push({ text: '🏆 KX-G21を討伐した！', color: '#f0c060' });
+        addItems([{ itemId: 'super_spanner', amount: 10 }, { itemId: 'makai_bihin', amount: 10 }, { itemId: 'kx_mech_track', amount: 1 }]);
+        setBattle(b => ({ ...b, enemies: newEnemies, log: [...b.log, ...logEntries], turn: 'result', result: 'win', kx: { ...battle.kx!, hp: 0 }, weaponMana: 0, ultimateReady: false }));
         return;
       }
       const pct = newKxHp / KX_MAX_HP * 100;
@@ -1988,12 +1971,8 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
             runningEnemies = hr.enemies.map(e => ({ ...e }));
           }
           if (silversNewKxHp <= 0) {
-            if (secureRandom() < 0.2) {
-              silversKxAwakened = true;
-            } else {
-              silversKxWin = true;
-              addItems([{ itemId: 'super_spanner', amount: 10 }, { itemId: 'makai_bihin', amount: 10 }, { itemId: 'kx_mech_track', amount: 1 }]);
-            }
+            silversKxWin = true;
+            addItems([{ itemId: 'super_spanner', amount: 10 }, { itemId: 'makai_bihin', amount: 10 }, { itemId: 'kx_mech_track', amount: 1 }]);
           }
         }
 
@@ -2125,10 +2104,6 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
               }
             }
             if (newKxHp <= 0) {
-              if (secureRandom() < 0.2) {
-                logEntries.push({ text: '「さぁ、延長戦の始まりだ！」 KX-G21が覚醒した！', color: '#ff00ff' });
-                return { ...newBattle, enemies: [], log: [...prev.log, ...logEntries], turn: 'player', kx: { ...prev.kx, hp: 0, isAwakened: true, awakeHp: prev.kx.awakeMaxHp, burnTurns: 0 } };
-              }
               addItems([{ itemId: 'super_spanner', amount: 10 }, { itemId: 'makai_bihin', amount: 10 }, { itemId: 'kx_mech_track', amount: 1 }]);
               logEntries.push({ text: '🏆 KX-G21を討伐した！', color: '#f0c060' });
               return { ...newBattle, enemies: newEnemies, log: [...prev.log, ...logEntries], turn: 'result', result: 'win', kx: { ...prev.kx, hp: 0 } };
@@ -3355,7 +3330,17 @@ export function DungeonScreen() {
       return;
     }
 
-    if (newDefeated % areaThreshold === 0 && areas) {
+    // ボスが配置されたエリアは1体倒せば即クリア扱いとする
+    // （ボスエリアは常に単体スポーンのため、5体撃破を待つと同じ相手と何度も再戦になってしまう）
+    // ※中ボス(isMidBoss)は他エリアで道中の圧として意図的に何度も出現させている場合があるため対象外とし、
+    //   チェイテのナイト・メア部屋（中ボス単体の専用ルーム）のみ個別に同様の即クリア対象とする。
+    const currentAreaForBossCheck = areas?.[nextAreaIdx] as any;
+    const isCurrentAreaBossFight = !!currentAreaForBossCheck?.monsters?.some((m: any) => {
+      const mon = getMergedMonster(m.monsterId);
+      return mon?.isBoss;
+    }) || (runState.dungeonId === 'chaite' && !!currentAreaForBossCheck?.monsters?.some((m: any) => m.monsterId === 'chaite_nightmare'));
+
+    if ((newDefeated % areaThreshold === 0 || isCurrentAreaBossFight) && areas) {
       if (nextAreaIdx < areas.length - 1) {
         nextAreaIdx = nextAreaIdx + 1;
         // 敵が一切いない通過専用エリア（休憩地帯など）は戦闘なしで自動的に通過する
@@ -3948,9 +3933,9 @@ export function DungeonScreen() {
                 initialPhase: runState.kxPhase ?? 1,
                 initialAwakened: runState.kxIsAwakened ?? false,
                 onVictory: (isAwakened) => {
-                  setKxBossMode(false);
                   if (isAwakened) {
                     // 覚醒KX討伐 → 生命の超越
+                    setKxBossMode(false);
                     const awakeLines: { text: string; color: string }[] = [
                       { text: '「馬鹿な...」', color: '#00e5ff' },
                       { text: '「この力を持ってしてもまだ敵わないと言うのか..?」', color: '#00e5ff' },
@@ -3966,7 +3951,9 @@ export function DungeonScreen() {
                       setRunState(prev => prev ? { ...prev, isComplete: true, kxAwakened: true } : null);
                     }, delay);
                   } else {
-                    // 通常KX討伐 → ダイアログ → 20%で覚醒チェック
+                    // 通常KX討伐 → ダイアログ → ダイアログ終了後に20%で覚醒抽選
+                    // ※ ダイアログ・抽選が終わるまでkxBossModeはtrueのまま維持し、
+                    //   HP0になった通常KXの撃破画面をその場に残す（AUTOモードによる別バトル開始を防止）
                     const normalLines: { text: string; color: string }[] = [
                       { text: 'ｷﾞｷﾞｷﾞ....損傷率99%...LCSﾆﾖﾙ修復不可...', color: '#ff8c00' },
                       { text: '再ﾘｽ...ﾎﾟｰﾝをｾｯﾃｲｼﾏ...ｼﾏｼﾀ', color: '#ff8c00' },
@@ -3979,39 +3966,41 @@ export function DungeonScreen() {
                       setTimeout(() => addNotification('warning', text), delay);
                       delay += 2000;
                     });
-                    // 覚醒抽選
-                    const willAwaken = secureRandom() < 0.2;
-                    if (willAwaken) {
-                      const awakenLines: { text: string; color: string }[] = [
-                        { text: '....', color: '#ff8c00' },
-                        { text: 'ｲﾔ..ﾏﾃ..', color: '#ff8c00' },
-                        { text: 'ｺﾉ我が身 ﾊｲﾏﾆﾓ砕けｿｳﾀﾞｶﾞ...', color: '#ff8c00' },
-                        { text: 'ﾅﾆｶｶﾞﾜｷｱｶﾞｯﾃｸﾙ...', color: '#ff8c00' },
-                        { text: 'このチカラはﾓｼﾔ', color: '#ff8c00' },
-                        { text: 'ｶﾝｾｲしたのﾀﾞﾛｳｶ...?', color: '#ff8c00' },
-                        { text: 'この最後の最期にﾂｲﾆ....', color: '#ff8c00' },
-                        { text: '私の成し遂げられなかった「生命」の完成に', color: '#ff8c00' },
-                        { text: 'ハハ...我は蘇ったぞ', color: '#00e5ff' },
-                        { text: '新しく、そして貴様らと同じ「命」を持ってな', color: '#00e5ff' },
-                        { text: 'いざ決戦だ！！！！！！', color: '#00e5ff' },
-                      ];
-                      awakenLines.forEach(({ text }) => {
-                        setTimeout(() => addNotification('info', text), delay);
-                        delay += 2000;
-                      });
-                      setTimeout(() => {
-                        // 覚醒KX戦を開始
-                        setRunState(prev => prev ? { ...prev, dungeonId: 'sky_castle_ex', kxBossMode: true, kxPhase: 1, kxHp: 38750, kxIsAwakened: true, currentAreaIdx: 0 } : null);
-                        setKxBossMode(true);
-                      }, delay);
-                    } else {
-                      // 覚醒なし → ガチャコイン4枚付与してクリア
-                      setTimeout(() => {
+                    // 覚醒抽選（最後のコメントが終わってから判定する）
+                    setTimeout(() => {
+                      const willAwaken = secureRandom() < 0.2;
+                      if (willAwaken) {
+                        const awakenLines: { text: string; color: string }[] = [
+                          { text: '....', color: '#ff8c00' },
+                          { text: 'ｲﾔ..ﾏﾃ..', color: '#ff8c00' },
+                          { text: 'ｺﾉ我が身 ﾊｲﾏﾆﾓ砕けｿｳﾀﾞｶﾞ...', color: '#ff8c00' },
+                          { text: 'ﾅﾆｶｶﾞﾜｷｱｶﾞｯﾃｸﾙ...', color: '#ff8c00' },
+                          { text: 'このチカラはﾓｼﾔ', color: '#ff8c00' },
+                          { text: 'ｶﾝｾｲしたのﾀﾞﾛｳｶ...?', color: '#ff8c00' },
+                          { text: 'この最後の最期にﾂｲﾆ....', color: '#ff8c00' },
+                          { text: '私の成し遂げられなかった「生命」の完成に', color: '#ff8c00' },
+                          { text: 'ハハ...我は蘇ったぞ', color: '#00e5ff' },
+                          { text: '新しく、そして貴様らと同じ「命」を持ってな', color: '#00e5ff' },
+                          { text: 'いざ決戦だ！！！！！！', color: '#00e5ff' },
+                        ];
+                        let awakenDelay = 0;
+                        awakenLines.forEach(({ text }) => {
+                          setTimeout(() => addNotification('info', text), awakenDelay);
+                          awakenDelay += 2000;
+                        });
+                        setTimeout(() => {
+                          // 覚醒KX戦を開始（覚醒の台詞が終わるまでここには来ない／kxBossModeは継続してtrue）
+                          setRunState(prev => prev ? { ...prev, dungeonId: 'sky_castle_ex', kxBossMode: true, kxPhase: 1, kxHp: 38750, kxIsAwakened: true, currentAreaIdx: 0 } : null);
+                          setBattleKey(k => k + 1);
+                        }, awakenDelay);
+                      } else {
+                        // 覚醒なし → ガチャコイン4枚付与してクリア
                         recordDungeonClear('sky_castle_ex');
                         addNotification('success', '🌟 裏超上級クリア！🪙 ガチャコイン+4枚獲得！');
+                        setKxBossMode(false);
                         setRunState(prev => prev ? { ...prev, isComplete: true } : null);
-                      }, delay);
-                    }
+                      }
+                    }, delay);
                   }
                 },
                 onDefeat: () => {

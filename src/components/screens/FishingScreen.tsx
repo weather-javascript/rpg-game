@@ -229,9 +229,12 @@ export function FishingScreen() {
         infinity_fish:'arowanna', god_koi:'arowanna',
       };
       addItems([{ itemId: itemMap[result.fish.id] ?? 'raw_cod', amount: 1 }]);
-      // 魚個体として保存（養殖・水族館システム連携）- レジェンダリーのみ即時保存、それ以外はスキップ
-      if (player?.uid && result.fish.rarity === 'legendary') {
-        const aquaRarity: AquaRarity = 'legendary';
+      // 魚個体として保存（養殖・水族館システム連携）- 全ての釣果を個体として保存する
+      if (player?.uid) {
+        const aquaRarityMap: Record<string, AquaRarity> = {
+          common: 'normal', uncommon: 'normal', rare: 'rare', epic: 'epic', legendary: 'legendary',
+        };
+        const aquaRarity: AquaRarity = aquaRarityMap[result.fish.rarity] ?? 'normal';
         nextIndividualId().then(indId => {
           saveFishIndividual({
             individualId: indId, fishId: result.fish.id, name: result.fish.name,
