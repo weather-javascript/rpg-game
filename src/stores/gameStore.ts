@@ -32,6 +32,7 @@ export interface GameState extends PlayerSlice, DungeonSlice, FishingSlice, Reli
   setUid: (uid: string | null) => void;
   setAuthLoading: (loading: boolean) => void;
   setPlayer: (player: PlayerData) => void;
+  settleOfflineMining: () => void;
   saveGame: () => Promise<void>;
   setActiveTab: (tab: TabId) => void;
   setFishingLocked: (locked: boolean) => void;
@@ -93,7 +94,6 @@ function ensureDefaults(player: PlayerData): PlayerData {
     lifetimeStats: player.lifetimeStats ?? { totalDamageDealt: 0, totalGoldEarned: 0, maxCombo: 0, monstersDefeated: 0 },
     unlockedAchievements: player.unlockedAchievements ?? [],
     totalWagered: player.totalWagered ?? 0,
-    stockSplitLedger: player.stockSplitLedger ?? {},
     offlineMining: player.offlineMining ?? { enabled: false, category: 'mining', startedAt: 0, lastSettledAt: 0 },
     missionProgress: player.missionProgress ?? {
       dailySlotPlays:0, dailyChohanWins:0, dailyChinchiroWins:0, dailyCoinFlipWins:0,
@@ -121,8 +121,8 @@ function ensureDefaults(player: PlayerData): PlayerData {
 
 // ============================================================
 // オフライン採掘（採掘委任）の精算
-// ログイン時/プレイヤーデータ読み込み直後の1回のみ実行する。
-// setIntervalによるリアルタイム進行は行わない。
+// ログイン時/プレイヤーデータ読み込み直後、および一定間隔（App.tsx側のタイマー）で
+// 経過時間分をまとめて精算する。演出のためのリアルタイムドロップ表示は行わない。
 // ============================================================
 function settleOfflineMiningOnLoad(
   player: PlayerData,
@@ -207,6 +207,12 @@ export const useGameStore = create<GameState>((set, get, api) => ({
       merged = settleOfflineMiningOnLoad(merged, get().addNotification);
     }
     set({ player: merged });
+  },
+  settleOfflineMining: () => {
+    const state = get();
+    if (!state.player) return;
+    const updated = settleOfflineMiningOnLoad(state.player, state.addNotification);
+    if (updated !== state.player) set({ player: updated });
   },
 
   setActiveTab: (tab) => set({ activeTab: tab }),
