@@ -5,7 +5,7 @@ import {
   arrayUnion, arrayRemove, runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, BattleHistoryEntry, PokerTable, PokerCard, PokerPlayer, PokerPhase, NpcQuest, QuestType, QuestRank, StockId } from '../types/game';
+import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, BattleHistoryEntry, PokerTable, PokerCard, PokerPlayer, PokerPhase, NpcQuest, QuestType, QuestRank, StockId, StockMaster, StockMarketSnapshot, StockMarketStats, StockSplitEvent, StockPricePoint, StockTrendData } from '../types/game';
 import { calcJackpotContrib, rollJackpot } from '../systems/minigames';
 import { enqueueActivityFeed } from './activityFeedBuffer';
 
@@ -2015,31 +2015,30 @@ export function subscribeQuestRanking(cb: (entries: QuestRankingEntry[]) => void
 // ============================================================
 // 株式市場（Wealth Exchange）
 // ============================================================
-export const STOCK_MASTERS: Record<StockId, { id: StockId; name: string; icon: string; basePrice: number; sector: import('../types/game').StockSector }> = {
-  wealth_mining:    { id: 'wealth_mining',    name: 'Wealth Mining',    icon: '⛏️', basePrice: 1000, sector: 'industry' },
-  wealth_fishery:   { id: 'wealth_fishery',   name: 'Wealth Fishery',   icon: '🎣', basePrice: 800,  sector: 'consumer' },
-  wealth_casino:    { id: 'wealth_casino',    name: 'Wealth Casino',    icon: '🎰', basePrice: 1200, sector: 'entertainment' },
-  wealth_tech:      { id: 'wealth_tech',      name: 'Wealth Tech',      icon: '💻', basePrice: 2000, sector: 'tech' },
-  wealth_energy:    { id: 'wealth_energy',    name: 'Wealth Energy',    icon: '⚡', basePrice: 900,  sector: 'energy' },
-  wealth_logistics: { id: 'wealth_logistics', name: 'Wealth Logistics', icon: '🚚', basePrice: 700,  sector: 'industry' },
-  wealth_foods:     { id: 'wealth_foods',     name: 'Wealth Foods',     icon: '🍖', basePrice: 600,  sector: 'consumer' },
-  wealth_finance:   { id: 'wealth_finance',   name: 'Wealth Finance',   icon: '💰', basePrice: 1500, sector: 'finance' },
-  // ── 新規追加銘柄 (15種) ──
-  wealth_robotics:  { id: 'wealth_robotics',  name: 'Wealth Robotics',  icon: '🤖', basePrice: 2500, sector: 'tech' },
-  wealth_software:  { id: 'wealth_software',  name: 'Wealth Software',  icon: '🖥️', basePrice: 2200, sector: 'tech' },
-  wealth_chemical:  { id: 'wealth_chemical',  name: 'Wealth Chemical',  icon: '🧪', basePrice: 850,  sector: 'industry' },
-  wealth_steel:     { id: 'wealth_steel',     name: 'Wealth Steel',     icon: '🏗️', basePrice: 750,  sector: 'industry' },
-  wealth_realestate:{ id: 'wealth_realestate',name: 'Wealth Realestate',icon: '🏢', basePrice: 1800, sector: 'finance' },
-  wealth_insurance: { id: 'wealth_insurance', name: 'Wealth Insurance', icon: '🛡️', basePrice: 1300, sector: 'finance' },
-  wealth_retail:    { id: 'wealth_retail',    name: 'Wealth Retail',    icon: '🛒', basePrice: 650,  sector: 'consumer' },
-  wealth_apparel:   { id: 'wealth_apparel',   name: 'Wealth Apparel',   icon: '👕', basePrice: 550,  sector: 'consumer' },
-  wealth_media:     { id: 'wealth_media',     name: 'Wealth Media',     icon: '📺', basePrice: 1100, sector: 'entertainment' },
-  wealth_gaming:    { id: 'wealth_gaming',    name: 'Wealth Gaming',    icon: '🎮', basePrice: 1900, sector: 'entertainment' },
-  wealth_airlines:  { id: 'wealth_airlines',  name: 'Wealth Airlines',  icon: '✈️', basePrice: 500,  sector: 'industry' },
-  wealth_solar:     { id: 'wealth_solar',     name: 'Wealth Solar',     icon: '🌞', basePrice: 950,  sector: 'energy' },
-  wealth_oil:       { id: 'wealth_oil',       name: 'Wealth Oil',       icon: '🛢️', basePrice: 1050, sector: 'energy' },
-  wealth_pharma:    { id: 'wealth_pharma',    name: 'Wealth Pharma',    icon: '💊', basePrice: 1700, sector: 'tech' },
-  wealth_telecom:   { id: 'wealth_telecom',   name: 'Wealth Telecom',   icon: '📡', basePrice: 1000, sector: 'industry' },
+export const STOCK_MASTERS: Record<StockId, StockMaster> = {
+  wealth_mining: { id: 'wealth_mining', name: 'Wealth Mining', icon: '⛏️', basePrice: 1000, sector: 'industry', sharesOutstanding: 100_000_000, splitThreshold: 6000 },
+  wealth_fishery: { id: 'wealth_fishery', name: 'Wealth Fishery', icon: '🎣', basePrice: 800, sector: 'consumer', sharesOutstanding: 100_000_000, splitThreshold: 5000 },
+  wealth_casino: { id: 'wealth_casino', name: 'Wealth Casino', icon: '🎰', basePrice: 1200, sector: 'entertainment', sharesOutstanding: 100_000_000, splitThreshold: 7200 },
+  wealth_tech: { id: 'wealth_tech', name: 'Wealth Tech', icon: '💻', basePrice: 2000, sector: 'tech', sharesOutstanding: 100_000_000, splitThreshold: 12000 },
+  wealth_energy: { id: 'wealth_energy', name: 'Wealth Energy', icon: '⚡', basePrice: 900, sector: 'energy', sharesOutstanding: 100_000_000, splitThreshold: 5400 },
+  wealth_logistics: { id: 'wealth_logistics', name: 'Wealth Logistics', icon: '🚚', basePrice: 700, sector: 'industry', sharesOutstanding: 100_000_000, splitThreshold: 5000 },
+  wealth_foods: { id: 'wealth_foods', name: 'Wealth Foods', icon: '🍖', basePrice: 600, sector: 'consumer', sharesOutstanding: 100_000_000, splitThreshold: 5000 },
+  wealth_finance: { id: 'wealth_finance', name: 'Wealth Finance', icon: '💰', basePrice: 1500, sector: 'finance', sharesOutstanding: 100_000_000, splitThreshold: 9000 },
+  wealth_robotics: { id: 'wealth_robotics', name: 'Wealth Robotics', icon: '🤖', basePrice: 2500, sector: 'tech', sharesOutstanding: 100_000_000, splitThreshold: 15000 },
+  wealth_software: { id: 'wealth_software', name: 'Wealth Software', icon: '🖥️', basePrice: 2200, sector: 'tech', sharesOutstanding: 100_000_000, splitThreshold: 13200 },
+  wealth_chemical: { id: 'wealth_chemical', name: 'Wealth Chemical', icon: '🧪', basePrice: 850, sector: 'industry', sharesOutstanding: 100_000_000, splitThreshold: 5100 },
+  wealth_steel: { id: 'wealth_steel', name: 'Wealth Steel', icon: '🏗️', basePrice: 750, sector: 'industry', sharesOutstanding: 100_000_000, splitThreshold: 5000 },
+  wealth_realestate: { id: 'wealth_realestate', name: 'Wealth Realestate', icon: '🏢', basePrice: 1800, sector: 'finance', sharesOutstanding: 100_000_000, splitThreshold: 10800 },
+  wealth_insurance: { id: 'wealth_insurance', name: 'Wealth Insurance', icon: '🛡️', basePrice: 1300, sector: 'finance', sharesOutstanding: 100_000_000, splitThreshold: 7800 },
+  wealth_retail: { id: 'wealth_retail', name: 'Wealth Retail', icon: '🛒', basePrice: 650, sector: 'consumer', sharesOutstanding: 100_000_000, splitThreshold: 5000 },
+  wealth_apparel: { id: 'wealth_apparel', name: 'Wealth Apparel', icon: '👕', basePrice: 550, sector: 'consumer', sharesOutstanding: 100_000_000, splitThreshold: 5000 },
+  wealth_media: { id: 'wealth_media', name: 'Wealth Media', icon: '📺', basePrice: 1100, sector: 'entertainment', sharesOutstanding: 100_000_000, splitThreshold: 6600 },
+  wealth_gaming: { id: 'wealth_gaming', name: 'Wealth Gaming', icon: '🎮', basePrice: 1900, sector: 'entertainment', sharesOutstanding: 100_000_000, splitThreshold: 11400 },
+  wealth_airlines: { id: 'wealth_airlines', name: 'Wealth Airlines', icon: '✈️', basePrice: 500, sector: 'industry', sharesOutstanding: 100_000_000, splitThreshold: 5000 },
+  wealth_solar: { id: 'wealth_solar', name: 'Wealth Solar', icon: '🌞', basePrice: 950, sector: 'energy', sharesOutstanding: 100_000_000, splitThreshold: 5700 },
+  wealth_oil: { id: 'wealth_oil', name: 'Wealth Oil', icon: '🛢️', basePrice: 1050, sector: 'energy', sharesOutstanding: 100_000_000, splitThreshold: 6300 },
+  wealth_pharma: { id: 'wealth_pharma', name: 'Wealth Pharma', icon: '💊', basePrice: 1700, sector: 'tech', sharesOutstanding: 100_000_000, splitThreshold: 10200 },
+  wealth_telecom: { id: 'wealth_telecom', name: 'Wealth Telecom', icon: '📡', basePrice: 1000, sector: 'industry', sharesOutstanding: 100_000_000, splitThreshold: 6000 },
 };
 
 const STOCK_IDS: StockId[] = [
@@ -2048,6 +2047,23 @@ const STOCK_IDS: StockId[] = [
   'wealth_apparel','wealth_media','wealth_gaming','wealth_airlines','wealth_solar','wealth_oil','wealth_pharma','wealth_telecom',
 ];
 export const STOCK_ID_LIST = STOCK_IDS;
+
+const STOCK_DAY_PREFIX = 'day';
+const STOCK_YEAR_PREFIX = 'year';
+const deriveMarketKey = (now: number): string => new Date(now).toISOString().slice(0, 10);
+const deriveYearKey = (now: number): string => String(new Date(now).getFullYear());
+const stockKey = (prefix: string, id: StockId): string => `${prefix}_${id}`;
+const stockDayKey = (id: StockId): string => stockKey(STOCK_DAY_PREFIX, id);
+const stockYearKey = (id: StockId): string => stockKey(STOCK_YEAR_PREFIX, id);
+const stockStatKey = (name: string, id: StockId): string => `${name}_${id}`;
+
+const defaultTrend = (sector: import('../types/game').StockSector): import('../types/game').StockTrendData => ({
+  trend: 0,
+  volatility: (0.02 + Math.random() * 0.04) * SECTOR_VOL_MULT[sector],
+  stability: Math.min(0.9, (0.3 + Math.random() * 0.5) * SECTOR_STABILITY_BASE[sector] / 0.5),
+  consecutiveTicks: 0,
+});
+
 
 // セクター別ボラティリティ特性
 const SECTOR_VOL_MULT: Record<import('../types/game').StockSector, number> = {
@@ -2180,18 +2196,30 @@ export function getVolatilityLabel(v: number): { label: string; color: string } 
 export function subscribeStockPrices(
   cb: (
     prices: Record<StockId, number>,
-    history: Record<StockId, import('../types/game').StockPricePoint[]>,
-    trends: Record<StockId, import('../types/game').StockTrendData>
+    history: Record<StockId, StockPricePoint[]>,
+    trends: Record<StockId, StockTrendData>,
+    stats: Record<StockId, import('../types/game').StockMarketStats>,
+    splitEvents: import('../types/game').StockSplitEvent[]
   ) => void
 ): () => void {
   const ref = doc(db, 'stock_market', 'prices');
   getDoc(ref).then(snap => {
     if (!snap.exists()) {
-      const initData: Record<string, unknown> = { lastTickAt: 0 };
+      const initData: Record<string, unknown> = { lastTickAt: 0, splitEvents: [] };
       for (const id of STOCK_IDS) {
-        initData[id] = STOCK_MASTERS[id].basePrice;
-        initData[`history_${id}`] = [{ timestamp: Date.now(), price: STOCK_MASTERS[id].basePrice }];
+        const base = STOCK_MASTERS[id].basePrice;
+        initData[id] = base;
+        initData[`history_${id}`] = [{ timestamp: Date.now(), price: base }];
         initData[`trend_${id}`] = { trend: 0, volatility: 0.03, stability: 0.5, consecutiveTicks: 0 };
+        initData[stockStatKey('prevClose', id)] = base;
+        initData[stockStatKey('dayOpen', id)] = base;
+        initData[stockStatKey('dayHigh', id)] = base;
+        initData[stockStatKey('dayLow', id)] = base;
+        initData[stockStatKey('dayVolume', id)] = 0;
+        initData[stockStatKey('yearHigh', id)] = base;
+        initData[stockStatKey('yearLow', id)] = base;
+        initData[stockDayKey(id)] = deriveMarketKey(Date.now());
+        initData[stockYearKey(id)] = deriveYearKey(Date.now());
       }
       setDoc(ref, initData).catch(() => {});
     }
@@ -2199,23 +2227,30 @@ export function subscribeStockPrices(
 
   return onSnapshot(ref, snap => {
     if (!snap.exists()) {
-      cb({} as Record<StockId, number>, {} as Record<StockId, import('../types/game').StockPricePoint[]>, {} as Record<StockId, import('../types/game').StockTrendData>);
+      cb({} as Record<StockId, number>, {} as Record<StockId, StockPricePoint[]>, {} as Record<StockId, StockTrendData>, {} as Record<StockId, import('../types/game').StockMarketStats>, []);
       return;
     }
     const data = snap.data();
-    const prices: Record<string, number> = {};
-    const history: Record<string, import('../types/game').StockPricePoint[]> = {};
-    const trends: Record<string, import('../types/game').StockTrendData> = {};
+    const prices = {} as Record<StockId, number>;
+    const history = {} as Record<StockId, StockPricePoint[]>;
+    const trends = {} as Record<StockId, StockTrendData>;
+    const stats = {} as Record<StockId, import('../types/game').StockMarketStats>;
     for (const id of STOCK_IDS) {
-      prices[id] = data[id] ?? STOCK_MASTERS[id].basePrice;
-      history[id] = data[`history_${id}`] ?? [];
-      trends[id] = data[`trend_${id}`] ?? { trend: 0, volatility: 0.03, stability: 0.5, consecutiveTicks: 0 };
+      const price = Number(data[id] ?? STOCK_MASTERS[id].basePrice);
+      prices[id] = price;
+      history[id] = (data[`history_${id}`] as StockPricePoint[]) ?? [];
+      trends[id] = (data[`trend_${id}`] as StockTrendData) ?? { trend: 0, volatility: 0.03, stability: 0.5, consecutiveTicks: 0 };
+      const prevClose = Number(data[stockStatKey('prevClose', id)] ?? price);
+      const dayOpen = Number(data[stockStatKey('dayOpen', id)] ?? prevClose);
+      const dayHigh = Number(data[stockStatKey('dayHigh', id)] ?? Math.max(prevClose, price));
+      const dayLow = Number(data[stockStatKey('dayLow', id)] ?? Math.min(prevClose, price));
+      const dayVolume = Number(data[stockStatKey('dayVolume', id)] ?? 0);
+      const yearHigh = Number(data[stockStatKey('yearHigh', id)] ?? price);
+      const yearLow = Number(data[stockStatKey('yearLow', id)] ?? price);
+      stats[id] = { prevClose, dayOpen, dayHigh, dayLow, dayVolume, yearHigh, yearLow };
     }
-    cb(
-      prices as Record<StockId, number>,
-      history as Record<StockId, import('../types/game').StockPricePoint[]>,
-      trends as Record<StockId, import('../types/game').StockTrendData>
-    );
+    const splitEvents = (data.splitEvents as import('../types/game').StockSplitEvent[]) ?? [];
+    cb(prices, history, trends, stats, splitEvents);
   }, () => {});
 }
 
@@ -2229,13 +2264,17 @@ const NEWS_PER_TICK_PROB_CLOSED = NEWS_PER_TICK_PROB / 15;
 export async function tickStockPrices(): Promise<{
   prices: Record<StockId, number>;
   news: string[];
-  trends: Record<StockId, import('../types/game').StockTrendData>;
+  trends: Record<StockId, StockTrendData>;
+  stats: Record<StockId, import('../types/game').StockMarketStats>;
+  splitEvents: import('../types/game').StockSplitEvent[];
 }> {
   const ref = doc(db, 'stock_market', 'prices');
   const now = Date.now();
   const prices: Record<string, number> = {};
   const newsItems: string[] = [];
-  const trends: Record<string, import('../types/game').StockTrendData> = {};
+  const trends: Record<string, StockTrendData> = {};
+  const stats: Record<string, import('../types/game').StockMarketStats> = {};
+  const splitEvents: import('../types/game').StockSplitEvent[] = [];
 
   try {
     await runTransaction(db, async (tx) => {
@@ -2245,83 +2284,114 @@ export async function tickStockPrices(): Promise<{
       const lastTick = (data['lastTickAt'] as number) ?? 0;
       if (lastTick !== 0 && now - lastTick < 25_000) {
         for (const id of STOCK_IDS) {
-          prices[id] = (data[id] as number) ?? STOCK_MASTERS[id].basePrice;
-          trends[id] = (data[`trend_${id}`] as import('../types/game').StockTrendData) ?? { trend: 0, volatility: 0.03, stability: 0.5, consecutiveTicks: 0 };
+          prices[id] = Number(data[id] ?? STOCK_MASTERS[id].basePrice);
+          trends[id] = (data[`trend_${id}`] as StockTrendData) ?? defaultTrend(STOCK_MASTERS[id].sector);
+          stats[id] = {
+            prevClose: Number(data[stockStatKey('prevClose', id)] ?? prices[id]),
+            dayOpen: Number(data[stockStatKey('dayOpen', id)] ?? prices[id]),
+            dayHigh: Number(data[stockStatKey('dayHigh', id)] ?? prices[id]),
+            dayLow: Number(data[stockStatKey('dayLow', id)] ?? prices[id]),
+            dayVolume: Number(data[stockStatKey('dayVolume', id)] ?? 0),
+            yearHigh: Number(data[stockStatKey('yearHigh', id)] ?? prices[id]),
+            yearLow: Number(data[stockStatKey('yearLow', id)] ?? prices[id]),
+          };
         }
         return;
       }
 
       console.log('[tickStockPrices] tick実行 diff=', now - lastTick);
 
-      // 今日の開始時刻
-      const todayStart = new Date(now);
-      todayStart.setHours(0, 0, 0, 0);
-      const todayStartMs = todayStart.getTime();
-
-      // 開場/閉場判定
+      const todayKey = deriveMarketKey(now);
+      const yearKey = deriveYearKey(now);
       const marketOpen = isMarketOpen(now);
 
-      // ランダムイベント発生判定（開場中は1日5件、閉場中は1日1件ペース）
       let eventForTick: typeof MARKET_EVENTS[number] | null = null;
       if (Math.random() < (marketOpen ? NEWS_PER_TICK_PROB : NEWS_PER_TICK_PROB_CLOSED)) {
         eventForTick = MARKET_EVENTS[Math.floor(Math.random() * MARKET_EVENTS.length)];
       }
 
-      const newData: Record<string, unknown> = { lastTickAt: now };
+      const newData: Record<string, unknown> = { lastTickAt: now, splitEvents: [] };
       newsItems.length = 0;
 
       for (const id of STOCK_IDS) {
-        const current: number = (data[id] as number) ?? STOCK_MASTERS[id].basePrice;
-        let trendData: import('../types/game').StockTrendData = (data[`trend_${id}`] as import('../types/game').StockTrendData) ?? {
-          trend: (Math.random() - 0.5) * 0.04,
-          volatility: (0.02 + Math.random() * 0.04) * SECTOR_VOL_MULT[STOCK_MASTERS[id].sector],
-          stability: Math.min(0.9, (0.3 + Math.random() * 0.5) * SECTOR_STABILITY_BASE[STOCK_MASTERS[id].sector] / 0.5),
-          consecutiveTicks: 0,
-        };
+        const master = STOCK_MASTERS[id];
+        const current: number = Number(data[id] ?? master.basePrice);
+        let trendData: StockTrendData = (data[`trend_${id}`] as StockTrendData) ?? defaultTrend(master.sector);
 
-        // 閉場中は価格更新を停止（トレンド・ボラティリティもそのまま維持）
+        const storedDayKey = String(data[stockDayKey(id)] ?? '');
+        const storedYearKey = String(data[stockYearKey(id)] ?? '');
+        let prevClose = Number(data[stockStatKey('prevClose', id)] ?? current);
+        let dayOpen = Number(data[stockStatKey('dayOpen', id)] ?? current);
+        let dayHigh = Number(data[stockStatKey('dayHigh', id)] ?? current);
+        let dayLow = Number(data[stockStatKey('dayLow', id)] ?? current);
+        let dayVolume = Number(data[stockStatKey('dayVolume', id)] ?? 0);
+        let yearHigh = Number(data[stockStatKey('yearHigh', id)] ?? current);
+        let yearLow = Number(data[stockStatKey('yearLow', id)] ?? current);
+
+        if (storedDayKey !== todayKey) {
+          prevClose = current;
+          dayOpen = current;
+          dayHigh = current;
+          dayLow = current;
+          dayVolume = 0;
+        }
+        if (storedYearKey !== yearKey) {
+          yearHigh = current;
+          yearLow = current;
+        }
+
         if (!marketOpen) {
           prices[id] = current;
           trends[id] = trendData;
+          stats[id] = { prevClose, dayOpen, dayHigh, dayLow, dayVolume, yearHigh, yearLow };
           newData[id] = current;
           newData[`trend_${id}`] = trendData;
+          newData[stockDayKey(id)] = todayKey;
+          newData[stockYearKey(id)] = yearKey;
+          newData[stockStatKey('prevClose', id)] = prevClose;
+          newData[stockStatKey('dayOpen', id)] = dayOpen;
+          newData[stockStatKey('dayHigh', id)] = dayHigh;
+          newData[stockStatKey('dayLow', id)] = dayLow;
+          newData[stockStatKey('dayVolume', id)] = dayVolume;
+          newData[stockStatKey('yearHigh', id)] = yearHigh;
+          newData[stockStatKey('yearLow', id)] = yearLow;
           continue;
         }
 
-        // ストップ高/安チェック: その日の取引停止
         const haltedAt = trendData.haltedAt;
-        if (haltedAt && haltedAt >= todayStartMs) {
-          // 今日は取引停止
+        if (haltedAt && haltedAt >= new Date(now).setHours(0, 0, 0, 0)) {
           prices[id] = current;
           trends[id] = trendData;
+          stats[id] = { prevClose, dayOpen, dayHigh, dayLow, dayVolume, yearHigh, yearLow };
           newData[id] = current;
           newData[`trend_${id}`] = trendData;
+          newData[stockDayKey(id)] = todayKey;
+          newData[stockYearKey(id)] = yearKey;
+          newData[stockStatKey('prevClose', id)] = prevClose;
+          newData[stockStatKey('dayOpen', id)] = dayOpen;
+          newData[stockStatKey('dayHigh', id)] = dayHigh;
+          newData[stockStatKey('dayLow', id)] = dayLow;
+          newData[stockStatKey('dayVolume', id)] = dayVolume;
+          newData[stockStatKey('yearHigh', id)] = yearHigh;
+          newData[stockStatKey('yearLow', id)] = yearLow;
           continue;
         }
 
-        // トレンド更新
         const stabilityFactor = trendData.stability;
-        // 同方向が続くほど反転しやすくなる
         const revertProb = Math.min(0.8, 0.05 + trendData.consecutiveTicks * 0.04);
         let newTrend = trendData.trend;
         if (Math.random() > stabilityFactor || Math.random() < revertProb) {
-          // トレンド変化
           newTrend = newTrend * 0.3 + (Math.random() - 0.5) * 0.08;
         } else {
-          // 小さなドリフト
           newTrend = newTrend * 0.9 + (Math.random() - 0.5) * 0.01;
         }
         newTrend = Math.max(-0.05, Math.min(0.05, newTrend));
 
         const newConsec = Math.sign(newTrend) === Math.sign(trendData.trend) ? trendData.consecutiveTicks + 1 : 0;
-        // volatilityも少しランダムウォーク
         const newVol = Math.max(0.01, Math.min(0.1, trendData.volatility + (Math.random() - 0.5) * 0.005));
-
-        // 価格変動計算
         const noise = (Math.random() - 0.5) * 2 * newVol;
         let changePct = newTrend + noise;
 
-        // バブル発生 (1.5%)
         let newsText: string | undefined;
         const bubbleRoll = Math.random();
         const isStopHigh = Math.random() < 0.002;
@@ -2329,27 +2399,24 @@ export async function tickStockPrices(): Promise<{
 
         if (isStopHigh) {
           changePct = 0.5;
-          newsText = `🚀 【ストップ高】${STOCK_MASTERS[id].name} +50%！本日の取引終了`;
+          newsText = `🚀 【ストップ高】${master.name} +50%！本日の取引終了`;
           trendData = { ...trendData, trend: newTrend, volatility: newVol, consecutiveTicks: newConsec, haltedAt: now };
         } else if (isStopLow) {
           changePct = -0.5;
-          newsText = `📉 【ストップ安】${STOCK_MASTERS[id].name} -50%！本日の取引終了`;
+          newsText = `📉 【ストップ安】${master.name} -50%！本日の取引終了`;
           trendData = { ...trendData, trend: newTrend, volatility: newVol, consecutiveTicks: newConsec, haltedAt: now };
         } else if (bubbleRoll < 0.015) {
-          // バブル
-          changePct = 1.0 + Math.random() * 1.0; // +100%~+200%
-          newsText = `🚀 【バブル発生！】${STOCK_MASTERS[id].name} が急騰中！`;
+          changePct = 1.0 + Math.random() * 1.0;
+          newsText = `🚀 【バブル発生！】${master.name} が急騰中！`;
           trendData = { ...trendData, trend: 0.05, volatility: Math.min(0.1, newVol * 1.5), consecutiveTicks: 0 };
         } else if (eventForTick) {
-          // マーケットイベント（個別銘柄 or セクター単位で影響）
           const affects = eventForTick.allMarket ||
             (eventForTick.targets && eventForTick.targets.includes(id)) ||
-            (eventForTick.sectors && eventForTick.sectors.includes(STOCK_MASTERS[id].sector));
+            (eventForTick.sectors && eventForTick.sectors.includes(master.sector));
           if (affects) {
-            // ニュースの方向と価格変動の方向を一致させる（ノイズは小さく抑える）
             changePct = eventForTick.changePct + noise * 0.2;
             if (Math.sign(changePct) !== Math.sign(eventForTick.changePct) && eventForTick.changePct !== 0) {
-              changePct = eventForTick.changePct; // 逆転を防止
+              changePct = eventForTick.changePct;
             }
             newsText = `📰 ${eventForTick.text}（${changePct > 0 ? '+' : ''}${(changePct * 100).toFixed(1)}%）`;
             trendData = {
@@ -2365,54 +2432,86 @@ export async function tickStockPrices(): Promise<{
           trendData = { ...trendData, trend: newTrend, volatility: newVol, consecutiveTicks: newConsec };
         }
 
-        const newPrice = Math.max(1, Math.round(current * (1 + changePct)));
-
-        // ローソク足データ生成
+        let newPrice = Math.max(1, Math.round(current * (1 + changePct)));
         const candleOpen = current;
         const candleClose = newPrice;
         const swing = Math.abs(changePct) * current * 0.3;
         const candleHigh = Math.max(candleOpen, candleClose) + Math.round(Math.random() * swing);
-        const candleLow  = Math.max(1, Math.min(candleOpen, candleClose) - Math.round(Math.random() * swing));
+        const candleLow = Math.max(1, Math.min(candleOpen, candleClose) - Math.round(Math.random() * swing));
+
+        if (newPrice >= master.splitThreshold) {
+          const ratio = 2;
+          const beforePrice = newPrice;
+          newPrice = Math.max(1, Math.round(newPrice / ratio));
+          prevClose = Math.max(1, Math.round(prevClose / ratio));
+          dayOpen = Math.max(1, Math.round(dayOpen / ratio));
+          dayHigh = Math.max(1, Math.round(dayHigh / ratio));
+          dayLow = Math.max(1, Math.round(dayLow / ratio));
+          yearHigh = Math.max(1, Math.round(yearHigh / ratio));
+          yearLow = Math.max(1, Math.round(yearLow / ratio));
+          const splitEvent: import('../types/game').StockSplitEvent = {
+            stockId: id, ratio, timestamp: now, beforePrice, afterPrice: newPrice,
+          };
+          splitEvents.push(splitEvent);
+          newsText = `📦 【株式分割】${master.name} が 1:${ratio} 分割（${beforePrice.toLocaleString()}WC → ${newPrice.toLocaleString()}WC）`;
+          trendData = { ...trendData, trend: Math.max(-0.01, Math.min(0.01, trendData.trend * 0.5)), consecutiveTicks: 0 };
+        }
+
+        const volume = Math.max(1, Math.round((Math.abs(changePct) * 900 + 120) * (0.7 + Math.random() * 0.8)));
+        dayHigh = Math.max(dayHigh, newPrice);
+        dayLow = Math.min(dayLow, newPrice);
+        dayVolume += volume;
+        yearHigh = Math.max(yearHigh, newPrice);
+        yearLow = Math.min(yearLow, newPrice);
 
         prices[id] = newPrice;
         trends[id] = trendData;
+        stats[id] = { prevClose, dayOpen, dayHigh, dayLow, dayVolume, yearHigh, yearLow };
         newData[id] = newPrice;
         newData[`trend_${id}`] = trendData;
-
-        if (newsText !== undefined) newsItems.push(newsText);
-        if (eventForTick && newsText && !newsItems.includes(newsText)) {
-          // already pushed above
-        }
+        newData[stockDayKey(id)] = todayKey;
+        newData[stockYearKey(id)] = yearKey;
+        newData[stockStatKey('prevClose', id)] = prevClose;
+        newData[stockStatKey('dayOpen', id)] = dayOpen;
+        newData[stockStatKey('dayHigh', id)] = dayHigh;
+        newData[stockStatKey('dayLow', id)] = dayLow;
+        newData[stockStatKey('dayVolume', id)] = dayVolume;
+        newData[stockStatKey('yearHigh', id)] = yearHigh;
+        newData[stockStatKey('yearLow', id)] = yearLow;
 
         const histKey = `history_${id}`;
-        const hist: import('../types/game').StockPricePoint[] = (data[histKey] as import('../types/game').StockPricePoint[]) ?? [];
-        const point: import('../types/game').StockPricePoint = {
+        const hist: StockPricePoint[] = (data[histKey] as StockPricePoint[]) ?? [];
+        const point: StockPricePoint = {
           timestamp: now,
           price: newPrice,
           open: candleOpen,
           high: candleHigh,
           low: candleLow,
           close: candleClose,
+          volume,
           ...(newsText !== undefined ? { news: newsText } : {}),
         };
         hist.push(point);
         if (hist.length > 96) hist.splice(0, hist.length - 96);
         newData[histKey] = hist;
+
+        if (newsText !== undefined) newsItems.push(newsText);
       }
 
-      // イベントが発生したら全体ニュースとして1件だけ
       if (eventForTick && newsItems.length === 0) {
-        // イベントは何も影響しなかった場合でもニュースだけ出す
         newsItems.push(`📰 ${eventForTick.text}`);
       }
 
+      newData.splitEvents = splitEvents;
       tx.set(ref, newData, { merge: true });
     });
 
     return {
       prices: prices as Record<StockId, number>,
       news: newsItems,
-      trends: trends as Record<StockId, import('../types/game').StockTrendData>,
+      trends: trends as Record<StockId, StockTrendData>,
+      stats: stats as Record<StockId, import('../types/game').StockMarketStats>,
+      splitEvents,
     };
   } catch (e) {
     console.error('[tickStockPrices] Firestoreへの書き込みに失敗:', e);
