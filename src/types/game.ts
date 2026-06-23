@@ -991,7 +991,29 @@ export interface QuestAcceptance {
 // ============================================================
 export type StockSector = 'tech' | 'industry' | 'finance' | 'consumer' | 'entertainment' | 'energy';
 
-export type StockId = string;
+export type StockId =
+  | 'wealth_mining'
+  | 'wealth_fishery'
+  | 'wealth_casino'
+  | 'wealth_tech'
+  | 'wealth_energy'
+  | 'wealth_logistics'
+  | 'wealth_foods'
+  | 'wealth_finance'
+  | 'wealth_robotics'
+  | 'wealth_software'
+  | 'wealth_chemical'
+  | 'wealth_steel'
+  | 'wealth_realestate'
+  | 'wealth_insurance'
+  | 'wealth_retail'
+  | 'wealth_apparel'
+  | 'wealth_media'
+  | 'wealth_gaming'
+  | 'wealth_airlines'
+  | 'wealth_solar'
+  | 'wealth_oil'
+  | 'wealth_pharma'
   | 'wealth_telecom';
 
 export interface StockMaster {
