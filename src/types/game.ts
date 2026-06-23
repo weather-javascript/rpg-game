@@ -715,6 +715,7 @@ export interface PlayerData {
   // 株式保有
   stockHoldings?: Record<string, StockHolding>; // key: StockId
   totalStockProfit?: number;
+  stockSplitLedger?: Record<string, number>; // key: StockId, 最後に反映した株式分割時刻
   // ナビ報酬受取済み
   naviClaimed?: Record<string, boolean>;
   // ギルド
@@ -1021,6 +1022,8 @@ export interface StockMaster {
   icon: string;
   basePrice: number;
   sector: StockSector;
+  sharesOutstanding: number;
+  splitThreshold: number;
 }
 
 export interface StockPricePoint {
@@ -1031,6 +1034,7 @@ export interface StockPricePoint {
   high?: number;
   low?: number;
   close?: number;
+  volume?: number;
 }
 
 export interface StockTrendData {
@@ -1139,4 +1143,30 @@ export interface DirectMessage {
   goldAmount?: number;
   read: boolean;
   createdAt: number;
+}
+
+export interface StockSplitEvent {
+  stockId: StockId;
+  ratio: number;
+  timestamp: number;
+  beforePrice: number;
+  afterPrice: number;
+}
+
+
+export interface StockMarketStats {
+  prevClose: number;
+  dayOpen: number;
+  dayHigh: number;
+  dayLow: number;
+  dayVolume: number;
+  yearHigh: number;
+  yearLow: number;
+}
+export interface StockMarketSnapshot {
+  prices: Record<StockId, number>;
+  history: Record<StockId, StockPricePoint[]>;
+  trends: Record<StockId, StockTrendData>;
+  stats: Record<StockId, StockMarketStats>;
+  splitEvents: StockSplitEvent[];
 }
