@@ -5,7 +5,7 @@ import {
   arrayUnion, arrayRemove, runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, BattleHistoryEntry, PokerTable, PokerCard, PokerPlayer, PokerPhase, NpcQuest, QuestType, QuestRank, StockId, StockMaster, StockMarketSnapshot, StockMarketStats, StockSplitEvent, StockPricePoint, StockTrendData } from '../types/game';
+import type { OnlineUser, BoardMessage, BoardReply, AuctionListing, GambleBattle, GambleBattleData, BattleHistoryEntry, PokerTable, PokerCard, PokerPlayer, PokerPhase, NpcQuest, QuestType, QuestRank, StockId, StockMaster, StockPricePoint, StockTrendData } from '../types/game';
 import { calcJackpotContrib, rollJackpot } from '../systems/minigames';
 import { enqueueActivityFeed } from './activityFeedBuffer';
 
