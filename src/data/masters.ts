@@ -294,6 +294,22 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   scale_high_3:    { id:'scale_high_3',    name:'上位鱗（風）',   description:'Rank4以上で入手。',    category:'material',  itemType:'Item', rarity:'rare',     sellPrice:1000, buyPrice:0, maxStack:99, icon:'vortex' },
   scale_high_4:    { id:'scale_high_4',    name:'上位鱗（土）',   description:'Rank4以上で入手。',    category:'material',  itemType:'Item', rarity:'rare',     sellPrice:1000, buyPrice:0, maxStack:99, icon:'mountain' },
   wolf_fang:       { id:'wolf_fang',       name:'ハーブウルフの牙', description:'FFGGで釣れる牙。',  category:'material',  itemType:'Item', rarity:'uncommon', sellPrice:300,  buyPrice:0, maxStack:99, icon:'tooth' },
+  // ── FF1 新規アイテム ──
+  herb_wolf_meat:          { id:'herb_wolf_meat',          name:'ハーブウルフの肉',       description:'FF1のハーブウルフが確定で落とす肉。焼くとステーキになる。【入手】FF1ハーブウルフ確定',      category:'food',     itemType:'Heal', rarity:'common',    sellPrice:50,      buyPrice:0, maxStack:99, icon:'meat',         useEffect:{hpRestore:30, satietyRestore:30, message:'ハーブウルフの肉を食べた！'} },
+  high_quality_log:        { id:'high_quality_log',        name:'上質な原木',             description:'FF1の彷徨う木が70%で落とす上質な木材。MMエンジンで吹き飛ばせる。【入手】FF1彷徨う木70%',   category:'material', itemType:'Item',  rarity:'uncommon',  sellPrice:200,     buyPrice:0, maxStack:99, icon:'leaf' },
+  wolf_mallow:             { id:'wolf_mallow',             name:'ウルフマロウ',           description:'FF1エリアの紫色の植物。特定の場所で息吹の羽根と交換できる。【入手】FF1採集確定',            category:'material', itemType:'Item',  rarity:'rare',      sellPrice:800,     buyPrice:0, maxStack:99, icon:'herb' },
+  river_crab_shell:        { id:'river_crab_shell',        name:'リバークラブの甲殻',     description:'FF1の水中にいるリバークラブを攻撃すると入手。範囲武器推奨。【入手】FF1リバークラブ30%',     category:'material', itemType:'Item',  rarity:'uncommon',  sellPrice:350,     buyPrice:0, maxStack:99, icon:'crab' },
+  lalaby_honey:            { id:'lalaby_honey',            name:'ララビーのはちみつ',     description:'FF1小屋1の固定採取地点で入手。ラジュース以外の目的では使わないこと。【入手】FF1小屋1固定採取', category:'material', itemType:'Item',  rarity:'rare',      sellPrice:600,     buyPrice:0, maxStack:99, icon:'honey' },
+  mozzarella_fruit:        { id:'mozzarella_fruit',        name:'モッツアレラフルーツ',   description:'FF1エリアの謎の果実から25%で採集できるフルーツ。【入手】FF1採集25%',                          category:'food',     itemType:'Heal',  rarity:'uncommon',  sellPrice:80,      buyPrice:0, maxStack:99, icon:'fruit',        useEffect:{hpRestore:20, satietyRestore:20, message:'モッツアレラフルーツを食べた！'} },
+  breath_feather:          { id:'breath_feather',          name:'息吹の羽根',             description:'ウルフマロウとの交換・取引で入手できる希少な羽根。強力な装備の素材。【入手】FF1取引オオカミ交換', category:'material', itemType:'Item',  rarity:'epic',      sellPrice:5000,    buyPrice:0, maxStack:99, icon:'feather' },
+  green_basil_s:           { id:'green_basil_s',           name:'グリーンバジルS',        description:'FF1のグリーンバジルから確定採集できる小バジル。【入手】FF1採集確定',                            category:'material', itemType:'Item',  rarity:'common',    sellPrice:30,      buyPrice:0, maxStack:99, icon:'herb' },
+  green_basil_l:           { id:'green_basil_l',           name:'グリーンバジルL',        description:'FF1のグリーンバジルから25%で採集できる大バジル。確率が低い。【入手】FF1採集25%',                 category:'material', itemType:'Item',  rarity:'uncommon',  sellPrice:150,     buyPrice:0, maxStack:99, icon:'herb' },
+  poison_cress:            { id:'poison_cress',            name:'ポイズンクレソン',       description:'FF1エリアで採集できる毒性の植物。素材として使用。【入手】FF1採集確定',                            category:'material', itemType:'Item',  rarity:'uncommon',  sellPrice:100,     buyPrice:0, maxStack:99, icon:'herb' },
+  // ── FF2 新規アイテム ──
+  sage_stone:              { id:'sage_stone',              name:'賢者の輝石',             description:'FF2の森の賢者フォレスター/フォレストルが10%で落とす輝石。【入手】FF2フォレスター10%',              category:'material', itemType:'Item',  rarity:'epic',      sellPrice:4000,    buyPrice:0, maxStack:99, icon:'gem' },
+  dark_knight_armor:       { id:'dark_knight_armor',       name:'暗黒騎士の甲冑（素材）', description:'FF2の暗黒騎士オメガ・ナイト・メアがタゲ/範囲それぞれ75%で落とす甲冑素材。【入手】FF2オメガ75%', category:'material', itemType:'Item',  rarity:'epic',      sellPrice:8000,    buyPrice:0, maxStack:99, icon:'chest_armor' },
+  nameless_sword:          { id:'nameless_sword',          name:'無銘の剣',               description:'FF2の暗黒騎士から稀に入手できる銘のない剣。タゲ1.5%・範囲0.8%。【入手】FF2オメガ低確率',         category:'weapon',   itemType:'Item',  rarity:'legendary', sellPrice:6000000, buyPrice:0, maxStack:1,  icon:'sword' },
+  omega_nightmare_contract:{ id:'omega_nightmare_contract', name:'契約「暗黒騎士ナイト・メア」', description:'暗黒騎士オメガ・ナイト・メアの魂を封じた契約書。タゲ0.1%のみ。【入手】FF2オメガ0.1%タゲのみ', category:'material', itemType:'Item',  rarity:'legendary', sellPrice:0,       buyPrice:0, maxStack:1,  icon:'scroll' },
   wolf_crystal:    { id:'wolf_crystal',    name:'狼牙魔結晶',     description:'上位鱗の交換素材。',  category:'material',  itemType:'Item', rarity:'rare',     sellPrice:1500, buyPrice:0, maxStack:99, icon:'crystal_ball' },
   caribbean_wave:  { id:'caribbean_wave',  name:'カリブの荒波',   description:'フィーバー中のみ。',   category:'material',  itemType:'Item', rarity:'rare',     sellPrice:800,  buyPrice:0, maxStack:99, icon:'wave' },
   la_juice_normal: { id:'la_juice_normal', name:'ラジュース',      description:'幸運バフ。釣り・採掘効率+30%。', category:'potion',  itemType:'Heal', rarity:'rare', sellPrice:500, buyPrice:0, maxStack:99, icon:'potion_mate', useEffect:{hpRestore:20,satietyRestore:20,message:'ラジュースを飲んだ！幸運バフが付いた！'} },
@@ -2347,6 +2363,39 @@ export const MONSTER_MASTER: Record<string, MonsterMaster> = {
   ff_soul_attack:    { id:'ff_soul_attack',    name:'アタックソール',       description:'ソウル系の攻撃特化個体。突進の威力が高く、優先的に処理したい。', icon:'swords', maxHp:145, defense:16, attack:15, baseExp:75, baseGold:42, dungeonIds:['ff_forest','ff_desert','ff_snow','ff_savanna','ff_pirate'], skills:['攻撃魂(ATK+10)','突進(高威力単体攻撃)'], drops:[{itemId:'ancient_shard',baseRate:0.25,minAmount:1,maxAmount:1}] },
   ff_soul_wind:      { id:'ff_soul_wind',      name:'ウィンドソール',       description:'ソウル系の俊敏個体。風刃で全体を斬り、自身は浮遊して攻撃を躱す。', icon:'wave', maxHp:135, defense:14, attack:9, baseExp:70, baseGold:40, dungeonIds:['ff_forest','ff_desert','ff_snow','ff_savanna','ff_pirate'], skills:['風刃(全体攻撃)','浮遊(回避率上昇)'], drops:[{itemId:'ancient_shard',baseRate:0.2,minAmount:1,maxAmount:1}] },
   // ============================================================
+  // FF1エリア モブ
+  // ============================================================
+  ff1_scout_knight:       { id:'ff1_scout_knight',       name:'偵察騎士',                     description:'FF1エリアの斥候。FF硬貨・FF小判を落とす。魔装騎士より弱い。',                                                                                  icon:'golden_chestplate', maxHp:120,  attack:10, defense:8,  baseExp:40,  baseGold:30,  dungeonIds:['ff1_main'], skills:['斥候の機動(先制回避)'],                                                             drops:[{itemId:'ff_coin_small',baseRate:0.60,minAmount:1,maxAmount:2}] },
+  ff1_magic_knight:       { id:'ff1_magic_knight',       name:'魔装騎士',                     description:'魔法を纏った重装騎士。偵察騎士より強く大量にFF硬貨を落とす。',                                                                                   icon:'golden_chestplate', maxHp:200,  attack:18, defense:14, baseExp:70,  baseGold:50,  dungeonIds:['ff1_main'], skills:['魔装突撃(DEF無視攻撃)','魔力壁(2ターンDEF+10)'],                                  drops:[{itemId:'ff_coin_small',baseRate:0.90,minAmount:2,maxAmount:4}] },
+  ff1_wandering_tree:     { id:'ff1_wandering_tree',     name:'彷徨う木',                     description:'FF1エリアに生息する歩く木。上質な原木を70%で落とす。MMエンジンで吹き飛ばせる。',                                                                icon:'leaf',              maxHp:180,  attack:8,  defense:20, baseExp:35,  baseGold:15,  dungeonIds:['ff1_main'], skills:['根の抱擁(スタン付与)','木の硬さ(DEF+15)'],                                        drops:[{itemId:'high_quality_log',baseRate:0.70,minAmount:1,maxAmount:2},{itemId:'ff_coin_small',baseRate:0.30,minAmount:1,maxAmount:1}] },
+  ff1_herb_wolf:          { id:'ff1_herb_wolf',          name:'ハーブウルフ',                 description:'FF1エリアの薬草喰いの狼。肉は確定ドロップ。牙は15%と渋い。',                                                                                     icon:'blizzard',          maxHp:150,  attack:14, defense:10, baseExp:55,  baseGold:35,  dungeonIds:['ff1_main'], skills:['薬草噛み(毒付与)','群れ咆哮(仲間がいるとATK+5)'],                               drops:[{itemId:'herb_wolf_meat',baseRate:1.00,minAmount:1,maxAmount:2},{itemId:'wolf_fang',baseRate:0.15,minAmount:1,maxAmount:1}] },
+  ff1_matelakaite_golem:  { id:'ff1_matelakaite_golem',  name:'マテラカイトゴーレム',         description:'マテラカイトでできたゴーレム。中確率でマテラカイトを落とす。FF洞窟3でも出現。',                                                                 icon:'ore_blue',          maxHp:400,  attack:25, defense:30, baseExp:100, baseGold:60,  dungeonIds:['ff1_main','ff1_cave3'], skills:['岩石砲(高ダメージ全体攻撃)','鉱石硬化(DEF+20)'],                            drops:[{itemId:'matelakaite',baseRate:0.50,minAmount:1,maxAmount:2},{itemId:'ff_coin_small',baseRate:0.40,minAmount:1,maxAmount:2}] },
+  ff1_comet:              { id:'ff1_comet',              name:'彗星',                         description:'FF1エリアを漂う彗星。逃げるので追い詰めよう。幸運で追加ドロップ。',                                                                              icon:'star',              maxHp:80,   attack:5,  defense:5,  baseExp:25,  baseGold:20,  dungeonIds:['ff1_main'], skills:['回避加速(逃走率上昇)'],                                                              drops:[{itemId:'cosmonium',baseRate:1.00,minAmount:1,maxAmount:1},{itemId:'ff_coin_small',baseRate:0.50,minAmount:1,maxAmount:2}] },
+  ff1_don_ff_coin:        { id:'ff1_don_ff_coin',        name:'ドン・FF小判',                 description:'FF硬貨の上位個体。大量のFF小判を落とす。',                                                                                                        icon:'coin',              maxHp:300,  attack:20, defense:15, baseExp:80,  baseGold:100, dungeonIds:['ff1_main'], isMidBoss:true, skills:['コイン投擲(全体攻撃)','金属硬化(DEF+10)'],                  drops:[{itemId:'ff_coin_small',baseRate:1.00,minAmount:5,maxAmount:10},{itemId:'ff_coin_large',baseRate:0.10,minAmount:1,maxAmount:1}] },
+  ff1_cave_spirit:        { id:'ff1_cave_spirit',        name:'洞窟の精霊',                   description:'洞窟1〜3に出没する精霊。囲まれると強烈な火力。',                                                                                                 icon:'magic_stone_blue',  maxHp:110,  attack:15, defense:8,  baseExp:45,  baseGold:25,  dungeonIds:['ff1_cave1','ff1_cave2','ff1_cave3'], skills:['精霊の怒り(ATK+8)','群れ強化(仲間の数でダメージ増加)'],    drops:[{itemId:'aurora_spinel',baseRate:0.15,minAmount:1,maxAmount:1},{itemId:'ff_coin_small',baseRate:0.30,minAmount:1,maxAmount:1}] },
+  ff1_cave_spirit_king:   { id:'ff1_cave_spirit_king',   name:'洞窟の精霊王',                 description:'精霊の上位個体。ATKが高く非常に危険。',                                                                                                          icon:'magic_stone_blue',  maxHp:220,  attack:28, defense:12, baseExp:90,  baseGold:50,  dungeonIds:['ff1_cave1','ff1_cave2','ff1_cave3'], isMidBoss:true, skills:['精霊爆砕(高威力全体攻撃)','霊体化(1ターン無敵)'],   drops:[{itemId:'aurora_spinel',baseRate:0.30,minAmount:1,maxAmount:2},{itemId:'nether_ruby',baseRate:0.20,minAmount:1,maxAmount:1},{itemId:'ff_coin_small',baseRate:0.50,minAmount:1,maxAmount:2}] },
+  ff1_cave_king:          { id:'ff1_cave_king',          name:'洞窟王',                       description:'洞窟のボス。洞窟王の宝石を落とし、LABで売れば時給1000万到達とも言われる。',                                                                    icon:'gem_blue',          maxHp:600,  attack:35, defense:25, baseExp:300, baseGold:200, dungeonIds:['ff1_cave1','ff1_cave3'], isBoss:true, skills:['洞窟崩落(全体高ダメージ)','宝石硬化(DEF+20)','王の威圧(デバフ)'],  drops:[{itemId:'cave_king_gem',baseRate:0.80,minAmount:1,maxAmount:2},{itemId:'aurora_spinel',baseRate:0.50,minAmount:1,maxAmount:3},{itemId:'nether_ruby',baseRate:0.30,minAmount:1,maxAmount:2},{itemId:'ff_coin_large',baseRate:0.20,minAmount:1,maxAmount:1}] },
+  // ============================================================
+  // FF2エリア モブ
+  // ============================================================
+  ff2_slamy:              { id:'ff2_slamy',              name:'スラムイ',                     description:'FF2エリアのスライム型モブ。スラムイ溶液を1%で落とす。',                                                                                         icon:'bubbles',           maxHp:120,  attack:10, defense:8,  baseExp:35,  baseGold:20,  dungeonIds:['ff2_main','ff_dungeon'], skills:['粘液飛ばし(ATK×1.5)'],                                                          drops:[{itemId:'slamy_liquid',baseRate:0.01,minAmount:1,maxAmount:1},{itemId:'ff_coin_small',baseRate:0.30,minAmount:1,maxAmount:1}] },
+  ff2_slamin:             { id:'ff2_slamin',             name:'スラムイン',                   description:'スラムイの上位種。スラムイ溶液10%。',                                                                                                             icon:'bubbles',           maxHp:220,  attack:18, defense:12, baseExp:65,  baseGold:40,  dungeonIds:['ff2_main','ff_dungeon'], skills:['溶液噴射(毒付与)','分裂(HP50%以下でスラムイ召喚)'],                             drops:[{itemId:'slamy_liquid',baseRate:0.10,minAmount:1,maxAmount:1},{itemId:'ff_coin_small',baseRate:0.50,minAmount:1,maxAmount:2}] },
+  ff2_slaminz:            { id:'ff2_slaminz',            name:'スラムインツ',                 description:'スラムイン最上位個体。ポイズンスフィア確定落とし。',                                                                                             icon:'bubbles',           maxHp:400,  attack:30, defense:18, baseExp:150, baseGold:100, dungeonIds:['ff2_main'], isMidBoss:true, skills:['猛毒球(ポイズン全体攻撃)','スラムイ召喚(2体召喚)'],            drops:[{itemId:'slamy_liquid',baseRate:1.00,minAmount:1,maxAmount:2},{itemId:'poison_sphere',baseRate:1.00,minAmount:1,maxAmount:1},{itemId:'ff_coin_large',baseRate:0.15,minAmount:1,maxAmount:1}] },
+  ff2_slam_king:          { id:'ff2_slam_king',          name:'スラムイキング',               description:'FF2の固定湧きボス。ポイズンスフィア確定。周回価値高し。',                                                                                        icon:'crown',             maxHp:1200, attack:65, defense:28, baseExp:500, baseGold:350, dungeonIds:['ff2_main'], isBoss:true, specialAttack:'王の毒爆発', skills:['王の毒爆発(全体高ダメージ+毒)','溶液嵐(全体固定20ダメージ)','王者の再生(HP20%以下毎ターン回復)'], drops:[{itemId:'poison_sphere',baseRate:1.00,minAmount:1,maxAmount:2},{itemId:'slamy_liquid',baseRate:1.00,minAmount:3,maxAmount:5},{itemId:'ff_coin_large',baseRate:0.30,minAmount:1,maxAmount:2}] },
+  ff2_sea_memoria:        { id:'ff2_sea_memoria',        name:'シーメモリア',                 description:'FF2海岸に出没する幻影型ボス。海原のオーブ・欠片を落とす。タゲ/範囲2回判定。',                                                                  icon:'wave',              maxHp:900,  attack:55, defense:22, baseExp:400, baseGold:280, dungeonIds:['ff2_main'], isBoss:true, specialAttack:'海嵐の幻影', skills:['海嵐の幻影(全体攻撃+防御低下)','幻影分身(シーメモリア召喚)','潮流盾(2ターン被ダメ70%軽減)'], drops:[{itemId:'ocean_shard',baseRate:0.60,minAmount:1,maxAmount:3},{itemId:'ocean_orb',baseRate:0.10,minAmount:1,maxAmount:1},{itemId:'ff_coin_large',baseRate:0.20,minAmount:1,maxAmount:1}] },
+  ff2_eliminator:         { id:'ff2_eliminator',         name:'エリミネイター',               description:'FF2全域にランダム出現する強敵。銀の弾丸を低確率で落とす。',                                                                                     icon:'dagger',            maxHp:500,  attack:40, defense:20, baseExp:200, baseGold:130, dungeonIds:['ff2_main'], isMidBoss:true, skills:['消去光線(全体攻撃)','高速突撃(先制攻撃)','自己修復(毎ターンHP+30)'],      drops:[{itemId:'silver_bullet',baseRate:0.08,minAmount:1,maxAmount:2},{itemId:'ff_coin_large',baseRate:0.10,minAmount:1,maxAmount:1},{itemId:'ff_coin_small',baseRate:0.80,minAmount:2,maxAmount:5}] },
+  ff2_omega_nightmare:    { id:'ff2_omega_nightmare',    name:'暗黒騎士オメガ・ナイト・メア', description:'FF2の固定湧きボス。タゲ/範囲で2回ドロップ判定。無銘の剣・契約書・甲冑を落とす。HP30%以下で暴走。',                                         icon:'skull',             maxHp:1800, attack:75, defense:35, baseExp:800, baseGold:500, dungeonIds:['ff2_main'], isBoss:true, specialAttack:'オメガブレード', skills:['オメガブレード(単体超高火力)','闇の霧(全体被ダメ軽減無効)','暗黒暴走(HP30%以下でATK+30)','連撃オメガ(3連続攻撃)'], drops:[{itemId:'dark_knight_armor',baseRate:0.75,minAmount:1,maxAmount:1},{itemId:'nameless_sword',baseRate:0.015,minAmount:1,maxAmount:1},{itemId:'omega_nightmare_contract',baseRate:0.001,minAmount:1,maxAmount:1},{itemId:'bloody_rain',baseRate:0.05,minAmount:1,maxAmount:1},{itemId:'ff_coin_large',baseRate:0.50,minAmount:1,maxAmount:3}] },
+  ff2_forester:           { id:'ff2_forester',           name:'森の賢者フォレスター',         description:'FF2の森ゾーンに出没する賢者。賢者の輝石10%。',                                                                                                  icon:'scroll',            maxHp:280,  attack:25, defense:16, baseExp:110, baseGold:70,  dungeonIds:['ff2_main'], skills:['賢者の光撃(高ダメージ魔法攻撃)','知恵の壁(DEF+12)'],                            drops:[{itemId:'sage_stone',baseRate:0.10,minAmount:1,maxAmount:1},{itemId:'ff_coin_small',baseRate:0.60,minAmount:2,maxAmount:4},{itemId:'cosmonium',baseRate:0.03,minAmount:1,maxAmount:1}] },
+  ff2_forestl:            { id:'ff2_forestl',            name:'森の賢者フォレストル',         description:'フォレスターの上位種。賢者の輝石15%（幸運積みで20%程度）。',                                                                                   icon:'scroll',            maxHp:420,  attack:38, defense:22, baseExp:180, baseGold:110, dungeonIds:['ff2_main'], isMidBoss:true, skills:['真賢者の裁き(全体高ダメージ)','知恵の極意(自己ATK+15)','輝石の守り(DEF+20)'],  drops:[{itemId:'sage_stone',baseRate:0.15,minAmount:1,maxAmount:2},{itemId:'ff_coin_large',baseRate:0.15,minAmount:1,maxAmount:1},{itemId:'cosmonium',baseRate:0.05,minAmount:1,maxAmount:1}] },
+  ff2_giant_comet:        { id:'ff2_giant_comet',        name:'巨大彗星（FF2）',              description:'FF2エリアに出現する巨大彗星。コスモニウム確定。FFGGとの同時周回が効率良い。',                                                                  icon:'star',              maxHp:600,  attack:15, defense:35, baseExp:500, baseGold:350, dungeonIds:['ff2_main'], isBoss:true, specialAttack:'大落下衝撃', skills:['大落下衝撃(全体超高ダメージ)','コスモ圧(毎ターン全体固定5ダメージ)','宇宙核(撃破時レアドロップ率+30%)'], drops:[{itemId:'cosmonium',baseRate:1.00,minAmount:1,maxAmount:2},{itemId:'ff_coin_large',baseRate:0.30,minAmount:1,maxAmount:2},{itemId:'ancient_shard',baseRate:1.00,minAmount:3,maxAmount:6}] },
+  // ============================================================
+  // FFダンジョンエリア モブ
+  // ============================================================
+  ffd_tuzok:              { id:'ffd_tuzok',              name:'トゥゾク',                     description:'FFダンジョンエリア山内部の盗賊。大量に湧き、囲まれると非常に危険。',                                                                           icon:'dagger',            maxHp:250,  attack:22, defense:14, baseExp:85,  baseGold:55,  dungeonIds:['ff_dungeon'], skills:['挟撃(複数体いるとダメージ増加)','毒ナイフ(毒付与)'],                            drops:[{itemId:'ff_coin_small',baseRate:0.50,minAmount:2,maxAmount:4},{itemId:'punk_parts_a',baseRate:0.05,minAmount:1,maxAmount:1}] },
+  ffd_brute_bandit_leader:{ id:'ffd_brute_bandit_leader', name:'脳筋盗賊リーダー',            description:'外エリアに複数湧く強力な盗賊頭。FF大判集め全エリア最高効率。イーヴィルガーネットも落とす。',                                                   icon:'swords',            maxHp:800,  attack:55, defense:28, baseExp:350, baseGold:250, dungeonIds:['ff_dungeon'], isMidBoss:true, skills:['脳筋突進(全体高ダメージ)','大声号令(仲間ATK+10)','大判強奪(撃破時FF大判追加)'], drops:[{itemId:'ff_coin_large',baseRate:0.80,minAmount:1,maxAmount:3},{itemId:'evil_garnet',baseRate:0.08,minAmount:1,maxAmount:1},{itemId:'punk_parts_a',baseRate:0.15,minAmount:1,maxAmount:1},{itemId:'punk_parts_b',baseRate:0.15,minAmount:1,maxAmount:1},{itemId:'bloody_rain',baseRate:0.03,minAmount:1,maxAmount:1}] },
+  ffd_dark_iron_golem:    { id:'ffd_dark_iron_golem',    name:'黒魔鉄鋼ゴーレム',             description:'地下エリアに出没するゴーレム。黒魔鉄鋼を60%で落とす。',                                                                                        icon:'ore_dark',          maxHp:600,  attack:40, defense:45, baseExp:200, baseGold:130, dungeonIds:['ff_dungeon'], skills:['鉄拳(超高威力単体攻撃)','黒魔装甲(DEF+20)','鉄塊落下(全体ダメージ)'],           drops:[{itemId:'dark_magic_iron',baseRate:0.60,minAmount:1,maxAmount:2},{itemId:'ff_coin_small',baseRate:0.50,minAmount:2,maxAmount:4}] },
+  ffd_em_iron_golem:      { id:'ffd_em_iron_golem',      name:'電磁魔鉄鋼ゴーレム',           description:'電磁波を放つゴーレム。電磁魔鉄鋼を60%で落とす。',                                                                                               icon:'lightning',         maxHp:550,  attack:38, defense:40, baseExp:190, baseGold:125, dungeonIds:['ff_dungeon'], skills:['電磁パルス(全体スタン付与)','雷装甲(雷属性耐性)','電磁砲(全体高ダメージ)'],      drops:[{itemId:'em_iron_steel',baseRate:0.60,minAmount:1,maxAmount:2},{itemId:'ff_coin_small',baseRate:0.50,minAmount:2,maxAmount:4}] },
+  // ============================================================
   // チェイテダンジョン 敵
   // ============================================================
   chaite_silver_gladiator: { id:'chaite_silver_gladiator', name:'銀装剣闘士', description:'チェイテの銀装位。俊敏な連撃で攻め立てる。銀装以上の防具が必要。', icon:'sword', maxHp:280, attack:160, defense:8, baseExp:12, baseGold:6, dungeonIds:['chaite'], skills:['連撃(2回攻撃)'], drops:[{itemId:'chaite_silver_emblem',baseRate:0.5,minAmount:1,maxAmount:1},{itemId:'coin',baseRate:1.0,minAmount:3,maxAmount:8}] },
@@ -3121,6 +3170,96 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
       { name:'8階　城外広場',    description:'最強部隊が城外で待ち受ける。英雄騎士装備必須。パルヴァトスを推奨。', monsters:[{monsterId:'chaite_hero_knight',count:5},{monsterId:'chaite_black_gladiator',count:3},{monsterId:'chaite_gold_mage',count:3}], isHardArea:true },
       { name:'8階　城内　ナイト・メア', description:'護衛の黒装騎士と暗黒騎士ナイト・メアとの中ボス戦。パルヴァトス推奨。', monsters:[{monsterId:'chaite_black_knight',count:2},{monsterId:'chaite_nightmare',count:1,isMidBoss:true}], isHardArea:true },
       { name:'9階　将軍の間',    description:'第999代将軍徳川義和公との最終決戦。通常攻撃は無効に近い。貫通武器で挑め。', monsters:[{monsterId:'chaite_tokugawa',count:1,isBoss:true}], isHardArea:true },
+    ],
+  },
+
+  // ============================================================
+  // FF1 ダンジョン群
+  // ============================================================
+  ff1_main: {
+    id:'ff1_main', name:'FF1メインフィールド', description:'フリーフィールド1のメインエリア。偵察騎士・ハーブウルフ・彷徨う木などが出没。FF系の入口部分。微妙に強い場所やここでしか取れないものもある。',
+    icon:'cave_hole', tier:'intermediate', requiredLevel:1, floors:3, expBonus:1.2, goldBonus:1.2,
+    monsterIds:['ff1_scout_knight','ff1_magic_knight','ff1_wandering_tree','ff1_herb_wolf','ff1_matelakaite_golem','ff1_comet','ff1_don_ff_coin','ff_trigger_zombie'],
+    areas:[
+      { name:'FF1・spawnエリア', description:'FF1の入口周辺。偵察騎士・彷徨う木が多い。',
+        monsters:[{monsterId:'ff_trigger_zombie',count:2},{monsterId:'ff1_scout_knight',count:3},{monsterId:'ff1_wandering_tree',count:1}] },
+      { name:'FF1・ウルフゾーン', description:'ハーブウルフとウルフマロウがセットで湧く。ウルフマロウは息吹の羽根と交換可能。',
+        monsters:[{monsterId:'ff1_herb_wolf',count:3},{monsterId:'ff1_magic_knight',count:2},{monsterId:'ff1_comet',count:1}] },
+      { name:'FF1・ゴーレムエリア', description:'マテラカイトゴーレムとドン・FF小判が出現する上位エリア。',
+        monsters:[{monsterId:'ff1_matelakaite_golem',count:2},{monsterId:'ff1_don_ff_coin',count:1},{monsterId:'ff1_magic_knight',count:2}], isHardArea:true },
+    ],
+  },
+  ff1_cave1: {
+    id:'ff1_cave1', name:'FF洞窟1', description:'FFエリア1から入れる洞窟。精霊系と洞窟王が出る。洞窟3でのスピネル・ルビー集めが厳しければこちらでも代用可能。',
+    icon:'cave_hole', tier:'intermediate', requiredLevel:1, floors:2, expBonus:1.4, goldBonus:1.4,
+    monsterIds:['ff1_cave_spirit','ff1_cave_spirit_king','ff1_cave_king'],
+    bossId:'ff1_cave_king',
+    areas:[
+      { name:'洞窟1・入口', description:'精霊と精霊王が出現する。',
+        monsters:[{monsterId:'ff1_cave_spirit',count:3},{monsterId:'ff1_cave_spirit_king',count:1}] },
+      { name:'洞窟1・深部（洞窟王）', description:'洞窟王が待ち受ける。宝石類が落ちる。',
+        monsters:[{monsterId:'ff1_cave_king',count:1,isBoss:true}], isHardArea:true },
+    ],
+  },
+  ff1_cave2: {
+    id:'ff1_cave2', name:'FF洞窟2', description:'ニトロトリンが唯一採集できる場所。精霊と精霊王のみ出現。ニトロトリンは取れるくん.jsや.jarで遠距離採集推奨（爆発ダメージ回避）。',
+    icon:'explosion', tier:'intermediate', requiredLevel:1, floors:1, expBonus:1.3, goldBonus:1.3,
+    monsterIds:['ff1_cave_spirit','ff1_cave_spirit_king'],
+    areas:[
+      { name:'洞窟2・ニトロトリン採集場', description:'ニトロトリン唯一の採集地点。取れるくん.jsや.jarで安全に採集可能。取れるくん.jsはFF小屋2、.jarはFFGG雪山で取引可能。',
+        monsters:[{monsterId:'ff1_cave_spirit',count:4},{monsterId:'ff1_cave_spirit_king',count:2}] },
+    ],
+  },
+  ff1_cave3: {
+    id:'ff1_cave3', name:'FF洞窟3', description:'オーロラスピネル・ネザードルビー・洞窟王の宝石の最高効率採集場。精霊・精霊王・洞窟王が大量湧き。内部は迷いやすいが周回ルート構築が重要。洞窟王の宝石はLABで売れば時給1000万到達とも。',
+    icon:'gem', tier:'advanced', requiredLevel:1, floors:3, expBonus:2.0, goldBonus:2.0,
+    monsterIds:['ff1_cave_spirit','ff1_cave_spirit_king','ff1_cave_king','ff1_matelakaite_golem'],
+    bossId:'ff1_cave_king',
+    areas:[
+      { name:'洞窟3・前半', description:'精霊と精霊王が大量湧き。囲まれると超火力。',
+        monsters:[{monsterId:'ff1_cave_spirit',count:4},{monsterId:'ff1_cave_spirit_king',count:2}] },
+      { name:'洞窟3・中盤（ゴーレム出現）', description:'精霊に加えてマテラカイトゴーレムも出現。',
+        monsters:[{monsterId:'ff1_cave_spirit',count:3},{monsterId:'ff1_cave_spirit_king',count:2},{monsterId:'ff1_matelakaite_golem',count:1}], isHardArea:true },
+      { name:'洞窟3・最深（洞窟王複数）', description:'洞窟王が複数出現する最高効率周回地点。宝石類の最高効率エリア。',
+        monsters:[{monsterId:'ff1_cave_king',count:2,isBoss:true},{monsterId:'ff1_cave_spirit_king',count:2}], isHardArea:true },
+    ],
+  },
+
+  // ============================================================
+  // FF2 ダンジョン
+  // ============================================================
+  ff2_main: {
+    id:'ff2_main', name:'FF2メインフィールド', description:'フリーフィールド2のメインエリア。スラムイキング・シーメモリア・エリミネイター・暗黒騎士が出現。全体的に敵の火力が高くしっかり防具を整えてから挑みたい。移動用のジェッパやリーピングがあると便利。',
+    icon:'dungeon_building', tier:'advanced', requiredLevel:1, floors:4, expBonus:2.5, goldBonus:2.5,
+    monsterIds:['ff2_slamy','ff2_slamin','ff2_slaminz','ff2_slam_king','ff2_sea_memoria','ff2_eliminator','ff2_omega_nightmare','ff2_forester','ff2_forestl','ff2_giant_comet','ff_trigger_zombie'],
+    bossId:'ff2_omega_nightmare',
+    areas:[
+      { name:'FF2・草・きのこゾーン', description:'七草・きのこが採集できるエリア。フォレスターが守っている。賢者の輝石狙いも。',
+        monsters:[{monsterId:'ff_trigger_zombie',count:2},{monsterId:'ff2_forester',count:2},{monsterId:'ff2_slamy',count:2}] },
+      { name:'FF2・スラムイゾーン', description:'スラムイキングが固定湧き。ポイズンスフィア周回に最適。スラムイ溶液→FF小屋2でポイズンスフィアに変換可能。',
+        monsters:[{monsterId:'ff2_slamin',count:2},{monsterId:'ff2_slaminz',count:1},{monsterId:'ff2_slam_king',count:1,isBoss:true}], isHardArea:true },
+      { name:'FF2・海岸エリア（巨大彗星・シーメモリア）', description:'巨大彗星とシーメモリアが出現。コスモニウムと海原オーブ狙い。FFGGの巨大彗星との同時周回推奨。',
+        monsters:[{monsterId:'ff2_sea_memoria',count:1,isBoss:true},{monsterId:'ff2_giant_comet',count:1,isBoss:true},{monsterId:'ff2_eliminator',count:1}], isHardArea:true },
+      { name:'FF2・暗黒騎士の間（オメガ・ナイト・メア）', description:'暗黒騎士オメガ・ナイト・メアの固定湧き地点。無銘の剣・契約書目当ての最重要周回地点。タゲ/範囲で2回ドロップ判定あり。',
+        monsters:[{monsterId:'ff2_omega_nightmare',count:1,isBoss:true},{monsterId:'ff2_forestl',count:1}], isHardArea:true },
+    ],
+  },
+
+  // ============================================================
+  // FFダンジョンエリア
+  // ============================================================
+  ff_dungeon: {
+    id:'ff_dungeon', name:'FFダンジョンエリア', description:'盗賊とゴーレムが住む山岳型複合ダンジョン。山内部・外エリア・地下の3エリア構成。全体的に敵の火力が高い。FF大判集めが全体でも最高効率。',
+    icon:'dungeon_building', tier:'super', requiredLevel:1, floors:3, expBonus:3.0, goldBonus:3.0,
+    monsterIds:['ff2_slamy','ff2_slamin','ffd_tuzok','ffd_brute_bandit_leader','ffd_dark_iron_golem','ffd_em_iron_golem','ff1_matelakaite_golem'],
+    bossId:'ffd_brute_bandit_leader',
+    areas:[
+      { name:'山内部（トゥゾク＆スラムイ密集）', description:'大量のトゥゾクとスラムイが湧く。囲まれると危険。ウエントペリドット採集も目的の場合はここ一択。山頂に謎の1万円Magic Armorガチャあり。',
+        monsters:[{monsterId:'ffd_tuzok',count:4},{monsterId:'ff2_slamy',count:2},{monsterId:'ff2_slamin',count:1}], isHardArea:true },
+      { name:'外エリア（脳筋盗賊リーダー複数湧き）', description:'FF大判集め全エリア最高効率。イーヴィルガーネット・パンクパーツA/B・ブラッドリィレインも入手可。',
+        monsters:[{monsterId:'ffd_brute_bandit_leader',count:3},{monsterId:'ffd_tuzok',count:2}], isHardArea:true },
+      { name:'地下（ゴーレムエリア）', description:'黒魔鉄鋼ゴーレム・電磁魔鉄鋼ゴーレム・マテラカイトゴーレムが出現する地下空間。素材集め向け。',
+        monsters:[{monsterId:'ffd_dark_iron_golem',count:2},{monsterId:'ffd_em_iron_golem',count:2},{monsterId:'ff1_matelakaite_golem',count:1}], isHardArea:true },
     ],
   },
 };

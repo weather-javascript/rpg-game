@@ -91,6 +91,85 @@ export const FFGG_HARVEST_NODES: Record<string, FreeFieldHarvestNode> = {
 };
 
 // ============================================================
+// FF1 採集ノード
+// ============================================================
+export const FF1_HARVEST_NODES: Record<string, FreeFieldHarvestNode> = {
+  ff1_wolf_mallow: {
+    id: 'ff1_wolf_mallow', displayName: 'ウルフマロウ（FF1）',
+    areaId: 'ff1_main_area', cooldownSeconds: 60, dangerLevel: 2,
+    requiredToolId: 'ffgg_gather_kit',
+    items: [
+      { itemId: 'wolf_mallow', displayName: 'ウルフマロウ', baseRate: 1.00, minAmount: 1, maxAmount: 1 },
+    ],
+  },
+  ff1_honey_hut: {
+    id: 'ff1_honey_hut', displayName: 'ララビーのはちみつ（小屋1固定）',
+    areaId: 'ff1_main_area', cooldownSeconds: 3600, dangerLevel: 1,
+    requiredToolId: 'ffgg_gather_kit',
+    items: [
+      { itemId: 'lalaby_honey', displayName: 'ララビーのはちみつ', baseRate: 1.00, minAmount: 1, maxAmount: 2 },
+    ],
+  },
+  ff1_nitrotrin: {
+    id: 'ff1_nitrotrin', displayName: 'ニトロトリン（FF洞窟2）',
+    areaId: 'ff1_cave_area', cooldownSeconds: 120, dangerLevel: 4,
+    requiredToolId: 'ffgg_gather_kit',
+    items: [
+      { itemId: 'nitrotrin', displayName: 'ニトロトリン', baseRate: 0.60, minAmount: 1, maxAmount: 2 },
+    ],
+  },
+};
+
+// ============================================================
+// FF2 採集ノード
+// ============================================================
+export const FF2_HARVEST_NODES: Record<string, FreeFieldHarvestNode> = {
+  ff2_herb_gather: {
+    id: 'ff2_herb_gather', displayName: '七草採集（FF2）',
+    areaId: 'ff2_main_area', cooldownSeconds: 90, dangerLevel: 2,
+    requiredToolId: 'ffgg_gather_kit',
+    items: [
+      { itemId: 'white_basil',   displayName: 'ホワイトバジル（七草）', baseRate: 0.80, minAmount: 1, maxAmount: 2 },
+      { itemId: 'poison_cress',  displayName: 'ポイズンクレソン',       baseRate: 0.70, minAmount: 1, maxAmount: 2 },
+      { itemId: 'green_basil_s', displayName: 'グリーンバジルS',        baseRate: 1.00, minAmount: 1, maxAmount: 2 },
+      { itemId: 'green_basil_l', displayName: 'グリーンバジルL',        baseRate: 0.25, minAmount: 1, maxAmount: 1 },
+      { itemId: 'matelakaite',   displayName: 'マテラカイト',           baseRate: 0.15, minAmount: 1, maxAmount: 1 },
+      { itemId: 'ff_coin_small', displayName: 'FF小判',                 baseRate: 0.20, minAmount: 1, maxAmount: 2 },
+    ],
+  },
+  ff2_mushroom_gather: {
+    id: 'ff2_mushroom_gather', displayName: '各種きのこ採集（FF2）',
+    areaId: 'ff2_main_area', cooldownSeconds: 120, dangerLevel: 2,
+    requiredToolId: 'ffgg_gather_kit',
+    items: [
+      { itemId: 'mushroom',       displayName: 'コウヨウモミジオオタケ', baseRate: 1.00, minAmount: 1, maxAmount: 2 },
+      { itemId: 'red_mushroom',   displayName: 'カオリヒラタケ',         baseRate: 0.40, minAmount: 1, maxAmount: 2 },
+      { itemId: 'brown_mushroom', displayName: 'キセイダケ',             baseRate: 0.40, minAmount: 1, maxAmount: 2 },
+      { itemId: 'sage_stone',     displayName: '賢者の輝石',             baseRate: 0.02, minAmount: 1, maxAmount: 1, isRare: true },
+    ],
+  },
+  ffd_uento_gather: {
+    id: 'ffd_uento_gather', displayName: 'ウエントペリドット採集（山内部）',
+    areaId: 'ff2_dungeon_area', cooldownSeconds: 180, dangerLevel: 4,
+    requiredToolId: 'ffgg_gather_kit',
+    items: [
+      { itemId: 'uento_peridot', displayName: 'ウエントペリドット', baseRate: 0.40, minAmount: 1, maxAmount: 1, isRare: true },
+      { itemId: 'matelakaite',   displayName: 'マテラカイト',       baseRate: 0.50, minAmount: 1, maxAmount: 2 },
+      { itemId: 'ff_coin_small', displayName: 'FF小判',             baseRate: 0.50, minAmount: 2, maxAmount: 4 },
+    ],
+  },
+};
+
+// ============================================================
+// 全採集ノード統合
+// ============================================================
+export const FF_ALL_HARVEST_NODES: Record<string, FreeFieldHarvestNode> = {
+  ...FFGG_HARVEST_NODES,
+  ...FF1_HARVEST_NODES,
+  ...FF2_HARVEST_NODES,
+};
+
+// ============================================================
 // FFGG エリア定義
 // ============================================================
 export const FFGG_AREAS: Record<string, FreeFieldArea> = {
@@ -880,80 +959,385 @@ export const FF1_WORLD: FreeFieldWorld = {
   id: 'ff1',
   name: 'ff1',
   displayName: 'FF1',
-  description: 'フリーフィールド1。(データ準備中)',
-  areaIds: ['ff1_start'],
-  notes: 'TODO: FF1 エリア・ノードを追加する。',
+  description: 'フリーフィールド1。FF系の入口エリア。微妙に強い場所やここでしか取れないものもある。洞窟2・3・チェイテへの入口あり。',
+  areaIds: ['ff1_main_area', 'ff1_cave_area'],
 };
 
 export const FF1_AREAS: Record<string, FreeFieldArea> = {
-  ff1_start: {
-    id: 'ff1_start',
-    name: 'ff1_start',
-    displayName: '開始エリア',
-    nodeIds: ['ff1_node_entrance'],
-    notes: 'TODO: FF1 ノードを追加する。',
+  ff1_main_area: {
+    id: 'ff1_main_area',
+    name: 'ff1_main_area',
+    displayName: 'FF1メインフィールド',
+    description: 'spawn周辺から広がるメインエリア。偵察騎士・ハーブウルフ・ウルフマロウなど。',
+    nodeIds: [
+      'ff1_node_spawn',
+      'ff1_node_wolf1','ff1_node_wolf2','ff1_node_wolf3',
+      'ff1_node_wolf4','ff1_node_wolf5','ff1_node_wolf6',
+      'ff1_node_hut1',
+      'ff1_node_chaite_entrance',
+    ],
+  },
+  ff1_cave_area: {
+    id: 'ff1_cave_area',
+    name: 'ff1_cave_area',
+    displayName: 'FF1洞窟群',
+    description: '洞窟1〜3が集まるエリア。スピネル・ルビー・洞窟王の宝石が採れる。',
+    nodeIds: ['ff1_node_cave1','ff1_node_cave2','ff1_node_cave3'],
   },
 };
 
 export const FF1_NODES: Record<string, FreeFieldNode> = {
-  ff1_node_entrance: {
-    id: 'ff1_node_entrance',
-    name: 'ff1_entrance',
-    displayName: 'FF1 入口',
-    type: 'entrance',
-    areaId: 'ff1_start',
-    position: { x: 0.5, y: 0.5 },
-    connections: [],
-    notes: 'TODO: FF1 マップ実装時に差し替える。',
+  ff1_node_spawn: {
+    id: 'ff1_node_spawn', name: 'ff1_spawn', displayName: 'FFspawn',
+    type: 'safe', areaId: 'ff1_main_area',
+    position: { x: 0.50, y: 0.95 },
+    connections: ['ff1_node_wolf1','ff1_node_cave2','ff1_node_hut1'],
+    isSafeZone: true,
+    description: 'FF1の出発地点。ここからウルフゾーンや洞窟へ向かう。',
+    actions: [
+      { type: 'landmark', label: '📍 spawnを確認', description: 'FF1のスタート地点。' },
+      { type: 'warp', label: 'ウルフゾーンへ', targetNodeId: 'ff1_node_wolf1' },
+      { type: 'warp', label: '洞窟2へ', targetNodeId: 'ff1_node_cave2' },
+    ],
+  },
+  ff1_node_wolf1: {
+    id: 'ff1_node_wolf1', name: 'ff1_wolf_1', displayName: 'ウルフポイント①',
+    type: 'danger', areaId: 'ff1_main_area',
+    position: { x: 0.18, y: 0.80 },
+    connections: ['ff1_node_spawn','ff1_node_wolf2','ff1_node_hut1','ff1_node_cave1'],
+    description: 'ハーブウルフとウルフマロウがセットで湧く地点。ウルフマロウは息吹の羽根と交換可能。',
+    actions: [
+      { type: 'battleTrigger', label: '⚔️ ウルフと戦う', systemTargetId: 'ff1_main',
+        description: 'ハーブウルフ・偵察騎士系が出現。' },
+      { type: 'harvest', label: '🌿 ウルフマロウ採集', systemTargetId: 'ff1_wolf_mallow',
+        description: '紫色の植物ウルフマロウを採集。息吹の羽根との交換素材。' },
+    ],
+  },
+  ff1_node_wolf2: {
+    id: 'ff1_node_wolf2', name: 'ff1_wolf_2', displayName: 'ウルフポイント②',
+    type: 'danger', areaId: 'ff1_main_area',
+    position: { x: 0.36, y: 0.58 },
+    connections: ['ff1_node_wolf1','ff1_node_wolf3','ff1_node_wolf4'],
+    description: 'ウルフマロウとハーブウルフ密集地帯。中央部。',
+    actions: [
+      { type: 'battleTrigger', label: '⚔️ ウルフと戦う', systemTargetId: 'ff1_main' },
+      { type: 'harvest', label: '🌿 ウルフマロウ採集', systemTargetId: 'ff1_wolf_mallow' },
+    ],
+  },
+  ff1_node_wolf3: {
+    id: 'ff1_node_wolf3', name: 'ff1_wolf_3', displayName: 'ウルフポイント③',
+    type: 'danger', areaId: 'ff1_main_area',
+    position: { x: 0.36, y: 0.35 },
+    connections: ['ff1_node_wolf2','ff1_node_wolf5','ff1_node_chaite_entrance'],
+    description: 'チェイテ入口の近くにあるウルフポイント。',
+    actions: [
+      { type: 'battleTrigger', label: '⚔️ ウルフと戦う', systemTargetId: 'ff1_main' },
+      { type: 'harvest', label: '🌿 ウルフマロウ採集', systemTargetId: 'ff1_wolf_mallow' },
+    ],
+  },
+  ff1_node_wolf4: {
+    id: 'ff1_node_wolf4', name: 'ff1_wolf_4', displayName: 'ウルフポイント④',
+    type: 'danger', areaId: 'ff1_main_area',
+    position: { x: 0.62, y: 0.55 },
+    connections: ['ff1_node_wolf2','ff1_node_wolf5','ff1_node_cave3'],
+    description: '中央ウルフポイント。洞窟3への分岐点。',
+    actions: [
+      { type: 'battleTrigger', label: '⚔️ ウルフと戦う', systemTargetId: 'ff1_main' },
+      { type: 'harvest', label: '🌿 ウルフマロウ採集', systemTargetId: 'ff1_wolf_mallow' },
+      { type: 'warp', label: '洞窟3へ', targetNodeId: 'ff1_node_cave3' },
+    ],
+  },
+  ff1_node_wolf5: {
+    id: 'ff1_node_wolf5', name: 'ff1_wolf_5', displayName: 'ウルフポイント⑤',
+    type: 'danger', areaId: 'ff1_main_area',
+    position: { x: 0.62, y: 0.30 },
+    connections: ['ff1_node_wolf3','ff1_node_wolf4','ff1_node_chaite_entrance'],
+    description: 'チェイテ寄りのウルフポイント。',
+    actions: [
+      { type: 'battleTrigger', label: '⚔️ ウルフと戦う', systemTargetId: 'ff1_main' },
+      { type: 'harvest', label: '🌿 ウルフマロウ採集', systemTargetId: 'ff1_wolf_mallow' },
+    ],
+  },
+  ff1_node_wolf6: {
+    id: 'ff1_node_wolf6', name: 'ff1_wolf_6', displayName: 'ウルフポイント⑥（南東）',
+    type: 'danger', areaId: 'ff1_main_area',
+    position: { x: 0.78, y: 0.72 },
+    connections: ['ff1_node_wolf4','ff1_node_cave3','ff1_node_cave2'],
+    description: '南東部ウルフポイント。洞窟2・3への中継地点。',
+    actions: [
+      { type: 'battleTrigger', label: '⚔️ ウルフと戦う', systemTargetId: 'ff1_main' },
+      { type: 'harvest', label: '🌿 ウルフマロウ採集', systemTargetId: 'ff1_wolf_mallow' },
+    ],
+  },
+  ff1_node_hut1: {
+    id: 'ff1_node_hut1', name: 'ff1_hut1', displayName: '小屋1',
+    type: 'safe', areaId: 'ff1_main_area',
+    position: { x: 0.20, y: 0.65 },
+    connections: ['ff1_node_wolf1','ff1_node_wolf2','ff1_node_spawn'],
+    isSafeZone: true,
+    description: 'ララビーのはちみつの固定採取地点。湧き時間が非常に長い。ラジュース以外の目的には使わないこと。',
+    actions: [
+      { type: 'harvest', label: '🍯 ララビーのはちみつ採集', systemTargetId: 'ff1_honey_hut',
+        description: '固定採取地点。湧き時間が非常に長い。ラジュース以外の目的では使わないこと。' },
+      { type: 'landmark', label: '📍 小屋1を調べる', description: 'ウルフゾーン内の安全な小屋。' },
+    ],
+  },
+  ff1_node_chaite_entrance: {
+    id: 'ff1_node_chaite_entrance', name: 'chaite_entrance', displayName: 'チェイテ入口',
+    type: 'entrance', areaId: 'ff1_main_area',
+    position: { x: 0.48, y: 0.08 },
+    connections: ['ff1_node_wolf3','ff1_node_wolf5'],
+    description: 'チェイテへの入口。山の裏手（spawnから見て）にある。チェイテ入口は山の裏手にあるため注意。',
+    actions: [
+      { type: 'battleTrigger', label: 'チェイテに突入（FF1ルート）',
+        description: 'チェイテダンジョンへ入場。FF1から入れる入口。山の裏手にある。',
+        systemTargetId: 'chaite' },
+      { type: 'landmark', label: '📍 チェイテ入口を確認',
+        description: '山の裏手に入口がある。スポーンからは見えにくい位置。注意。' },
+    ],
+  },
+  ff1_node_cave1: {
+    id: 'ff1_node_cave1', name: 'ff1_cave1', displayName: 'FF洞窟1',
+    type: 'danger', areaId: 'ff1_cave_area',
+    position: { x: 0.15, y: 0.92 },
+    connections: ['ff1_node_wolf1','ff1_node_cave2'],
+    description: 'FFエリア1から入れる洞窟。精霊系と洞窟王が出る。洞窟3より効率は落ちる。',
+    actions: [
+      { type: 'battleTrigger', label: '⚔️ 洞窟1に入る', systemTargetId: 'ff1_cave1' },
+      { type: 'warp', label: '洞窟2へ移動', targetNodeId: 'ff1_node_cave2' },
+    ],
+  },
+  ff1_node_cave2: {
+    id: 'ff1_node_cave2', name: 'ff1_cave2', displayName: 'FF洞窟2',
+    type: 'danger', areaId: 'ff1_cave_area',
+    position: { x: 0.50, y: 0.72 },
+    connections: ['ff1_node_spawn','ff1_node_wolf6','ff1_node_cave1','ff1_node_cave3'],
+    description: 'ニトロトリンが唯一採集できる場所。取れるくん.jsや.jarを使って遠距離採集推奨（爆発ダメージ回避）。精霊と精霊王のみ出現。',
+    actions: [
+      { type: 'battleTrigger', label: '⚔️ 洞窟2に入る', systemTargetId: 'ff1_cave2' },
+      { type: 'harvest', label: '💥 ニトロトリン採集', systemTargetId: 'ff1_nitrotrin',
+        description: '爆発性植物。取れるくん.js/.jarで遠距離採集推奨。取れるくん.jsはFF小屋2、.jarはFFGG雪山で取引可能。' },
+    ],
+  },
+  ff1_node_cave3: {
+    id: 'ff1_node_cave3', name: 'ff1_cave3', displayName: 'FF洞窟3',
+    type: 'boss', areaId: 'ff1_cave_area',
+    position: { x: 0.88, y: 0.42 },
+    connections: ['ff1_node_wolf4','ff1_node_wolf6'],
+    description: 'オーロラスピネル・ネザードルビー・洞窟王の宝石の最効率採集場。内部は大量の精霊と精霊王が湧き、囲まれると超火力。洞窟王の宝石はLABで売れば時給1000万到達の話もある。',
+    actions: [
+      { type: 'battleTrigger', label: '⚔️ 洞窟3に突入（最高効率）', systemTargetId: 'ff1_cave3' },
+    ],
   },
 };
 
 // ============================================================
-// FF2 ワールド（スタブ）
+// FF2 ワールド
 // ============================================================
 export const FF2_WORLD: FreeFieldWorld = {
   id: 'ff2',
   name: 'ff2',
   displayName: 'FF2',
-  description: 'フリーフィールド2。チェイテダンジョンへの入口がある。',
-  areaIds: ['ff2_start'],
+  description: 'フリーフィールド2。スラムイキング・暗黒騎士オメガ・巨大彗星・シーメモリアなどが出現する中〜上級エリア。移動用のジェッパやリーピングがあると便利。',
+  areaIds: ['ff2_main_area', 'ff2_dungeon_area'],
 };
 
 export const FF2_AREAS: Record<string, FreeFieldArea> = {
-  ff2_start: {
-    id: 'ff2_start',
-    name: 'ff2_start',
-    displayName: 'チェイテ前広場',
-    nodeIds: ['ff2_node_entrance', 'ff2_node_chaite'],
+  ff2_main_area: {
+    id: 'ff2_main_area',
+    name: 'ff2_main_area',
+    displayName: 'FF2メインフィールド',
+    description: 'スラムイキング・シーメモリア・暗黒騎士・巨大彗星が出現。草・きのこ採集ゾーンあり。',
+    nodeIds: [
+      'ff2_node_entrance',
+      'ff2_node_slam_king',
+      'ff2_node_herb_mushroom',
+      'ff2_node_sea_memoria',
+      'ff2_node_omega_nightmare',
+      'ff2_node_giant_comet',
+      'ff2_node_wolf_trade',
+      'ff2_node_hut2',
+      'ff2_node_chaite',
+      'ff2_node_ffgg_entrance',
+    ],
+  },
+  ff2_dungeon_area: {
+    id: 'ff2_dungeon_area',
+    name: 'ff2_dungeon_area',
+    displayName: 'FFダンジョンエリア',
+    description: '盗賊・ゴーレムが密集する山岳型ダンジョン。FF大判集め最高効率。全体的に敵の火力が高い。',
+    nodeIds: [
+      'ff2_node_dungeon_mountain',
+      'ff2_node_dungeon_outside',
+      'ff2_node_dungeon_underground',
+      'ff2_node_dungeon_smith',
+    ],
   },
 };
 
 export const FF2_NODES: Record<string, FreeFieldNode> = {
   ff2_node_entrance: {
-    id: 'ff2_node_entrance',
-    name: 'ff2_entrance',
-    displayName: 'FF2 入口',
-    type: 'entrance',
-    areaId: 'ff2_start',
-    position: { x: 0.15, y: 0.5 },
-    connections: ['ff2_node_chaite'],
+    id: 'ff2_node_entrance', name: 'ff2_entrance', displayName: 'FF2入口（FFspawn）',
+    type: 'entrance', areaId: 'ff2_main_area',
+    position: { x: 0.57, y: 0.95 },
+    connections: ['ff2_node_slam_king','ff2_node_herb_mushroom','ff2_node_wolf_trade'],
+    isSafeZone: true,
+    description: 'FF2のスポーン地点。FFspawn。ここからFF2各エリアへ向かう。',
+    actions: [
+      { type: 'landmark', label: '📍 FF2入口を確認', description: 'FF2の起点。' },
+      { type: 'warp', label: 'スラムイキングゾーンへ', targetNodeId: 'ff2_node_slam_king' },
+      { type: 'warp', label: '草・きのこゾーンへ', targetNodeId: 'ff2_node_herb_mushroom' },
+    ],
+  },
+  ff2_node_slam_king: {
+    id: 'ff2_node_slam_king', name: 'slam_king_zone', displayName: 'スラムイキング',
+    type: 'boss', areaId: 'ff2_main_area',
+    position: { x: 0.67, y: 0.40 },
+    connections: ['ff2_node_entrance','ff2_node_herb_mushroom','ff2_node_ffgg_entrance'],
+    description: 'スラムイキングが固定湧きする地点。ポイズンスフィア確定周回が可能。',
+    actions: [
+      { type: 'battleTrigger', label: '⚔️ スラムイキングと戦う', systemTargetId: 'ff2_main',
+        description: 'スラムイキング(固定湧き)・スラムインツ・スラムイン出現。' },
+    ],
+  },
+  ff2_node_herb_mushroom: {
+    id: 'ff2_node_herb_mushroom', name: 'herb_mushroom_zone', displayName: '草・きのこゾーン',
+    type: 'harvest', areaId: 'ff2_main_area',
+    position: { x: 0.52, y: 0.55 },
+    connections: ['ff2_node_entrance','ff2_node_slam_king','ff2_node_omega_nightmare'],
+    description: '七草・各種きのこが採集できるFF2中央エリア。フォレスターが守護する。取れるくん.jsで効率大幅UP。',
+    actions: [
+      { type: 'harvest', label: '🌿 七草採集', systemTargetId: 'ff2_herb_gather',
+        description: '七草×7種を採集。七草粥のレシピは各7種＋ボウル。取れるくん.jsで効率大幅UP。' },
+      { type: 'harvest', label: '🍄 きのこ採集', systemTargetId: 'ff2_mushroom_gather',
+        description: 'コウヨウモミジオオタケ・カオリヒラタケ・キセイダケなど各種きのこ。' },
+      { type: 'battleTrigger', label: '⚔️ フォレスターと戦う', systemTargetId: 'ff2_main' },
+    ],
+  },
+  ff2_node_sea_memoria: {
+    id: 'ff2_node_sea_memoria', name: 'sea_memoria_zone', displayName: 'シーメモリア（海岸）',
+    type: 'boss', areaId: 'ff2_main_area',
+    position: { x: 0.88, y: 0.35 },
+    connections: ['ff2_node_giant_comet','ff2_node_hut2','ff2_node_slam_king'],
+    description: '海岸沿いにシーメモリアがランダム湧き。海原のオーブ・欠片目当てに周回する価値あり。',
+    actions: [
+      { type: 'battleTrigger', label: '⚔️ シーメモリアを討伐', systemTargetId: 'ff2_main',
+        description: '海原の欠片60% / 海原のオーブ10%' },
+    ],
+  },
+  ff2_node_omega_nightmare: {
+    id: 'ff2_node_omega_nightmare', name: 'omega_nightmare_zone', displayName: '暗黒騎士オメガ・ナイト・メア',
+    type: 'boss', areaId: 'ff2_main_area',
+    position: { x: 0.42, y: 0.75 },
+    connections: ['ff2_node_herb_mushroom','ff2_node_chaite','ff2_node_wolf_trade'],
+    description: '暗黒騎士オメガ・ナイト・メアが固定湧き。タゲと範囲で2回ドロップ判定。無銘の剣・契約書・暗黒騎士の甲冑狙いの最重要地点。',
+    actions: [
+      { type: 'battleTrigger', label: '⚔️ オメガ・ナイト・メアと戦う', systemTargetId: 'ff2_main',
+        description: '暗黒騎士の甲冑75% / 無銘の剣タゲ1.5%範囲0.8% / 契約書タゲ0.1%のみ' },
+    ],
+  },
+  ff2_node_giant_comet: {
+    id: 'ff2_node_giant_comet', name: 'ff2_giant_comet', displayName: '巨大彗星（FF2）',
+    type: 'boss', areaId: 'ff2_main_area',
+    position: { x: 0.88, y: 0.55 },
+    connections: ['ff2_node_sea_memoria','ff2_node_hut2'],
+    description: 'FF2の巨大彗星。コスモニウム確定。FFGGの巨大彗星と合わせた周回が効率良い。',
+    actions: [
+      { type: 'battleTrigger', label: '⚔️ 巨大彗星に挑む', systemTargetId: 'ff2_main',
+        description: 'コスモニウム確定 / FF大判30%' },
+    ],
+  },
+  ff2_node_wolf_trade: {
+    id: 'ff2_node_wolf_trade', name: 'wolf_trade', displayName: '取引オオカミ',
+    type: 'shop', areaId: 'ff2_main_area',
+    position: { x: 0.38, y: 0.88 },
+    connections: ['ff2_node_entrance','ff2_node_omega_nightmare'],
+    description: 'FF1とFF2の境目にいるオオカミ。息吹の羽根と白銀TPを取引できる。必ず場所を覚えておこう。',
+    actions: [
+      { type: 'shop', label: '🐺 取引オオカミと取引', description: '息吹の羽根・白銀TPの取引が可能。' },
+      { type: 'landmark', label: '📍 取引オオカミの位置確認', description: 'FF1/FF2の境目。絶対覚えておくべき場所。' },
+    ],
+  },
+  ff2_node_hut2: {
+    id: 'ff2_node_hut2', name: 'ff2_hut2', displayName: 'FF小屋2',
+    type: 'safe', areaId: 'ff2_main_area',
+    position: { x: 0.98, y: 0.72 },
+    connections: ['ff2_node_sea_memoria','ff2_node_giant_comet'],
+    isSafeZone: true,
+    description: 'FF2右端の小屋。スラムイ溶液をポイズンスフィアに変換できる。取れるくん.jsの取引も可能。',
+    actions: [
+      { type: 'shop', label: '🏠 FF小屋2を利用', description: 'スラムイ溶液→ポイズンスフィア変換。取れるくん.js取引など。' },
+    ],
   },
   ff2_node_chaite: {
-    id: 'ff2_node_chaite',
-    name: 'chaite_gate',
-    displayName: 'チェイテ城門',
-    type: 'boss',
-    areaId: 'ff2_start',
-    position: { x: 0.6, y: 0.5 },
-    connections: ['ff2_node_entrance'],
-    description: '第999代将軍徳川義和公が治める難攻不落の城塞。通常攻撃はほぼ通らない——貫通武器を用意せよ。',
+    id: 'ff2_node_chaite', name: 'chaite_gate_ff2', displayName: 'チェイテ城門（FF2側）',
+    type: 'boss', areaId: 'ff2_main_area',
+    position: { x: 0.58, y: 0.82 },
+    connections: ['ff2_node_omega_nightmare','ff2_node_wolf_trade'],
+    description: '第999代将軍徳川義和公が治める難攻不落の城塞。物理はほぼ無効。貫通武器必須。',
     actions: [
-      {
-        type: 'battleTrigger',
-        label: 'チェイテに突入',
+      { type: 'battleTrigger', label: 'チェイテに突入（FF2ルート）',
         description: '9階層・最終ボス「徳川義和公」を目指す。物理はほぼ無効。貫通ダメージ必須。',
-        systemTargetId: 'chaite',
-      },
+        systemTargetId: 'chaite' },
+    ],
+  },
+  ff2_node_ffgg_entrance: {
+    id: 'ff2_node_ffgg_entrance', name: 'ffgg_entrance_from_ff2', displayName: 'FFGG入口',
+    type: 'transition', areaId: 'ff2_main_area',
+    position: { x: 0.75, y: 0.20 },
+    connections: ['ff2_node_slam_king'],
+    description: 'FFGG（フリーフィールドGG）への遷移ポイント。FF2の北部にある。',
+    actions: [
+      { type: 'warp', label: 'FFGGへ移動', targetAreaId: 'ffgg_forest',
+        description: 'FFGGエリアへ移動する。' },
+    ],
+  },
+  // FFダンジョンエリアノード
+  ff2_node_dungeon_mountain: {
+    id: 'ff2_node_dungeon_mountain', name: 'dungeon_mountain', displayName: '盗賊の大洞窟（山内部）',
+    type: 'danger', areaId: 'ff2_dungeon_area',
+    position: { x: 0.30, y: 0.40 },
+    connections: ['ff2_node_dungeon_outside','ff2_node_dungeon_underground'],
+    description: 'トゥゾクとスラムイが大量湧き。囲まれると極めて危険。ウエントペリドットが唯一採集できる場所。山頂に謎の1万円Magic Armorガチャあり。',
+    actions: [
+      { type: 'battleTrigger', label: '⚔️ 山内部に突入', systemTargetId: 'ff_dungeon' },
+      { type: 'harvest', label: '💎 ウエントペリドット採集', systemTargetId: 'ffd_uento_gather',
+        description: 'ウエントペリドット唯一の採集地点。Vortex Hurricane・息吹の羽根クラフトに必須。' },
+      { type: 'landmark', label: '🎰 頂上の謎ガチャを確認',
+        description: '頂上に鉄/金/ダイヤMagic Armorガチャ。1回1万円。ダイヤは期待値2000〜6000万。外れでも何も出ない。' },
+    ],
+  },
+  ff2_node_dungeon_outside: {
+    id: 'ff2_node_dungeon_outside', name: 'dungeon_outside', displayName: '盗賊リーダー外エリア',
+    type: 'danger', areaId: 'ff2_dungeon_area',
+    position: { x: 0.55, y: 0.25 },
+    connections: ['ff2_node_dungeon_mountain','ff2_node_dungeon_underground','ff2_node_dungeon_smith'],
+    description: '脳筋盗賊リーダーが複数湧く外エリア。FF大判集め効率が全体でもトップクラス。イーヴィルガーネット・パンクパーツ・ブラッドリィレインも入手可能。',
+    actions: [
+      { type: 'battleTrigger', label: '⚔️ 脳筋盗賊リーダーと戦う', systemTargetId: 'ff_dungeon',
+        description: 'FF大判80%（複数体）→超効率 / イーヴィルガーネット8% / パンクパーツA/B各15% / ブラッドリィレイン3%' },
+    ],
+  },
+  ff2_node_dungeon_underground: {
+    id: 'ff2_node_dungeon_underground', name: 'dungeon_underground', displayName: '地下ゴーレムエリア',
+    type: 'danger', areaId: 'ff2_dungeon_area',
+    position: { x: 0.30, y: 0.70 },
+    connections: ['ff2_node_dungeon_mountain','ff2_node_dungeon_outside'],
+    description: '様々なゴーレムが湧く地下空間。黒魔鉄鋼・電磁魔鉄鋼・マテラカイトが入手可能。',
+    actions: [
+      { type: 'battleTrigger', label: '⚔️ ゴーレムと戦う', systemTargetId: 'ff_dungeon',
+        description: '黒魔鉄鋼60% / 電磁魔鉄鋼60% / マテラカイト50%' },
+    ],
+  },
+  ff2_node_dungeon_smith: {
+    id: 'ff2_node_dungeon_smith', name: 'dungeon_smith', displayName: '山外周の鍛冶屋',
+    type: 'shop', areaId: 'ff2_dungeon_area',
+    position: { x: 0.75, y: 0.55 },
+    connections: ['ff2_node_dungeon_outside'],
+    description: '山の外周部に住む鍛冶屋。パラディンイクス装備の設計図（パラディンクス）やAF2の取引が可能。',
+    actions: [
+      { type: 'shop', label: '⚒️ 鍛冶屋と取引', description: 'パラディンクス設計図・AF2など取引可能。' },
+      { type: 'landmark', label: '📍 鍛冶屋の場所を確認', description: '山外周部の特殊NPC。' },
     ],
   },
 };
