@@ -3185,6 +3185,9 @@ export function DungeonScreen() {
   const [ffBattleRunState, setFfBattleRunState] = useState<DungeonRunState | null>(null);
   const [ffBattleKey, setFfBattleKey] = useState(0);
   const [ffBattleMana, setFfBattleMana] = useState(0);
+  const [ffEncounterProfileId, setFfEncounterProfileId] = useState<string>('');  // ループ用：現在のenounterProfileId
+  const [ffBattleAreaName, setFfBattleAreaName] = useState<string>('');           // ループ用：表示エリア名
+  const [ffLoopStats, setFfLoopStats] = useState<{wins:number;totalExp:number;totalGold:number}>({wins:0,totalExp:0,totalGold:0});
   // 無限深層回廊：実戦闘（ホットバー/武器選択TurnBattle）
   const icCurrentFloor = useGameStore(s => s.icCurrentFloor);
   const icBattleActive = useGameStore(s => s.icBattleActive);
@@ -3490,8 +3493,12 @@ export function DungeonScreen() {
       setDungeonInnerTab('dungeon');
       return;
     }
+    const profileId = req.dungeonId; // dungeonIdをenounterProfileIdとして使う
+    setFfEncounterProfileId(profileId);
+    setFfBattleAreaName(req.areaName);
+    setFfLoopStats({ wins: 0, totalExp: 0, totalGold: 0 });
     const rs: DungeonRunState = {
-      dungeonId: req.dungeonId,
+      dungeonId: profileId,
       currentFloor: 1,
       currentAreaName: req.areaName,
       currentAreaIdx: 0,
@@ -3507,22 +3514,43 @@ export function DungeonScreen() {
     setFfBattleMana(0);
   }, [player, getDungeon]);
 
+  // 勝利 → ループ継続（nullにしない）、敗北 → 画面を閉じる
   const handleFFBattleEnd = useCallback((won: boolean, expGained: number, goldGained: number, drops: {itemId:string;amount:number}[], _hpDelta: number) => {
     if (won) {
-      addNotification('success', `🏆 FF戦闘勝利！ EXP+${expGained} Gold+${goldGained}`);
       addItems(drops);
       addExp(expGained);
       changeGold(goldGained);
+      addSkillExp('combat', Math.floor(expGained / 2));
+      setFfLoopStats(prev => ({ wins: prev.wins + 1, totalExp: prev.totalExp + expGained, totalGold: prev.totalGold + goldGained }));
+      // 同じenounterProfileIdで新しいバトルを即起動（ループ）
+      setFfBattleRunState(prev => prev ? {
+        ...prev,
+        monstersDefeated: (prev.monstersDefeated ?? 0) + 1,
+        totalExp: (prev.totalExp ?? 0) + expGained,
+        totalGold: (prev.totalGold ?? 0) + goldGained,
+        isComplete: false,
+        isFailed: false,
+      } : null);
+      setFfBattleKey(k => k + 1);
     } else {
       addNotification('error', '💀 FF戦闘敗北...');
+      setFfBattleRunState(null);
+      setFfLoopStats({ wins: 0, totalExp: 0, totalGold: 0 });
     }
-    setFfBattleRunState(null);
-  }, [addNotification, addItems, addExp, changeGold]);
+  }, [addNotification, addItems, addExp, changeGold, addSkillExp]);
 
+  // 逃走（敵がいなくなっても続行しない意思表示） → ループ継続
   const handleFFBattleEscape = useCallback(() => {
-    addNotification('info', '💨 FF戦闘から逃走した');
-    setFfBattleRunState(null);
+    addNotification('info', '💨 逃走した。次の敵が出現...');
+    setFfBattleKey(k => k + 1);
   }, [addNotification]);
+
+  // 「フィールドを離れる」ボタン → 完全終了
+  const handleFFBattleLeave = useCallback(() => {
+    addNotification('info', `🚪 フリーフィールドを離れた（${ffLoopStats.wins}戦 EXP+${ffLoopStats.totalExp} G+${ffLoopStats.totalGold}）`);
+    setFfBattleRunState(null);
+    setFfLoopStats({ wins: 0, totalExp: 0, totalGold: 0 });
+  }, [addNotification, ffLoopStats]);
 
   // オートバトル：戦闘終了後に自動で次の戦闘を開始
   useEffect(() => {
@@ -3613,8 +3641,24 @@ export function DungeonScreen() {
       {ffBattleRunState && freeFieldTabActive && (
         <div style={{ position: 'fixed', inset: 0, background: '#0a0d14', zIndex: 1000, overflowY: 'auto' }}>
           <div style={{ maxWidth: 520, margin: '0 auto', padding: '12px 12px 80px' }}>
-            <div style={{ background: 'rgba(96,160,255,0.10)', border: '1px solid #2d3752', borderRadius: 8, padding: '6px 12px', marginBottom: 10, fontSize: '0.72rem', color: '#60a0ff', fontWeight: 700 }}>
-              🗺️ フリーフィールド戦闘 — {ffBattleRunState.currentAreaName}
+            {/* ヘッダー：エリア名・ループ統計・離脱ボタン */}
+            <div style={{ background: 'rgba(96,160,255,0.10)', border: '1px solid #2d3752', borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.72rem', color: '#60a0ff', fontWeight: 700 }}>
+                  🗺️ {ffBattleAreaName || ffBattleRunState.currentAreaName}
+                </span>
+                <button
+                  onClick={handleFFBattleLeave}
+                  style={{ padding: '4px 10px', background: 'rgba(200,80,80,0.2)', border: '1px solid #c05050', color: '#e07070', borderRadius: 6, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700 }}
+                >
+                  🚪 フィールドを離れる
+                </button>
+              </div>
+              {ffLoopStats.wins > 0 && (
+                <div style={{ marginTop: 4, fontSize: '0.68rem', color: '#8a92b2' }}>
+                  🔁 {ffLoopStats.wins}戦 ／ EXP+{ffLoopStats.totalExp} ／ G+{ffLoopStats.totalGold}
+                </div>
+              )}
             </div>
             <TurnBattle
               key={ffBattleKey}

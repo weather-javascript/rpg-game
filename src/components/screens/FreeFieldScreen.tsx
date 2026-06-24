@@ -1189,8 +1189,9 @@ const FF_AREA_TO_DUNGEON: Record<string, string> = {
 };
 
 export interface FFBattleRequest {
-  dungeonId: string;
+  dungeonId: string;        // FFGG_ENCOUNTER_TABLEのキー（encounterProfileId兼用）
   areaName: string;
+  encounterProfileId?: string; // dungeonIdと同値。明示用
 }
 
 export function FreeFieldScreen({ onStartFFBattle }: { onStartFFBattle?: (req: FFBattleRequest) => void }) {
@@ -1240,14 +1241,16 @@ export function FreeFieldScreen({ onStartFFBattle }: { onStartFFBattle?: (req: F
   }, [activeAreaId, addNotification]);
 
   // ── バトル開始（親DungeonScreenのTurnBattleに委譲） ──
-  const handleBattleStart = useCallback((_action: FreeFieldNodeAction, node: FreeFieldNode) => {
-    const dungeonId = FF_AREA_TO_DUNGEON[node.areaId];
-    if (!dungeonId) {
+  const handleBattleStart = useCallback((action: FreeFieldNodeAction, node: FreeFieldNode) => {
+    // action.systemTargetId があればそれをenounterProfileIdとして使う（ノード固有の敵を出す）
+    // なければエリアIDからdungeonIdを決定（フォールバック）
+    const encounterProfileId = action.systemTargetId ?? FF_AREA_TO_DUNGEON[node.areaId];
+    if (!encounterProfileId) {
       addNotification('error', 'このエリアは戦闘未対応です');
       return;
     }
     if (onStartFFBattle) {
-      onStartFFBattle({ dungeonId, areaName: node.displayName });
+      onStartFFBattle({ dungeonId: encounterProfileId, areaName: node.displayName });
     } else {
       addNotification('warning', '戦闘を開始するにはダンジョンタブから入ってください');
     }
