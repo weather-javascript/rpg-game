@@ -3195,7 +3195,7 @@ export function DungeonScreen() {
   const icCancelBattle = useGameStore(s => s.icCancelBattle);
   const icSetBattleMana = useGameStore(s => s.icSetBattleMana);
 
-  const HIDDEN_DUNGEON_IDS = ['devil_armor_fight', 'dead_armor_fight', 'sky_castle_ex', 'dragons_lair', 'ff_forest', 'ff_plain', 'ff_desert', 'ff_snow', 'ff_savanna', 'ff_pirate', 'chaite'];
+  const HIDDEN_DUNGEON_IDS = ['devil_armor_fight', 'dead_armor_fight', 'sky_castle_ex', 'dragons_lair', 'ff_forest', 'ff_plain', 'ff_desert', 'ff_snow', 'ff_savanna', 'ff_pirate', 'chaite', 'ff1_main', 'ff1_cave1', 'ff1_cave2', 'ff1_cave3', 'ff2_main', 'ff_dungeon'];
   const dungeons = Object.values(DUNGEON_MASTER).filter(d => !HIDDEN_DUNGEON_IDS.includes(d.id));
   const lockedDungeons = dungeons.filter(d => !isDungeonUnlocked(d.id));
 

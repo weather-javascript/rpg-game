@@ -8,7 +8,7 @@ import {
   FREE_FIELD_WORLDS,
   FREE_FIELD_AREAS_ALL,
   FREE_FIELD_NODES_ALL,
-  FFGG_HARVEST_NODES,
+  FF_ALL_HARVEST_NODES,
   getAreasByWorld,
   getNodesByWorld,
   getNodesByArea,
@@ -1076,7 +1076,7 @@ function FFHarvestTab() {
   const hasGatherKit = (player?.inventory?.['ffgg_gather_kit'] ?? 0) > 0;
 
   const handleHarvest = (nodeId: string) => {
-    const harvestNode = FFGG_HARVEST_NODES[nodeId];
+    const harvestNode = FF_ALL_HARVEST_NODES[nodeId];
     if (!harvestNode) return;
     if (harvestNode.requiredToolId && (player?.inventory?.[harvestNode.requiredToolId] ?? 0) <= 0) {
       addNotification('error', '専用ツール（FF採集キット）が必要です');
@@ -1107,7 +1107,7 @@ function FFHarvestTab() {
         {!hasGatherKit && <span style={{ color: '#f0a830' }}> 🔒 採集にはFF採集キットが必要です（クラフトでFF小判×9から作成可）。</span>}
       </div>
 
-      {Object.values(FFGG_HARVEST_NODES).map(hnode => {
+      {Object.values(FF_ALL_HARVEST_NODES).map(hnode => {
         const locked = !!hnode.requiredToolId && (player?.inventory?.[hnode.requiredToolId] ?? 0) <= 0;
         return (
         <div key={hnode.id} style={{
@@ -1173,13 +1173,19 @@ function FFHarvestTab() {
 // ────────────────────────────────────────────
 // FF エリアID → DUNGEON_MASTER のダンジョンID へのマッピング
 const FF_AREA_TO_DUNGEON: Record<string, string> = {
-  ffgg_forest:  'ff_forest',
-  ffgg_plain:   'ff_plain',
-  ffgg_desert:  'ff_desert',
-  ffgg_snow:    'ff_snow',
-  ffgg_savanna: 'ff_savanna',
-  ffgg_pirate:  'ff_pirate',
-  ff2_start:    'chaite',
+  ffgg_forest:       'ff_forest',
+  ffgg_plain:        'ff_plain',
+  ffgg_desert:       'ff_desert',
+  ffgg_snow:         'ff_snow',
+  ffgg_savanna:      'ff_savanna',
+  ffgg_pirate:       'ff_pirate',
+  ff2_start:         'chaite',
+  // FF1
+  ff1_main_area:     'ff1_main',
+  ff1_cave_area:     'ff1_cave3',
+  // FF2
+  ff2_main_area:     'ff2_main',
+  ff2_dungeon_area:  'ff_dungeon',
 };
 
 export interface FFBattleRequest {
@@ -1254,7 +1260,7 @@ export function FreeFieldScreen({ onStartFFBattle }: { onStartFFBattle?: (req: F
       addNotification('error', 'この採集スポットのデータが未設定です');
       return;
     }
-    const harvestNode = FFGG_HARVEST_NODES[harvestNodeId];
+    const harvestNode = FF_ALL_HARVEST_NODES[harvestNodeId];
     if (!harvestNode) {
       addNotification('error', `採集スポット "${harvestNodeId}" が見つかりません`);
       return;
