@@ -10,6 +10,7 @@ import type {
   FFGGFeverDefinition,
   EncounterTable,
 } from '../types/ffgg';
+import { MONSTER_MASTER } from './masters';
 
 // ============================================================
 // 共通スキルスニペット（再利用）
@@ -873,6 +874,199 @@ export const FFGG_ENCOUNTER_TABLE: EncounterTable = {
     maxGroupSize: 2, dangerLevel: 5,
     feverChance: 0.03,
   },
+
+  // ============================================================
+  // FF1 エンカウンタープロファイル
+  // ============================================================
+  ff1_main: {
+    areaId: 'ff1_main_area',
+    normalEnemyIds: ['ff1_scout_knight','ff1_magic_knight','ff1_wandering_tree','ff1_herb_wolf','ff1_comet'],
+    triggerEnemyId: 'ff1_scout_knight',
+    midBossId: 'ff1_don_ff_coin',
+    maxGroupSize: 3, dangerLevel: 2,
+    feverChance: 0.05,
+  },
+  ff1_cave1: {
+    areaId: 'ff1_cave_area',
+    normalEnemyIds: ['ff1_cave_spirit','ff1_cave_spirit_king'],
+    triggerEnemyId: 'ff1_cave_spirit',
+    midBossId: 'ff1_cave_spirit_king',
+    bossId: 'ff1_cave_king',
+    maxGroupSize: 4, dangerLevel: 3,
+    feverChance: 0.04,
+  },
+  ff1_cave2: {
+    areaId: 'ff1_cave_area',
+    normalEnemyIds: ['ff1_cave_spirit','ff1_cave_spirit_king'],
+    triggerEnemyId: 'ff1_cave_spirit',
+    midBossId: 'ff1_cave_spirit_king',
+    maxGroupSize: 4, dangerLevel: 3,
+    feverChance: 0.04,
+  },
+  ff1_cave3: {
+    areaId: 'ff1_cave_area',
+    normalEnemyIds: ['ff1_cave_spirit','ff1_cave_spirit_king','ff1_matelakaite_golem'],
+    triggerEnemyId: 'ff1_cave_spirit_king',
+    midBossId: 'ff1_cave_spirit_king',
+    bossId: 'ff1_cave_king',
+    maxGroupSize: 4, dangerLevel: 4,
+    feverChance: 0.06,
+  },
+  ff1_wolf: {
+    areaId: 'ff1_main_area',
+    normalEnemyIds: ['ff1_herb_wolf','ff1_herb_wolf','ff1_scout_knight'],
+    triggerEnemyId: 'ff1_herb_wolf',
+    maxGroupSize: 3, dangerLevel: 2,
+    feverChance: 0.05,
+  },
+  ff1_golem: {
+    areaId: 'ff1_main_area',
+    normalEnemyIds: ['ff1_matelakaite_golem','ff1_magic_knight'],
+    triggerEnemyId: 'ff1_matelakaite_golem',
+    midBossId: 'ff1_don_ff_coin',
+    maxGroupSize: 2, dangerLevel: 3,
+    feverChance: 0.04,
+  },
+
+  // ============================================================
+  // FF2 エンカウンタープロファイル
+  // ============================================================
+  ff2_main: {
+    areaId: 'ff2_main_area',
+    normalEnemyIds: ['ff2_slamy','ff2_slamin','ff2_forester','ff2_eliminator'],
+    triggerEnemyId: 'ff2_slamin',
+    midBossId: 'ff2_slaminz',
+    maxGroupSize: 3, dangerLevel: 4,
+    feverChance: 0.04,
+  },
+  ff2_slam_king: {
+    areaId: 'ff2_main_area',
+    normalEnemyIds: ['ff2_slamin','ff2_slaminz'],
+    triggerEnemyId: 'ff2_slamin',
+    midBossId: 'ff2_slaminz',
+    bossId: 'ff2_slam_king',
+    maxGroupSize: 2, dangerLevel: 4,
+    feverChance: 0.05,
+  },
+  ff2_sea_memoria: {
+    areaId: 'ff2_main_area',
+    normalEnemyIds: ['ff2_eliminator','ff2_slamin'],
+    triggerEnemyId: 'ff2_eliminator',
+    bossId: 'ff2_sea_memoria',
+    maxGroupSize: 2, dangerLevel: 4,
+    feverChance: 0.04,
+  },
+  ff2_omega_nightmare: {
+    areaId: 'ff2_main_area',
+    normalEnemyIds: ['ff2_forester','ff2_forestl'],
+    triggerEnemyId: 'ff2_forestl',
+    midBossId: 'ff2_forestl',
+    bossId: 'ff2_omega_nightmare',
+    maxGroupSize: 2, dangerLevel: 5,
+    feverChance: 0.03,
+  },
+  ff2_giant_comet: {
+    areaId: 'ff2_main_area',
+    normalEnemyIds: ['ff2_eliminator','ff2_slamin'],
+    triggerEnemyId: 'ff2_eliminator',
+    bossId: 'ff2_giant_comet',
+    maxGroupSize: 2, dangerLevel: 4,
+    feverChance: 0.05,
+  },
+  ff2_herb_zone: {
+    areaId: 'ff2_main_area',
+    normalEnemyIds: ['ff2_slamy','ff2_forester','ff2_forestl'],
+    triggerEnemyId: 'ff2_forester',
+    midBossId: 'ff2_forestl',
+    maxGroupSize: 3, dangerLevel: 3,
+    feverChance: 0.04,
+  },
+
+  // ============================================================
+  // FFダンジョンエリア エンカウンタープロファイル
+  // ============================================================
+  ff_dungeon: {
+    areaId: 'ff2_dungeon_area',
+    normalEnemyIds: ['ffd_tuzok','ff2_slamy','ff2_slamin'],
+    triggerEnemyId: 'ffd_tuzok',
+    midBossId: 'ffd_brute_bandit_leader',
+    maxGroupSize: 4, dangerLevel: 5,
+    feverChance: 0.04,
+  },
+  ff_dungeon_outside: {
+    areaId: 'ff2_dungeon_area',
+    normalEnemyIds: ['ffd_tuzok','ffd_brute_bandit_leader'],
+    triggerEnemyId: 'ffd_tuzok',
+    midBossId: 'ffd_brute_bandit_leader',
+    maxGroupSize: 3, dangerLevel: 5,
+    feverChance: 0.05,
+  },
+  ff_dungeon_underground: {
+    areaId: 'ff2_dungeon_area',
+    normalEnemyIds: ['ffd_dark_iron_golem','ffd_em_iron_golem','ff1_matelakaite_golem'],
+    triggerEnemyId: 'ffd_dark_iron_golem',
+    midBossId: 'ffd_em_iron_golem',
+    maxGroupSize: 2, dangerLevel: 4,
+    feverChance: 0.04,
+  },
+};
+
+// ============================================================
+// FF1/FF2/FFダンジョン エネミー定義（FFGG_ALL_ENEMIESに統合用）
+// masters.tsのMonsterMasterからFFGGEnemyDefinition形式に変換したスタブ
+// ============================================================
+
+function monsterToFFGG(id: string, areaIds: string[], category: FFGGEnemyDefinition['category'] = 'swarm'): FFGGEnemyDefinition {
+  const m = (MONSTER_MASTER as any)[id];
+  if (!m) return { id, name: id, description: '', icon: 'skull', category, maxHp: 100, attack: 10, defense: 5, baseExp: 10, baseGold: 10, drops: [], skills: [], areaIds, dangerLevel: 3 };
+  return {
+    id: m.id,
+    name: m.name,
+    description: m.description ?? '',
+    icon: m.icon ?? 'skull',
+    category,
+    maxHp: m.maxHp,
+    attack: m.attack,
+    defense: m.defense,
+    baseExp: m.baseExp,
+    baseGold: m.baseGold,
+    drops: (m.drops ?? []).map((d: any) => ({ itemId: d.itemId, baseRate: d.baseRate, minAmount: d.minAmount, maxAmount: d.maxAmount })),
+    skills: [],
+    areaIds,
+    dangerLevel: 3,
+    isBoss: m.isBoss,
+    isMidBoss: m.isMidBoss,
+  };
+}
+
+export const FF1_FF2_ENEMIES: Record<string, FFGGEnemyDefinition> = {
+  // FF1
+  ff1_scout_knight:      monsterToFFGG('ff1_scout_knight',      ['ff1_main_area'],             'swarm'),
+  ff1_magic_knight:      monsterToFFGG('ff1_magic_knight',      ['ff1_main_area'],             'swarm'),
+  ff1_wandering_tree:    monsterToFFGG('ff1_wandering_tree',    ['ff1_main_area'],             'counter'),
+  ff1_herb_wolf:         monsterToFFGG('ff1_herb_wolf',         ['ff1_main_area'],             'swarm'),
+  ff1_matelakaite_golem: monsterToFFGG('ff1_matelakaite_golem', ['ff1_main_area','ff1_cave_area'], 'counter'),
+  ff1_comet:             monsterToFFGG('ff1_comet',             ['ff1_main_area'],             'swarm'),
+  ff1_don_ff_coin:       monsterToFFGG('ff1_don_ff_coin',       ['ff1_main_area'],             'swarm'),
+  ff1_cave_spirit:       monsterToFFGG('ff1_cave_spirit',       ['ff1_cave_area'],             'swarm'),
+  ff1_cave_spirit_king:  monsterToFFGG('ff1_cave_spirit_king',  ['ff1_cave_area'],             'swarm'),
+  ff1_cave_king:         monsterToFFGG('ff1_cave_king',         ['ff1_cave_area'],             'phase'),
+  // FF2
+  ff2_slamy:             monsterToFFGG('ff2_slamy',             ['ff2_main_area'],             'swarm'),
+  ff2_slamin:            monsterToFFGG('ff2_slamin',            ['ff2_main_area'],             'swarm'),
+  ff2_slaminz:           monsterToFFGG('ff2_slaminz',           ['ff2_main_area'],             'summoner'),
+  ff2_slam_king:         monsterToFFGG('ff2_slam_king',         ['ff2_main_area'],             'phase'),
+  ff2_sea_memoria:       monsterToFFGG('ff2_sea_memoria',       ['ff2_main_area'],             'phase'),
+  ff2_eliminator:        monsterToFFGG('ff2_eliminator',        ['ff2_main_area'],             'artillery'),
+  ff2_omega_nightmare:   monsterToFFGG('ff2_omega_nightmare',   ['ff2_main_area'],             'phase'),
+  ff2_forester:          monsterToFFGG('ff2_forester',          ['ff2_main_area'],             'swarm'),
+  ff2_forestl:           monsterToFFGG('ff2_forestl',           ['ff2_main_area'],             'artillery'),
+  ff2_giant_comet:       monsterToFFGG('ff2_giant_comet',       ['ff2_main_area'],             'phase'),
+  // FFダンジョン
+  ffd_tuzok:             monsterToFFGG('ffd_tuzok',             ['ff2_dungeon_area'],          'swarm'),
+  ffd_brute_bandit_leader: monsterToFFGG('ffd_brute_bandit_leader', ['ff2_dungeon_area'],      'swarm'),
+  ffd_dark_iron_golem:   monsterToFFGG('ffd_dark_iron_golem',   ['ff2_dungeon_area'],          'counter'),
+  ffd_em_iron_golem:     monsterToFFGG('ffd_em_iron_golem',     ['ff2_dungeon_area'],          'counter'),
 };
 
 // ============================================================
@@ -887,4 +1081,5 @@ export const FFGG_ALL_ENEMIES: Record<string, FFGGEnemyDefinition> = {
   ...FFGG_SAVANNA_ENEMIES,
   ...FFGG_PIRATE_ENEMIES,
   ...(FFGG_BOSSES as unknown as Record<string, FFGGEnemyDefinition>),
+  ...FF1_FF2_ENEMIES,
 };
