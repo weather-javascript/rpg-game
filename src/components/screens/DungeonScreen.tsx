@@ -3185,7 +3185,7 @@ export function DungeonScreen() {
   const [ffBattleRunState, setFfBattleRunState] = useState<DungeonRunState | null>(null);
   const [ffBattleKey, setFfBattleKey] = useState(0);
   const [ffBattleMana, setFfBattleMana] = useState(0);
-  const [setFfEncounterProfileId] = useState<string>('');  // ループ用：現在のenounterProfileId
+  const [, setFfEncounterProfileId] = useState<string>('');  // ループ用：現在のenounterProfileId
   const [ffBattleAreaName, setFfBattleAreaName] = useState<string>('');           // ループ用：表示エリア名
   const [ffLoopStats, setFfLoopStats] = useState<{wins:number;totalExp:number;totalGold:number}>({wins:0,totalExp:0,totalGold:0});
   // 無限深層回廊：実戦闘（ホットバー/武器選択TurnBattle）
