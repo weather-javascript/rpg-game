@@ -47,34 +47,54 @@ export function spawnEnemiesAfterTrigger(
   const profile = FFGG_ENCOUNTER_TABLE[encounterProfileId];
   if (!profile) return [];
 
-  // スポーン確率チェック（一定確率でスポーンしないこともある）
-  const spawnChance = 0.80; // 80%の確率でスポーン
-  if (!rollChance(spawnChance)) return [];
-
-  const pool = [...profile.normalEnemyIds];
-  if (!pool.length) return [];
-
-  // スポーン数: 3〜10体（maxGroupSize * 2 を上限とする）
-  const maxCount = Math.min(10, profile.maxGroupSize * 3);
-  const minCount = Math.min(3, maxCount);
-  const count = randInt(minCount, maxCount);
-
   const result: FFBattleEnemy[] = [];
 
-  for (let i = 0; i < count; i++) {
-    // ランダムに敵を選択
-    const pickedId = pool[randInt(0, pool.length - 1)];
-    const def = FFGG_ALL_ENEMIES[pickedId];
-    if (!def) continue;
-
-    // ボス・中ボスは通常スポーンから除外（isBoss/isMidBoss 判定）
-    const defAny = def as FFGGEnemyDefinition & { isBoss?: boolean; isMidBoss?: boolean };
-    if (defAny.isBoss || defAny.isMidBoss) continue;
-
-    result.push(enemyDefToInstance(def));
+  // ── ボス出現チェック（bossId があれば低確率で出現）
+  if (profile.bossId) {
+    const bossDef = FFGG_ALL_ENEMIES[profile.bossId];
+    if (bossDef && rollChance(0.15)) {
+      result.push(enemyDefToInstance(bossDef));
+      return result; // ボスが出たら他は出さない
+    }
   }
 
-  // 最大8体を上限
+  // ── 中ボス出現チェック（midBossId があれば中確率で出現）
+  if (profile.midBossId) {
+    const midDef = FFGG_ALL_ENEMIES[profile.midBossId];
+    if (midDef && rollChance(0.30)) {
+      result.push(enemyDefToInstance(midDef));
+      // 中ボス＋通常敵を少数追加
+      const pool = profile.normalEnemyIds.filter(id => {
+        const d = FFGG_ALL_ENEMIES[id] as FFGGEnemyDefinition & { isBoss?: boolean; isMidBoss?: boolean };
+        return d && !d.isBoss && !d.isMidBoss;
+      });
+      const extraCount = randInt(1, Math.min(3, profile.maxGroupSize));
+      for (let i = 0; i < extraCount; i++) {
+        const pickedId = pool[randInt(0, pool.length - 1)];
+        const def = FFGG_ALL_ENEMIES[pickedId];
+        if (def) result.push(enemyDefToInstance(def));
+      }
+      return result.slice(0, 8);
+    }
+  }
+
+  // ── 通常スポーン
+  const pool = profile.normalEnemyIds.filter(id => {
+    const d = FFGG_ALL_ENEMIES[id] as FFGGEnemyDefinition & { isBoss?: boolean; isMidBoss?: boolean };
+    return d && !d.isBoss && !d.isMidBoss;
+  });
+  if (!pool.length) return [];
+
+  const maxCount = Math.min(8, profile.maxGroupSize * 2);
+  const minCount = Math.min(2, maxCount);
+  const count = randInt(minCount, maxCount);
+
+  for (let i = 0; i < count; i++) {
+    const pickedId = pool[randInt(0, pool.length - 1)];
+    const def = FFGG_ALL_ENEMIES[pickedId];
+    if (def) result.push(enemyDefToInstance(def));
+  }
+
   return result.slice(0, 8);
 }
 
