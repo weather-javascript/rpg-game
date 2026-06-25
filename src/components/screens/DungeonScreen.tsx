@@ -3185,7 +3185,7 @@ export function DungeonScreen() {
   const [ffBattleRunState, setFfBattleRunState] = useState<DungeonRunState | null>(null);
   const [ffBattleKey, setFfBattleKey] = useState(0);
   const [ffBattleMana, setFfBattleMana] = useState(0);
-  const [, setFfEncounterProfileId] = useState<string>('');  // ループ用：現在のenounterProfileId
+  const [ffEncounterProfileId, setFfEncounterProfileId] = useState<string>('');  // ループ用：現在のenounterProfileId
   const [ffBattleAreaName, setFfBattleAreaName] = useState<string>('');           // ループ用：表示エリア名
   const [ffLoopStats, setFfLoopStats] = useState<{wins:number;totalExp:number;totalGold:number}>({wins:0,totalExp:0,totalGold:0});
   // 無限深層回廊：実戦闘（ホットバー/武器選択TurnBattle）
@@ -3522,6 +3522,15 @@ export function DungeonScreen() {
       changeGold(goldGained);
       addSkillExp('combat', Math.floor(expGained / 2));
       setFfLoopStats(prev => ({ wins: prev.wins + 1, totalExp: prev.totalExp + expGained, totalGold: prev.totalGold + goldGained }));
+      // ドラゴンソウル付与 + ffBattleWins更新
+      useGameStore.setState(state => {
+        if (!state.player) return state;
+        const prevSoul = state.player.dragonSoul ?? 0;
+        const prevWins = state.player.ffBattleWins ?? 0;
+        // ボス/中ボスに応じてソウル付与（ドロップ内容から判定不可なので通常+1固定、ボスwardsなら+20）
+        const soulGain = expGained >= 500 ? 20 : expGained >= 150 ? 5 : 1;
+        return { player: { ...state.player, dragonSoul: prevSoul + soulGain, dragonSoulTotal: (state.player.dragonSoulTotal ?? 0) + soulGain, ffBattleWins: prevWins + 1 } };
+      });
       // 同じenounterProfileIdで新しいバトルを即起動（ループ）
       setFfBattleRunState(prev => prev ? {
         ...prev,
