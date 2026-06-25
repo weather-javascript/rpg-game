@@ -413,7 +413,7 @@ export function StatusScreen() {
 
   const hpPct = (player.stats.hp / player.stats.maxHp) * 100;
   const satPct = (player.stats.satiety / player.stats.maxSatiety) * 100;
-  const expPct = player.stats.level < 200 ? Math.min(100, (player.stats.exp / player.stats.expToNextLevel) * 100) : 100;
+  const expPct = player.stats.level < 10_000_000 ? Math.min(100, (player.stats.exp / player.stats.expToNextLevel) * 100) : 100;
 
   const bar = (pct: number, color: string) => (
     <div style={{height:8, background:'#2d3752', borderRadius:4, overflow:'hidden', marginTop:3}}>

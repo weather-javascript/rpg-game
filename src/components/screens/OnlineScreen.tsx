@@ -37,7 +37,7 @@ const WORLD_NEWS_TYPES = new Set([
   'dungeon_clear','sky_castle_clear','sky_castle_ex_clear','volcano_clear',
   'boss_kx','boss_rei','boss_ragnarok','boss_hard','boss_title',
   'super_jackpot','jackpot','gamble_rank_up',
-  'level_50','level_100','level_200',
+  'level_50','level_100','level_200','level_1000','level_10000','level_100000','level_1000000','level_10000000',
   'event_clear','admin_event',
 ]);
 
@@ -59,13 +59,18 @@ const NEWS_STYLE: Record<string, { emoji: string; color: string }> = {
   level_50:             { emoji: '💎', color: '#5b8dee' },
   level_100:            { emoji: '👑', color: '#f0c060' },
   level_200:            { emoji: '🔮', color: '#ff66cc' },
+  level_1000:           { emoji: '🌠', color: '#ff44aa' },
+  level_10000:          { emoji: '🌌', color: '#cc22ff' },
+  level_100000:         { emoji: '💫', color: '#ff0088' },
+  level_1000000:        { emoji: '🌈', color: '#ff0000' },
+  level_10000000:       { emoji: '🔱', color: '#ffd700' },
   event_clear:          { emoji: '🎉', color: '#4caf87' },
   admin_event:          { emoji: '📢', color: '#5b8dee' },
 };
 
 // ─── ワールドニュース ランクテーブル ────────────────────────
 const NEWS_RANK: Record<string, number> = {
-  super_jackpot: 5, sky_castle_ex_clear: 5, level_200: 5,
+  super_jackpot: 5, sky_castle_ex_clear: 5, level_200: 5, level_1000: 5, level_10000: 5, level_100000: 5, level_1000000: 5, level_10000000: 5,
   volcano_clear: 4, boss_kx: 4, boss_rei: 4, boss_ragnarok: 4, boss_title: 4,
   jackpot: 3, sky_castle_clear: 3, boss_hard: 3, level_100: 3,
   dungeon_clear: 2, gamble_rank_up: 2, level_50: 2, event_clear: 2,
