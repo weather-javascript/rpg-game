@@ -43,12 +43,12 @@ export type FreeFieldNodeActionType =
 // ──────────────────────────────────────────────
 // 解放条件
 // ──────────────────────────────────────────────
-export interface FreeFieldUnlockCondition {
-  // TODO: 解放条件の詳細仕様が決まったら実装する
-  type: string;
-  value?: unknown;
-  description?: string;
-}
+export type FreeFieldUnlockCondition =
+  | { type: 'itemOwned';      itemId: string;    amount: number;  description?: string }
+  | { type: 'harvestCount';   count: number;                      description?: string }
+  | { type: 'ffBattleWins';   count: number;                      description?: string }
+  | { type: 'nodeVisited';    nodeId: string;                     description?: string }
+  | { type: 'dragonSoul';     amount: number;                     description?: string };
 
 // ──────────────────────────────────────────────
 // 報酬ヒント

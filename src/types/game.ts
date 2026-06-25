@@ -728,6 +728,16 @@ export interface PlayerData {
     titleId: string;       // 称号ID
     favDungeonId: string;  // 好きなダンジョン
   };
+  // ── フリーフィールド ──
+  dragonSoul?: number;                             // ドラゴンソウル蓄積量
+  dragonSoulTotal?: number;                        // 累計獲得量
+  feverActive?: boolean;                           // フィーバー発動中か
+  feverActivatedAt?: number;                       // フィーバー開始時刻(ms)
+  ffVisitedNodes?: string[];                       // 初回到達済みノードID
+  ffHarvestCount?: number;                         // FF採集累計回数
+  ffHarvestLog?: { itemId: string; displayName: string; amount: number; at: number }[]; // 採集履歴(最新50件)
+  ffNodeInteractions?: Record<string, { lastUsedAt: number; useCount: number; completed: boolean }>; // ノードインタラクション状態
+  ffBattleWins?: number;                           // FFフィールド戦闘勝利数
 }
 
 export interface ActivityEntry {
