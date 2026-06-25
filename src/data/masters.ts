@@ -98,6 +98,17 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   // ============================================================
   emerald_sword:  { id:'emerald_sword',  name:'エメラルドの剣', description:'エメラルドから作れる剣。攻撃力+9、防御力+5、HP+10。', category:'weapon', itemType:'Weapon', rarity:'epic',     sellPrice:900,  buyPrice:0, maxStack:1, icon:'emerald_sword_png', weaponDef:5, weaponHpBonus:10,  useEffect:{attackBonus:9,  message:'エメラルドの剣で斬りつけた！', attackType:'physical'} },
   netherite_sword:{ id:'netherite_sword',name:'ネザライトの剣', description:'ネザライトインゴットから作れる剣。攻撃力+10、防御力+8、HP+15。', category:'weapon', itemType:'Weapon', rarity:'legendary', sellPrice:1200, buyPrice:0, maxStack:1, icon:'netherite_sword_png', weaponDef:8, weaponHpBonus:15, useEffect:{attackBonus:10, message:'ネザライトの剣で斬りつけた！', attackType:'physical'} },
+  // ============================================================
+  // FFGG 専用クラフト品（レシピのoutputItemId対応）
+  // ============================================================
+  ffgg_green_blade:       { id:'ffgg_green_blade',       name:'緑竜刃',         description:'緑鱗から鍛えた上位武器。攻撃力+12。森地帯周回の成果。', category:'weapon', itemType:'Weapon', rarity:'epic', sellPrice:1200, buyPrice:0, maxStack:1, icon:'emerald_sword_png', weaponDef:0, weaponHpBonus:0, useEffect:{attackBonus:12, message:'緑竜刃で斬りつけた！', attackType:'physical'} },
+  ffgg_red_blade:         { id:'ffgg_red_blade',         name:'赤竜刃',         description:'赤鱗から鍛えた上位武器。攻撃力+14。平原周回の成果。', category:'weapon', itemType:'Weapon', rarity:'epic', sellPrice:1500, buyPrice:0, maxStack:1, icon:'netherite_sword_png', weaponDef:0, weaponHpBonus:0, useEffect:{attackBonus:14, message:'赤竜刃で斬りつけた！', attackType:'physical'} },
+  ffgg_rock_armor:        { id:'ffgg_rock_armor',        name:'岩鱗の鎧',       description:'岩鱗から鍛えた重防具。防御力+12。砂漠周回の成果。', category:'armor', itemType:'Armor', rarity:'epic', sellPrice:1200, buyPrice:0, maxStack:1, icon:'reinforced_obsidian_chestplate', armorSlot:'chestplate' as const, weaponDef:12 },
+  ocean_orb_staff_item:   { id:'ocean_orb_staff_item',   name:'海原の杖',       description:'海原のオーブから鍛えた魔杖。範囲攻撃貫通15。', category:'weapon', itemType:'Weapon', rarity:'epic', sellPrice:2500, buyPrice:0, maxStack:1, icon:'wand', isAreaWeapon:true, areaPenetrate:15, useEffect:{attackBonus:0, message:'海原の杖で全体攻撃！', attackType:'area'} },
+  em_iron_sword_item:     { id:'em_iron_sword_item',     name:'電磁魔鉄剣',     description:'電磁魔鉄鋼から鍛えた上位武器。攻撃力+15。', category:'weapon', itemType:'Weapon', rarity:'epic', sellPrice:2000, buyPrice:0, maxStack:1, icon:'netherite_sword_png', weaponDef:0, weaponHpBonus:0, useEffect:{attackBonus:15, message:'電磁魔鉄剣で斬りつけた！', attackType:'physical'} },
+  dark_magic_iron_armor_item: { id:'dark_magic_iron_armor_item', name:'黒魔鉄の鎧', description:'黒魔鉄鋼から鍛えた最上位防具。防御力+15。', category:'armor', itemType:'Armor', rarity:'epic', sellPrice:2500, buyPrice:0, maxStack:1, icon:'reinforced_obsidian_chestplate', armorSlot:'chestplate' as const, weaponDef:15 },
+  nitrotrin_bomb_item:    { id:'nitrotrin_bomb_item',    name:'ニトロ爆弾',     description:'ニトロトリンから作る爆発物。敵に投げると大ダメージ。消耗品。', category:'material', itemType:'Item', rarity:'rare', sellPrice:200, buyPrice:0, maxStack:99, icon:'bomb' },
+  punk_gear_item:         { id:'punk_gear_item',         name:'パンクギア',     description:'パンクパーツから作るカスタム装備。防御力+10、攻撃力+5。', category:'armor', itemType:'Armor', rarity:'epic', sellPrice:2000, buyPrice:0, maxStack:1, icon:'reinforced_obsidian_chestplate', armorSlot:'chestplate' as const, weaponDef:10, weaponAtk:5 },
   shinen_dan_ken: { id:'shinen_dan_ken', name:'深淵の断魔剣', description:'攻撃+26、防御+10、被ダメ-25%。攻撃時に敵へ「刻印」を付与（最大3スタック）。3ターンごとに全体へ「刻印数×貫通15」ダメージを与える。', category:'weapon', itemType:'Weapon', rarity:'epic', sellPrice:0, buyPrice:0, maxStack:1, icon:'shinen_dan_ken_png', weaponAtk:26, weaponDef:10, weaponSkills:[{type:'hotbar_shield', cutPercent:25},{type:'mark_on_hit', maxStacks:3},{type:'mark_burst', interval:3, penetratePerStack:15}], useEffect:{attackBonus:26, message:'深淵の断魔剣で斬りつけた！', attackType:'physical'} },
   ryugan_no_maken: { id:'ryugan_no_maken', name:'竜眼の魔剣', description:'攻撃+32、HP+20。毎ターンHP+10回復（竜血再生）。HP80%以上時は攻撃+8（覚醒）。HP50%以下時は攻撃するたびに追加で貫通20ダメージ（竜の怒り）。', category:'weapon', itemType:'Weapon', rarity:'legendary', sellPrice:0, buyPrice:0, maxStack:1, icon:'ryugan_no_maken_png', weaponAtk:32, weaponHpBonus:20, weaponSkills:[{type:'regen_per_turn', hpRestore:10, satietyRestore:0},{type:'conditional_atk_bonus', condition:'hp_above_pct', threshold:80, bonus:8},{type:'conditional_penetrate_on_hit', condition:'hp_below_pct', threshold:50, penetrate:20}], useEffect:{attackBonus:32, message:'竜眼の魔剣で斬りつけた！', attackType:'physical'} },
   iron_sacrifice_staff:      { id:'iron_sacrifice_staff',      name:'アイアンサクリファイス',     description:'鉄の剣と圧縮鉄ブロックから作られた杖。範囲攻撃貫通8。毎ターンHP5・満腹度2回復。',         category:'weapon', itemType:'Weapon', rarity:'rare',      sellPrice:1500,   buyPrice:0, maxStack:1, icon:'wand', isAreaWeapon:true, areaPenetrate:8,  weaponSkills:[{type:'regen_per_turn', hpRestore:5, satietyRestore:2}], useEffect:{attackBonus:0, message:'アイアンサクリファイスで全体攻撃！', attackType:'area'} },
@@ -1607,7 +1618,7 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     id: 'ffgg_green_blade',
     name: '緑竜刃を作る',
     description: '緑鱗×4と緑鱗（上位）×2、鉄塊×3から作る上位武器。攻撃力+12。森地帯周回の成果。',
-    outputItemId: 'iron_sword', // TODO: ffgg_green_blade 専用アイテムIDに差し替え
+    outputItemId: 'ffgg_green_blade',
     outputAmount: 1,
     inputs: [{ itemId: 'green_scale', amount: 4 }, { itemId: 'green_scale_high', amount: 2 }, { itemId: 'iron_ingot', amount: 3 }],
     shape: ['green_scale_high','green_scale','green_scale_high', 'green_scale','iron_ingot','green_scale', 'iron_ingot','','iron_ingot'],
@@ -1618,7 +1629,7 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     id: 'ffgg_red_blade',
     name: '赤竜刃を作る',
     description: '赤鱗×4と赤鱗（上位）×2、鉄塊×3から作る上位武器。攻撃力+14。平原周回の成果。',
-    outputItemId: 'iron_sword', // TODO: ffgg_red_blade 専用アイテムIDに差し替え
+    outputItemId: 'ffgg_red_blade',
     outputAmount: 1,
     inputs: [{ itemId: 'red_scale', amount: 4 }, { itemId: 'red_scale_high', amount: 2 }, { itemId: 'iron_ingot', amount: 3 }],
     shape: ['red_scale_high','red_scale','red_scale_high', 'red_scale','iron_ingot','red_scale', 'iron_ingot','','iron_ingot'],
@@ -1631,7 +1642,7 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     id: 'ffgg_rock_armor',
     name: '岩鱗の鎧を作る',
     description: '岩鱗×6と岩鱗（上位）×2から作る重防具。砂漠周回の成果。防御力+12。',
-    outputItemId: 'iron_chestplate', // TODO: ffgg_rock_armor 専用アイテムIDに差し替え
+    outputItemId: 'ffgg_rock_armor',
     outputAmount: 1,
     inputs: [{ itemId: 'rock_scale', amount: 6 }, { itemId: 'rock_scale_high', amount: 2 }, { itemId: 'iron_ingot', amount: 1 }],
     shape: ['rock_scale','rock_scale_high','rock_scale', 'rock_scale','iron_ingot','rock_scale', 'rock_scale','rock_scale_high','rock_scale'],
@@ -1679,7 +1690,7 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     id: 'ocean_orb_staff',
     name: '海原の杖を作る',
     description: '海原のオーブ×1と海原の欠片×4、マテラカイト×2、鉄塊×2から作る魔杖。範囲貫通15。',
-    outputItemId: 'cave_staff2', // TODO: ocean_orb_staff 専用アイテムIDに差し替え
+    outputItemId: 'ocean_orb_staff_item',
     outputAmount: 1,
     inputs: [{ itemId: 'ocean_orb', amount: 1 }, { itemId: 'ocean_shard', amount: 4 }, { itemId: 'matelakaite', amount: 2 }, { itemId: 'iron_ingot', amount: 2 }],
     shape: ['ocean_shard','ocean_orb','ocean_shard', 'matelakaite','iron_ingot','matelakaite', 'ocean_shard','iron_ingot','ocean_shard'],
@@ -1692,7 +1703,7 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     id: 'em_iron_sword',
     name: '電磁魔鉄剣を作る',
     description: '電磁魔鉄鋼×4とウエントペリドット×2、鉄塊×3から作る上位武器。攻撃力+15。',
-    outputItemId: 'emerald_sword', // TODO: em_iron_sword 専用アイテムIDに差し替え
+    outputItemId: 'em_iron_sword_item',
     outputAmount: 1,
     inputs: [{ itemId: 'em_iron_steel', amount: 4 }, { itemId: 'uento_peridot', amount: 2 }, { itemId: 'iron_ingot', amount: 3 }],
     shape: ['em_iron_steel','uento_peridot','em_iron_steel', 'em_iron_steel','iron_ingot','em_iron_steel', 'iron_ingot','uento_peridot','iron_ingot'],
@@ -1703,7 +1714,7 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     id: 'dark_magic_iron_armor',
     name: '黒魔鉄の鎧を作る',
     description: '黒魔鉄鋼×6とイーヴィルガーネット×2、鉄塊×1から作る最上位防具。防御力+15。',
-    outputItemId: 'iron_chestplate', // TODO: dark_magic_iron_armor 専用アイテムIDに差し替え
+    outputItemId: 'dark_magic_iron_armor_item',
     outputAmount: 1,
     inputs: [{ itemId: 'dark_magic_iron', amount: 6 }, { itemId: 'evil_garnet', amount: 2 }, { itemId: 'iron_ingot', amount: 1 }],
     shape: ['dark_magic_iron','evil_garnet','dark_magic_iron', 'dark_magic_iron','iron_ingot','dark_magic_iron', 'dark_magic_iron','evil_garnet','dark_magic_iron'],
@@ -1716,7 +1727,7 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     id: 'nitrotrin_bomb',
     name: 'ニトロ爆弾を作る',
     description: 'ニトロトリン×3と銀の弾丸×3、石炭×3から作る爆発物。敵に投げると大ダメージ。',
-    outputItemId: 'gunpowder', // TODO: nitrotrin_bomb 専用アイテムIDに差し替え
+    outputItemId: 'nitrotrin_bomb_item',
     outputAmount: 5,
     inputs: [{ itemId: 'nitrotrin', amount: 3 }, { itemId: 'silver_bullet', amount: 3 }, { itemId: 'coal', amount: 3 }],
     shape: ['nitrotrin','silver_bullet','nitrotrin', 'silver_bullet','coal','silver_bullet', 'nitrotrin','coal','nitrotrin'],
@@ -1729,7 +1740,7 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     id: 'punk_equipment_ab',
     name: 'パンクギアを作る',
     description: 'パンクパーツA×4とパンクパーツB×4、光輝トラス×1から作るカスタム装備。防御力+10、攻撃力+5。',
-    outputItemId: 'iron_chestplate', // TODO: punk_gear 専用アイテムIDに差し替え
+    outputItemId: 'punk_gear_item',
     outputAmount: 1,
     inputs: [{ itemId: 'punk_parts_a', amount: 4 }, { itemId: 'punk_parts_b', amount: 4 }, { itemId: 'light_trus', amount: 1 }],
     shape: ['punk_parts_a','light_trus','punk_parts_a', 'punk_parts_b','punk_parts_a','punk_parts_b', 'punk_parts_a','punk_parts_b','punk_parts_b'],
