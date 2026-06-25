@@ -3531,9 +3531,20 @@ export const FISHING_RODS: Record<string, {
 // ============================================================
 // ゲームバランス定数
 // ============================================================
+// Lv上限: 10,000,000
+// セグメント別指数で高Lvほど緩やかに増加
 export const EXP_TABLE: number[] = (() => {
   const t = [0];
-  for (let lv = 1; lv <= 200; lv++) t.push(Math.floor(Math.pow(lv, 1.8) * 50));
+  for (let lv = 1; lv <= 10_000_000; lv++) {
+    let xp: number;
+    if      (lv <= 200)         xp = Math.floor(Math.pow(lv, 1.80) *     50);
+    else if (lv <= 1_000)       xp = Math.floor(Math.pow(lv, 1.50) *     80);
+    else if (lv <= 10_000)      xp = Math.floor(Math.pow(lv, 1.30) *    200);
+    else if (lv <= 100_000)     xp = Math.floor(Math.pow(lv, 1.15) *    800);
+    else if (lv <= 1_000_000)   xp = Math.floor(Math.pow(lv, 1.08) *  5_000);
+    else                        xp = Math.floor(Math.pow(lv, 1.04) * 30_000);
+    t.push(xp);
+  }
   return t;
 })();
 
