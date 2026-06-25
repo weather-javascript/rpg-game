@@ -730,7 +730,7 @@ function StatusBar() {
 
   const hpPct = (player.stats.hp / player.stats.maxHp) * 100;
   const satPct = (player.stats.satiety / player.stats.maxSatiety) * 100;
-  const expPct = player.stats.level < 200 ? Math.min(100, (player.stats.exp / player.stats.expToNextLevel) * 100) : 100;
+  const expPct = player.stats.level < 10_000_000 ? Math.min(100, (player.stats.exp / player.stats.expToNextLevel) * 100) : 100;
   const hpDanger = hpPct < 20;
   const satDanger = satPct < 15;
 
