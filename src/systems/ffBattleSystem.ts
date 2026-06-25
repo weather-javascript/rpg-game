@@ -7,6 +7,7 @@ import {
   FFGG_ENCOUNTER_TABLE,
   FFGG_ALL_ENEMIES,
 } from '../data/ffggMaster';
+import { ITEM_MASTER } from '../data/masters';
 import type { FFGGEnemyDefinition } from '../types/ffgg';
 import type { FFBattleSession, FFBattleEnemy, FreeFieldHarvestNode, FFHarvestResult } from '../types/freefield';
 
@@ -335,7 +336,7 @@ function collectDrops(def: FFGGEnemyDefinition | undefined): {
     if (totalAmount > 0) {
       items.push({
         itemId: drop.itemId,
-        displayName: drop.itemId, // TODO: itemMasterから名前を引くなら追加
+        displayName: ITEM_MASTER[drop.itemId]?.name ?? drop.itemId,
         amount: totalAmount,
       });
     }
