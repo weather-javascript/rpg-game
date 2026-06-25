@@ -126,7 +126,7 @@ function ensureDefaults(player: PlayerData): PlayerData {
 // ============================================================
 function settleOfflineMiningOnLoad(
   player: PlayerData,
-  addNotification: (type: Notification['type'], message: string) => void
+  _addNotification: (type: Notification['type'], message: string) => void
 ): PlayerData {
   const om = player.offlineMining;
   if (!om || !om.enabled) return player;
@@ -168,10 +168,13 @@ function settleOfflineMiningOnLoad(
     counts[d.itemId] = (counts[d.itemId] ?? 0) + d.amount;
   }
 
-  const msg = result.capped
-    ? '🪨 採掘隊が資源を満載で持ち帰りました'
-    : `🪨 採掘隊が資源を持ち帰りました（${result.totalAmount}個）`;
-  setTimeout(() => addNotification('success', msg), 800);
+  // _pendingMiningResult: App.tsx側でポップアップ表示用にセット
+  (globalThis as Record<string,unknown>)['__pendingMiningResult'] = {
+    drops: result.drops,
+    totalAmount: result.totalAmount,
+    elapsedMinutes: result.elapsedMinutes,
+    capped: result.capped,
+  };
 
   return {
     ...player,
