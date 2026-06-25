@@ -16,7 +16,7 @@ import { AdminScreen }     from './components/screens/AdminScreen';
 import { CraftingScreen }   from './components/screens/CraftingScreen';
 import { NaviScreen }       from './components/screens/NaviScreen';
 import { AquariumScreen }  from './components/screens/AquariumScreen';
-import { subscribeSoldNotifications, markSoldNotificationRead, subscribeMaintenanceStatus, setPlayerActivity, subscribeTabMaintenance } from './services/multiplayer';
+import { subscribeSoldNotifications, markSoldNotificationRead, subscribeMaintenanceStatus, setPlayerActivity, subscribeTabMaintenance, subscribeActivityFeed } from './services/multiplayer';
 import type { TabMaintenanceConfig } from './services/multiplayer';
 import type { PlayerActivityCode } from './services/multiplayer';
 
@@ -124,6 +124,94 @@ const LOADING_SCREEN_CSS = `
   }
 `;
 
+// ゲーム全体アニメーションCSS（<GlobalAnimations />でbodyに注入）
+const GLOBAL_ANIM_CSS = `
+  @keyframes fadeSlideUp {
+    from { opacity:0; transform:translateY(12px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  @keyframes fadeSlideIn {
+    from { opacity:0; transform:translateX(-10px); }
+    to   { opacity:1; transform:translateX(0); }
+  }
+  @keyframes popIn {
+    0%   { opacity:0; transform:scale(0.7); }
+    70%  { opacity:1; transform:scale(1.05); }
+    100% { transform:scale(1); }
+  }
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
+  }
+  @keyframes pulseGlow {
+    0%,100% { box-shadow: 0 0 8px rgba(91,141,238,0.4); }
+    50%     { box-shadow: 0 0 20px rgba(91,141,238,0.8), 0 0 40px rgba(91,141,238,0.4); }
+  }
+  @keyframes badgePop {
+    0%   { opacity:0; transform:scale(0) rotate(-20deg); }
+    60%  { opacity:1; transform:scale(1.15) rotate(5deg); }
+    100% { transform:scale(1) rotate(0); }
+  }
+  @keyframes floatUp {
+    0%   { opacity:1; transform:translateY(0); }
+    100% { opacity:0; transform:translateY(-40px); }
+  }
+  @keyframes hpBarAnim {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+  }
+  @keyframes tabActive {
+    from { transform:scale(0.9); opacity:0.6; }
+    to   { transform:scale(1);   opacity:1; }
+  }
+  @keyframes notifSlideIn {
+    from { opacity:0; transform:translateX(40px) scale(0.9); }
+    to   { opacity:1; transform:translateX(0)    scale(1);   }
+  }
+  @keyframes goldSpin {
+    0%   { transform:rotateY(0deg); }
+    100% { transform:rotateY(360deg); }
+  }
+  @keyframes levelUpBurst {
+    0%   { opacity:1; transform:scale(1); }
+    50%  { opacity:0.8; transform:scale(1.4); }
+    100% { opacity:0; transform:scale(2); }
+  }
+  /* ナビバー・EXPバー用 */
+  .rpg-tab-active {
+    animation: tabActive 0.2s ease forwards;
+  }
+  /* 通知 */
+  .rpg-notif-enter {
+    animation: notifSlideIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards;
+  }
+  /* カード汎用 */
+  .rpg-card-appear {
+    animation: fadeSlideUp 0.3s ease forwards;
+  }
+  /* アイテム獲得バッジ */
+  .rpg-badge-pop {
+    animation: badgePop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  }
+  /* EXPバーシマー */
+  .rpg-exp-shimmer {
+    background: linear-gradient(90deg, #5b8dee 0%, #8ab0ff 40%, #5b8dee 60%, #3a6fd0 100%);
+    background-size: 200% 100%;
+    animation: hpBarAnim 2s linear infinite;
+  }
+  /* HPバーシマー */
+  .rpg-hp-shimmer {
+    background: linear-gradient(90deg, #4caf87 0%, #7dd9b0 40%, #4caf87 60%, #2d8a60 100%);
+    background-size: 200% 100%;
+    animation: hpBarAnim 2.5s linear infinite;
+  }
+`;
+
+function GlobalAnimations() {
+  return <style>{GLOBAL_ANIM_CSS}</style>;
+}
+
+
 function LoadingScreen({ authReady = false, onDone }: { authReady?: boolean; onDone?: () => void }) {
   const [hintIdx, setHintIdx] = useState(() => Math.floor(Date.now() % LOADING_HINTS.length));
   const [progress, setProgress] = useState(0);
@@ -189,14 +277,39 @@ function LoadingScreen({ authReady = false, onDone }: { authReady?: boolean; onD
     return () => clearInterval(t);
   }, [phase]);
 
-  const barColor = `linear-gradient(90deg, #7f0000 0%, #bf3000 20%, #ff6a00 45%, #ffae00 60%, #fff3a0 75%, #ffae00 85%, #ff6a00 100%)`;
+  const hour = new Date().getHours();
+  const timeTheme = hour >= 5 && hour < 10
+    ? { // 朝: オレンジ調
+        bg: 'radial-gradient(ellipse at 50% 60%, #1a0800 0%, #0a0400 50%, #000 100%)',
+        bar: 'linear-gradient(90deg, #7f2000 0%, #bf5000 20%, #ff8c00 45%, #ffcc00 60%, #fff0a0 75%, #ffcc00 85%, #ff8c00 100%)',
+        ring1: 'rgba(255,140,0,0.15)', ring2: 'rgba(255,200,0,0.12)', ring3: 'rgba(255,140,0,0.25)',
+        ember: '#ffaa00', glow: 'drop-shadow(0 0 12px #ff8c00) drop-shadow(0 0 30px #ffcc00)',
+        title: '#ffcc00', grid: 'rgba(255,140,0,0.03)',
+      }
+    : hour >= 10 && hour < 17
+    ? { // 昼: シアン調
+        bg: 'radial-gradient(ellipse at 50% 60%, #001a1a 0%, #000d0d 50%, #000 100%)',
+        bar: 'linear-gradient(90deg, #004040 0%, #007070 20%, #00c0c0 45%, #00e8e8 60%, #a0ffff 75%, #00e8e8 85%, #00c0c0 100%)',
+        ring1: 'rgba(0,200,200,0.15)', ring2: 'rgba(0,230,230,0.12)', ring3: 'rgba(0,200,200,0.25)',
+        ember: '#00cccc', glow: 'drop-shadow(0 0 12px #00c0c0) drop-shadow(0 0 30px #00e8e8)',
+        title: '#00e8e8', grid: 'rgba(0,200,200,0.03)',
+      }
+    : { // 夜: 紫調
+        bg: 'radial-gradient(ellipse at 50% 60%, #0d001a 0%, #06000d 50%, #000 100%)',
+        bar: 'linear-gradient(90deg, #3f0080 0%, #6600cc 20%, #9933ff 45%, #cc88ff 60%, #f0d0ff 75%, #cc88ff 85%, #9933ff 100%)',
+        ring1: 'rgba(153,51,255,0.15)', ring2: 'rgba(180,100,255,0.12)', ring3: 'rgba(153,51,255,0.25)',
+        ember: '#aa44ff', glow: 'drop-shadow(0 0 12px #9933ff) drop-shadow(0 0 30px #cc88ff)',
+        title: '#cc88ff', grid: 'rgba(153,51,255,0.03)',
+      };
+  const barColor = timeTheme.bar;
 
   return (
     <>
+      <GlobalAnimations />
       <style>{LOADING_SCREEN_CSS}</style>
       <div style={{
         position:'fixed', inset:0, zIndex:9999,
-        background:'radial-gradient(ellipse at 50% 60%, #1a0a00 0%, #0a0500 50%, #000 100%)',
+        background:timeTheme.bg,
         display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
         overflow:'hidden',
       }}>
@@ -208,7 +321,7 @@ function LoadingScreen({ authReady = false, onDone }: { authReady?: boolean; onD
             left:`${e.x}%`, bottom:0,
             width:e.size, height:e.size,
             borderRadius:'50%',
-            background:`radial-gradient(circle, #fff 0%, #ffae00 40%, #ff4500 100%)`,
+            background:`radial-gradient(circle, #fff 0%, ${timeTheme.ember} 40%, ${timeTheme.ember}88 100%)`,
             boxShadow:`0 0 ${e.size*2}px #ff6a00`,
             animation:`rpg-ember ${2.5+Math.random()*2}s ease-out ${e.delay}s infinite`,
             ['--dx' as any]: `${e.dx}px`,
@@ -220,8 +333,8 @@ function LoadingScreen({ authReady = false, onDone }: { authReady?: boolean; onD
         <div style={{
           position:'absolute', inset:0, pointerEvents:'none',
           backgroundImage:`
-            linear-gradient(rgba(255,106,0,0.03) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,106,0,0.03) 1px, transparent 1px)
+            linear-gradient(${timeTheme.grid} 1px, transparent 1px),
+            linear-gradient(90deg, ${timeTheme.grid} 1px, transparent 1px)
           `,
           backgroundSize:'40px 40px',
         }} />
@@ -233,7 +346,7 @@ function LoadingScreen({ authReady = false, onDone }: { authReady?: boolean; onD
               position:'absolute',
               width:340, height:340,
               borderRadius:'50%',
-              border:'1px solid rgba(255,106,0,0.15)',
+              border:`1px solid ${timeTheme.ring1}`,
               animation:'rpg-rotate-rune 18s linear infinite',
               backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 340 340'%3E%3Ccircle cx='170' cy='170' r='168' fill='none' stroke='rgba(255,106,0,0.2)' stroke-width='1' stroke-dasharray='8 16'/%3E%3C/svg%3E")`,
             }} />
@@ -241,25 +354,25 @@ function LoadingScreen({ authReady = false, onDone }: { authReady?: boolean; onD
               position:'absolute',
               width:260, height:260,
               borderRadius:'50%',
-              border:'1px solid rgba(255,174,0,0.12)',
+              border:`1px solid ${timeTheme.ring2}`,
               animation:'rpg-rotate-rune-rev 12s linear infinite',
             }} />
             <div style={{
               position:'absolute',
               width:200, height:200,
               borderRadius:'50%',
-              border:'2px solid rgba(255,106,0,0.25)',
+              border:`2px solid ${timeTheme.ring3}`,
               animation:'rpg-pulse-ring 3s ease-in-out infinite',
             }} />
 
             {/* 剣アイコン */}
-            <div style={{ fontSize:'5rem', animation:'rpg-sword-glow 2s ease-in-out infinite, rpg-float 3.5s ease-in-out infinite', zIndex:1, marginBottom:8 }}>⚔️</div>
+<div style={{ fontSize:'5rem', animation:'rpg-sword-glow 2s ease-in-out infinite, rpg-float 3.5s ease-in-out infinite', filter:timeTheme.glow, zIndex:1, marginBottom:8 }}>⚔️</div>
 
             {/* タイトル */}
             <h1 style={{
               fontFamily:'Cinzel,serif',
               fontSize:'clamp(1.6rem,5vw,2.4rem)',
-              color:'#ffae00',
+              color:timeTheme.title,
               letterSpacing:'0.25em',
               margin:'0 0 4px',
               animation:'rpg-flicker 2.5s ease-in-out infinite',
@@ -861,14 +974,20 @@ function TabNav({ activeTab, setTab }: { activeTab: TabId; setTab: (t: TabId) =>
 function NotificationToast() {
   const notifications = useGameStore(s => s.notifications);
   const remove = useGameStore(s => s.removeNotification);
-  const colors = { success:'rgba(76,175,135,0.95)', error:'rgba(224,85,85,0.95)', info:'rgba(91,141,238,0.95)', warning:'rgba(240,168,48,0.95)' };
+  const colors: Record<string, string> = { success:'rgba(76,175,135,0.95)', error:'rgba(224,85,85,0.95)', info:'rgba(91,141,238,0.95)', warning:'rgba(240,168,48,0.95)' };
   return (
     <div style={{ position:'fixed', top:56, right:10, zIndex:200, display:'flex', flexDirection:'column', gap:6, maxWidth:280 }}>
       {notifications.map(n => (
         <div
           key={n.id}
           onClick={() => remove(n.id)}
-          style={{ padding:'9px 13px', borderRadius:6, fontSize:'0.8rem', cursor:'pointer', background:colors[n.type], color: n.type === 'warning' ? '#000' : '#fff' }}
+          style={{
+            padding:'9px 13px', borderRadius:8, fontSize:'0.8rem', cursor:'pointer',
+            background:colors[n.type], color: n.type === 'warning' ? '#000' : '#fff',
+            animation:'notifSlideIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards',
+            boxShadow:'0 4px 16px rgba(0,0,0,0.4)',
+            borderLeft: '3px solid rgba(255,255,255,0.4)',
+          }}
         >
           {n.message}
         </div>
@@ -948,6 +1067,186 @@ function ActiveScreen({ tab }: { tab: TabId }) {
   }
 }
 
+// ============================================================
+// オフライン採掘結果ポップアップ（ソシャゲ風）
+// ============================================================
+function MiningResultPopup({ result, onClose }: {
+  result: { drops: {itemId:string;amount:number}[]; totalAmount:number; elapsedMinutes:number; capped:boolean };
+  onClose: () => void;
+}) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setVisible(true), 50); return () => clearTimeout(t); }, []);
+
+  return (
+    <div style={{
+      position:'fixed', inset:0, zIndex:600,
+      background:'rgba(0,0,0,0.75)',
+      display:'flex', alignItems:'center', justifyContent:'center',
+      padding:16,
+      animation:'miningBgIn 0.3s ease',
+    }}>
+      <style>{`
+        @keyframes miningBgIn { from{opacity:0} to{opacity:1} }
+        @keyframes miningCardIn { from{transform:scale(0.85) translateY(30px);opacity:0} to{transform:scale(1) translateY(0);opacity:1} }
+        @keyframes miningItemIn { from{transform:translateX(-20px);opacity:0} to{transform:translateX(0);opacity:1} }
+        @keyframes miningShine { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+        @keyframes miningFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+      `}</style>
+      <div style={{
+        background:'linear-gradient(135deg, #1c2235 0%, #161b26 100%)',
+        border:'2px solid #f0c060',
+        borderRadius:18,
+        padding:'24px 20px',
+        width:'100%', maxWidth:420,
+        boxShadow:'0 0 60px rgba(240,192,96,0.3), 0 20px 60px rgba(0,0,0,0.8)',
+        animation: visible ? 'miningCardIn 0.4s cubic-bezier(0.16,1,0.3,1) forwards' : 'none',
+      }}>
+        {/* ヘッダー */}
+        <div style={{ textAlign:'center', marginBottom:18 }}>
+          <div style={{ fontSize:'2.5rem', animation:'miningFloat 2s ease-in-out infinite', marginBottom:8 }}>🪨</div>
+          <h2 style={{ color:'#f0c060', fontFamily:'Cinzel,serif', margin:'0 0 4px', fontSize:'1.1rem' }}>採掘隊が帰還しました！</h2>
+          <div style={{ color:'#8a92b2', fontSize:'0.75rem' }}>
+            {result.elapsedMinutes}分間の採掘 / 計{result.totalAmount}個獲得
+            {result.capped && ' (満載)'}
+          </div>
+        </div>
+        {/* 仕切り線 */}
+        <div style={{ height:1, background:'linear-gradient(90deg, transparent, #f0c06040, transparent)', marginBottom:14 }} />
+        {/* アイテムリスト */}
+        <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:260, overflowY:'auto', marginBottom:16 }}>
+          {result.drops.map((d, i) => {
+            const item = ITEM_MASTER[d.itemId];
+            return (
+              <div key={i} style={{
+                display:'flex', alignItems:'center', gap:10,
+                padding:'8px 12px',
+                background:'rgba(255,255,255,0.04)',
+                borderRadius:10,
+                border:'1px solid #2d3752',
+                animation:`miningItemIn 0.3s ease ${i * 0.06}s both`,
+              }}>
+                <span style={{ fontSize:'1.3rem', flexShrink:0 }}>
+                  {item?.icon ? '📦' : '📦'}
+                </span>
+                <span style={{ flex:1, fontSize:'0.88rem', fontWeight:600, color:'#e8e6ff' }}>
+                  {item?.name ?? d.itemId}
+                </span>
+                <span style={{
+                  padding:'2px 10px', borderRadius:999,
+                  background:'rgba(240,192,96,0.15)', border:'1px solid #f0c06060',
+                  color:'#f0c060', fontSize:'0.85rem', fontWeight:700,
+                }}>
+                  ×{d.amount}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        {/* 受け取りボタン */}
+        <button onClick={onClose} style={{
+          width:'100%', padding:'13px 0', borderRadius:10,
+          border:'none', cursor:'pointer', fontWeight:800, fontSize:'0.95rem',
+          background:'linear-gradient(135deg, #f0a830, #e07820)',
+          color:'#fff',
+          boxShadow:'0 4px 20px rgba(240,168,48,0.4)',
+          letterSpacing:'0.05em',
+        }}>
+          ✨ 受け取る
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ワールドニュースポップアップ（ログイン後）
+// ============================================================
+function WorldNewsPopup({ onClose }: { onClose: () => void }) {
+  const [entries, setEntries] = useState<Array<{type:string;displayName:string;message:string;timestamp:number;title?:string}>>([]);
+  const [loading, setLoading] = useState(true);
+
+  const WORLD_NEWS_TYPES = new Set([
+    'dungeon_clear','sky_castle_clear','sky_castle_ex_clear','volcano_clear',
+    'boss_kx','boss_rei','boss_ragnarok','boss_hard','boss_title',
+    'super_jackpot','jackpot','gamble_rank_up',
+    'level_50','level_100','level_200','level_1000','level_10000','level_100000','level_1000000','level_10000000',
+    'event_clear','admin_event',
+  ]);
+  const NEWS_STYLE: Record<string,{emoji:string;color:string}> = {
+    dungeon_clear:{emoji:'🏰',color:'#f0c060'}, sky_castle_clear:{emoji:'🏯',color:'#f0c060'},
+    sky_castle_ex_clear:{emoji:'✨',color:'#ff9933'}, volcano_clear:{emoji:'🌋',color:'#ff6644'},
+    boss_kx:{emoji:'🤖',color:'#e05555'}, boss_rei:{emoji:'💀',color:'#cc44cc'},
+    boss_ragnarok:{emoji:'🌪️',color:'#ff4444'}, boss_hard:{emoji:'⚔️',color:'#e05555'},
+    boss_title:{emoji:'🏆',color:'#f0c060'}, super_jackpot:{emoji:'🌟',color:'#ffd700'},
+    jackpot:{emoji:'💰',color:'#f0c060'}, gamble_rank_up:{emoji:'🎖️',color:'#9b6df0'},
+    level_50:{emoji:'💎',color:'#5b8dee'}, level_100:{emoji:'👑',color:'#f0c060'},
+    level_200:{emoji:'🔮',color:'#ff66cc'}, level_1000:{emoji:'🌠',color:'#ff44aa'},
+    level_10000:{emoji:'🌌',color:'#cc22ff'}, level_100000:{emoji:'💫',color:'#ff0088'},
+    level_1000000:{emoji:'🌈',color:'#ff0000'}, level_10000000:{emoji:'🔱',color:'#ffd700'},
+    event_clear:{emoji:'🎉',color:'#4caf87'}, admin_event:{emoji:'📢',color:'#5b8dee'},
+  };
+
+  useEffect(() => {
+    const unsub = subscribeActivityFeed((es) => {
+      setEntries(es.filter(e => WORLD_NEWS_TYPES.has(e.type)).slice(0, 20) as typeof entries);
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  return (
+    <div style={{
+      position:'fixed', inset:0, zIndex:600,
+      background:'rgba(0,0,0,0.8)',
+      display:'flex', alignItems:'center', justifyContent:'center',
+      padding:16,
+    }}>
+      <style>{`@keyframes newsIn { from{transform:scale(0.9) translateY(20px);opacity:0} to{transform:scale(1) translateY(0);opacity:1} }`}</style>
+      <div style={{
+        background:'#1c2235', border:'2px solid #2d3752',
+        borderRadius:16, padding:'20px 16px',
+        width:'100%', maxWidth:460, maxHeight:'80vh', overflowY:'auto',
+        animation:'newsIn 0.4s cubic-bezier(0.16,1,0.3,1) forwards',
+        boxShadow:'0 20px 60px rgba(0,0,0,0.8)',
+      }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+          <div>
+            <h2 style={{ color:'#f0c060', margin:0, fontSize:'1.1rem', fontFamily:'Cinzel,serif' }}>🌍 ワールドニュース</h2>
+            <div style={{ color:'#4a5070', fontSize:'0.72rem', marginTop:2 }}>世界で起きた重要イベント</div>
+          </div>
+          <button onClick={onClose} style={{ background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontSize:'0.85rem' }}>✕</button>
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+          {loading && <div style={{ color:'#8a92b2', textAlign:'center', padding:24 }}>読み込み中...</div>}
+          {!loading && entries.length === 0 && <div style={{ color:'#4a5070', textAlign:'center', padding:24 }}>まだニュースがありません</div>}
+          {entries.map((e, i) => {
+            const s = NEWS_STYLE[e.type] ?? {emoji:'📌',color:'#8a92b2'};
+            const diff = Date.now() - e.timestamp;
+            const time = diff < 60_000 ? 'たった今'
+              : diff < 3_600_000 ? `${Math.floor(diff/60_000)}分前`
+              : diff < 86_400_000 ? `${Math.floor(diff/3_600_000)}時間前`
+              : new Date(e.timestamp).toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'});
+            return (
+              <div key={i} style={{ padding:'8px 10px', background:'rgba(255,255,255,0.03)', borderRadius:8, border:`1px solid ${s.color}30`, animation:`newsIn 0.3s ease ${i*0.04}s both` }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ fontSize:'1.1rem' }}>{s.emoji}</span>
+                  <span style={{ flex:1, fontSize:'0.8rem', color:'#c8d0e0' }}>
+                    <span style={{ color:s.color, fontWeight:700 }}>{e.displayName}</span> {e.message}
+                  </span>
+                  <span style={{ fontSize:'0.65rem', color:'#4a5070', flexShrink:0 }}>{time}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <button onClick={onClose} style={{ width:'100%', padding:'10px', background:'linear-gradient(135deg,#5b8dee,#3a6fd0)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, marginTop:14 }}>
+          確認しました！
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   useAuth();
   useAutoSave();
@@ -975,6 +1274,8 @@ export default function App() {
   }, [player?.uid]);
   const [showVersionPopup, setShowVersionPopup] = useState(false);
   const [showAdminAnnounce, setShowAdminAnnounce] = useState(false);
+  const [miningPopup, setMiningPopup] = useState<{ drops: {itemId:string;amount:number}[]; totalAmount:number; elapsedMinutes:number; capped:boolean } | null>(null);
+  const [showWorldNewsPopup, setShowWorldNewsPopup] = useState(false);
   const [maintenanceStatus, setMaintenanceStatus] = useState<{ active: boolean; startedAt: number; estimatedMinutes: number; message?: string } | null>(null);
   const [tabMaintenance, setTabMaintenance] = useState<TabMaintenanceConfig>({});
   const [soldPopup, setSoldPopup] = useState<SoldPopupInfo | null>(null);
@@ -999,6 +1300,11 @@ export default function App() {
   const handleCloseVersionPopup = () => {
     setShowVersionPopup(false);
     setShowAdminAnnounce(true);
+  };
+  const handleCloseAdminAnnounce = () => {
+    setShowAdminAnnounce(false);
+    // アドミン告知後にワールドニュースポップアップを表示
+    setShowWorldNewsPopup(true);
   };
 
   // お知らせ購読（Firestoreのshared/announcementをリアルタイム監視）
@@ -1036,6 +1342,14 @@ export default function App() {
   useEffect(() => {
     if (!player) return;
     settleOfflineMining();
+    // globalThisに結果が格納されていればポップアップ表示
+    const pending = (globalThis as Record<string,unknown>)['__pendingMiningResult'];
+    if (pending) {
+      setTimeout(() => {
+        setMiningPopup(pending as { drops: {itemId:string;amount:number}[]; totalAmount:number; elapsedMinutes:number; capped:boolean });
+        delete (globalThis as Record<string,unknown>)['__pendingMiningResult'];
+      }, 2000);
+    }
     const miningInterval = setInterval(() => {
       settleOfflineMining();
     }, 60000);
@@ -1073,7 +1387,9 @@ export default function App() {
   return (
     <div style={{ maxWidth:900, margin:'0 auto', minHeight:'100vh', background:'#0d0f14' }}>
       {showVersionPopup && <VersionPopup onClose={handleCloseVersionPopup} />}
-      {showAdminAnnounce && <AdminAnnouncementPopup onClose={() => { setShowAdminAnnounce(false); const q = soldQueueRef.current; if (q.length > 0) { setSoldPopup(q[0]); soldQueueRef.current = q.slice(1); } }} />}
+      {miningPopup && <MiningResultPopup result={miningPopup} onClose={() => setMiningPopup(null)} />}
+      {showWorldNewsPopup && <WorldNewsPopup onClose={() => setShowWorldNewsPopup(false)} />}
+      {showAdminAnnounce && <AdminAnnouncementPopup onClose={() => { handleCloseAdminAnnounce(); const q = soldQueueRef.current; if (q.length > 0) { setSoldPopup(q[0]); soldQueueRef.current = q.slice(1); } }} />}
       {soldPopup && <SoldPopup info={soldPopup} onClose={() => { setSoldPopup(null); const q = soldQueueRef.current; if (q.length > 0) { setTimeout(() => { setSoldPopup(q[0]); soldQueueRef.current = q.slice(1); }, 300); } }} />}
       <StatusBar />
       <main style={{ paddingBottom:104 }}>
