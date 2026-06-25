@@ -1,9 +1,9 @@
 // src/components/screens/FreeFieldScreen.tsx
-// フリーフィールド画面 — ノードアクション完全実装版
-// 戦闘・採集・ワープ・ショップ・釣り・テスターを FreeField 内で動かす。
-// GatheringScreen には混ぜない。向き依存表現は使わない。
+// フリーフィールド画面 — 完全実装版
+// 採取インベントリ反映 / hidden解放 / ワープ改善 / ドラゴンソウル / フィーバー /
+// FF専用ショップ / ドロップ正式名称 / CD / 危険度 / 発見報酬 / 採取ログ / UI改善
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   FREE_FIELD_WORLDS,
   FREE_FIELD_AREAS_ALL,
@@ -20,13 +20,82 @@ import type {
   FreeFieldNodeType,
   FreeFieldNodeAction,
   FreeFieldNodeActionType,
+  FreeFieldUnlockCondition,
   FFHarvestResult,
 } from '../../types/freefield';
 import { FFGG_ENCOUNTER_TABLE, FFGG_ALL_ENEMIES } from '../../data/ffggMaster';
+import { ITEM_MASTER } from '../../data/masters';
 import { useGameStore } from '../../stores/gameStore';
-import {
-  executeFFHarvest,
-} from '../../systems/ffBattleSystem';
+import { executeFFHarvest } from '../../systems/ffBattleSystem';
+
+// ────────────────────────────────────────────
+// FF専用ショップ定義
+// ────────────────────────────────────────────
+interface FFShopEntry {
+  id: string;
+  label: string;
+  costItemId: string;
+  costAmount: number;
+  rewardItemId: string;
+  rewardAmount: number;
+}
+
+const FF_SHOP_ENTRIES: FFShopEntry[] = [
+  { id: 'shop_coin_to_gold',     label: 'FF小判→ゴールド',         costItemId: 'ff_coin_small',   costAmount: 10,  rewardItemId: 'coin',          rewardAmount: 1000 },
+  { id: 'shop_large_coin_gold',  label: 'FF大判→ゴールド',         costItemId: 'ff_coin_large',   costAmount: 1,   rewardItemId: 'coin',          rewardAmount: 500000 },
+  { id: 'shop_matelakaite_box',  label: 'マテラカイト→装備箱',     costItemId: 'matelakaite',     costAmount: 20,  rewardItemId: 'equip_box',     rewardAmount: 1 },
+  { id: 'shop_ancient_special',  label: '古代の欠片→特殊素材',     costItemId: 'ancient_shard',   costAmount: 10,  rewardItemId: 'hard_magic_stone', rewardAmount: 5 },
+  { id: 'shop_spinel_to_ruby',   label: 'スピネル→ネザードルビー', costItemId: 'aurora_spinel',   costAmount: 5,   rewardItemId: 'nether_ruby',   rewardAmount: 3 },
+  { id: 'shop_slamy_to_poison',  label: 'スラムイ溶液→ポイズンスフィア', costItemId: 'slamy_liquid', costAmount: 30, rewardItemId: 'poison_sphere', rewardAmount: 1 },
+  { id: 'shop_cave_gem_gold',    label: '洞窟王の宝石→ゴールド',   costItemId: 'cave_king_gem',   costAmount: 1,   rewardItemId: 'coin',          rewardAmount: 10000000 },
+  { id: 'shop_cosmonium_special',label: 'コスモニウム→古代の欠片', costItemId: 'cosmonium',       costAmount: 3,   rewardItemId: 'ancient_shard', rewardAmount: 10 },
+];
+
+// ────────────────────────────────────────────
+// ドラゴンソウル設定
+// ────────────────────────────────────────────
+const DS_PER_NORMAL   = 1;
+const DS_PER_MIDBOSS  = 5;
+const DS_PER_BOSS     = 20;
+const DS_FEVER_THRESH = 500;
+const FEVER_DURATION_MS = 5 * 60 * 1000; // 5分
+
+// ────────────────────────────────────────────
+// アイテム名を正式名称で取得
+// ────────────────────────────────────────────
+function itemName(itemId: string): string {
+  return ITEM_MASTER[itemId]?.name ?? itemId;
+}
+
+// ────────────────────────────────────────────
+// 解放条件判定（共通）
+// ────────────────────────────────────────────
+function checkUnlockCondition(
+  cond: FreeFieldUnlockCondition,
+  player: NonNullable<ReturnType<typeof useGameStore.getState>['player']>,
+): boolean {
+  switch (cond.type) {
+    case 'itemOwned':
+      return (player.inventory[cond.itemId] ?? 0) >= cond.amount;
+    case 'harvestCount':
+      return (player.ffHarvestCount ?? 0) >= cond.count;
+    case 'ffBattleWins':
+      return (player.ffBattleWins ?? 0) >= cond.count;
+    case 'nodeVisited':
+      return (player.ffVisitedNodes ?? []).includes(cond.nodeId);
+    case 'dragonSoul':
+      return (player.dragonSoul ?? 0) >= cond.amount;
+    default:
+      return false;
+  }
+}
+
+function checkAllConditions(
+  conditions: FreeFieldUnlockCondition[],
+  player: NonNullable<ReturnType<typeof useGameStore.getState>['player']>,
+): boolean {
+  return conditions.every(c => checkUnlockCondition(c, player));
+}
 
 // ────────────────────────────────────────────
 // アクション種別の表示設定
@@ -43,12 +112,9 @@ const ACTION_CFG: Record<FreeFieldNodeActionType, { emoji: string; color: string
   hidden:        { emoji: '🔒', color: '#606878', label: '隠し要素' },
 };
 
-// ────────────────────────────────────────────
-// ノード種別の表示設定
-// ────────────────────────────────────────────
 const NODE_CFG: Record<FreeFieldNodeType, { emoji: string; color: string; label: string }> = {
   entrance:   { emoji: '🚪', color: '#60c060', label: '入口' },
-  safe:       { emoji: '🏕️',  color: '#6090ff', label: '安全地帯' },
+  safe:       { emoji: '🏕️', color: '#6090ff', label: '安全地帯' },
   danger:     { emoji: '⚔️', color: '#e06050', label: '危険' },
   boss:       { emoji: '💀', color: '#c040c0', label: 'ボス' },
   harvest:    { emoji: '🌿', color: '#40c080', label: '採取' },
@@ -71,40 +137,26 @@ function ConnectionLines({ nodes }: { nodes: FreeFieldNode[] }) {
     return m;
   }, [nodes]);
 
-  const lines: { x1: number; y1: number; x2: number; y2: number; key: string }[] = [];
-  const drawn = new Set<string>();
-  nodes.forEach(n => {
-    n.connections.forEach(cid => {
-      const target = nodeMap[cid];
-      if (!target) return;
-      const key = [n.id, cid].sort().join('|');
-      if (drawn.has(key)) return;
-      drawn.add(key);
-      lines.push({
-        x1: n.position.x * 100,
-        y1: n.position.y * 100,
-        x2: target.position.x * 100,
-        y2: target.position.y * 100,
-        key,
+  const lines = useMemo(() => {
+    const result: { x1: number; y1: number; x2: number; y2: number; key: string }[] = [];
+    const drawn = new Set<string>();
+    nodes.forEach(n => {
+      n.connections.forEach(cid => {
+        const target = nodeMap[cid];
+        if (!target) return;
+        const key = [n.id, cid].sort().join('|');
+        if (drawn.has(key)) return;
+        drawn.add(key);
+        result.push({ x1: n.position.x * 100, y1: n.position.y * 100, x2: target.position.x * 100, y2: target.position.y * 100, key });
       });
     });
-  });
+    return result;
+  }, [nodes, nodeMap]);
 
   return (
-    <svg
-      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-    >
+    <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }} viewBox="0 0 100 100" preserveAspectRatio="none">
       {lines.map(l => (
-        <line
-          key={l.key}
-          x1={`${l.x1}%`} y1={`${l.y1}%`}
-          x2={`${l.x2}%`} y2={`${l.y2}%`}
-          stroke="rgba(120,140,200,0.35)"
-          strokeWidth="0.6"
-          strokeDasharray="2 1.5"
-        />
+        <line key={l.key} x1={`${l.x1}%`} y1={`${l.y1}%`} x2={`${l.x2}%`} y2={`${l.y2}%`} stroke="rgba(120,140,200,0.35)" strokeWidth="0.6" strokeDasharray="2 1.5" />
       ))}
     </svg>
   );
@@ -113,39 +165,26 @@ function ConnectionLines({ nodes }: { nodes: FreeFieldNode[] }) {
 // ────────────────────────────────────────────
 // ノードピン
 // ────────────────────────────────────────────
-function NodePin({
-  node,
-  selected,
-  onClick,
-}: {
-  node: FreeFieldNode;
-  selected: boolean;
-  onClick: () => void;
-}) {
+function NodePin({ node, selected, onClick, isNew }: { node: FreeFieldNode; selected: boolean; onClick: () => void; isNew: boolean }) {
   const cfg = NODE_CFG[node.type];
   return (
     <button
       onClick={onClick}
-      title={`${node.indexLabel ?? ''} ${node.displayName}`}
+      title={`${node.indexLabel ?? ''} ${node.displayName}${isNew ? ' ★初回' : ''}`}
       style={{
         position: 'absolute',
         left: `${node.position.x * 100}%`,
         top: `${node.position.y * 100}%`,
         transform: 'translate(-50%, -50%)',
         background: selected ? cfg.color : 'rgba(15,20,35,0.88)',
-        border: `2px solid ${cfg.color}`,
+        border: `2px solid ${isNew ? '#f0c060' : cfg.color}`,
         borderRadius: '50%',
-        width: 32,
-        height: 32,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        width: 32, height: 32,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer',
-        boxShadow: selected ? `0 0 10px ${cfg.color}` : '0 1px 4px rgba(0,0,0,0.5)',
+        boxShadow: selected ? `0 0 10px ${cfg.color}` : isNew ? '0 0 6px #f0c060' : '0 1px 4px rgba(0,0,0,0.5)',
         zIndex: selected ? 10 : 5,
-        padding: 0,
-        transition: 'all 0.15s',
-        fontSize: '0.82rem',
+        padding: 0, transition: 'all 0.15s', fontSize: '0.82rem',
       }}
     >
       {cfg.emoji}
@@ -155,72 +194,42 @@ function NodePin({
 
 function NodeLabel({ node, selected }: { node: FreeFieldNode; selected: boolean }) {
   const cfg = NODE_CFG[node.type];
-  const shortName = node.indexLabel ? `${node.indexLabel}` : node.displayName.slice(0, 4);
+  const shortName = node.indexLabel ? node.indexLabel : node.displayName.slice(0, 4);
   return (
-    <div
-      style={{
-        position: 'absolute',
-        left: `${node.position.x * 100}%`,
-        top: `calc(${node.position.y * 100}% + 18px)`,
-        transform: 'translateX(-50%)',
-        fontSize: '0.55rem',
-        color: selected ? cfg.color : '#8a92b2',
-        whiteSpace: 'nowrap',
-        pointerEvents: 'none',
-        fontWeight: selected ? 700 : 400,
-        textShadow: '0 1px 2px rgba(0,0,0,0.9)',
-        zIndex: 4,
-        maxWidth: 60,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-      }}
-    >
+    <div style={{
+      position: 'absolute',
+      left: `${node.position.x * 100}%`,
+      top: `calc(${node.position.y * 100}% + 18px)`,
+      transform: 'translateX(-50%)',
+      fontSize: '0.55rem', color: selected ? cfg.color : '#8a92b2',
+      whiteSpace: 'nowrap', pointerEvents: 'none',
+      fontWeight: selected ? 700 : 400,
+      textShadow: '0 1px 2px rgba(0,0,0,0.9)', zIndex: 4,
+      maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis',
+    }}>
       {shortName}
     </div>
   );
 }
 
 const AREA_COLORS: Record<string, string> = {
-  ffgg_forest:  'rgba(20,60,20,0.32)',
-  ffgg_plain:   'rgba(50,60,20,0.28)',
-  ffgg_desert:  'rgba(60,45,15,0.30)',
-  ffgg_snow:    'rgba(30,50,70,0.30)',
-  ffgg_savanna: 'rgba(50,35,10,0.30)',
-  ffgg_pirate:  'rgba(10,30,60,0.35)',
+  ffgg_forest: 'rgba(20,60,20,0.32)', ffgg_plain: 'rgba(50,60,20,0.28)',
+  ffgg_desert: 'rgba(60,45,15,0.30)', ffgg_snow: 'rgba(30,50,70,0.30)',
+  ffgg_savanna: 'rgba(50,35,10,0.30)', ffgg_pirate: 'rgba(10,30,60,0.35)',
   ffgg_special: 'rgba(40,20,60,0.28)',
 };
 
-function MapView({
-  world,
-  activeAreaId,
-  selectedNode,
-  onSelectNode,
-}: {
-  world: FreeFieldWorld;
-  activeAreaId: string | null;
-  selectedNode: FreeFieldNode | null;
-  onSelectNode: (n: FreeFieldNode) => void;
+function MapView({ world, activeAreaId, selectedNode, onSelectNode, visitedNodes }: {
+  world: FreeFieldWorld; activeAreaId: string | null;
+  selectedNode: FreeFieldNode | null; onSelectNode: (n: FreeFieldNode) => void;
+  visitedNodes: string[];
 }) {
   const allNodes = useMemo(() => getNodesByWorld(world.id), [world.id]);
-  const visibleNodes = useMemo(() => {
-    if (!activeAreaId) return allNodes;
-    return getNodesByArea(activeAreaId);
-  }, [allNodes, activeAreaId]);
-
+  const visibleNodes = useMemo(() => activeAreaId ? getNodesByArea(activeAreaId) : allNodes, [allNodes, activeAreaId]);
   const aspect = world.mapAspect ?? 0.82;
 
   return (
-    <div
-      style={{
-        position: 'relative',
-        width: '100%',
-        paddingBottom: `${(1 / aspect) * 100}%`,
-        background: '#111827',
-        border: '2px solid #2d3752',
-        borderRadius: 10,
-        overflow: 'hidden',
-      }}
-    >
+    <div style={{ position: 'relative', width: '100%', paddingBottom: `${(1 / aspect) * 100}%`, background: '#111827', border: '2px solid #2d3752', borderRadius: 10, overflow: 'hidden' }}>
       {world.id === 'ffgg' && (
         <>
           <div style={{ position: 'absolute', left: '35%', top: '5%', width: '28%', height: '35%', background: AREA_COLORS.ffgg_forest, borderRadius: '50%', filter: 'blur(18px)' }} />
@@ -232,7 +241,6 @@ function MapView({
           <div style={{ position: 'absolute', left: '5%', top: '5%', width: '32%', height: '30%', background: AREA_COLORS.ffgg_special, borderRadius: '50%', filter: 'blur(16px)' }} />
         </>
       )}
-
       <div style={{ position: 'absolute', inset: 0 }}>
         {[...Array(10)].map((_, i) => (
           <div key={`h${i}`} style={{ position: 'absolute', top: `${i * 10}%`, left: 0, right: 0, height: 1, background: 'rgba(255,255,255,0.025)' }} />
@@ -241,45 +249,21 @@ function MapView({
           <div key={`v${i}`} style={{ position: 'absolute', left: `${i * 10}%`, top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.025)' }} />
         ))}
       </div>
-
       <ConnectionLines nodes={visibleNodes} />
-
       {visibleNodes.map(node => (
-        <NodePin
-          key={node.id}
-          node={node}
-          selected={selectedNode?.id === node.id}
-          onClick={() => onSelectNode(node)}
-        />
+        <NodePin key={node.id} node={node} selected={selectedNode?.id === node.id} onClick={() => onSelectNode(node)} isNew={!visitedNodes.includes(node.id)} />
       ))}
-
       {visibleNodes.map(node => (
         <NodeLabel key={`lbl-${node.id}`} node={node} selected={selectedNode?.id === node.id} />
       ))}
-
-      <div style={{
-        position: 'absolute', bottom: 8, right: 6,
-        background: 'rgba(8,12,22,0.90)', border: '1px solid #2d3752',
-        borderRadius: 6, padding: '4px 7px', fontSize: '0.54rem', color: '#8a92b2',
-        lineHeight: 1.6,
-      }}>
-        {(['entrance', 'safe', 'danger', 'boss', 'fever', 'landmark', 'transition', 'shortcut', 'test'] as FreeFieldNodeType[]).map(k => {
+      <div style={{ position: 'absolute', bottom: 8, right: 6, background: 'rgba(8,12,22,0.90)', border: '1px solid #2d3752', borderRadius: 6, padding: '4px 7px', fontSize: '0.54rem', color: '#8a92b2', lineHeight: 1.6 }}>
+        {(['entrance','safe','danger','boss','fever','landmark','transition','shortcut','test'] as FreeFieldNodeType[]).map(k => {
           const c = NODE_CFG[k];
-          return (
-            <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <span>{c.emoji}</span>
-              <span style={{ color: c.color }}>{c.label}</span>
-            </div>
-          );
+          return <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span>{c.emoji}</span><span style={{ color: c.color }}>{c.label}</span></div>;
         })}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ color: '#f0c060' }}>★</span><span style={{ color: '#f0c060' }}>未発見</span></div>
       </div>
-
-      <div style={{
-        position: 'absolute', top: 6, left: 8,
-        background: 'rgba(8,12,22,0.85)', border: '1px solid #3d4772',
-        borderRadius: 5, padding: '2px 8px', fontSize: '0.65rem',
-        color: '#60a0ff', fontWeight: 700, letterSpacing: 1,
-      }}>
+      <div style={{ position: 'absolute', top: 6, left: 8, background: 'rgba(8,12,22,0.85)', border: '1px solid #3d4772', borderRadius: 5, padding: '2px 8px', fontSize: '0.65rem', color: '#60a0ff', fontWeight: 700, letterSpacing: 1 }}>
         {world.displayName}
       </div>
     </div>
@@ -287,44 +271,68 @@ function MapView({
 }
 
 // ────────────────────────────────────────────
+// エリア踏破率
+// ────────────────────────────────────────────
+function AreaCoverage({ areaId, visitedNodes }: { areaId: string; visitedNodes: string[] }) {
+  const nodes = getNodesByArea(areaId);
+  if (nodes.length === 0) return null;
+  const visited = nodes.filter(n => visitedNodes.includes(n.id)).length;
+  const pct = Math.round((visited / nodes.length) * 100);
+  return (
+    <div style={{ fontSize: '0.62rem', color: '#6a7290', marginTop: 2 }}>
+      踏破率: <span style={{ color: pct >= 100 ? '#f0c060' : '#60a0ff' }}>{pct}%</span> ({visited}/{nodes.length})
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
 // エリアセレクター
 // ────────────────────────────────────────────
-function AreaSelector({
-  areas,
-  activeId,
-  onSelect,
-}: {
-  areas: FreeFieldArea[];
-  activeId: string | null;
-  onSelect: (id: string | null) => void;
+function AreaSelector({ areas, activeId, onSelect, visitedNodes }: {
+  areas: FreeFieldArea[]; activeId: string | null;
+  onSelect: (id: string | null) => void; visitedNodes: string[];
 }) {
   return (
     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
-      <button
-        onClick={() => onSelect(null)}
-        style={{
-          padding: '4px 8px', fontSize: '0.70rem', borderRadius: 6, cursor: 'pointer',
-          background: activeId === null ? 'rgba(240,192,96,0.15)' : '#1c2235',
-          border: `1px solid ${activeId === null ? '#f0c060' : '#2d3752'}`,
-          color: activeId === null ? '#f0c060' : '#8a92b2',
-        }}
-      >
+      <button onClick={() => onSelect(null)} style={{ padding: '4px 8px', fontSize: '0.70rem', borderRadius: 6, cursor: 'pointer', background: activeId === null ? 'rgba(240,192,96,0.15)' : '#1c2235', border: `1px solid ${activeId === null ? '#f0c060' : '#2d3752'}`, color: activeId === null ? '#f0c060' : '#8a92b2' }}>
         全体
       </button>
-      {areas.map(a => (
-        <button
-          key={a.id}
-          onClick={() => onSelect(a.id)}
-          style={{
-            padding: '4px 8px', fontSize: '0.70rem', borderRadius: 6, cursor: 'pointer',
-            background: activeId === a.id ? 'rgba(96,144,255,0.15)' : '#1c2235',
-            border: `1px solid ${activeId === a.id ? '#6090ff' : '#2d3752'}`,
-            color: activeId === a.id ? '#6090ff' : '#8a92b2',
-          }}
-        >
-          {a.displayName}
-        </button>
-      ))}
+      {areas.map(a => {
+        const nodes = getNodesByArea(a.id);
+        const hasUnvisited = nodes.some(n => !visitedNodes.includes(n.id));
+        return (
+          <button key={a.id} onClick={() => onSelect(a.id)} style={{ padding: '4px 8px', fontSize: '0.70rem', borderRadius: 6, cursor: 'pointer', background: activeId === a.id ? 'rgba(96,144,255,0.15)' : '#1c2235', border: `1px solid ${activeId === a.id ? '#6090ff' : '#2d3752'}`, color: activeId === a.id ? '#6090ff' : '#8a92b2' }}>
+            {a.displayName}{hasUnvisited ? ' ★' : ''}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
+// ドラゴンソウルバー
+// ────────────────────────────────────────────
+function DragonSoulBar({ soul, feverActive, feverRemainingMs }: { soul: number; feverActive: boolean; feverRemainingMs: number }) {
+  const pct = Math.min(1, soul / DS_FEVER_THRESH);
+  return (
+    <div style={{ background: 'rgba(20,15,35,0.9)', border: `1px solid ${feverActive ? '#ff8020' : '#3d2d5a'}`, borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: feverActive ? '#ff8020' : '#a060d0' }}>
+          {feverActive ? '🔥 フィーバー発動中！' : '🐉 ドラゴンソウル'}
+        </span>
+        <span style={{ fontSize: '0.68rem', color: feverActive ? '#ffa060' : '#8060a0' }}>
+          {feverActive ? `残り ${Math.ceil(feverRemainingMs / 1000)}s` : `${soul} / ${DS_FEVER_THRESH}`}
+        </span>
+      </div>
+      <div style={{ background: '#1a1030', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct * 100}%`, background: feverActive ? 'linear-gradient(90deg,#ff6020,#ffd040)' : 'linear-gradient(90deg,#6020c0,#c060ff)', transition: 'width 0.4s' }} />
+      </div>
+      {feverActive && (
+        <div style={{ fontSize: '0.60rem', color: '#ffa060', marginTop: 4 }}>
+          ✨ ドロップ率+50% / 採取量+1 / ゴールド+30% / ドラゴンソウル獲得2倍
+        </div>
+      )}
     </div>
   );
 }
@@ -332,60 +340,123 @@ function AreaSelector({
 // ────────────────────────────────────────────
 // FF採集モーダル
 // ────────────────────────────────────────────
-function FFHarvestModal({
-  result,
-  onClose,
-}: {
-  result: FFHarvestResult;
-  onClose: () => void;
-}) {
+function FFHarvestModal({ result, onClose }: { result: FFHarvestResult; onClose: () => void }) {
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.80)', zIndex: 1000,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-    }}>
-      <div style={{
-        background: '#0f1420', border: '2px solid #40c080', borderRadius: 12,
-        padding: 18, maxWidth: 360, width: '100%',
-      }}>
-        <div style={{ fontWeight: 700, color: '#40c080', fontSize: '0.95rem', marginBottom: 10 }}>
-          🌿 FF採集結果
-        </div>
-        <div style={{ fontSize: '0.80rem', color: '#b0b8d0', marginBottom: 10, lineHeight: 1.6, whiteSpace: 'pre-line' }}>
-          {result.message}
-        </div>
-        {result.items.length > 0 && (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.80)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: '#0f1420', border: '2px solid #40c080', borderRadius: 12, padding: 18, maxWidth: 360, width: '100%' }}>
+        <div style={{ fontWeight: 700, color: '#40c080', fontSize: '0.95rem', marginBottom: 10 }}>🌿 FF採集結果</div>
+        {result.items.length > 0 ? (
           <div style={{ marginBottom: 10 }}>
             {result.items.map((item, i) => (
-              <div key={i} style={{
-                background: 'rgba(64,192,128,0.10)', border: '1px solid #40c080',
-                borderRadius: 6, padding: '4px 8px', marginBottom: 4,
-                fontSize: '0.78rem', color: '#70e0a0',
-              }}>
-                ✅ {item.displayName} × {item.amount}
+              <div key={i} style={{ background: 'rgba(64,192,128,0.10)', border: '1px solid #40c080', borderRadius: 6, padding: '5px 10px', marginBottom: 4, fontSize: '0.82rem', color: '#70e0a0' }}>
+                ✅ {item.displayName} × {item.amount} <span style={{ fontSize: '0.65rem', color: '#6a9280' }}>→ インベントリに追加</span>
               </div>
             ))}
           </div>
+        ) : (
+          <div style={{ fontSize: '0.78rem', color: '#6a7290', marginBottom: 10 }}>何も見つからなかった...</div>
         )}
         {result.triggeredCombat && (
-          <div style={{
-            background: 'rgba(224,96,80,0.12)', border: '1px solid #e06050',
-            borderRadius: 6, padding: '4px 8px', marginBottom: 10,
-            fontSize: '0.72rem', color: '#e08060',
-          }}>
-            ⚠️ 採集中に敵が出現した！（戦闘は別途「戦う」ボタンから）
+          <div style={{ background: 'rgba(224,96,80,0.12)', border: '1px solid #e06050', borderRadius: 6, padding: '4px 8px', marginBottom: 10, fontSize: '0.72rem', color: '#e08060' }}>
+            ⚠️ 採集中に敵が出現した！（戦闘は「戦う」ボタンから）
           </div>
         )}
-        <button
-          onClick={onClose}
-          style={{
-            width: '100%', padding: '7px 0', borderRadius: 6, cursor: 'pointer',
-            background: 'rgba(64,192,128,0.15)', border: '1px solid #40c080',
-            color: '#40c080', fontWeight: 700, fontSize: '0.78rem',
-          }}
-        >
+        <button onClick={onClose} style={{ width: '100%', padding: '7px 0', borderRadius: 6, cursor: 'pointer', background: 'rgba(64,192,128,0.15)', border: '1px solid #40c080', color: '#40c080', fontWeight: 700, fontSize: '0.78rem' }}>
           閉じる
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
+// FF専用ショップモーダル
+// ────────────────────────────────────────────
+function FFShopModal({ onClose }: { onClose: () => void }) {
+  const player = useGameStore(s => s.player);
+  const addItems = useGameStore(s => s.addItems);
+  const consumeItem = useGameStore(s => s.consumeItem);
+  const addNotification = useGameStore(s => s.addNotification);
+
+  const handleExchange = (entry: FFShopEntry) => {
+    const owned = player?.inventory[entry.costItemId] ?? 0;
+    if (owned < entry.costAmount) {
+      addNotification('error', `${itemName(entry.costItemId)} が足りません（必要: ${entry.costAmount}、所持: ${owned}）`);
+      return;
+    }
+    const ok = consumeItem(entry.costItemId, entry.costAmount);
+    if (!ok) { addNotification('error', '交換に失敗しました'); return; }
+    addItems([{ itemId: entry.rewardItemId, amount: entry.rewardAmount }]);
+    addNotification('success', `${itemName(entry.costItemId)}×${entry.costAmount} → ${itemName(entry.rewardItemId)}×${entry.rewardAmount} を交換しました`);
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
+      <div style={{ background: '#0f1420', border: '2px solid #f0c060', borderRadius: 12, padding: 18, maxWidth: 400, width: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
+        <div style={{ fontWeight: 700, color: '#f0c060', fontSize: '0.95rem', marginBottom: 12 }}>🛒 FF素材交換所</div>
+        {FF_SHOP_ENTRIES.map(entry => {
+          const owned = player?.inventory[entry.costItemId] ?? 0;
+          const canBuy = owned >= entry.costAmount;
+          return (
+            <div key={entry.id} style={{ background: 'rgba(30,25,10,0.6)', border: `1px solid ${canBuy ? '#a08030' : '#3d3020'}`, borderRadius: 8, padding: '10px 12px', marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '0.80rem', color: '#d0b060', fontWeight: 700 }}>{entry.label}</div>
+                  <div style={{ fontSize: '0.68rem', color: '#8a7850', marginTop: 2 }}>
+                    {itemName(entry.costItemId)} × {entry.costAmount} → {itemName(entry.rewardItemId)} × {entry.rewardAmount}
+                  </div>
+                  <div style={{ fontSize: '0.60rem', color: canBuy ? '#70c090' : '#805030', marginTop: 2 }}>
+                    所持: {owned}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleExchange(entry)}
+                  disabled={!canBuy}
+                  style={{ padding: '5px 10px', borderRadius: 6, cursor: canBuy ? 'pointer' : 'not-allowed', background: canBuy ? 'rgba(240,192,96,0.15)' : 'rgba(40,30,15,0.4)', border: `1px solid ${canBuy ? '#f0c060' : '#604020'}`, color: canBuy ? '#f0c060' : '#604020', fontSize: '0.70rem', fontWeight: 700 }}
+                >
+                  交換
+                </button>
+              </div>
+            </div>
+          );
+        })}
+        <button onClick={onClose} style={{ width: '100%', padding: '7px 0', borderRadius: 6, cursor: 'pointer', background: 'rgba(240,192,96,0.12)', border: '1px solid #f0c060', color: '#f0c060', fontWeight: 700, fontSize: '0.78rem', marginTop: 4 }}>
+          閉じる
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
+// フィーバーモーダル
+// ────────────────────────────────────────────
+function FFFeverModal({ soul, feverActive, onActivate, onClose }: { soul: number; feverActive: boolean; onActivate: () => void; onClose: () => void }) {
+  const canActivate = soul >= DS_FEVER_THRESH && !feverActive;
+  const pct = Math.min(1, soul / DS_FEVER_THRESH);
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: '#0f1420', border: '2px solid #ff8020', borderRadius: 12, padding: 18, maxWidth: 380, width: '100%' }}>
+        <div style={{ fontWeight: 700, color: '#ff8020', fontSize: '0.95rem', marginBottom: 12 }}>🔥 ドラゴンフィーバー</div>
+        <div style={{ background: 'rgba(255,128,32,0.10)', border: '1px solid #ff8020', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
+          <div style={{ fontSize: '0.72rem', color: '#ffa060', marginBottom: 4 }}>ドラゴンソウル蓄積量</div>
+          <div style={{ fontSize: '0.80rem', color: '#c08040', fontWeight: 700, marginBottom: 6 }}>{soul.toLocaleString()} / {DS_FEVER_THRESH.toLocaleString()}</div>
+          <div style={{ background: '#1a2030', borderRadius: 4, height: 10, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${pct * 100}%`, background: 'linear-gradient(90deg,#ff8020,#ffd040)' }} />
+          </div>
+        </div>
+        <div style={{ fontSize: '0.68rem', color: '#a08060', marginBottom: 12, lineHeight: 1.6 }}>
+          フィーバー発動中: ドロップ率+50% / 採取量+1 / ゴールド+30% / ソウル2倍<br/>
+          持続時間: 5分<br/>
+          ソウル獲得: 通常敵+{DS_PER_NORMAL} / 中ボス+{DS_PER_MIDBOSS} / ボス+{DS_PER_BOSS}
+        </div>
+        {feverActive && <div style={{ fontSize: '0.72rem', color: '#ff8020', fontWeight: 700, marginBottom: 10 }}>🔥 フィーバー発動中！</div>}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onActivate} disabled={!canActivate} style={{ flex: 1, padding: '8px 0', borderRadius: 6, cursor: canActivate ? 'pointer' : 'not-allowed', background: canActivate ? 'rgba(255,128,32,0.20)' : 'rgba(40,30,20,0.4)', border: `1px solid ${canActivate ? '#ff8020' : '#604030'}`, color: canActivate ? '#ff8020' : '#604030', fontWeight: 700, fontSize: '0.78rem' }}>
+            {feverActive ? '発動中' : canActivate ? '🔥 フィーバー発動！' : `あと ${DS_FEVER_THRESH - soul} 必要`}
+          </button>
+          <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 6, cursor: 'pointer', background: 'rgba(40,40,60,0.4)', border: '1px solid #3d4772', color: '#8a92b2', fontSize: '0.78rem' }}>閉じる</button>
+        </div>
       </div>
     </div>
   );
@@ -400,116 +471,24 @@ function FFTesterModal({ onClose }: { onClose: () => void }) {
   const def = player?.stats?.defense ?? 0;
   const hp = player?.stats?.hp ?? 0;
   const maxHp = player?.stats?.maxHp ?? 0;
-
-  // 仮想ダミー敵に対するダメージ計算
   const dummyDef = 20;
   const dmg = Math.max(1, atk - Math.floor(dummyDef * 0.5));
-
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.80)', zIndex: 1000,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-    }}>
-      <div style={{
-        background: '#0f1420', border: '2px solid #8080a0', borderRadius: 12,
-        padding: 18, maxWidth: 380, width: '100%',
-      }}>
-        <div style={{ fontWeight: 700, color: '#8080a0', fontSize: '0.95rem', marginBottom: 12 }}>
-          🔬 武器テスター
-        </div>
-
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.80)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: '#0f1420', border: '2px solid #8080a0', borderRadius: 12, padding: 18, maxWidth: 380, width: '100%' }}>
+        <div style={{ fontWeight: 700, color: '#8080a0', fontSize: '0.95rem', marginBottom: 12 }}>🔬 武器テスター</div>
         <div style={{ background: 'rgba(40,45,70,0.6)', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
           <div style={{ fontSize: '0.75rem', color: '#8a92b2', marginBottom: 6, fontWeight: 700 }}>現在のステータス</div>
           <div style={{ fontSize: '0.72rem', color: '#b0b8d0', lineHeight: 1.8 }}>
-            <div>⚔️ 攻撃力: {atk}</div>
-            <div>🛡️ 防御力: {def}</div>
-            <div>❤️ HP: {hp} / {maxHp}</div>
+            <div>⚔️ 攻撃力: {atk}</div><div>🛡️ 防御力: {def}</div><div>❤️ HP: {hp} / {maxHp}</div>
           </div>
         </div>
-
         <div style={{ background: 'rgba(128,128,160,0.12)', border: '1px solid #8080a0', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
           <div style={{ fontSize: '0.75rem', color: '#a0a0c0', marginBottom: 6, fontWeight: 700 }}>ダミー目標（防御20）への推定ダメージ</div>
           <div style={{ fontSize: '1.1rem', color: '#c0c0e0', fontWeight: 700 }}>約 {dmg} ダメージ</div>
-          <div style={{ fontSize: '0.65rem', color: '#6a7290', marginTop: 4 }}>
-            計算式: 攻撃力({atk}) - 防御({dummyDef})×0.5 = {dmg}
-          </div>
+          <div style={{ fontSize: '0.65rem', color: '#6a7290', marginTop: 4 }}>計算式: {atk} - {dummyDef}×0.5 = {dmg}</div>
         </div>
-
-        <div style={{ fontSize: '0.65rem', color: '#606880', marginBottom: 12 }}>
-          {/* TODO: 実際の武器別ダメージ計算・スキル試用は仕様確定後に追加 */}
-          ※ テスターは参考値を表示します。実際の戦闘では敵の防御力・スキルによって変動します。
-        </div>
-
-        <button
-          onClick={onClose}
-          style={{
-            width: '100%', padding: '7px 0', borderRadius: 6, cursor: 'pointer',
-            background: 'rgba(128,128,160,0.15)', border: '1px solid #8080a0',
-            color: '#8080a0', fontWeight: 700, fontSize: '0.78rem',
-          }}
-        >
-          閉じる
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────
-// フィーバー状態モーダル
-// ────────────────────────────────────────────
-function FFFeverModal({ action: _action, onClose }: { action: FreeFieldNodeAction; onClose: () => void }) {
-  // TODO: ドラゴンソール蓄積量は playerSlice 拡張後に取得
-  const dragonSoulCurrent = 0; // TODO: useGameStore(s => s.player?.dragonSoulCount ?? 0)
-  const dragonSoulTarget = 30000;
-  const progress = Math.min(1, dragonSoulCurrent / dragonSoulTarget);
-
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.80)', zIndex: 1000,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-    }}>
-      <div style={{
-        background: '#0f1420', border: '2px solid #ff8020', borderRadius: 12,
-        padding: 18, maxWidth: 380, width: '100%',
-      }}>
-        <div style={{ fontWeight: 700, color: '#ff8020', fontSize: '0.95rem', marginBottom: 12 }}>
-          🔥 ドラゴンフィーバー状態
-        </div>
-
-        <div style={{ background: 'rgba(255,128,32,0.10)', border: '1px solid #ff8020', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
-          <div style={{ fontSize: '0.75rem', color: '#ffa060', marginBottom: 6 }}>ドラゴンソール蓄積量</div>
-          <div style={{ fontSize: '0.70rem', color: '#c08040', marginBottom: 4 }}>
-            {dragonSoulCurrent.toLocaleString()} / {dragonSoulTarget.toLocaleString()}
-          </div>
-          <div style={{ background: '#1a2030', borderRadius: 4, height: 10, overflow: 'hidden', marginBottom: 6 }}>
-            <div style={{
-              height: '100%', width: `${progress * 100}%`,
-              background: 'linear-gradient(90deg, #ff8020, #ffd040)',
-            }} />
-          </div>
-          {dragonSoulCurrent >= dragonSoulTarget
-            ? <div style={{ fontSize: '0.72rem', color: '#ff6020', fontWeight: 700 }}>🔥 ドラゴンフィーバー発動可能！</div>
-            : <div style={{ fontSize: '0.65rem', color: '#806040' }}>残り: {(dragonSoulTarget - dragonSoulCurrent).toLocaleString()}</div>
-          }
-        </div>
-
-        <div style={{ fontSize: '0.65rem', color: '#606880', marginBottom: 12 }}>
-          {/* TODO: ドラゴンソール蓄積・フィーバー発動ロジックは playerSlice 拡張後に実装 */}
-          ※ ドラゴンソールは敵撃破で蓄積されます。30000に達するとドラゴンフィーバーが発動します。
-          発動ロジックは実装準備中です。
-        </div>
-
-        <button
-          onClick={onClose}
-          style={{
-            width: '100%', padding: '7px 0', borderRadius: 6, cursor: 'pointer',
-            background: 'rgba(255,128,32,0.15)', border: '1px solid #ff8020',
-            color: '#ff8020', fontWeight: 700, fontSize: '0.78rem',
-          }}
-        >
-          閉じる
-        </button>
+        <button onClick={onClose} style={{ width: '100%', padding: '7px 0', borderRadius: 6, cursor: 'pointer', background: 'rgba(128,128,160,0.15)', border: '1px solid #8080a0', color: '#8080a0', fontWeight: 700, fontSize: '0.78rem' }}>閉じる</button>
       </div>
     </div>
   );
@@ -521,47 +500,17 @@ function FFFeverModal({ action: _action, onClose }: { action: FreeFieldNodeActio
 function FFLandmarkModal({ node, action, onClose }: { node: FreeFieldNode; action: FreeFieldNodeAction; onClose: () => void }) {
   const cfg = NODE_CFG[node.type];
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.80)', zIndex: 1000,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-    }}>
-      <div style={{
-        background: '#0f1420', border: `2px solid ${cfg.color}`, borderRadius: 12,
-        padding: 18, maxWidth: 380, width: '100%',
-      }}>
-        <div style={{ fontWeight: 700, color: cfg.color, fontSize: '0.95rem', marginBottom: 8 }}>
-          {cfg.emoji} {node.indexLabel} {node.displayName}
-        </div>
-        <div style={{ fontSize: '0.78rem', color: '#b0b8d0', lineHeight: 1.6, marginBottom: 10 }}>
-          {action.description ?? node.description ?? 'この地点の詳細情報はありません。'}
-        </div>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.80)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: '#0f1420', border: `2px solid ${cfg.color}`, borderRadius: 12, padding: 18, maxWidth: 380, width: '100%' }}>
+        <div style={{ fontWeight: 700, color: cfg.color, fontSize: '0.95rem', marginBottom: 8 }}>{cfg.emoji} {node.indexLabel} {node.displayName}</div>
+        <div style={{ fontSize: '0.78rem', color: '#b0b8d0', lineHeight: 1.6, marginBottom: 10 }}>{action.description ?? node.description ?? 'この地点の詳細情報はありません。'}</div>
         {node.encounterHints && node.encounterHints.length > 0 && (
           <div style={{ marginBottom: 8 }}>
             <div style={{ fontSize: '0.65rem', color: '#e06050', marginBottom: 4 }}>⚔️ 出現モブ情報</div>
-            {node.encounterHints.map((h, i) => (
-              <div key={i} style={{ fontSize: '0.68rem', color: '#b0a090', lineHeight: 1.5 }}>• {h}</div>
-            ))}
+            {node.encounterHints.map((h, i) => <div key={i} style={{ fontSize: '0.68rem', color: '#b0a090', lineHeight: 1.5 }}>• {h}</div>)}
           </div>
         )}
-        {node.resourceHints && node.resourceHints.length > 0 && (
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: '0.65rem', color: '#40c080', marginBottom: 4 }}>🌿 素材情報</div>
-            {node.resourceHints.map((h, i) => (
-              <div key={i} style={{ fontSize: '0.68rem', color: '#80c0a0', lineHeight: 1.5 }}>• {h}</div>
-            ))}
-          </div>
-        )}
-        <button
-          onClick={onClose}
-          style={{
-            width: '100%', padding: '7px 0', borderRadius: 6, cursor: 'pointer',
-            background: `rgba(${cfg.color.replace(/[^,\d]/g, '')},0.12)`,
-            border: `1px solid ${cfg.color}`,
-            color: cfg.color, fontWeight: 700, fontSize: '0.78rem',
-          }}
-        >
-          閉じる
-        </button>
+        <button onClick={onClose} style={{ width: '100%', padding: '7px 0', borderRadius: 6, cursor: 'pointer', background: `${cfg.color}22`, border: `1px solid ${cfg.color}`, color: cfg.color, fontWeight: 700, fontSize: '0.78rem' }}>閉じる</button>
       </div>
     </div>
   );
@@ -570,101 +519,86 @@ function FFLandmarkModal({ node, action, onClose }: { node: FreeFieldNode; actio
 // ────────────────────────────────────────────
 // アクションボタン
 // ────────────────────────────────────────────
-function ActionButton({
-  action,
-  onExecute,
-}: {
+function ActionButton({ action, onExecute, player, interactionState, isFeverActive }: {
   action: FreeFieldNodeAction;
   onExecute: (a: FreeFieldNodeAction) => void;
+  player: NonNullable<ReturnType<typeof useGameStore.getState>['player']> | null;
+  interactionState: { lastUsedAt: number; useCount: number; completed: boolean } | undefined;
+  isFeverActive: boolean;
 }) {
   const cfg = ACTION_CFG[action.type];
-  const hasUnlock = (action.unlockConditions ?? []).length > 0;
+
+  const conditionsMet = player && (action.unlockConditions ?? []).length > 0
+    ? checkAllConditions(action.unlockConditions!, player)
+    : true;
+
+  const isLocked = action.hidden && !conditionsMet;
+  if (isLocked) return null;
+
+  const isCompleted = action.onceOnly && interactionState?.completed;
+
+  // クールダウン計算
+  const nowMs = Date.now();
+  const cdSec = action.cooldownSeconds ?? 0;
+  const lastUsedAt = interactionState?.lastUsedAt ?? 0;
+  const cdRemainingMs = cdSec > 0 ? Math.max(0, lastUsedAt + cdSec * 1000 - nowMs) : 0;
+  const onCooldown = cdRemainingMs > 0;
+
+  const isDisabled = isCompleted || onCooldown;
+
+  // ワープ先が同ワールド内かチェック（targetWorldIdがあれば未実装として非表示）
+  if (action.type === 'warp' && action.targetWorldId) return null;
 
   return (
-    <div style={{
-      background: 'rgba(22,28,44,0.9)',
-      border: `1px solid ${action.hidden ? '#404860' : cfg.color}`,
-      borderRadius: 8,
-      padding: '8px 10px',
-      marginBottom: 6,
-      opacity: action.hidden ? 0.65 : 1,
-    }}>
+    <div style={{ background: 'rgba(22,28,44,0.9)', border: `1px solid ${cfg.color}`, borderRadius: 8, padding: '8px 10px', marginBottom: 6, opacity: isDisabled ? 0.5 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: '1rem' }}>{cfg.emoji}</span>
-          <span style={{ fontSize: '0.80rem', fontWeight: 700, color: action.hidden ? '#606878' : cfg.color }}>
-            {action.label}
-          </span>
-          {action.hidden && (
-            <span style={{ fontSize: '0.60rem', color: '#606878', background: 'rgba(40,44,60,0.6)', borderRadius: 3, padding: '1px 4px' }}>
-              隠し
-            </span>
+          <span style={{ fontSize: '0.80rem', fontWeight: 700, color: cfg.color }}>{action.label}</span>
+          {isFeverActive && (action.type === 'battleTrigger' || action.type === 'harvest') && (
+            <span style={{ fontSize: '0.58rem', color: '#ff8020', background: 'rgba(40,20,10,0.6)', borderRadius: 3, padding: '1px 4px' }}>🔥FEVER</span>
           )}
         </div>
         <button
           onClick={() => onExecute(action)}
-          style={{
-            padding: '3px 10px',
-            fontSize: '0.68rem',
-            borderRadius: 5,
-            cursor: 'pointer',
-            background: `rgba(${cfg.color.slice(1).match(/.{2}/g)?.map(x => parseInt(x,16)).join(',') ?? '255,255,255'},0.15)`,
-            border: `1px solid ${action.hidden ? '#3d4772' : cfg.color}`,
-            color: action.hidden ? '#505870' : cfg.color,
-            fontWeight: 600,
-          }}
+          disabled={isDisabled}
+          style={{ padding: '3px 10px', fontSize: '0.68rem', borderRadius: 5, cursor: isDisabled ? 'not-allowed' : 'pointer', background: `${cfg.color}26`, border: `1px solid ${isDisabled ? '#3d4772' : cfg.color}`, color: isDisabled ? '#3d4772' : cfg.color, fontWeight: 600 }}
         >
-          {cfg.emoji} 実行
+          {isCompleted ? '完了' : onCooldown ? `⏱ ${Math.ceil(cdRemainingMs / 1000)}s` : `${cfg.emoji} 実行`}
         </button>
       </div>
-
-      {action.description && (
-        <div style={{ fontSize: '0.70rem', color: '#8a92b2', marginBottom: 3, lineHeight: 1.45 }}>
-          {action.description}
-        </div>
-      )}
-
+      {action.description && <div style={{ fontSize: '0.70rem', color: '#8a92b2', marginBottom: 3, lineHeight: 1.45 }}>{action.description}</div>}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-        {action.triggerMode && (
-          <span style={{ fontSize: '0.60rem', color: action.triggerMode === 'auto' ? '#e06050' : '#6090c0', background: 'rgba(30,35,55,0.5)', borderRadius: 3, padding: '1px 5px' }}>
-            {action.triggerMode === 'auto' ? '⚡自動開始' : '🖐手動開始'}
-          </span>
-        )}
         {action.harvestDanger != null && (
           <span style={{ fontSize: '0.60rem', color: '#c06040', background: 'rgba(30,35,55,0.5)', borderRadius: 3, padding: '1px 5px' }}>
-            採取危険度: {'⭐'.repeat(action.harvestDanger)}
-          </span>
-        )}
-        {action.combatDuringHarvest && (
-          <span style={{ fontSize: '0.60rem', color: '#e06050', background: 'rgba(40,20,20,0.4)', borderRadius: 3, padding: '1px 5px' }}>
-            ⚔️採取中に戦闘発生あり
+            採取危険度: {'⭐'.repeat(action.harvestDanger)} ({action.harvestDanger * 10}%で敵出現)
           </span>
         )}
         {action.cooldownSeconds != null && action.cooldownSeconds > 0 && (
-          <span style={{ fontSize: '0.60rem', color: '#8090a0', background: 'rgba(30,35,55,0.5)', borderRadius: 3, padding: '1px 5px' }}>
-            ⏱ CD: {action.cooldownSeconds}s
-          </span>
+          <span style={{ fontSize: '0.60rem', color: '#8090a0', background: 'rgba(30,35,55,0.5)', borderRadius: 3, padding: '1px 5px' }}>⏱ CD: {action.cooldownSeconds}s</span>
         )}
-        {action.feverType && (
-          <span style={{ fontSize: '0.60rem', color: '#ff8020', background: 'rgba(40,20,10,0.4)', borderRadius: 3, padding: '1px 5px' }}>
-            🔥 {action.feverType === 'dragon' ? 'ドラゴンフィーバー' : action.feverType === 'red' ? 'レッドフィーバー' : 'ゴールドフィーバー'}
-          </span>
+        {action.onceOnly && (
+          <span style={{ fontSize: '0.60rem', color: '#a06030', background: 'rgba(40,25,10,0.4)', borderRadius: 3, padding: '1px 5px' }}>🔑 一度限り</span>
         )}
-        {action.feverConditionText && (
-          <span style={{ fontSize: '0.60rem', color: '#c08040', background: 'rgba(40,25,10,0.4)', borderRadius: 3, padding: '1px 5px' }}>
-            条件: {action.feverConditionText}
-          </span>
-        )}
-        {(action.targetNodeId || action.targetWorldId) && (
+        {action.targetNodeId && (
           <span style={{ fontSize: '0.60rem', color: '#a060d0', background: 'rgba(30,20,45,0.5)', borderRadius: 3, padding: '1px 5px' }}>
-            {action.targetWorldId
-              ? `→ ワールド: ${action.targetWorldId}`
-              : `→ ${FREE_FIELD_NODES_ALL[action.targetNodeId!]?.displayName ?? action.targetNodeId}`}
+            → {FREE_FIELD_NODES_ALL[action.targetNodeId]?.displayName ?? action.targetNodeId}
           </span>
         )}
       </div>
-
-      {hasUnlock && (
+      {(action.rewardHints ?? []).length > 0 && (
+        <div style={{ marginTop: 4 }}>
+          <div style={{ fontSize: '0.60rem', color: '#6a7290', marginBottom: 2 }}>💎 報酬ヒント</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {(action.rewardHints ?? []).map((rh, i) => (
+              <span key={i} style={{ fontSize: '0.58rem', color: '#70c090', background: 'rgba(20,40,25,0.4)', borderRadius: 3, padding: '1px 5px' }}>
+                {rh.itemId ? itemName(rh.itemId) : rh.description}{rh.dropRate ? ` (${rh.dropRate})` : ''}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {(action.unlockConditions ?? []).length > 0 && !conditionsMet && (
         <div style={{ marginTop: 4 }}>
           {(action.unlockConditions ?? []).map((c, i) => (
             <div key={i} style={{ fontSize: '0.60rem', color: '#806040', background: 'rgba(40,25,10,0.3)', borderRadius: 3, padding: '1px 6px', display: 'inline-block', marginRight: 3 }}>
@@ -673,150 +607,74 @@ function ActionButton({
           ))}
         </div>
       )}
-
-      {(action.rewardHints ?? []).length > 0 && (
-        <div style={{ marginTop: 4 }}>
-          <div style={{ fontSize: '0.60rem', color: '#6a7290', marginBottom: 2 }}>💎 報酬ヒント</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-            {(action.rewardHints ?? []).map((rh, i) => (
-              <span key={i} style={{ fontSize: '0.58rem', color: '#70c090', background: 'rgba(20,40,25,0.4)', borderRadius: 3, padding: '1px 5px' }}>
-                {rh.description}{rh.dropRate ? ` (${rh.dropRate})` : ''}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 // ────────────────────────────────────────────
-// アクション一覧パネル（実行ハンドラ付き）
+// アクション一覧パネル
 // ────────────────────────────────────────────
-function NodeActionsPanel({
-  node,
-  onWarpToNode,
-  onBattleStart,
-  onHarvestStart,
-  onFishingStart,
-  onTestStart,
-  onShopStart,
-  onFeverStart,
-  onLandmarkStart,
-}: {
+function NodeActionsPanel({ node, onWarpToNode, onBattleStart, onHarvestStart, onFishingStart, onTestStart, onShopOpen, onFeverStart, onLandmarkStart, player, nodeInteractions, isFeverActive }: {
   node: FreeFieldNode;
   onWarpToNode?: (nodeId: string) => void;
   onBattleStart: (action: FreeFieldNodeAction, node: FreeFieldNode) => void;
   onHarvestStart: (action: FreeFieldNodeAction, node: FreeFieldNode) => void;
   onFishingStart: () => void;
   onTestStart: () => void;
-  onShopStart: () => void;
+  onShopOpen: () => void;
   onFeverStart: (action: FreeFieldNodeAction) => void;
   onLandmarkStart: (action: FreeFieldNodeAction) => void;
+  player: NonNullable<ReturnType<typeof useGameStore.getState>['player']> | null;
+  nodeInteractions: Record<string, { lastUsedAt: number; useCount: number; completed: boolean }>;
+  isFeverActive: boolean;
 }) {
   const actions = node.actions ?? [];
-  const visibleActions = actions; // 全部表示（hidden は薄く）
+  const visibleActions = actions.filter(a => {
+    if (!a.hidden) return true;
+    if (!player) return false;
+    return checkAllConditions(a.unlockConditions ?? [], player);
+  });
 
   if (visibleActions.length === 0) return null;
 
-  const typeSet = new Set(actions.map(a => a.type));
-  const hasBattle = typeSet.has('battleTrigger');
-  const hasHarvest = typeSet.has('harvest');
-  const hasFever = typeSet.has('fever');
-  const warpActions = actions.filter(a => a.type === 'warp');
-
   const handleExecute = (action: FreeFieldNodeAction) => {
     switch (action.type) {
-      case 'battleTrigger':
-        onBattleStart(action, node);
-        break;
-      case 'harvest':
-        onHarvestStart(action, node);
-        break;
+      case 'battleTrigger': onBattleStart(action, node); break;
+      case 'harvest':       onHarvestStart(action, node); break;
       case 'warp':
-        if (action.targetNodeId && onWarpToNode) {
-          onWarpToNode(action.targetNodeId);
-        } else if (action.targetWorldId) {
-          // TODO: ワールド間遷移は実装準備中
-          alert(`FF ワールド遷移: ${action.targetWorldId}\n（TODO: World 間遷移の実装方針が決まったら接続を更新する）`);
-        }
+        if (action.targetNodeId && onWarpToNode) onWarpToNode(action.targetNodeId);
+        // targetWorldIdは ActionButton側で非表示にしているので到達しない
         break;
-      case 'fishing':
-        onFishingStart();
-        break;
-      case 'test':
-        onTestStart();
-        break;
-      case 'shop':
-        onShopStart();
-        break;
-      case 'fever':
-        onFeverStart(action);
-        break;
-      case 'landmark':
-        onLandmarkStart(action);
-        break;
-      case 'hidden':
-        // TODO: 隠し要素の解放条件チェックは未実装
-        break;
-      default:
-        break;
+      case 'fishing':   onFishingStart(); break;
+      case 'test':      onTestStart(); break;
+      case 'shop':      onShopOpen(); break;
+      case 'fever':     onFeverStart(action); break;
+      case 'landmark':  onLandmarkStart(action); break;
+      default: break;
     }
   };
 
+  const hasUnvisited = node.connections
+    .map(id => FREE_FIELD_NODES_ALL[id])
+    .some(n => n && !player?.ffVisitedNodes?.includes(n.id));
+
   return (
     <div style={{ marginTop: 10 }}>
-      <div style={{
-        background: 'rgba(20,26,42,0.8)',
-        border: '1px solid #2d3752',
-        borderRadius: 7,
-        padding: '7px 10px',
-        marginBottom: 8,
-      }}>
-        <div style={{ fontSize: '0.68rem', color: '#8a92b2', marginBottom: 5, fontWeight: 700 }}>
-          📋 このノードでできること
+      {/* 次のおすすめ行動 */}
+      {hasUnvisited && (
+        <div style={{ background: 'rgba(240,192,96,0.08)', border: '1px solid #a08030', borderRadius: 6, padding: '5px 10px', marginBottom: 8, fontSize: '0.68rem', color: '#c0a050' }}>
+          💡 接続先に未発見のノードがあります！ワープで探索しましょう
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {Array.from(typeSet).map(t => {
-            const cfg = ACTION_CFG[t];
-            return (
-              <span key={t} style={{
-                fontSize: '0.65rem',
-                color: cfg.color,
-                background: `rgba(${cfg.color.slice(1).match(/.{2}/g)?.map(x => parseInt(x,16)).join(',') ?? '255,255,255'}, 0.12)`,
-                border: `1px solid ${cfg.color}`,
-                borderRadius: 5,
-                padding: '2px 7px',
-              }}>
-                {cfg.emoji} {cfg.label}
-              </span>
-            );
-          })}
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6, fontSize: '0.62rem', color: '#6a7290' }}>
-          {hasBattle && <span>⚔️ 戦闘あり</span>}
-          {hasHarvest && <span>🌿 採取あり（FF専用）</span>}
-          {hasFever && <span style={{ color: '#ff8020' }}>🔥 フィーバー関連</span>}
-          {warpActions.length > 0 && (
-            <span style={{ color: '#a060d0' }}>
-              🌀 接続先: {warpActions.map(a =>
-                a.targetWorldId
-                  ? a.targetWorldId
-                  : (FREE_FIELD_NODES_ALL[a.targetNodeId ?? '']?.displayName ?? a.targetNodeId ?? '?')
-              ).join(' / ')}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div style={{ fontSize: '0.68rem', color: '#8a92b2', marginBottom: 5, fontWeight: 700 }}>
-        🎮 アクション
-      </div>
+      )}
+      <div style={{ fontSize: '0.68rem', color: '#8a92b2', marginBottom: 5, fontWeight: 700 }}>🎮 アクション</div>
       {visibleActions.map((action, idx) => (
         <ActionButton
           key={idx}
           action={action}
           onExecute={handleExecute}
+          player={player}
+          interactionState={nodeInteractions[`${node.id}:${action.type}:${idx}`]}
+          isFeverActive={isFeverActive}
         />
       ))}
     </div>
@@ -826,82 +684,69 @@ function NodeActionsPanel({
 // ────────────────────────────────────────────
 // ノード詳細パネル
 // ────────────────────────────────────────────
-function NodeDetailPanel({
-  node,
-  onClose,
-  onWarpToNode,
-  onBattleStart,
-  onHarvestStart,
-  onFishingStart,
-  onTestStart,
-  onShopStart,
-  onFeverStart,
-  onLandmarkStart,
-}: {
-  node: FreeFieldNode;
-  onClose: () => void;
+function NodeDetailPanel({ node, onClose, onWarpToNode, onBattleStart, onHarvestStart, onFishingStart, onTestStart, onShopOpen, onFeverStart, onLandmarkStart, player, nodeInteractions, isFeverActive, isFirstVisit }: {
+  node: FreeFieldNode; onClose: () => void;
   onWarpToNode?: (nodeId: string) => void;
   onBattleStart: (action: FreeFieldNodeAction, node: FreeFieldNode) => void;
   onHarvestStart: (action: FreeFieldNodeAction, node: FreeFieldNode) => void;
-  onFishingStart: () => void;
-  onTestStart: () => void;
-  onShopStart: () => void;
+  onFishingStart: () => void; onTestStart: () => void; onShopOpen: () => void;
   onFeverStart: (action: FreeFieldNodeAction) => void;
   onLandmarkStart: (action: FreeFieldNodeAction) => void;
+  player: NonNullable<ReturnType<typeof useGameStore.getState>['player']> | null;
+  nodeInteractions: Record<string, { lastUsedAt: number; useCount: number; completed: boolean }>;
+  isFeverActive: boolean;
+  isFirstVisit: boolean;
 }) {
   const cfg = NODE_CFG[node.type];
   const area = FREE_FIELD_AREAS_ALL[node.areaId];
   const [showDetail, setShowDetail] = useState(false);
+  const connectedNodes = node.connections.map(id => FREE_FIELD_NODES_ALL[id]).filter(Boolean) as FreeFieldNode[];
 
-  const connectedNodes = node.connections
-    .map(id => FREE_FIELD_NODES_ALL[id])
-    .filter(Boolean);
+  // エンカウンター情報（FFGG_ENCOUNTER_TABLEからノードのsystemTargetIdまたはareaIdで検索）
+  const encounterProfileId = (node.actions ?? []).find(a => a.type === 'battleTrigger')?.systemTargetId ?? node.areaId;
+  const encProfile = FFGG_ENCOUNTER_TABLE[encounterProfileId];
 
   return (
-    <div style={{
-      background: '#161b26',
-      border: `2px solid ${cfg.color}`,
-      borderRadius: 10,
-      padding: 14,
-      marginTop: 10,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+    <div style={{ background: '#161b26', border: `2px solid ${cfg.color}`, borderRadius: 10, padding: 14, marginTop: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: '0.95rem', color: cfg.color }}>
-            {cfg.emoji}{' '}
-            {node.indexLabel && <span style={{ marginRight: 4 }}>{node.indexLabel}</span>}
-            {node.displayName}
+            {cfg.emoji} {node.indexLabel && <span style={{ marginRight: 4 }}>{node.indexLabel}</span>}{node.displayName}
+            {isFirstVisit && <span style={{ marginLeft: 8, fontSize: '0.65rem', color: '#f0c060', background: 'rgba(240,192,96,0.15)', borderRadius: 3, padding: '1px 5px' }}>★ 初到達！</span>}
           </div>
-          {node.aliasNames && node.aliasNames.length > 0 && (
-            <div style={{ fontSize: '0.65rem', color: '#6a7290', marginTop: 2 }}>
-              別名: {node.aliasNames.join(' / ')}
-            </div>
-          )}
         </div>
-        <button
-          onClick={onClose}
-          style={{ background: 'none', border: 'none', color: '#8a92b2', cursor: 'pointer', fontSize: '1rem', flexShrink: 0, paddingTop: 0 }}
-        >
-          ✕
-        </button>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#8a92b2', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: '0.70rem', color: '#8a92b2', marginBottom: 8 }}>
-        <span>種別: <span style={{ color: cfg.color }}>{cfg.label}</span></span>
-        {area && <span>エリア: <span style={{ color: '#9090c0' }}>{area.displayName}</span></span>}
-        {node.dangerLevel != null && (
-          <span style={{ color: '#c06040' }}>危険度: {'⭐'.repeat(node.dangerLevel)}</span>
-        )}
+      {/* 主要情報を先頭に */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: '0.68rem', marginBottom: 8 }}>
+        <span style={{ color: cfg.color }}>種別: {cfg.label}</span>
+        {area && <span style={{ color: '#9090c0' }}>エリア: {area.displayName}</span>}
+        {node.dangerLevel != null && <span style={{ color: '#e07050' }}>危険度: {'⭐'.repeat(node.dangerLevel)}</span>}
         {node.isSafeZone && <span style={{ color: '#60a060' }}>✅ 安全地帯</span>}
       </div>
 
-      {node.description && (
-        <div style={{ fontSize: '0.78rem', color: '#b0b8d0', marginBottom: 8, lineHeight: 1.55 }}>
-          {node.description}
+      {/* 主な報酬ヒント（冒頭に表示） */}
+      {node.actions && node.actions.some(a => (a.rewardHints ?? []).length > 0) && (
+        <div style={{ background: 'rgba(20,40,25,0.4)', border: '1px solid #2d5040', borderRadius: 6, padding: '6px 10px', marginBottom: 8 }}>
+          <div style={{ fontSize: '0.62rem', color: '#6a9280', marginBottom: 3 }}>💎 主な入手物</div>
+          {node.actions.flatMap(a => a.rewardHints ?? []).slice(0, 4).map((rh, i) => (
+            <span key={i} style={{ fontSize: '0.65rem', color: '#70c090', marginRight: 6 }}>
+              {rh.itemId ? itemName(rh.itemId) : rh.description}{rh.dropRate ? ` (${rh.dropRate})` : ''}
+            </span>
+          ))}
         </div>
       )}
 
-      {/* アクション一覧 ← メイン */}
+      {node.description && <div style={{ fontSize: '0.75rem', color: '#b0b8d0', marginBottom: 8, lineHeight: 1.5 }}>{node.description}</div>}
+
+      {/* 未発見地点ヒント */}
+      {(area && getNodesByArea(area.id).some(n => !player?.ffVisitedNodes?.includes(n.id))) && (
+        <div style={{ fontSize: '0.60rem', color: '#a08030', background: 'rgba(40,30,10,0.3)', borderRadius: 4, padding: '3px 7px', marginBottom: 6 }}>
+          🔍 このエリアには未発見の地点があります
+        </div>
+      )}
+
       <NodeActionsPanel
         node={node}
         onWarpToNode={onWarpToNode}
@@ -909,33 +754,24 @@ function NodeDetailPanel({
         onHarvestStart={onHarvestStart}
         onFishingStart={onFishingStart}
         onTestStart={onTestStart}
-        onShopStart={onShopStart}
+        onShopOpen={onShopOpen}
         onFeverStart={onFeverStart}
         onLandmarkStart={onLandmarkStart}
+        player={player}
+        nodeInteractions={nodeInteractions}
+        isFeverActive={isFeverActive}
       />
 
-      {/* 接続先 */}
       {connectedNodes.length > 0 && (
         <div style={{ marginTop: 10, marginBottom: 8 }}>
           <div style={{ fontSize: '0.65rem', color: '#8a92b2', marginBottom: 4 }}>🔗 接続先ノード</div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {connectedNodes.map(cn => {
               const ccfg = NODE_CFG[cn.type];
+              const isUnvisited = !player?.ffVisitedNodes?.includes(cn.id);
               return (
-                <button
-                  key={cn.id}
-                  onClick={() => onWarpToNode?.(cn.id)}
-                  style={{
-                    fontSize: '0.65rem',
-                    background: 'rgba(40,50,80,0.6)',
-                    border: `1px solid ${ccfg.color}`,
-                    borderRadius: 5,
-                    padding: '2px 7px',
-                    color: ccfg.color,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {ccfg.emoji} {cn.indexLabel && `${cn.indexLabel} `}{cn.displayName}
+                <button key={cn.id} onClick={() => onWarpToNode?.(cn.id)} style={{ fontSize: '0.65rem', background: 'rgba(40,50,80,0.6)', border: `1px solid ${isUnvisited ? '#f0c060' : ccfg.color}`, borderRadius: 5, padding: '2px 7px', color: isUnvisited ? '#f0c060' : ccfg.color, cursor: 'pointer' }}>
+                  {ccfg.emoji} {cn.displayName}{isUnvisited ? ' ★' : ''}
                 </button>
               );
             })}
@@ -943,82 +779,30 @@ function NodeDetailPanel({
         </div>
       )}
 
-      {node.tags && node.tags.length > 0 && (
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
-          {node.tags.map(t => (
-            <span key={t} style={{ fontSize: '0.60rem', background: 'rgba(60,70,110,0.5)', border: '1px solid #3d4772', borderRadius: 4, padding: '1px 6px', color: '#8090c0' }}>
-              {t}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <button
-        onClick={() => setShowDetail(v => !v)}
-        style={{
-          width: '100%', padding: '4px', marginTop: 4, marginBottom: showDetail ? 8 : 0,
-          background: 'rgba(30,36,55,0.5)', border: '1px solid #2d3752',
-          borderRadius: 5, color: '#6a7290', fontSize: '0.65rem', cursor: 'pointer',
-        }}
-      >
-        {showDetail ? '▲ 詳細情報を閉じる' : '▼ 詳細情報を見る（ヒント・エンカウンター）'}
+      <button onClick={() => setShowDetail(v => !v)} style={{ width: '100%', padding: '4px', marginTop: 4, marginBottom: showDetail ? 8 : 0, background: 'rgba(30,36,55,0.5)', border: '1px solid #2d3752', borderRadius: 5, color: '#6a7290', fontSize: '0.65rem', cursor: 'pointer' }}>
+        {showDetail ? '▲ 詳細情報を閉じる' : '▼ 詳細情報（エンカウンター・ヒント）'}
       </button>
 
       {showDetail && (
         <>
-          {(node.encounterHints ?? []).length > 0 && (
-            <div style={{ fontSize: '0.68rem', color: '#e06050', marginBottom: 4 }}>
-              ⚔️ 出現ヒント: {node.encounterHints!.join(' / ')}
-            </div>
-          )}
-          {(node.resourceHints ?? []).length > 0 && (
-            <div style={{ fontSize: '0.68rem', color: '#60c080', marginBottom: 4 }}>
-              🌿 素材ヒント: {node.resourceHints!.join(' / ')}
-            </div>
-          )}
-          {(node.eventHints ?? []).length > 0 && (
-            <div style={{ fontSize: '0.68rem', color: '#ff8020', marginBottom: 4 }}>
-              🔥 イベントヒント: {node.eventHints!.join(' / ')}
-            </div>
-          )}
-
-          {area?.description && (
-            <div style={{ fontSize: '0.65rem', color: '#707890', marginBottom: 6, borderTop: '1px solid #2d3752', paddingTop: 6 }}>
-              📍 エリア説明: {area.description}
-            </div>
-          )}
-
-          {node.notes && (
-            <div style={{
-              fontSize: '0.63rem', color: '#606880',
-              background: 'rgba(30,35,55,0.5)', borderRadius: 5, padding: '5px 8px', marginBottom: 8,
-            }}>
-              📝 {node.notes}
-            </div>
-          )}
-
-          {/* FFGGエンカウンター情報パネル */}
-          {(() => {
-            const profile = FFGG_ENCOUNTER_TABLE[node.areaId];
-            if (!profile) return null;
-            const normalEnemies = (profile.normalEnemyIds ?? []).map(id => FFGG_ALL_ENEMIES[id]?.name).filter(Boolean);
-            const triggerEnemy = profile.triggerEnemyId ? FFGG_ALL_ENEMIES[profile.triggerEnemyId]?.name : null;
-            const boss = profile.bossId ? FFGG_ALL_ENEMIES[profile.bossId]?.name : null;
-            const midBoss = profile.midBossId ? FFGG_ALL_ENEMIES[profile.midBossId]?.name : null;
-            const feverChancePct = profile.feverChance ? Math.round(profile.feverChance * 100) : 0;
-            const dangerStars = '⭐'.repeat(profile.dangerLevel);
+          {encProfile && (() => {
+            const normalEnemies = (encProfile.normalEnemyIds ?? []).map(id => FFGG_ALL_ENEMIES[id]?.name).filter(Boolean);
+            const triggerEnemy = encProfile.triggerEnemyId ? FFGG_ALL_ENEMIES[encProfile.triggerEnemyId]?.name : null;
+            const boss = encProfile.bossId ? FFGG_ALL_ENEMIES[encProfile.bossId]?.name : null;
+            const midBoss = encProfile.midBossId ? FFGG_ALL_ENEMIES[encProfile.midBossId]?.name : null;
             return (
               <div style={{ fontSize: '0.68rem', borderTop: '1px solid #2d3752', paddingTop: 8, marginBottom: 8 }}>
                 <div style={{ color: '#f0c060', fontWeight: 700, marginBottom: 4 }}>⚔️ エンカウンター情報</div>
-                <div style={{ color: '#e06050', marginBottom: 2 }}>危険度: {dangerStars}</div>
-                {triggerEnemy && <div style={{ color: '#ff8060', marginBottom: 2 }}>🎯 戦闘トリガー: {triggerEnemy}（倒すと仲間が出現）</div>}
-                {normalEnemies.length > 0 && <div style={{ color: '#b0b8d0', marginBottom: 2 }}>👾 通常敵: {normalEnemies.slice(0, 5).join(' / ')}{normalEnemies.length > 5 ? ' ...' : ''}</div>}
-                {midBoss && <div style={{ color: '#c060c0', marginBottom: 2 }}>⚡ 中ボス: {midBoss}</div>}
-                {boss && <div style={{ color: '#e05555', marginBottom: 2 }}>💀 ボス: {boss}</div>}
-                {feverChancePct > 0 && <div style={{ color: '#ff8020', marginBottom: 2 }}>🔥 フィーバー発生率: {feverChancePct}%</div>}
+                <div style={{ color: '#e06050', marginBottom: 2 }}>危険度: {'⭐'.repeat(encProfile.dangerLevel)}</div>
+                {triggerEnemy && <div style={{ color: '#ff8060', marginBottom: 2 }}>🎯 トリガー: {triggerEnemy}</div>}
+                {normalEnemies.length > 0 && <div style={{ color: '#b0b8d0', marginBottom: 2 }}>👾 通常敵: {normalEnemies.slice(0, 5).join(' / ')}</div>}
+                {midBoss && <div style={{ color: '#c060c0', marginBottom: 2 }}>⚡ 中ボス: {midBoss} (30%)</div>}
+                {boss && <div style={{ color: '#e05555', marginBottom: 2 }}>💀 ボス: {boss} (15%)</div>}
               </div>
             );
           })()}
+          {node.encounterHints && node.encounterHints.length > 0 && <div style={{ fontSize: '0.68rem', color: '#e06050', marginBottom: 4 }}>⚔️ {node.encounterHints.join(' / ')}</div>}
+          {node.notes && <div style={{ fontSize: '0.63rem', color: '#606880', background: 'rgba(30,35,55,0.5)', borderRadius: 5, padding: '5px 8px', marginBottom: 8 }}>📝 {node.notes}</div>}
         </>
       )}
     </div>
@@ -1026,17 +810,9 @@ function NodeDetailPanel({
 }
 
 // ────────────────────────────────────────────
-// ノード一覧（エリア選択時）
+// ノード一覧
 // ────────────────────────────────────────────
-function NodeListPanel({
-  nodes,
-  selectedNode,
-  onSelectNode,
-}: {
-  nodes: FreeFieldNode[];
-  selectedNode: FreeFieldNode | null;
-  onSelectNode: (n: FreeFieldNode) => void;
-}) {
+function NodeListPanel({ nodes, selectedNode, onSelectNode, visitedNodes }: { nodes: FreeFieldNode[]; selectedNode: FreeFieldNode | null; onSelectNode: (n: FreeFieldNode) => void; visitedNodes: string[] }) {
   if (nodes.length === 0) return null;
   return (
     <div style={{ marginTop: 10 }}>
@@ -1045,18 +821,10 @@ function NodeListPanel({
         {nodes.map(node => {
           const cfg = NODE_CFG[node.type];
           const sel = selectedNode?.id === node.id;
+          const isNew = !visitedNodes.includes(node.id);
           return (
-            <button
-              key={node.id}
-              onClick={() => onSelectNode(node)}
-              style={{
-                padding: '4px 9px', borderRadius: 6, cursor: 'pointer', fontSize: '0.70rem',
-                background: sel ? 'rgba(96,144,255,0.15)' : '#1c2235',
-                border: `1px solid ${sel ? cfg.color : '#2d3752'}`,
-                color: sel ? cfg.color : '#8a92b2',
-              }}
-            >
-              {cfg.emoji}{node.indexLabel && ` ${node.indexLabel}`} {node.displayName}
+            <button key={node.id} onClick={() => onSelectNode(node)} style={{ padding: '4px 9px', borderRadius: 6, cursor: 'pointer', fontSize: '0.70rem', background: sel ? 'rgba(96,144,255,0.15)' : '#1c2235', border: `1px solid ${isNew ? '#f0c060' : sel ? cfg.color : '#2d3752'}`, color: isNew ? '#f0c060' : sel ? cfg.color : '#8a92b2' }}>
+              {cfg.emoji}{node.indexLabel && ` ${node.indexLabel}`} {node.displayName}{isNew ? ' ★' : ''}
             </button>
           );
         })}
@@ -1066,12 +834,14 @@ function NodeListPanel({
 }
 
 // ────────────────────────────────────────────
-// FF採集タブ（FreeField専用・GatheringScreen非使用）
+// FF採集タブ
 // ────────────────────────────────────────────
-function FFHarvestTab() {
+function FFHarvestTab({ isFeverActive }: { isFeverActive: boolean }) {
   const [lastResult, setLastResult] = useState<FFHarvestResult | null>(null);
   const [harvesting, setHarvesting] = useState<string | null>(null);
   const addNotification = useGameStore(s => s.addNotification);
+  const addItems = useGameStore(s => s.addItems);
+  const changeSatiety = useGameStore(s => s.changeSatiety);
   const player = useGameStore(s => s.player);
   const hasGatherKit = (player?.inventory?.['ffgg_gather_kit'] ?? 0) > 0;
 
@@ -1079,89 +849,96 @@ function FFHarvestTab() {
     const harvestNode = FF_ALL_HARVEST_NODES[nodeId];
     if (!harvestNode) return;
     if (harvestNode.requiredToolId && (player?.inventory?.[harvestNode.requiredToolId] ?? 0) <= 0) {
-      addNotification('error', '専用ツール（FF採集キット）が必要です');
-      return;
+      addNotification('error', '専用ツール（FF採集キット）が必要です'); return;
     }
     setHarvesting(nodeId);
-
     setTimeout(() => {
       const result = executeFFHarvest(harvestNode, 'player');
-      setLastResult(result);
+      // フィーバー中は採取量+1
+      const boostedItems = isFeverActive
+        ? result.items.map(i => ({ ...i, amount: i.amount + 1 }))
+        : result.items;
+      const finalResult = { ...result, items: boostedItems };
+      setLastResult(finalResult);
       setHarvesting(null);
-
-      if (result.items.length > 0) {
-        addNotification('success', `FF採集: ${result.items.map(i => `${i.displayName}×${i.amount}`).join(', ')}`);
+      if (boostedItems.length > 0) {
+        // インベントリへ追加
+        addItems(boostedItems.map(i => ({ itemId: i.itemId, amount: i.amount })));
+        changeSatiety(-2);
+        addNotification('success', `FF採集: ${boostedItems.map(i => `${i.displayName}×${i.amount}`).join(', ')}`);
+        // ゲームストアの採集カウントを更新
+        useGameStore.setState(state => {
+          if (!state.player) return state;
+          const prev = state.player.ffHarvestCount ?? 0;
+          const prevLog = state.player.ffHarvestLog ?? [];
+          const newLog = [
+            ...boostedItems.map(i => ({ itemId: i.itemId, displayName: i.displayName, amount: i.amount, at: Date.now() })),
+            ...prevLog,
+          ].slice(0, 50);
+          return { player: { ...state.player, ffHarvestCount: prev + 1, ffHarvestLog: newLog } };
+        });
       } else {
         addNotification('info', 'FF採集: 何も見つからなかった');
       }
     }, 800);
   };
 
+  const harvestLog = player?.ffHarvestLog ?? [];
+
   return (
     <div>
-      <div style={{ fontSize: '0.75rem', color: '#40c080', fontWeight: 700, marginBottom: 10 }}>
-        🌿 FF専用採集スポット
-      </div>
-      <div style={{ fontSize: '0.65rem', color: '#6a7290', marginBottom: 10 }}>
-        ※ FF採集は通常採取タブとは別の専用システムです。各エリアのノードの採集アクションからも実行できます。
-        {!hasGatherKit && <span style={{ color: '#f0a830' }}> 🔒 採集にはFF採集キットが必要です（クラフトでFF小判×9から作成可）。</span>}
-      </div>
+      <div style={{ fontSize: '0.75rem', color: '#40c080', fontWeight: 700, marginBottom: 6 }}>🌿 FF専用採集スポット</div>
+      {!hasGatherKit && <div style={{ fontSize: '0.65rem', color: '#f0a830', marginBottom: 8 }}>🔒 採集にはFF採集キットが必要です（クラフトでFF小判×9から作成可）。</div>}
+      {isFeverActive && <div style={{ fontSize: '0.65rem', color: '#ff8020', marginBottom: 8 }}>🔥 フィーバー中！採取量+1ボーナス</div>}
 
       {Object.values(FF_ALL_HARVEST_NODES).map(hnode => {
         const locked = !!hnode.requiredToolId && (player?.inventory?.[hnode.requiredToolId] ?? 0) <= 0;
         return (
-        <div key={hnode.id} style={{
-          background: '#161b26', border: '1px solid #2d3752', borderRadius: 8,
-          padding: '10px 12px', marginBottom: 8,
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <div>
-              <div style={{ fontSize: '0.80rem', fontWeight: 700, color: '#40c080' }}>{hnode.displayName}</div>
-              <div style={{ fontSize: '0.65rem', color: '#6a7290' }}>
-                エリア: {FREE_FIELD_AREAS_ALL[hnode.areaId]?.displayName ?? hnode.areaId}
-                {hnode.dangerLevel != null && ` | 危険度: ${'⭐'.repeat(hnode.dangerLevel)}`}
-                {hnode.cooldownSeconds != null && hnode.cooldownSeconds > 0 && ` | CD: ${hnode.cooldownSeconds}s`}
+          <div key={hnode.id} style={{ background: '#161b26', border: '1px solid #2d3752', borderRadius: 8, padding: '10px 12px', marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <div>
+                <div style={{ fontSize: '0.80rem', fontWeight: 700, color: '#40c080' }}>{hnode.displayName}</div>
+                <div style={{ fontSize: '0.62rem', color: '#6a7290' }}>
+                  {FREE_FIELD_AREAS_ALL[hnode.areaId]?.displayName ?? hnode.areaId}
+                  {hnode.dangerLevel != null && ` | 危険度: ${'⭐'.repeat(hnode.dangerLevel)}`}
+                  {hnode.cooldownSeconds != null && hnode.cooldownSeconds > 0 && ` | CD: ${hnode.cooldownSeconds}s`}
+                </div>
               </div>
+              <button onClick={() => handleHarvest(hnode.id)} disabled={harvesting === hnode.id || locked} style={{ padding: '5px 12px', borderRadius: 6, cursor: (harvesting === hnode.id || locked) ? 'not-allowed' : 'pointer', background: locked ? 'rgba(60,40,30,0.4)' : harvesting === hnode.id ? 'rgba(40,44,60,0.4)' : 'rgba(64,192,128,0.15)', border: `1px solid ${locked ? '#7a5a30' : '#40c080'}`, color: locked ? '#f0a830' : '#40c080', fontWeight: 600, fontSize: '0.72rem' }}>
+                {locked ? '🔒 専用ツール必要' : harvesting === hnode.id ? '採集中...' : '🌿 採集'}
+              </button>
             </div>
-            <button
-              onClick={() => handleHarvest(hnode.id)}
-              disabled={harvesting === hnode.id || locked}
-              style={{
-                padding: '5px 12px', borderRadius: 6, cursor: (harvesting === hnode.id || locked) ? 'not-allowed' : 'pointer',
-                background: locked ? 'rgba(60,40,30,0.4)' : harvesting === hnode.id ? 'rgba(40,44,60,0.4)' : 'rgba(64,192,128,0.15)',
-                border: `1px solid ${locked ? '#7a5a30' : '#40c080'}`, color: locked ? '#f0a830' : '#40c080', fontWeight: 600, fontSize: '0.72rem',
-              }}
-            >
-              {locked ? '🔒 専用ツール必要' : harvesting === hnode.id ? '採集中...' : '🌿 採集'}
-            </button>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {hnode.items.map((item, i) => (
+                <span key={i} style={{ fontSize: '0.60rem', padding: '1px 6px', background: item.isRare ? 'rgba(255,180,20,0.12)' : 'rgba(40,60,40,0.4)', border: `1px solid ${item.isRare ? '#f0c060' : '#3d5040'}`, borderRadius: 4, color: item.isRare ? '#f0c060' : '#70c090' }}>
+                  {item.displayName} {Math.round(item.baseRate * 100)}%{item.isRare ? ' ★' : ''}
+                </span>
+              ))}
+            </div>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            {hnode.items.map((item, i) => (
-              <span key={i} style={{
-                fontSize: '0.60rem', padding: '1px 6px',
-                background: item.isRare ? 'rgba(255,180,20,0.12)' : 'rgba(40,60,40,0.4)',
-                border: `1px solid ${item.isRare ? '#f0c060' : '#3d5040'}`,
-                borderRadius: 4, color: item.isRare ? '#f0c060' : '#70c090',
-              }}>
-                {item.displayName} {Math.round(item.baseRate * 100)}%
-                {item.isRare && ' ★'}
-              </span>
-            ))}
-          </div>
-        </div>
         );
       })}
 
       {lastResult && (
-        <div style={{
-          background: lastResult.items.length > 0 ? 'rgba(64,192,128,0.10)' : 'rgba(40,44,60,0.4)',
-          border: `1px solid ${lastResult.items.length > 0 ? '#40c080' : '#3d4772'}`,
-          borderRadius: 8, padding: '10px 12px', marginTop: 8,
-        }}>
+        <div style={{ background: lastResult.items.length > 0 ? 'rgba(64,192,128,0.10)' : 'rgba(40,44,60,0.4)', border: `1px solid ${lastResult.items.length > 0 ? '#40c080' : '#3d4772'}`, borderRadius: 8, padding: '10px 12px', marginTop: 8 }}>
           <div style={{ fontSize: '0.72rem', color: '#8a92b2', marginBottom: 4 }}>最後の採集結果</div>
-          <div style={{ fontSize: '0.72rem', color: '#b0b8d0', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
-            {lastResult.message}
-          </div>
+          {lastResult.items.map((item, i) => (
+            <div key={i} style={{ fontSize: '0.72rem', color: '#70e0a0' }}>✅ {item.displayName} × {item.amount}</div>
+          ))}
+          {lastResult.items.length === 0 && <div style={{ fontSize: '0.72rem', color: '#6a7290' }}>何も見つからなかった</div>}
+        </div>
+      )}
+
+      {/* 採取ログ履歴 */}
+      {harvestLog.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: '0.68rem', color: '#8a92b2', marginBottom: 6, fontWeight: 700 }}>📋 採集履歴（最新{Math.min(harvestLog.length, 20)}件）</div>
+          {harvestLog.slice(0, 20).map((entry, i) => (
+            <div key={i} style={{ fontSize: '0.65rem', color: '#8a92b2', borderBottom: '1px solid #1a2030', paddingBottom: 3, marginBottom: 3 }}>
+              {entry.displayName} × {entry.amount} <span style={{ color: '#4a5270' }}>{new Date(entry.at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+          ))}
+          <div style={{ fontSize: '0.60rem', color: '#4a5270', marginTop: 4 }}>累計採集回数: {player?.ffHarvestCount ?? 0}回</div>
         </div>
       )}
     </div>
@@ -1169,86 +946,148 @@ function FFHarvestTab() {
 }
 
 // ────────────────────────────────────────────
+// FF専用ミッション（簡易）
+// ────────────────────────────────────────────
+function FFMissionPanel({ player }: { player: NonNullable<ReturnType<typeof useGameStore.getState>['player']> | null }) {
+  if (!player) return null;
+  const harvestCount = player.ffHarvestCount ?? 0;
+  const battleWins = player.ffBattleWins ?? 0;
+  const visitedCount = (player.ffVisitedNodes ?? []).length;
+
+  const missions = [
+    { label: '採取50回', current: harvestCount, target: 50, reward: 'FF小判×5' },
+    { label: '採取100回', current: harvestCount, target: 100, reward: 'FF大判×1' },
+    { label: '戦闘勝利10回', current: battleWins, target: 10, reward: '古代の欠片×3' },
+    { label: '戦闘勝利50回', current: battleWins, target: 50, reward: 'FF大判×2' },
+    { label: '10箇所発見', current: visitedCount, target: 10, reward: 'FF小判×10' },
+    { label: '30箇所発見', current: visitedCount, target: 30, reward: '古代の欠片×5' },
+  ];
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: '0.72rem', color: '#f0c060', fontWeight: 700, marginBottom: 6 }}>📋 FFミッション</div>
+      {missions.map((m, i) => {
+        const pct = Math.min(1, m.current / m.target);
+        const done = pct >= 1;
+        return (
+          <div key={i} style={{ background: done ? 'rgba(240,192,96,0.10)' : '#161b26', border: `1px solid ${done ? '#f0c060' : '#2d3752'}`, borderRadius: 6, padding: '6px 10px', marginBottom: 5 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+              <span style={{ fontSize: '0.68rem', color: done ? '#f0c060' : '#8a92b2' }}>{done ? '✅' : '🎯'} {m.label}</span>
+              <span style={{ fontSize: '0.62rem', color: '#6a9250' }}>報酬: {m.reward}</span>
+            </div>
+            <div style={{ background: '#0a0d14', borderRadius: 3, height: 5, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pct * 100}%`, background: done ? '#f0c060' : '#40c080' }} />
+            </div>
+            <div style={{ fontSize: '0.60rem', color: '#4a6050', marginTop: 2 }}>{m.current}/{m.target}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────
 // メイン
 // ────────────────────────────────────────────
-// FF エリアID → DUNGEON_MASTER のダンジョンID へのマッピング
 const FF_AREA_TO_DUNGEON: Record<string, string> = {
-  ffgg_forest:       'ff_forest',
-  ffgg_plain:        'ff_plain',
-  ffgg_desert:       'ff_desert',
-  ffgg_snow:         'ff_snow',
-  ffgg_savanna:      'ff_savanna',
-  ffgg_pirate:       'ff_pirate',
-  ff2_start:         'chaite',
-  // FF1
-  ff1_main_area:     'ff1_main',
-  ff1_cave_area:     'ff1_cave3',
-  // FF2
-  ff2_main_area:     'ff2_main',
-  ff2_dungeon_area:  'ff_dungeon',
+  ffgg_forest: 'ff_forest', ffgg_plain: 'ff_plain', ffgg_desert: 'ff_desert',
+  ffgg_snow: 'ff_snow', ffgg_savanna: 'ff_savanna', ffgg_pirate: 'ff_pirate',
+  ff2_start: 'chaite',
+  ff1_main_area: 'ff1_main', ff1_cave_area: 'ff1_cave3',
+  ff2_main_area: 'ff2_main', ff2_dungeon_area: 'ff_dungeon',
 };
 
 export interface FFBattleRequest {
-  dungeonId: string;        // FFGG_ENCOUNTER_TABLEのキー（encounterProfileId兼用）
+  dungeonId: string;
   areaName: string;
-  encounterProfileId?: string; // dungeonIdと同値。明示用
+  encounterProfileId?: string;
 }
 
 export function FreeFieldScreen({ onStartFFBattle }: { onStartFFBattle?: (req: FFBattleRequest) => void }) {
   const [selectedWorldId, setSelectedWorldId] = useState<string>(FREE_FIELD_WORLDS[0].id);
   const [activeAreaId, setActiveAreaId] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<FreeFieldNode | null>(null);
-  const [activeTab, setActiveTab] = useState<'map' | 'harvest'>('map');
-
-  // バトル状態 — 実際の戦闘はDungeonScreenのTurnBattleに委譲（onStartFFBattle prop）
+  const [activeTab, setActiveTab] = useState<'map' | 'harvest' | 'shop' | 'mission'>('map');
   const [harvestResult, setHarvestResult] = useState<FFHarvestResult | null>(null);
   const [showTester, setShowTester] = useState(false);
-  const [feverAction, setFeverAction] = useState<FreeFieldNodeAction | null>(null);
+  const [feverModalOpen, setFeverModalOpen] = useState(false);
   const [landmarkAction, setLandmarkAction] = useState<{ action: FreeFieldNodeAction; node: FreeFieldNode } | null>(null);
+  const [nodeInteractions, setNodeInteractions] = useState<Record<string, { lastUsedAt: number; useCount: number; completed: boolean }>>({});
+  const [nowMs, setNowMs] = useState(Date.now());
 
   const setGlobalTab = useGameStore(s => s.setActiveTab);
   const addNotification = useGameStore(s => s.addNotification);
+  const addItems = useGameStore(s => s.addItems);
+  const addExp = useGameStore(s => s.addExp);
+  const changeGold = useGameStore(s => s.changeGold);
+  const changeSatiety = useGameStore(s => s.changeSatiety);
   const player = useGameStore(s => s.player);
+
+  // 1秒ごとにnowMsを更新（CD残時間表示用）
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // ドラゴンソウル・フィーバー
+  const dragonSoul = player?.dragonSoul ?? 0;
+  const feverActive = player?.feverActive ?? false;
+  const feverActivatedAt = player?.feverActivatedAt ?? 0;
+  const feverRemainingMs = feverActive ? Math.max(0, feverActivatedAt + FEVER_DURATION_MS - nowMs) : 0;
+
+  // フィーバー期限チェック
+  useEffect(() => {
+    if (feverActive && feverRemainingMs <= 0) {
+      useGameStore.setState(state => {
+        if (!state.player) return state;
+        return { player: { ...state.player, feverActive: false } };
+      });
+      addNotification('info', '🔥 ドラゴンフィーバーが終了しました');
+    }
+  }, [feverActive, feverRemainingMs, addNotification]);
+
+  const visitedNodes = player?.ffVisitedNodes ?? [];
 
   const world = FREE_FIELD_WORLDS.find(w => w.id === selectedWorldId)!;
   const areas = getAreasByWorld(world.id);
   const nodesInActiveArea = activeAreaId ? getNodesByArea(activeAreaId) : [];
 
-  const handleSelectWorld = (id: string) => {
-    setSelectedWorldId(id);
-    setActiveAreaId(null);
-    setSelectedNode(null);
-  };
+  const handleSelectWorld = (id: string) => { setSelectedWorldId(id); setActiveAreaId(null); setSelectedNode(null); };
+  const handleSelectArea = (id: string | null) => { setActiveAreaId(id); setSelectedNode(null); };
 
-  const handleSelectArea = (id: string | null) => {
-    setActiveAreaId(id);
-    setSelectedNode(null);
-  };
-
-  const handleSelectNode = (node: FreeFieldNode) => {
+  const handleSelectNode = useCallback((node: FreeFieldNode) => {
     setSelectedNode(prev => (prev?.id === node.id ? null : node));
-  };
+    // 初回訪問を記録
+    if (!visitedNodes.includes(node.id)) {
+      useGameStore.setState(state => {
+        if (!state.player) return state;
+        const prev = state.player.ffVisitedNodes ?? [];
+        if (prev.includes(node.id)) return state;
+        addNotification('success', `📍 ${node.displayName} を初めて発見！ EXP+50 G+500`);
+        // 発見報酬
+        addExp(50);
+        changeGold(500);
+        return {
+          player: {
+            ...state.player,
+            ffVisitedNodes: [...prev, node.id],
+          },
+        };
+      });
+    }
+  }, [visitedNodes, addNotification, addExp, changeGold]);
 
   const handleWarpToNode = useCallback((nodeId: string) => {
     const target = FREE_FIELD_NODES_ALL[nodeId];
     if (target) {
-      setSelectedNode(target);
-      if (target.areaId !== activeAreaId) {
-        setActiveAreaId(target.areaId);
-      }
-      addNotification('info', `${target.indexLabel ?? ''} ${target.displayName} へ移動`);
+      handleSelectNode(target);
+      if (target.areaId !== activeAreaId) setActiveAreaId(target.areaId);
     }
-  }, [activeAreaId, addNotification]);
+  }, [activeAreaId, handleSelectNode]);
 
-  // ── バトル開始（親DungeonScreenのTurnBattleに委譲） ──
   const handleBattleStart = useCallback((action: FreeFieldNodeAction, node: FreeFieldNode) => {
-    // action.systemTargetId があればそれをenounterProfileIdとして使う（ノード固有の敵を出す）
-    // なければエリアIDからdungeonIdを決定（フォールバック）
     const encounterProfileId = action.systemTargetId ?? FF_AREA_TO_DUNGEON[node.areaId];
-    if (!encounterProfileId) {
-      addNotification('error', 'このエリアは戦闘未対応です');
-      return;
-    }
+    if (!encounterProfileId) { addNotification('error', 'このエリアは戦闘未対応です'); return; }
     if (onStartFFBattle) {
       onStartFFBattle({ dungeonId: encounterProfileId, areaName: node.displayName });
     } else {
@@ -1256,166 +1095,131 @@ export function FreeFieldScreen({ onStartFFBattle }: { onStartFFBattle?: (req: F
     }
   }, [addNotification, onStartFFBattle]);
 
-  // ── 採集 ──
   const handleHarvestStart = useCallback((action: FreeFieldNodeAction, node: FreeFieldNode) => {
     const harvestNodeId = action.systemTargetId ?? node.gatherNodeIds?.[0];
-    if (!harvestNodeId) {
-      addNotification('error', 'この採集スポットのデータが未設定です');
-      return;
-    }
+    if (!harvestNodeId) { addNotification('error', '採集スポットが未設定です'); return; }
     const harvestNode = FF_ALL_HARVEST_NODES[harvestNodeId];
-    if (!harvestNode) {
-      addNotification('error', `採集スポット "${harvestNodeId}" が見つかりません`);
-      return;
-    }
+    if (!harvestNode) { addNotification('error', `採集スポット "${harvestNodeId}" が見つかりません`); return; }
     if (harvestNode.requiredToolId && (player?.inventory?.[harvestNode.requiredToolId] ?? 0) <= 0) {
-      addNotification('error', '専用ツール（FF採集キット）が必要です');
-      return;
+      addNotification('error', '専用ツール（FF採集キット）が必要です'); return;
     }
+
+    const actionKey = `${node.id}:harvest:${(node.actions ?? []).indexOf(action)}`;
+    const cdSec = action.cooldownSeconds ?? harvestNode.cooldownSeconds ?? 0;
+    if (cdSec > 0) {
+      const lastUsed = nodeInteractions[actionKey]?.lastUsedAt ?? 0;
+      const remaining = Math.max(0, lastUsed + cdSec * 1000 - Date.now());
+      if (remaining > 0) { addNotification('info', `⏱ クールダウン中 残り${Math.ceil(remaining / 1000)}秒`); return; }
+    }
+
     const result = executeFFHarvest(harvestNode, 'player');
-    setHarvestResult(result);
-    if (result.items.length > 0) {
-      addNotification('success', `FF採集: ${result.items.map(i => `${i.displayName}×${i.amount}`).join(', ')}`);
-      // TODO: 実際にインベントリへ追加するには playerSlice.addItem など追加が必要
+    const feverBoost = feverActive ? result.items.map(i => ({ ...i, amount: i.amount + 1 })) : result.items;
+    const finalResult = { ...result, items: feverBoost };
+
+    if (feverBoost.length > 0) {
+      addItems(feverBoost.map(i => ({ itemId: i.itemId, amount: i.amount })));
+      changeSatiety(-2);
+      addNotification('success', `🌿 FF採集: ${feverBoost.map(i => `${i.displayName}×${i.amount}`).join(', ')}`);
+      useGameStore.setState(state => {
+        if (!state.player) return state;
+        const prevCount = state.player.ffHarvestCount ?? 0;
+        const prevLog = state.player.ffHarvestLog ?? [];
+        const newLog = [
+          ...feverBoost.map(i => ({ itemId: i.itemId, displayName: i.displayName, amount: i.amount, at: Date.now() })),
+          ...prevLog,
+        ].slice(0, 50);
+        return { player: { ...state.player, ffHarvestCount: prevCount + 1, ffHarvestLog: newLog } };
+      });
+    } else {
+      addNotification('info', '🌿 FF採集: 何も見つからなかった');
     }
-  }, [addNotification, player]);
 
-  // ── 釣り ──
-  const handleFishingStart = useCallback(() => {
-    setGlobalTab('fishing');
-    addNotification('info', '🎣 釣り画面へ移動');
-  }, [setGlobalTab, addNotification]);
+    // インタラクション状態更新
+    setNodeInteractions(prev => ({
+      ...prev,
+      [actionKey]: { lastUsedAt: Date.now(), useCount: (prev[actionKey]?.useCount ?? 0) + 1, completed: action.onceOnly ? true : (prev[actionKey]?.completed ?? false) },
+    }));
 
-  // ── テスター ──
-  const handleTestStart = useCallback(() => {
-    setShowTester(true);
-  }, []);
+    setHarvestResult(finalResult);
+  }, [addNotification, addItems, changeSatiety, player, feverActive, nodeInteractions]);
 
-  // ── ショップ ──
-  const handleShopStart = useCallback(() => {
-    // TODO: FFGGの隠しSHOP専用UIは仕様確定後に実装
-    setGlobalTab('market');
-    addNotification('info', '🛒 ショップへ移動（FF専用ショップは準備中）');
-  }, [setGlobalTab, addNotification]);
+  const handleFishingStart = useCallback(() => { setGlobalTab('fishing'); addNotification('info', '🎣 釣り画面へ移動'); }, [setGlobalTab, addNotification]);
+  const handleTestStart = useCallback(() => { setShowTester(true); }, []);
+  const handleShopOpen = useCallback(() => { setActiveTab('shop'); }, []);
+  const handleFeverStart = useCallback(() => { setFeverModalOpen(true); }, []);
+  const handleLandmarkStart = useCallback((action: FreeFieldNodeAction) => { if (selectedNode) setLandmarkAction({ action, node: selectedNode }); }, [selectedNode]);
 
-  // ── フィーバー ──
-  const handleFeverStart = useCallback((action: FreeFieldNodeAction) => {
-    setFeverAction(action);
-  }, []);
+  const handleFeverActivate = useCallback(() => {
+    if (dragonSoul < DS_FEVER_THRESH) return;
+    useGameStore.setState(state => {
+      if (!state.player) return state;
+      return { player: { ...state.player, dragonSoul: 0, feverActive: true, feverActivatedAt: Date.now() } };
+    });
+    addNotification('success', '🔥 ドラゴンフィーバー発動！ドロップ率上昇・採取量増加・ゴールド増加（5分間）');
+    setFeverModalOpen(false);
+  }, [dragonSoul, addNotification]);
 
-  // ── ランドマーク ──
-  const handleLandmarkStart = useCallback((action: FreeFieldNodeAction) => {
-    if (selectedNode) setLandmarkAction({ action, node: selectedNode });
-  }, [selectedNode]);
+  const isFirstVisit = selectedNode ? !visitedNodes.includes(selectedNode.id) : false;
 
   return (
     <div style={{ padding: '4px 0 80px' }}>
-      {/* 採集結果モーダル */}
-      {harvestResult && (
-        <FFHarvestModal result={harvestResult} onClose={() => setHarvestResult(null)} />
-      )}
-      {/* テスターモーダル */}
+      {harvestResult && <FFHarvestModal result={harvestResult} onClose={() => setHarvestResult(null)} />}
       {showTester && <FFTesterModal onClose={() => setShowTester(false)} />}
-      {/* フィーバーモーダル */}
-      {feverAction && <FFFeverModal action={feverAction} onClose={() => setFeverAction(null)} />}
-      {/* ランドマークモーダル */}
-      {landmarkAction && (
-        <FFLandmarkModal
-          node={landmarkAction.node}
-          action={landmarkAction.action}
-          onClose={() => setLandmarkAction(null)}
-        />
-      )}
+      {feverModalOpen && <FFFeverModal soul={dragonSoul} feverActive={feverActive} onActivate={handleFeverActivate} onClose={() => setFeverModalOpen(false)} />}
+      {landmarkAction && <FFLandmarkModal node={landmarkAction.node} action={landmarkAction.action} onClose={() => setLandmarkAction(null)} />}
 
-      <h2 style={{
-        fontFamily: 'Cinzel,serif', color: '#60a0ff',
-        borderBottom: '1px solid #2d3752', paddingBottom: 8, marginBottom: 12,
-      }}>
-        🗺️ フリーフィールド
-      </h2>
+      <h2 style={{ fontFamily: 'Cinzel,serif', color: '#60a0ff', borderBottom: '1px solid #2d3752', paddingBottom: 8, marginBottom: 10 }}>🗺️ フリーフィールド</h2>
+
+      {/* ドラゴンソウルバー */}
+      <DragonSoulBar soul={dragonSoul} feverActive={feverActive} feverRemainingMs={feverRemainingMs} />
 
       {/* ワールド選択 */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
         {FREE_FIELD_WORLDS.map(w => (
-          <button
-            key={w.id}
-            onClick={() => handleSelectWorld(w.id)}
-            style={{
-              flex: 1, minWidth: 60, padding: '6px 4px', fontWeight: 700, fontSize: '0.78rem',
-              borderRadius: 8, cursor: 'pointer',
-              background: selectedWorldId === w.id ? 'rgba(96,160,255,0.18)' : '#1c2235',
-              border: `1px solid ${selectedWorldId === w.id ? '#60a0ff' : '#2d3752'}`,
-              color: selectedWorldId === w.id ? '#60a0ff' : '#8a92b2',
-            }}
-          >
+          <button key={w.id} onClick={() => handleSelectWorld(w.id)} style={{ flex: 1, minWidth: 60, padding: '6px 4px', fontWeight: 700, fontSize: '0.78rem', borderRadius: 8, cursor: 'pointer', background: selectedWorldId === w.id ? 'rgba(96,160,255,0.18)' : '#1c2235', border: `1px solid ${selectedWorldId === w.id ? '#60a0ff' : '#2d3752'}`, color: selectedWorldId === w.id ? '#60a0ff' : '#8a92b2' }}>
             {w.displayName}
           </button>
         ))}
       </div>
 
-      {/* タブ：地図 / FF採集 */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-        {(['map', 'harvest'] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            style={{
-              padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600,
-              background: activeTab === tab ? 'rgba(64,192,128,0.15)' : '#1c2235',
-              border: `1px solid ${activeTab === tab ? '#40c080' : '#2d3752'}`,
-              color: activeTab === tab ? '#40c080' : '#8a92b2',
-            }}
-          >
-            {tab === 'map' ? '🗺️ マップ' : '🌿 FF採集'}
-          </button>
-        ))}
+      {/* タブ */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
+        {(['map', 'harvest', 'shop', 'mission'] as const).map(tab => {
+          const labels = { map: '🗺️ マップ', harvest: '🌿 FF採集', shop: '🛒 FF交換所', mission: '📋 ミッション' };
+          return (
+            <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: '5px 10px', borderRadius: 6, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600, background: activeTab === tab ? 'rgba(96,160,255,0.15)' : '#1c2235', border: `1px solid ${activeTab === tab ? '#60a0ff' : '#2d3752'}`, color: activeTab === tab ? '#60a0ff' : '#8a92b2' }}>
+              {labels[tab]}
+            </button>
+          );
+        })}
       </div>
 
       {activeTab === 'harvest' ? (
-        <FFHarvestTab />
+        <FFHarvestTab isFeverActive={feverActive} />
+      ) : activeTab === 'shop' ? (
+        <FFShopModal onClose={() => setActiveTab('map')} />
+      ) : activeTab === 'mission' ? (
+        <FFMissionPanel player={player ?? null} />
       ) : (
         <>
-          {/* ワールド説明 */}
           {world.description && (
             <div style={{ fontSize: '0.70rem', color: '#8a92b2', marginBottom: 6, lineHeight: 1.5 }}>
               {world.description}
-              {world.mapSizeHint && (
-                <span style={{ marginLeft: 8, color: '#606880' }}>({world.mapSizeHint})</span>
-              )}
             </div>
           )}
-
-          {/* エリアフィルター */}
-          <AreaSelector areas={areas} activeId={activeAreaId} onSelect={handleSelectArea} />
-
-          {/* 地図（横スクロール可） */}
-          <div style={{ overflowX: 'auto', overflowY: 'hidden' }}>
+          <AreaSelector areas={areas} activeId={activeAreaId} onSelect={handleSelectArea} visitedNodes={visitedNodes} />
+          {activeAreaId && <AreaCoverage areaId={activeAreaId} visitedNodes={visitedNodes} />}
+          <div style={{ overflowX: 'auto', marginTop: 8 }}>
             <div style={{ minWidth: 300 }}>
-              <MapView
-                world={world}
-                activeAreaId={activeAreaId}
-                selectedNode={selectedNode}
-                onSelectNode={handleSelectNode}
-              />
+              <MapView world={world} activeAreaId={activeAreaId} selectedNode={selectedNode} onSelectNode={handleSelectNode} visitedNodes={visitedNodes} />
             </div>
           </div>
-
-          {/* エリア説明 */}
           {activeAreaId && FREE_FIELD_AREAS_ALL[activeAreaId] && (
-            <div style={{
-              marginTop: 8, background: '#161b26', border: '1px solid #2d3752',
-              borderRadius: 6, padding: '7px 10px', fontSize: '0.72rem', color: '#8a92b2',
-            }}>
-              <span style={{ color: '#6090ff', fontWeight: 700 }}>
-                {FREE_FIELD_AREAS_ALL[activeAreaId].displayName}
-              </span>
-              {FREE_FIELD_AREAS_ALL[activeAreaId].description && (
-                <span style={{ marginLeft: 6 }}>— {FREE_FIELD_AREAS_ALL[activeAreaId].description}</span>
-              )}
+            <div style={{ marginTop: 8, background: '#161b26', border: '1px solid #2d3752', borderRadius: 6, padding: '7px 10px', fontSize: '0.72rem', color: '#8a92b2' }}>
+              <span style={{ color: '#6090ff', fontWeight: 700 }}>{FREE_FIELD_AREAS_ALL[activeAreaId].displayName}</span>
+              {FREE_FIELD_AREAS_ALL[activeAreaId].description && <span style={{ marginLeft: 6 }}>— {FREE_FIELD_AREAS_ALL[activeAreaId].description}</span>}
             </div>
           )}
-
-          {/* ノード詳細パネル（アクション含む） */}
           {selectedNode && (
             <NodeDetailPanel
               node={selectedNode}
@@ -1425,20 +1229,16 @@ export function FreeFieldScreen({ onStartFFBattle }: { onStartFFBattle?: (req: F
               onHarvestStart={handleHarvestStart}
               onFishingStart={handleFishingStart}
               onTestStart={handleTestStart}
-              onShopStart={handleShopStart}
+              onShopOpen={handleShopOpen}
               onFeverStart={handleFeverStart}
               onLandmarkStart={handleLandmarkStart}
+              player={player ?? null}
+              nodeInteractions={nodeInteractions}
+              isFeverActive={feverActive}
+              isFirstVisit={isFirstVisit}
             />
           )}
-
-          {/* エリア内ノード一覧 */}
-          {activeAreaId && (
-            <NodeListPanel
-              nodes={nodesInActiveArea}
-              selectedNode={selectedNode}
-              onSelectNode={handleSelectNode}
-            />
-          )}
+          {activeAreaId && <NodeListPanel nodes={nodesInActiveArea} selectedNode={selectedNode} onSelectNode={handleSelectNode} visitedNodes={visitedNodes} />}
         </>
       )}
     </div>
