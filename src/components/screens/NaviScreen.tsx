@@ -2,7 +2,7 @@
 // 冒険ナビゲーションシステム（拡張版）
 
 import { useEffect, useMemo, useState } from 'react';
-import { useGameStore } from '../../stores/gameStore';
+import { useGameStore, type GameState } from '../../stores/gameStore';
 import { DUNGEON_MASTER, ITEM_MASTER, CRAFT_RECIPES, MONSTER_MASTER } from '../../data/masters';
 import type { PlayerData } from '../../types/game';
 import { WikiTab } from '../wiki/WikiTab';
@@ -157,7 +157,8 @@ function computeAnalysis(player: PlayerData): AnalysisPoint[] {
   // 装備確認
   const eq = player.equipment ?? { hotbar: Array(9).fill(null), helmet: null, chestplate: null, leggings: null, boots: null, offhand: null };
   const hasWeapon = (eq.hotbar ?? []).some((id) => id && ITEM_MASTER[id]?.category === 'weapon');
-  const armorCount = ['helmet','chestplate','leggings','boots'].filter(slot => (eq as Record<string,string|null>)[slot]).length;
+  const eqAny = eq as unknown as Record<string, unknown>;
+  const armorCount = ['helmet','chestplate','leggings','boots'].filter(slot => !!eqAny[slot]).length;
 
   if (!hasWeapon) {
     points.push({ emoji: '⚠️', label: '武器未装備', desc: 'ホットバーに武器をセットすると攻撃力が上がります。', type: 'weak' });
@@ -365,11 +366,11 @@ export function NaviScreen() {
 // NaviHomePanel — セクション切り替えUI
 // ============================================================
 function NaviHomePanel({ onOpenWiki }: { onOpenWiki: () => void }) {
-  const player = useGameStore(s => s.player);
-  const setActiveTab = useGameStore(s => s.setActiveTab);
-  const changeGold = useGameStore(s => s.changeGold);
-  const changeWealthCoin = useGameStore(s => s.changeWealthCoin);
-  const addNotification = useGameStore(s => s.addNotification);
+  const player = useGameStore((s: GameState) => s.player);
+  const setActiveTab = useGameStore((s: GameState) => s.setActiveTab);
+  const changeGold = useGameStore((s: GameState) => s.changeGold);
+  const changeWealthCoin = useGameStore((s: GameState) => s.changeWealthCoin);
+  const addNotification = useGameStore((s: GameState) => s.addNotification);
   const [section, setSection] = useState<NaviSection>('goal');
 
   const goal = useMemo(() => player ? computeGoal(player) : null, [
@@ -511,10 +512,10 @@ function NaviHomePanel({ onOpenWiki }: { onOpenWiki: () => void }) {
 // ============================================================
 function GoalSection({ goal, player, setActiveTab, changeGold, changeWealthCoin, addNotification, onOpenWiki }: {
   goal: NaviGoal; player: PlayerData;
-  setActiveTab: (tab: string) => void;
+  setActiveTab: (tab: import('../../types/game').TabId) => void;
   changeGold: (n: number) => void;
   changeWealthCoin: (n: number) => void;
-  addNotification: (type: string, msg: string) => void;
+  addNotification: (type: 'success' | 'error' | 'info' | 'warning', msg: string) => void;
   onOpenWiki: () => void;
 }) {
   const allMet = goal.conditions.every(c => c.met);
