@@ -87,7 +87,7 @@ export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (
         import('../../services/multiplayer').then(({ postActivityFeed }) => {
           const p = get().player;
           if (!p) return;
-          const milestoneType = level >= 200 ? 'level_200' : level >= 100 ? 'level_100' : level >= 50 ? 'level_50' : 'level_up';
+          const milestoneType = level >= 10_000_000 ? 'level_10000000' : level >= 1_000_000 ? 'level_1000000' : level >= 100_000 ? 'level_100000' : level >= 10_000 ? 'level_10000' : level >= 1_000 ? 'level_1000' : level >= 200 ? 'level_200' : level >= 100 ? 'level_100' : level >= 50 ? 'level_50' : 'level_up';
           postActivityFeed({ uid: p.uid, displayName: p.displayName, type: milestoneType, message: `がLv.${level}になりました！` }).catch(() => {});
         });
       }
