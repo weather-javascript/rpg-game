@@ -3179,7 +3179,7 @@ export function DungeonScreen() {
   const [showDevilArmorChoice, setShowDevilArmorChoice] = useState(false);
   const [showZeroChoice, setShowZeroChoice] = useState(false);
   const [showVolcanoRouteChoice, setShowVolcanoRouteChoice] = useState(false); // 火山CP3分岐UI
-  const [volcanoRoutePending, setVolcanoRoutePending] = useState<'lich'|'back'|null>(null); // 大橋突破後に切り替えるルート
+  const [volcanoRoutePending, setVolcanoRoutePending] = useState<'lich'|'back'|'moon'|null>(null); // 共通ルート突破後に切り替えるルート
   const [autoBattle, setAutoBattle] = useState(false);
   // 0=なし, 1=デビルアーマー戦, 2=デッドアーマー戦
   const [devilArmorPhase, setDevilArmorPhase] = useState(0);
