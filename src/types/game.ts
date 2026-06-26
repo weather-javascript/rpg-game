@@ -371,7 +371,7 @@ export interface MissionProgress {
   // claimed mission reward ids (separate from completed)
   claimedMissions: string[];
 }
-export type DungeonTier = 'beginner' | 'intermediate' | 'advanced' | 'super' | 'extreme' | 'volcano' | 'infinite';
+export type DungeonTier = 'beginner' | 'intermediate' | 'advanced' | 'super' | 'extreme' | 'volcano' | 'cosmic' | 'infinite';
 
 // ============================================================
 // マスターデータ型
@@ -515,9 +515,10 @@ export interface DungeonMaster {
   areas?: DungeonArea[];
   // ノードベース分岐ルート（火山 CP3分岐などで使用）
   routes?: {
-    main: DungeonArea[];   // 共通→CP3まで
-    lich: DungeonArea[];   // CP3リッチルート（分岐A）
-    back: DungeonArea[];   // 裏火山本線（分岐B）
+    main: DungeonArea[];   // 共通→分岐点まで
+    lich: DungeonArea[];   // 分岐A
+    back: DungeonArea[];   // 分岐B
+    moon?: DungeonArea[];  // 隠しルート（アストラル・ノクス 月面遺構ルート）
   };
   bossId?: string;
   expBonus: number;
