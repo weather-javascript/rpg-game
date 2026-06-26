@@ -4013,6 +4013,21 @@ export const DEFAULT_PLAYER_STATS = {
 // ============================================================
 export const VERSION_PATCHES = [
   {
+    version: '2.27.0',
+    date: '2026-06-26',
+    changes: [
+      '🚀 新ダンジョン「星骸宇宙砦 アストラル・ノクス」を追加！火山クリア済み・Lv60以上で解放される最高難度ダンジョン（全72階）',
+      '🌌 共通区間（10エリア）→ 分岐中枢CP3で3ルートに分岐：☀️太陽航路／🌑虚空航路／🌙月面遺構ルート（隠し）',
+      '☀️ 太陽航路：燃焼・光線・反射砲台ルート。ボス「ソラリス熾天使」（3フェーズ：星炎ビーム→砲台召喚+聖盾→恒星爆発）',
+      '🌑 虚空航路：真空・呪詛・防御貫通・MP吸収ルート。ボス「虚空大公」（3フェーズ：真空斬撃→分身生成→ブラックホール化）',
+      '🌙 月面遺構ルート：両ボス撃破後に解放される隠しルート。凍結・幻影・高報酬。ボス「月面番人」',
+      '👾 新モンスター21種を追加：雑魚6種（cosmic_mite/orbit_drone/flare_imp/lunar_wisp/vacuum_wisp/starling）中堅8種（orbital_knight/ray_sniper/beam_archer/gravity_crusher/void_mage/sun_priest/debris_hunter/mirror_turret）エリート5種（plasma_hound/event_hunter/curse_scribe/flare_paladin/drift_guard）ボス2種（solaris_seraph/abyss_archon）＋月面専用中ボスmoon_sentinel',
+      '💎 新素材16種を追加：共通3種（cosmic_shard/astral_core_fragment/stardust_gear）太陽3種（stellar_core/flare_plate/sun_conductive_crystal）虚空3種（void_core/event_horizon_fiber/abyss_resin）月面3種（lunar_core/moon_shard/frost_silica）ボスドロップ2種（seraph_halo/archon_void_core）隠し鍵（moon_key）',
+      '⚔️ ルートごとに必要な対策装備が異なる設計：太陽は火耐性+継続回復、虚空は呪い耐性+MP回収、月面は凍結耐性+短期決戦',
+      '🏆 アストラル・ノクスクリアはワールドニュースに最高ランク5で掲載（火山クリアより上位）',
+    ],
+  },
+  {
     version: '2.26.0',
     date: '2026-06-26',
     changes: [
