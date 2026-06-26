@@ -222,11 +222,12 @@ function TargetSelectModal({ enemies, onSelect, onCancel }: {
   );
 }
 
-// 火山の分岐ルートに対応したエリアリストを返す
+// 分岐ルートに対応したエリアリストを返す（火山・アストラル・ノクス等共通）
 function getVolcanoAreas(dungeon: DungeonMaster, volcanoRoute?: string): DungeonArea[] | undefined {
-  if (dungeon.id !== 'volcano' || !dungeon.routes) return dungeon.areas;
+  if (!dungeon.routes) return dungeon.areas;
   if (volcanoRoute === 'lich') return dungeon.routes.lich;
   if (volcanoRoute === 'back') return dungeon.routes.back;
+  if (volcanoRoute === 'moon') return dungeon.routes.moon ?? dungeon.routes.main;
   return dungeon.routes.main; // デフォルトは共通ルート
 }
 
@@ -255,7 +256,7 @@ function spawnEnemies(dungeon: DungeonMaster, areaIdx: number, _kxPhase?: number
   const nonBossPool = pool.filter(id => !getMergedMonster(id)?.isBoss);
   const finalPool = nonBossPool.length > 0 ? nonBossPool : pool;
   // 同時出現数の上限：火山は群れ・複数中ボス同時出現を前提にした難度のため引き上げる。チェイテは敵量3倍仕様。
-  const maxEnemies = dungeon.id === 'sky_castle_ex' ? 15 : dungeon.id === 'volcano' ? 6 : dungeon.id === 'chaite' ? 9 : 3;
+  const maxEnemies = dungeon.id === 'sky_castle_ex' ? 15 : dungeon.id === 'volcano' ? 6 : dungeon.id === 'astral_nox' ? 8 : dungeon.id === 'chaite' ? 9 : 3;
   const minEnemies = dungeon.id === 'chaite' ? 3 : 1;
   const count = Math.min(finalPool.length, randomIntRange(minEnemies, maxEnemies));
   // ランダムにcount体選ぶ（重複可）
@@ -2696,6 +2697,7 @@ function getEquipmentHint(dungeon: DungeonMaster): string | null {
   if (avgPerArea >= 3) return '👥 範囲武器が有効（多数の敵が同時出現）';
   if (bossDefPct >= 0.5) return '🛡️ 貫通武器がおすすめ（ボスは高防御）';
   if (dungeon.tier === 'volcano' || dungeon.tier === 'extreme') return '⚔️ 火力・防御を両立した装備で挑もう';
+  if (dungeon.tier === 'cosmic') return '🚀 ルートごとに装備を切り替えること。対策なしでは突破不可能';
   return null;
 }
 
@@ -2734,7 +2736,7 @@ function DungeonCard({ dungeon, selected, onSelect, playerLevel, clearedCount, i
   const canSelect = isUnlocked;
   const tierColors: Record<string, string> = {
     beginner: '#4caf87', intermediate: '#5b8dee', advanced: '#f0a830',
-    super: '#e05555', extreme: '#9b6df0', volcano: '#ff6b35',
+    super: '#e05555', extreme: '#9b6df0', volcano: '#ff6b35', cosmic: '#00c8ff',
   };
   const color = tierColors[dungeon.tier] ?? '#5b8dee';
   const uc = (dungeon as any).unlockCondition as { dungeonId: string; clearedCount: number } | undefined;
@@ -3305,16 +3307,18 @@ export function DungeonScreen() {
     }
 
     const areaThreshold = 5;
-    // 火山の場合はvolcanoRouteに応じたエリアリストを使用
-    const volcanoMaster = dungeon?.id === 'volcano' ? dungeon as any : null;
+    // 分岐ルートに対応したエリアリストを使用（火山・アストラル・ノクス等共通）
+    const routedDungeon = dungeon?.routes ? dungeon : null;
     const currentVolcanoRoute = runState.volcanoRoute;
-    const areas = dungeon?.id === 'volcano' && volcanoMaster?.routes
-      ? (currentVolcanoRoute === 'lich' ? volcanoMaster.routes.lich
-        : currentVolcanoRoute === 'back' ? volcanoMaster.routes.back
-        : volcanoMaster.routes.main)
+    const areas = routedDungeon?.routes
+      ? (currentVolcanoRoute === 'lich' ? routedDungeon.routes.lich
+        : currentVolcanoRoute === 'back' ? routedDungeon.routes.back
+        : currentVolcanoRoute === 'moon' ? (routedDungeon.routes.moon ?? routedDungeon.routes.main)
+        : routedDungeon.routes.main)
       : dungeon?.areas;
     let nextAreaIdx = runState.currentAreaIdx ?? 0;
     let isComplete = false;
+
 
     // 洞窟王（初級ダンジョンの最終エリア）は1体倒したらクリア選択を即表示
     if (
@@ -3356,8 +3360,8 @@ export function DungeonScreen() {
         addNotification('info', `✅ ${nextArea.name} に進んだ！`);
         setRunLog(prev => [...prev, ...skipMsgs, `📍 ${nextArea.name} へ進んだ！`]);
 
-        // ── 火山CP3分岐：共通ルートのisBranchPointエリアに進んだ時に分岐選択UIを出す ──
-        if (runState.dungeonId === 'volcano' && !currentVolcanoRoute && nextArea.isBranchPoint) {
+        // ── 分岐点：共通ルートのisBranchPointエリアに進んだ時に分岐選択UIを出す ──
+        if (dungeon?.routes && !currentVolcanoRoute && nextArea.isBranchPoint) {
           setRunState(prev => prev ? {
             ...prev, currentAreaIdx: nextAreaIdx,
             currentAreaName: nextArea.name,
@@ -3380,18 +3384,21 @@ export function DungeonScreen() {
           return;
         }
       } else {
-        // ── 火山：mainルート最終エリア（大橋地帯3層目）突破 → pendingルートへ切り替え ──
-        if (runState.dungeonId === 'volcano' && currentVolcanoRoute === 'main' && volcanoRoutePending) {
+        // ── 分岐ルート：mainルート最終エリア突破 → pendingルートへ切り替え ──
+        if (dungeon?.routes && currentVolcanoRoute === 'main' && volcanoRoutePending) {
           const pendingRoute = volcanoRoutePending;
-          const volcanoMasterForRoute = dungeon as any;
           const nextRouteAreas = pendingRoute === 'lich'
-            ? volcanoMasterForRoute?.routes?.lich
-            : volcanoMasterForRoute?.routes?.back;
-          const firstAreaName = nextRouteAreas?.[0]?.name ?? (pendingRoute === 'lich' ? 'リッチの間・前哨' : '裏火山入口');
-          const routeLabel = pendingRoute === 'lich' ? '🔮 リッチ討伐ルート' : '🏯 裏火山本線';
+            ? dungeon.routes.lich
+            : pendingRoute === 'back' ? dungeon.routes.back
+            : pendingRoute === 'moon' ? (dungeon.routes.moon ?? dungeon.routes.main)
+            : dungeon.routes.main;
+          const isAstral = runState.dungeonId === 'astral_nox';
+          const defaultName = pendingRoute === 'lich' ? (isAstral ? '恒星炉前室' : 'リッチの間・前哨') : pendingRoute === 'back' ? (isAstral ? '冷月外殻' : '裏火山入口') : '月面前庭';
+          const firstAreaName = nextRouteAreas?.[0]?.name ?? defaultName;
+          const routeLabel = pendingRoute === 'lich' ? (isAstral ? '☀️ 太陽航路' : '🔮 リッチ討伐ルート') : pendingRoute === 'back' ? (isAstral ? '🌑 虚空航路' : '🏯 裏火山本線') : '🌙 月面遺構ルート';
+          const icon = isAstral ? '🚀' : '🌋';
           addNotification('success', `${routeLabel} へ突入！`);
-          setRunLog(prev => [...prev, `🌋 大橋地帯を突破！${routeLabel} へ切り替え`, `📍 ${firstAreaName} へ進んだ！`]);
-          // monstersDefeatedを次のエリア進行のために5の倍数-1に調整
+          setRunLog(prev => [...prev, `${icon} 共通区間突破！${routeLabel} へ切り替え`, `📍 ${firstAreaName} へ進んだ！`]);
           const cur = newDefeated;
           const aligned = Math.ceil((cur + 1) / 5) * 5 - 1;
           setRunState(prev => prev ? {
@@ -3408,9 +3415,9 @@ export function DungeonScreen() {
 
         // ボスエリア最終撃破 → 初級ダンジョンのみ継続選択、他はクリア
         recordDungeonClear(runState.dungeonId);
-        const gachaCoinReward = ({ beginner:1, intermediate:2, advanced:3, super:4, extreme:5, volcano:4 } as Record<string,number>)[dungeon?.tier ?? 'beginner'] ?? 1;
+        const gachaCoinReward = ({ beginner:1, intermediate:2, advanced:3, super:4, extreme:5, volcano:4, cosmic:6 } as Record<string,number>)[dungeon?.tier ?? 'beginner'] ?? 1;
         addNotification('success', `🏆 ${dungeon?.name} ボス撃破！🪙 ガチャコイン+${gachaCoinReward}枚！`);
-        if (player) { const dId = runState.dungeonId; const clearType = dId === 'sky_castle' ? 'sky_castle_clear' : dId === 'sky_castle_ex' ? 'sky_castle_ex_clear' : dId === 'volcano' ? 'volcano_clear' : dId === 'kx_fight' || dId === 'kx_ex_fight' ? 'boss_kx' : dId === 'rei_fight' ? 'boss_rei' : 'dungeon_clear'; postActivityFeed({ uid: player.uid, displayName: player.displayName, type: clearType, message: `が「${dungeon?.name}」をクリアしました！` }).catch(() => {}); }
+        if (player) { const dId = runState.dungeonId; const clearType = dId === 'sky_castle' ? 'sky_castle_clear' : dId === 'sky_castle_ex' ? 'sky_castle_ex_clear' : dId === 'volcano' ? 'volcano_clear' : dId === 'astral_nox' ? 'astral_nox_clear' : dId === 'kx_fight' || dId === 'kx_ex_fight' ? 'boss_kx' : dId === 'rei_fight' ? 'boss_rei' : 'dungeon_clear'; postActivityFeed({ uid: player.uid, displayName: player.displayName, type: clearType, message: `が「${dungeon?.name}」をクリアしました！` }).catch(() => {}); }
         if (runState.dungeonId === 'beginner_cave') {
           // 初級のみ：帰還or継続の選択を表示
           setRunState(prev => prev ? {
@@ -3753,16 +3760,18 @@ export function DungeonScreen() {
               {(() => {
                 const _vm = DUNGEON_MASTER[runState.dungeonId] as any;
                 const _vr = runState.volcanoRoute;
-                const _areas = (_vm?.routes && runState.dungeonId === 'volcano')
-                  ? (_vr === 'lich' ? _vm.routes.lich : _vr === 'back' ? _vm.routes.back : _vm.routes.main)
+                const _areas = _vm?.routes
+                  ? (_vr === 'lich' ? _vm.routes.lich : _vr === 'back' ? _vm.routes.back : _vr === 'moon' ? (_vm.routes.moon ?? _vm.routes.main) : _vm.routes.main)
                   : _vm?.areas;
                 const _area = _areas?.[runState.currentAreaIdx ?? 0] as any;
+                const _isAstral = runState.dungeonId === 'astral_nox';
                 return <>
                   {_area?.checkpointLabel && <span style={{ marginLeft: 6, fontSize:'0.7rem', background:'#1a6640', color:'#4caf87', borderRadius:4, padding:'1px 6px', fontWeight:700 }}>{_area.checkpointLabel}</span>}
                   {_area?.isHardArea && !_area?.checkpointLabel && <span style={{ marginLeft: 6, fontSize:'0.7rem', background:'#4a1a1a', color:'#e05555', borderRadius:4, padding:'1px 6px', fontWeight:700 }}>⚠ 難所</span>}
                   {_area?.isBranchPoint && <span style={{ marginLeft: 6, fontSize:'0.7rem', background:'#3a2a00', color:'#ff9900', borderRadius:4, padding:'1px 6px', fontWeight:700 }}>🔀 分岐点</span>}
-                  {runState.volcanoRoute === 'lich' && <span style={{ marginLeft: 6, fontSize:'0.7rem', background:'#2a0050', color:'#cc88ff', borderRadius:4, padding:'1px 6px', fontWeight:700 }}>🔮 リッチルート</span>}
-                  {runState.volcanoRoute === 'back' && <span style={{ marginLeft: 6, fontSize:'0.7rem', background:'#500000', color:'#ff6666', borderRadius:4, padding:'1px 6px', fontWeight:700 }}>🏯 裏火山本線</span>}
+                  {runState.volcanoRoute === 'lich' && <span style={{ marginLeft: 6, fontSize:'0.7rem', background: _isAstral ? '#3a2000' : '#2a0050', color: _isAstral ? '#ffaa33' : '#cc88ff', borderRadius:4, padding:'1px 6px', fontWeight:700 }}>{_isAstral ? '☀️ 太陽航路' : '🔮 リッチルート'}</span>}
+                  {runState.volcanoRoute === 'back' && <span style={{ marginLeft: 6, fontSize:'0.7rem', background: _isAstral ? '#001030' : '#500000', color: _isAstral ? '#44aaff' : '#ff6666', borderRadius:4, padding:'1px 6px', fontWeight:700 }}>{_isAstral ? '🌑 虚空航路' : '🏯 裏火山本線'}</span>}
+                  {runState.volcanoRoute === 'moon' && <span style={{ marginLeft: 6, fontSize:'0.7rem', background:'#102040', color:'#88ccff', borderRadius:4, padding:'1px 6px', fontWeight:700 }}>🌙 月面遺構</span>}
                 </>;
               })()}
             </div>
@@ -3902,6 +3911,64 @@ export function DungeonScreen() {
               </div>
             </div>
           ) : showVolcanoRouteChoice ? (
+            /* ── ルート分岐UI（火山・アストラル・ノクス共通） ── */
+            runState.dungeonId === 'astral_nox' ? (
+              <div style={{ background: '#0a0e1a', border: '2px solid #00c8ff', borderRadius: 12, padding: 18, textAlign: 'center' }}>
+                <div style={{ fontSize: '1.6rem', marginBottom: 6 }}>🚀</div>
+                <div style={{ color: '#00c8ff', fontWeight: 700, fontSize: '1.05rem', marginBottom: 6 }}>
+                  分岐中枢制圧。CP3取得！
+                </div>
+                <div style={{ color: '#c8e8ff', fontSize: '0.85rem', marginBottom: 4 }}>
+                  共通区間を突破した先に<strong style={{ color: '#ffcc44' }}>3つのルート</strong>が待ち受ける。
+                </div>
+                <div style={{ color: '#8a92b2', fontSize: '0.78rem', marginBottom: 16, lineHeight: 1.6 }}>
+                  <span style={{ color: '#ffaa33' }}>☀️ 太陽航路</span> ─ 燃焼・光線・耐久戦。火耐性と継続回復が鍵。ソラリス熾天使との決戦。<br/>
+                  <span style={{ color: '#44aaff' }}>🌑 虚空航路</span> ─ 真空・呪詛・防御貫通。長期戦が命取り。虚空大公との決戦。<br/>
+                  <span style={{ color: '#88ccff' }}>🌙 月面遺構</span> ─ 両ボス撃破後に解放される隠しルート。凍結・幻影・高報酬。
+                </div>
+                <div style={{ color: '#555', fontSize: '0.72rem', marginBottom: 14 }}>
+                  ※ まず共通区間の残り部分を突破してからルートが確定します。
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <button onClick={() => {
+                    setShowVolcanoRouteChoice(false);
+                    setVolcanoRoutePending('lich');
+                    setRunState(prev => prev ? { ...prev, volcanoRoute: 'main' } : null);
+                    setBattleKey(k => k + 1);
+                    setInBattle(true);
+                  }} style={{ padding: '11px', background: 'linear-gradient(135deg,#ff8800,#cc5500)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+                    ☀️ 太陽航路へ（燃焼・光線・ソラリス熾天使）
+                  </button>
+                  <button onClick={() => {
+                    setShowVolcanoRouteChoice(false);
+                    setVolcanoRoutePending('back');
+                    setRunState(prev => prev ? { ...prev, volcanoRoute: 'main' } : null);
+                    setBattleKey(k => k + 1);
+                    setInBattle(true);
+                  }} style={{ padding: '11px', background: 'linear-gradient(135deg,#0055cc,#002266)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+                    🌑 虚空航路へ（真空・呪詛・虚空大公）
+                  </button>
+                  <button onClick={() => {
+                    setShowVolcanoRouteChoice(false);
+                    setVolcanoRoutePending('moon');
+                    setRunState(prev => prev ? { ...prev, volcanoRoute: 'main' } : null);
+                    setBattleKey(k => k + 1);
+                    setInBattle(true);
+                  }} style={{ padding: '11px', background: 'linear-gradient(135deg,#224466,#112233)', color: '#aaddff', border: '1px solid #446688', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+                    🌙 月面遺構ルートへ（凍結・幻影・高報酬）
+                  </button>
+                  <button onClick={() => {
+                    setShowVolcanoRouteChoice(false);
+                    setVolcanoRoutePending(null);
+                    setRunState(prev => prev ? { ...prev, volcanoRoute: undefined } : null);
+                    setBattleKey(k => k + 1);
+                    setInBattle(true);
+                  }} style={{ padding: '8px', background: '#1a1f2f', color: '#8a92b2', border: '1px solid #2a3050', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem' }}>
+                    ⚔️ 今は選ばず戦闘を続ける（CP3エリアで鍛える）
+                  </button>
+                </div>
+              </div>
+            ) : (
             /* ── 火山CP3ルート分岐UI ── */
             <div style={{ background: '#161b26', border: '2px solid #ff6600', borderRadius: 12, padding: 18, textAlign: 'center' }}>
               <div style={{ fontSize: '1.6rem', marginBottom: 6 }}>🌋</div>
@@ -3948,6 +4015,7 @@ export function DungeonScreen() {
                 </button>
               </div>
             </div>
+            )
           ) : showBossChoice ? (
             <div style={{ background: '#161b26', border: '2px solid #f0c060', borderRadius: 12, padding: 18, textAlign: 'center' }}>
               <div style={{ fontSize: '1.3rem', marginBottom: 6 }}>👑</div>

@@ -21,6 +21,7 @@ const MAIN_DUNGEON_ORDER = [
   'sky_castle',
   'sky_castle_ex',
   'volcano',
+  'astral_nox',
 ];
 
 // ============================================================
