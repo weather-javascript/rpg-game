@@ -792,7 +792,7 @@ export interface DungeonRunState {
   kxIsAwakened?: boolean; // KX覚醒状態
   kxAwakened?: boolean;   // 覚醒KXを討伐してクリア（生命の超越）
   // 火山CP3分岐管理
-  volcanoRoute?: 'main' | 'lich' | 'back'; // main=共通ルート, lich=CP3リッチ単体, back=裏火山本線
+  volcanoRoute?: 'main' | 'lich' | 'back' | 'moon'; // main=共通ルート, lich=CP3リッチ単体, back=裏火山本線, moon=月面遺構(astral_nox)
 }
 
 export interface GambleResult {
