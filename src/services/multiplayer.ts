@@ -779,13 +779,16 @@ export async function updateAnnouncementRecord(id: string, text: string, imageUr
 export interface ActivityFeedEntry {
   uid: string;
   displayName: string;
-  type: string;   // 'mining'|'fishing'|'dungeon'|'gamble_win'|'gamble_lose'|'auction'|'level_up'|'crafting'|'boss_title'|'kill_log'
+  type: string;   // 'mining'|'fishing'|'dungeon'|'gamble_win'|'gamble_lose'|'auction'|'level_up'|'crafting'|'boss_title'|'kill_log'|'drop_log'
   message: string;
   timestamp: number;
   // 称号・キルログ専用の表示色（HEX、または "ALT:#色1,#色2" で1文字ごと2色交互表示）
   color?: string;
   // boss_title用：称号テキスト本体（強調表示に使用）
   title?: string;
+  // drop_log用：ダンジョンID・レアリティ
+  dungeonId?: string;
+  itemRarity?: string;
 }
 
 const FEED_REF = () => doc(db, 'shared', 'activity_feed');
