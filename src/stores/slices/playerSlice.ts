@@ -84,6 +84,7 @@ export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (
       while (level < EXP_TABLE.length - 1 && exp >= EXP_TABLE[level + 1]) level++;
       const expToNextLevel = EXP_TABLE[level + 1] ?? Infinity;
       if (level > prevLevel) {
+        get().triggerLevelUp(level);
         import('../../services/multiplayer').then(({ postActivityFeed }) => {
           const p = get().player;
           if (!p) return;
