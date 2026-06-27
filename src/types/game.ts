@@ -480,6 +480,31 @@ export interface DungeonArea {
   isCheckpoint?: boolean;   // CP表示用フラグ
   checkpointLabel?: string; // 'CP1'〜'CP5' など
   isBranchPoint?: boolean;  // ここでルート分岐UIを出す
+  turns?: number;          // このエリアの想定戦闘ターン数（データ駆動のバランス調整・ルート設計用）
+  eventRate?: number;      // このエリア進入時にランダムイベントが発生する確率(0〜1)。データ駆動のイベント密度調整用
+}
+
+// ============================================================
+// ダンジョン分岐木（第1分岐3択 → 第2分岐3択 の9ルート構造）表示用メタデータ
+// 実際の戦闘エリアは DungeonMaster.routes.branches[leafKey] に格納する。
+// このメタデータは選択UIの表示・ルート差別化の説明にのみ使用し、戦闘ロジックには影響しない。
+// ============================================================
+export interface DungeonRouteLeafMeta {
+  key: string;                       // routes.branches 内のキー
+  label: string;                     // 選択ボタン等に表示する名称
+  tagline: string;                   // 一行の特徴説明
+  danger: 1 | 2 | 3 | 4 | 5;          // 危険度（★の数）
+  estimatedTurns: number;            // 想定ターン数（表示用、areasのturns合計と一致させること）
+  healSupply: 'low' | 'normal' | 'high'; // 回復・休憩機会の多さ
+}
+
+export interface DungeonRouteThemeMeta {
+  themeKey: string;   // 第1分岐のキー（routes.lich/back/moon 等、または独自キー）
+  label: string;       // '☀️ 太陽航路' 等
+  icon: string;
+  color: string;
+  description: string;
+  leaves: DungeonRouteLeafMeta[]; // 第2分岐の3ルート
 }
 
 export interface MonsterMaster {
@@ -516,10 +541,14 @@ export interface DungeonMaster {
   // ノードベース分岐ルート（火山 CP3分岐などで使用）
   routes?: {
     main: DungeonArea[];   // 共通→分岐点まで
-    lich: DungeonArea[];   // 分岐A
-    back: DungeonArea[];   // 分岐B
-    moon?: DungeonArea[];  // 隠しルート（アストラル・ノクス 月面遺構ルート）
+    lich?: DungeonArea[];  // 分岐A（レガシー互換。新設計では branches を使用）
+    back?: DungeonArea[];  // 分岐B（レガシー互換。新設計では branches を使用）
+    moon?: DungeonArea[];  // 隠しルート（レガシー互換。新設計では branches を使用）
+    // 第1分岐(3択)→第2分岐(3択)の9ルート木構造。キー例: 'lich_inferno','back_drift' など
+    branches?: Record<string, DungeonArea[]>;
   };
+  // 9ルート選択UI表示用メタデータ（第1分岐3テーマ×各テーマ内3サブルート）
+  routeTree?: DungeonRouteThemeMeta[];
   bossId?: string;
   expBonus: number;
   goldBonus: number;
@@ -791,8 +820,8 @@ export interface DungeonRunState {
   kxHp?: number;          // KX現在HP
   kxIsAwakened?: boolean; // KX覚醒状態
   kxAwakened?: boolean;   // 覚醒KXを討伐してクリア（生命の超越）
-  // 火山CP3分岐管理
-  volcanoRoute?: 'main' | 'lich' | 'back' | 'moon'; // main=共通ルート, lich=CP3リッチ単体, back=裏火山本線, moon=月面遺構(astral_nox)
+  // 火山CP3分岐管理（アストラル・ノクスでは9ルート木のリーフキーも格納する）
+  volcanoRoute?: string; // main=共通ルート, lich/back/moon=旧分岐 or 新リーフキー（例: 'lich_inferno'）
 }
 
 export interface GambleResult {
