@@ -3551,6 +3551,16 @@ export function DungeonScreen() {
         const gachaCoinReward = ({ beginner:1, intermediate:2, advanced:3, super:4, extreme:5, volcano:4, cosmic:6 } as Record<string,number>)[dungeon?.tier ?? 'beginner'] ?? 1;
         addNotification('success', `🏆 ${dungeon?.name} ボス撃破！🪙 ガチャコイン+${gachaCoinReward}枚！`);
         if (player) { const dId = runState.dungeonId; const clearType = dId === 'sky_castle' ? 'sky_castle_clear' : dId === 'sky_castle_ex' ? 'sky_castle_ex_clear' : dId === 'volcano' ? 'volcano_clear' : dId === 'astral_nox' ? 'astral_nox_clear' : dId === 'kx_fight' || dId === 'kx_ex_fight' ? 'boss_kx' : dId === 'rei_fight' ? 'boss_rei' : 'dungeon_clear'; postActivityFeed({ uid: player.uid, displayName: player.displayName, type: clearType, message: `が「${dungeon?.name}」をクリアしました！` }).catch(() => {}); }
+        if (runState.dungeonId === 'lycoris_dungeon') {
+          // 裏初級：覚醒抽選（4%）は TurnBattle 勝利後にドロップで black_higanbana を追加付与
+          const awakenRoll = Math.random() < 0.04;
+          if (awakenRoll) {
+            addItems([{ itemId: 'black_higanbana', amount: 1 }]);
+            addNotification('success', '🌑 覚醒Lycorisの黒彼岸花を入手した！');
+          }
+          setRunState(prev => prev ? { ...prev, isComplete: true } : null);
+          return;
+        }
         if (runState.dungeonId === 'beginner_cave') {
           // 初級のみ：帰還or継続の選択を表示
           setRunState(prev => prev ? {
