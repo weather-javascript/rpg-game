@@ -133,7 +133,7 @@ function rollDropTable(
 // 初期化
 // ============================================================
 
-export function initLycorisBattle(playerCount = 1, rng: () => number = Math.random): LycorisBattleState {
+export function initLycorisBattle(playerCount = 1, _rng: () => number = Math.random): LycorisBattleState {
   const maxHp = LYCORIS_DEF.maxHp + (playerCount > 1 ? LYCORIS_DEF.hpPerPlayer! * (playerCount - 1) : 0);
   const initialMinions: LycorisMinionInstance[] = Array.from(
     { length: LYCORIS_DEF.initialSummonCount },
