@@ -3,7 +3,7 @@ import { FreeFieldScreen } from './FreeFieldScreen';
 import type { FFBattleRequest } from './FreeFieldScreen';
 import { InfiniteCorridorScreen } from './InfiniteCorridorScreen';
 import { GameIcon } from '../icons';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { secureRandom, randomInt, randomIntRange, randomChance } from '../../utils/random';
 import { DUNGEON_MASTER, MONSTER_MASTER, ITEM_MASTER, BOSS_TITLE_MASTER, KILL_LOG_MASTER, rollDungeonEvent } from '../../data/masters';
@@ -15,7 +15,7 @@ import type { MonsterOverride, DungeonOverride } from '../../services/multiplaye
 import { TOOLS_MASTER } from '../../data/toolsMaster';
 import { TOOL_GACHA_TABLE } from '../../data/toolAcquisition';
 import { useCombatFx } from '../combat/useCombatFx';
-import { EnemyFxOverlay, SelfFxBadge, SelfFxBanner } from '../combat/CombatFx';
+import { EnemyFxOverlay, SelfFxBadge, SelfFxBanner, CritFlashOverlay } from '../combat/CombatFx';
 
 // ============================================================
 // 戦闘ロジック（1ターン分）
@@ -218,6 +218,61 @@ function TargetSelectModal({ enemies, onSelect, onCancel }: {
         })}
         <button onClick={onCancel} style={{ width:'100%', padding:'8px', background:'rgba(74,80,112,0.3)', border:'1px solid #4a5070', borderRadius:6, color:'#8a92b2', cursor:'pointer', fontSize:'0.8rem', marginTop:4 }}>キャンセル</button>
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// 環境演出：ダンジョンごとのテーマカラーで漂う背景パーティクル
+// ============================================================
+let _ambientStyleInjected = false;
+function ensureAmbientStyles() {
+  if (_ambientStyleInjected || typeof document === 'undefined') return;
+  _ambientStyleInjected = true;
+  const style = document.createElement('style');
+  style.textContent = `
+@keyframes amb-float-up { 0%{transform:translateY(0) translateX(0); opacity:0;} 12%{opacity:0.75;} 88%{opacity:0.45;} 100%{transform:translateY(-150px) translateX(var(--adx,0px)); opacity:0;} }
+`;
+  document.head.appendChild(style);
+}
+const AMBIENT_THEMES: Record<string, string[]> = {
+  volcano:      ['#ff6a3d', '#ffae00', '#ff4500'],
+  astral_nox:   ['#8a5cff', '#38d9ff', '#ffe9a8'],
+  frozen_cave:  ['#7fd6ff', '#e8f9ff', '#b4f0ff'],
+  sky_castle:   ['#ffe9a8', '#cfe8ff', '#ffffff'],
+  sky_castle_ex:['#ffd24d', '#ffffff', '#cfe8ff'],
+  fortress:     ['#c97aff', '#5b8dee', '#8ab0ff'],
+  underground_fortress: ['#c97aff', '#7a5cff', '#5b8dee'],
+  garden:       ['#7dd9b0', '#bdf0c8', '#4caf87'],
+};
+function AmbientParticles({ dungeonId }: { dungeonId: string }) {
+  ensureAmbientStyles();
+  const colors = AMBIENT_THEMES[dungeonId];
+  const particles = useMemo(() => {
+    if (!colors) return [];
+    return Array.from({ length: 9 }, (_, i) => ({
+      id: i,
+      left: 5 + Math.random() * 90,
+      size: 2 + Math.random() * 4,
+      delay: Math.random() * 4,
+      dur: 4 + Math.random() * 3,
+      dx: Math.round((Math.random() - 0.5) * 30),
+      color: colors[i % colors.length],
+    }));
+  }, [dungeonId]);
+  if (!colors || particles.length === 0) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', borderRadius: 12, zIndex: 0 }}>
+      {particles.map(p => (
+        <div key={p.id} style={{
+          position: 'absolute', left: `${p.left}%`, bottom: 0,
+          width: p.size, height: p.size, borderRadius: '50%',
+          background: p.color, boxShadow: `0 0 6px ${p.color}`,
+          animation: `amb-float-up ${p.dur}s ease-in infinite`,
+          animationDelay: `${p.delay}s`,
+          ['--adx' as string]: `${p.dx}px`,
+        } as any} />
+      ))}
     </div>
   );
 }
@@ -482,6 +537,32 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
   const [hotbarModal, setHotbarModal] = useState<{slot:string;idx?:number} | null>(null);
   const [localEquip, setLocalEquip] = useState<EquipmentSlots>(equipment);
   const combatFx = useCombatFx();
+  // ── ボスフェーズ移行カットイン（汎用：isBossの敵HPが66%/33%を切った瞬間に1回だけ演出） ──
+  const [phaseBanner, setPhaseBanner] = useState<{ text: string; key: number } | null>(null);
+  const bossPhaseFlagsRef = useRef<Record<number, Set<number>>>({});
+  useEffect(() => {
+    battle.enemies.forEach((e, idx) => {
+      if (e.hp <= 0 || e.maxHp <= 0) return;
+      const mon = getMergedMonster(e.monsterId);
+      if (!mon?.isBoss) return;
+      const pct = (e.hp / e.maxHp) * 100;
+      const flags = bossPhaseFlagsRef.current[idx] ?? new Set<number>();
+      const thresholds: [number, number][] = [[66, 2], [33, 3]];
+      for (const [pctThreshold, phaseNo] of thresholds) {
+        if (pct <= pctThreshold && !flags.has(phaseNo)) {
+          flags.add(phaseNo);
+          bossPhaseFlagsRef.current[idx] = flags;
+          setPhaseBanner({ text: `${mon.name} 【第${phaseNo}形態へ移行！】`, key: Date.now() });
+        }
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [battle.enemies]);
+  useEffect(() => {
+    if (!phaseBanner) return;
+    const t = setTimeout(() => setPhaseBanner(null), 1900);
+    return () => clearTimeout(t);
+  }, [phaseBanner]);
 
   // Fix 7: sync localEquip changes to store so they persist after battle
   const setLocalEquipAndSave = useCallback((updater: (prev: EquipmentSlots) => EquipmentSlots) => {
@@ -2315,8 +2396,25 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
   const hpPct = (player.stats.hp / player.stats.maxHp) * 100;
 
   return (
-    <div style={{ background: '#161b26', border: '2px solid #e05555', borderRadius: 12, padding: 14, overflow: 'hidden' }}>
-      <div key={combatFx.shakeKey} className={combatFx.shakeKey > 0 ? 'combatfx-shake' : undefined}>
+    <div style={{ background: '#161b26', border: '2px solid #e05555', borderRadius: 12, padding: 14, overflow: 'hidden', position: 'relative' }}>
+      <AmbientParticles dungeonId={runState.dungeonId} />
+      {combatFx.shakeKey > 0 && combatFx.shakeCritical && <CritFlashOverlay flashKey={combatFx.shakeKey} />}
+      {phaseBanner && (
+        <div key={phaseBanner.key} style={{
+          position: 'absolute', left: 0, right: 0, top: '38%', zIndex: 20, textAlign: 'center', pointerEvents: 'none',
+        }}>
+          <div style={{
+            display: 'inline-block', padding: '10px 22px', borderRadius: 10,
+            background: 'linear-gradient(135deg, rgba(120,10,10,0.92), rgba(20,5,10,0.92))',
+            border: '2px solid #ff5050', boxShadow: '0 0 30px rgba(255,40,40,0.7)',
+            color: '#ffdede', fontWeight: 800, fontSize: '1.0rem', letterSpacing: 1,
+            animation: 'badgePop 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards, cfx-shake 0.4s ease-in-out',
+          }}>
+            🔴 {phaseBanner.text}
+          </div>
+        </div>
+      )}
+      <div key={combatFx.shakeKey} className={combatFx.shakeKey > 0 ? (combatFx.shakeCritical ? 'combatfx-shake-crit' : 'combatfx-shake') : undefined}>
       {/* ターゲット選択モーダル */}
       {battle.turn === 'select_target' && (
         <TargetSelectModal
@@ -3364,15 +3462,21 @@ export function DungeonScreen() {
             if (evt.type === 'spring') {
               const healAmt = Math.max(1, Math.round((player?.stats?.maxHp ?? 100) * 0.25));
               changeHp(healAmt);
-              msgs.push(`🌊 ${evt.label}を発見！HP+${healAmt}回復！`);
+              const msg = `🌊 ${evt.label}を発見！HP+${healAmt}回復！`;
+              msgs.push(msg);
+              addNotification('success', msg);
             } else if (evt.type === 'altar') {
               const bonusExp = randomIntRange(30, 200);
               addExp(bonusExp);
-              msgs.push(`✨ ${evt.label}を発見！EXP+${bonusExp}`);
+              const msg = `✨ ${evt.label}を発見！EXP+${bonusExp}`;
+              msgs.push(msg);
+              addNotification('success', msg);
             } else {
               const bonusGold = randomIntRange(50, 400);
               changeGold(bonusGold);
-              msgs.push(`💰 ${evt.label}を発見！ゴールド+${bonusGold}`);
+              const msg = `💰 ${evt.label}を発見！ゴールド+${bonusGold}`;
+              msgs.push(msg);
+              addNotification('success', msg);
             }
           }
           return msgs;
@@ -3783,7 +3887,7 @@ export function DungeonScreen() {
               <span style={{ color: '#f0c060', fontWeight: 700 }}>{DUNGEON_MASTER[runState.dungeonId]?.name}</span>
               <span style={{ color: '#8a92b2', fontSize: '0.85rem' }}>B{runState.currentFloor}F</span>
             </div>
-            <div style={{ fontSize: '0.8rem', color: '#5b8dee', marginBottom: 6 }}>
+            <div key={`area-${runState.currentAreaIdx}-${runState.volcanoRoute ?? 'main'}`} className="rpg-card-appear" style={{ fontSize: '0.8rem', color: '#5b8dee', marginBottom: 6 }}>
               📍 {runState.currentAreaName}
               {/* CP・難所・ルートバッジ */}
               {(() => {
@@ -3823,8 +3927,18 @@ export function DungeonScreen() {
                     if (!item) return null;
                     const rarity = item.rarity;
                     const dcolor = rarity === 'legendary' ? '#ffd700' : rarity === 'epic' ? '#c97aff' : rarity === 'rare' ? '#5b8dee' : '#70c090';
+                    const isRarePlus = rarity === 'legendary' || rarity === 'epic' || rarity === 'rare';
                     return (
-                      <span key={d.itemId} style={{ fontSize: '0.72rem', padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: `1px solid ${dcolor}`, color: dcolor, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span key={d.itemId} className={isRarePlus ? 'rpg-badge-pop' : undefined} style={{
+                        fontSize: '0.72rem', padding: '2px 7px', borderRadius: 6,
+                        background: isRarePlus
+                          ? `linear-gradient(90deg, rgba(255,255,255,0.04) 0%, ${dcolor}33 45%, rgba(255,255,255,0.04) 100%)`
+                          : 'rgba(255,255,255,0.05)',
+                        backgroundSize: isRarePlus ? '200% 100%' : undefined,
+                        border: `1px solid ${dcolor}`, color: dcolor, display: 'flex', alignItems: 'center', gap: 4,
+                        boxShadow: isRarePlus ? `0 0 8px ${dcolor}66` : undefined,
+                        animation: isRarePlus ? 'badgePop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards, shimmer 2.2s linear infinite' : undefined,
+                      }}>
                         <GameIcon id={item.icon} size={14} />{item.name} ×{d.amount}
                       </span>
                     );
