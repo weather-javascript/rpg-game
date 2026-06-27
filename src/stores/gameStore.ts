@@ -26,6 +26,7 @@ export interface GameState extends PlayerSlice, DungeonSlice, FishingSlice, Reli
   lastSaveTime: number;
   activeTab: TabId;
   notifications: Notification[];
+  levelUpFlash: { level: number; ts: number } | null; // レベルアップ演出用の一時フラグ
   isFishingLocked: boolean;
   isGatheringLocked: boolean;
 
@@ -39,6 +40,8 @@ export interface GameState extends PlayerSlice, DungeonSlice, FishingSlice, Reli
   setGatheringLocked: (locked: boolean) => void;
   addNotification: (type: Notification['type'], message: string) => void;
   removeNotification: (id: string) => void;
+  triggerLevelUp: (level: number) => void; // レベルアップ演出（カットイン）を発火
+  clearLevelUp: () => void;
 }
 
 // ============================================================
@@ -198,6 +201,7 @@ export const useGameStore = create<GameState>((set, get, api) => ({
   lastSaveTime: 0,
   activeTab: 'gathering',
   notifications: [],
+  levelUpFlash: null,
   isFishingLocked: false,
   isGatheringLocked: false,
 
@@ -231,6 +235,16 @@ export const useGameStore = create<GameState>((set, get, api) => ({
   removeNotification: (id) => {
     set((state) => ({ notifications: state.notifications.filter((n) => n.id !== id) }));
   },
+
+  // レベルアップ演出（カットイン）：一定時間後に自動で消える
+  triggerLevelUp: (level) => {
+    set({ levelUpFlash: { level, ts: Date.now() } });
+    setTimeout(() => {
+      // その間に再度レベルアップしていなければクリア
+      if (get().levelUpFlash?.level === level) set({ levelUpFlash: null });
+    }, 2400);
+  },
+  clearLevelUp: () => set({ levelUpFlash: null }),
 
   saveGame: async () => {
     const { player } = get();
