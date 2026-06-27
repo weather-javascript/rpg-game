@@ -205,6 +205,19 @@ const GLOBAL_ANIM_CSS = `
     background-size: 200% 100%;
     animation: hpBarAnim 2.5s linear infinite;
   }
+  /* 全ボタン共通の軽いタップ・ホバー演出（インラインstyleは上書きしない） */
+  button {
+    transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+  }
+  button:active:not(:disabled) {
+    transform: scale(0.96);
+    filter: brightness(0.94);
+  }
+  @media (hover: hover) {
+    button:hover:not(:disabled) {
+      filter: brightness(1.06);
+    }
+  }
 `;
 
 function GlobalAnimations() {
@@ -971,6 +984,41 @@ function TabNav({ activeTab, setTab }: { activeTab: TabId; setTab: (t: TabId) =>
   );
 }
 
+function LevelUpBanner() {
+  const flash = useGameStore(s => s.levelUpFlash);
+  const clear = useGameStore(s => s.clearLevelUp);
+  if (!flash) return null;
+  return (
+    <div key={flash.ts} onClick={clear} style={{
+      position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      pointerEvents: 'none',
+    }}>
+      <div style={{ position: 'relative', textAlign: 'center' }}>
+        {/* 拡散リング x2（タイミングをずらして重ねる） */}
+        <div style={{
+          position: 'absolute', left: '50%', top: '50%', width: 160, height: 160, marginLeft: -80, marginTop: -80,
+          borderRadius: '50%', border: '3px solid #f0c060', boxShadow: '0 0 40px rgba(240,192,96,0.7)',
+          animation: 'levelUpBurst 1.1s ease-out',
+        }} />
+        <div style={{
+          position: 'absolute', left: '50%', top: '50%', width: 160, height: 160, marginLeft: -80, marginTop: -80,
+          borderRadius: '50%', border: '3px solid #ffe9a8', boxShadow: '0 0 30px rgba(255,233,168,0.6)',
+          animation: 'levelUpBurst 1.1s ease-out 0.18s',
+        }} />
+        <div className="rpg-badge-pop" style={{
+          background: 'linear-gradient(135deg,#ffae00,#ff6a00)', color: '#fff', fontWeight: 900,
+          padding: '14px 30px', borderRadius: 16, fontSize: '1.4rem', lineHeight: 1.3,
+          boxShadow: '0 8px 30px rgba(255,140,0,0.5), 0 0 60px rgba(255,174,0,0.4)',
+          border: '2px solid rgba(255,255,255,0.4)',
+        }}>
+          🎉 LEVEL UP!<br/>
+          <span style={{ fontSize: '1.15rem' }}>Lv.{flash.level} に到達！</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NotificationToast() {
   const notifications = useGameStore(s => s.notifications);
   const remove = useGameStore(s => s.removeNotification);
@@ -1398,7 +1446,7 @@ export default function App() {
             if (tabEntry?.active && !ADMIN_UIDS.includes(player.uid)) {
               return <TabMaintenanceScreen tab={activeTab} entry={tabEntry} />;
             }
-            return <ActiveScreen tab={activeTab} />;
+            return <div key={activeTab} className="rpg-card-appear"><ActiveScreen tab={activeTab} /></div>;
           })()}
         </main>
       <ReliefPanel />
@@ -1410,6 +1458,7 @@ export default function App() {
         }
       }} />
       <NotificationToast />
+      <LevelUpBanner />
     </div>
   );
 }
