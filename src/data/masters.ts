@@ -957,6 +957,18 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   shogun_crest:         { id:'shogun_crest',         name:'将軍の軍配', description:'第999代将軍徳川義和公が振るっていた軍配。TODO: 専用クラフトレシピは未確定。', category:'material', itemType:'Item', rarity:'legendary', sellPrice:5000, buyPrice:0, maxStack:99, icon:'castle_jp' },
   // 無限深層回廊 専用素材・クラフト品
   ...IC_ITEMS,
+  // ============================================================
+  // 裏ダンジョン初級（Lycoris）専用アイテム
+  // ============================================================
+  higanbana_petal:      { id:'higanbana_petal',      name:'彼岸花の花びら',    description:'彼岸花から採れる花びら。裏初級の基本素材。',                             category:'material',   itemType:'Item', rarity:'common',    sellPrice:30,  buyPrice:0, maxStack:-1, icon:'leaf' },
+  dimension_energy:     { id:'dimension_energy',     name:'次元エネルギー',    description:'次元の歪みから生まれたエネルギー体。',                                   category:'material',   itemType:'Item', rarity:'uncommon',  sellPrice:120, buyPrice:0, maxStack:-1, icon:'gem_blue' },
+  high_dimension_energy:{ id:'high_dimension_energy',name:'高次元エネルギー',  description:'通常の次元エネルギーより高純度の結晶体。中ボスから入手。',               category:'material',   itemType:'Item', rarity:'rare',      sellPrice:400, buyPrice:0, maxStack:99,  icon:'gem' },
+  eerie_seed:           { id:'eerie_seed',           name:'不気味な種',        description:'誰かが植えようとした謎の種。薄暗い場所で育つらしい。',                    category:'material',   itemType:'Item', rarity:'uncommon',  sellPrice:80,  buyPrice:0, maxStack:99,  icon:'ore_dark' },
+  growth_pot:           { id:'growth_pot',           name:'急成長ポット',      description:'植物の成長を急速に促す小さな鉢。消耗品。',                               category:'consumable', itemType:'Item', rarity:'uncommon',  sellPrice:150, buyPrice:0, maxStack:99,  icon:'potion' },
+  nutrient_water:       { id:'nutrient_water',       name:'栄養の詰まった水',  description:'Lycorisの眷属が持っていた謎の水。飲むとHPが回復する。',                  category:'consumable', itemType:'Heal', rarity:'rare',      sellPrice:300, buyPrice:0, maxStack:99,  icon:'droplet', useEffect:{ hpRestore:20, message:'栄養の詰まった水を飲んだ。HPが20回復した！' } },
+  petal_gacha_key:      { id:'petal_gacha_key',      name:'花びらガチャキー',  description:'花びら柄の小さな鍵。専用ガチャを1回回せる。売却不可。',                  category:'consumable', itemType:'Item', rarity:'rare',      sellPrice:0,   buyPrice:0, maxStack:99,  icon:'gem_red' },
+  lycoris_gleam:        { id:'lycoris_gleam',        name:'リコリスの輝き',    description:'Lycorisの力が結晶化した輝石。上位装備のクラフトに使う。',                 category:'material',   itemType:'Item', rarity:'rare',      sellPrice:500, buyPrice:0, maxStack:99,  icon:'sparkle' },
+  black_higanbana:      { id:'black_higanbana',      name:'黒彼岸花',          description:'覚醒したLycorisだけが咲かせる禁忌の花。入手困難な伝説の素材。売却不可。',  category:'treasure',   itemType:'Item', rarity:'legendary', sellPrice:0,   buyPrice:0, maxStack:1,   icon:'ore_dark' },
 };
 
 // ============================================================
@@ -2253,19 +2265,6 @@ export const GATHER_NODE_MASTER: Record<string, GatherNodeMaster> = {
 
   // FF系統（ffgg_*）の採集ノードはFFタブ専用システム（FFGG_HARVEST_NODES / src/data/freefieldData.ts）に
   // 一本化。専用ツール（ffgg_gather_kit）所持時のみFFタブから採集可能。
-
-  // ============================================================
-  // 裏ダンジョン初級（Lycoris）専用アイテム
-  // ============================================================
-  higanbana_petal:      { id:'higanbana_petal',      name:'彼岸花の花びら',    description:'彼岸花から採れる花びら。裏初級の基本素材。',                          category:'material',   itemType:'Item', rarity:'common',    sellPrice:30,  buyPrice:0, maxStack:-1, icon:'leaf' },
-  dimension_energy:     { id:'dimension_energy',     name:'次元エネルギー',    description:'次元の歪みから生まれたエネルギー体。',                                category:'material',   itemType:'Item', rarity:'uncommon',  sellPrice:120, buyPrice:0, maxStack:-1, icon:'gem_blue' },
-  high_dimension_energy:{ id:'high_dimension_energy',name:'高次元エネルギー',  description:'通常の次元エネルギーより高純度の結晶体。中ボスから入手。',            category:'material',   itemType:'Item', rarity:'rare',      sellPrice:400, buyPrice:0, maxStack:99,  icon:'gem' },
-  eerie_seed:           { id:'eerie_seed',           name:'不気味な種',        description:'誰かが植えようとした謎の種。薄暗い場所で育つらしい。',                 category:'material',   itemType:'Item', rarity:'uncommon',  sellPrice:80,  buyPrice:0, maxStack:99,  icon:'ore_dark' },
-  growth_pot:           { id:'growth_pot',           name:'急成長ポット',      description:'植物の成長を急速に促す小さな鉢。消耗品。',                            category:'consumable', itemType:'Item', rarity:'uncommon',  sellPrice:150, buyPrice:0, maxStack:99,  icon:'potion' },
-  nutrient_water:       { id:'nutrient_water',       name:'栄養の詰まった水',  description:'Lycorisの眷属が持っていた謎の水。飲むとHPが回復する。',               category:'consumable', itemType:'Heal', rarity:'rare',      sellPrice:300, buyPrice:0, maxStack:99,  icon:'droplet', useEffect:{ hpRestore:20, message:'栄養の詰まった水を飲んだ。HPが20回復した！' } },
-  petal_gacha_key:      { id:'petal_gacha_key',      name:'花びらガチャキー',  description:'花びら柄の小さな鍵。専用ガチャを1回回せる。売却不可。',               category:'consumable', itemType:'Item', rarity:'rare',      sellPrice:0,   buyPrice:0, maxStack:99,  icon:'gem_red' },
-  lycoris_gleam:        { id:'lycoris_gleam',        name:'リコリスの輝き',    description:'Lycorisの力が結晶化した輝石。上位装備のクラフトに使う。',              category:'material',   itemType:'Item', rarity:'rare',      sellPrice:500, buyPrice:0, maxStack:99,  icon:'sparkle' },
-  black_higanbana:      { id:'black_higanbana',      name:'黒彼岸花',          description:'覚醒したLycorisだけが咲かせる禁忌の花。入手困難な伝説の素材。売却不可。', category:'treasure', itemType:'Item', rarity:'legendary', sellPrice:0,   buyPrice:0, maxStack:1,   icon:'ore_dark' },
 };
 
 // ============================================================
@@ -2696,15 +2695,22 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
   },
   lycoris_dungeon: {
     id:'lycoris_dungeon', name:'彼岸花の檻 【裏初級】', description:'Lycorisが支配する幻惑の裏ダンジョン。眷属を倒して本体にダメージを与えよ。4%の確率で覚醒戦に突入する。',
-    icon:'cherry_blossom', tier:'beginner', requiredLevel:1, floors:5, expBonus:1.5, goldBonus:1.5,
+    icon:'cherry_blossom', tier:'beginner', requiredLevel:1, floors:12, expBonus:1.5, goldBonus:1.5,
     monsterIds:['lycoris_minion','lycoris_escort','lycoris_rightarm','lycoris_leftarm','vision_of_lycoris','lycoris'],
     bossId:'lycoris',
     areas:[
-      { name:'彼岸花の回廊',  description:'Lycorisの手下たちが徘徊する入口。',              monsters:[{monsterId:'lycoris_minion',count:2},{monsterId:'lycoris_escort',count:1}] },
-      { name:'左腕の間',      description:'Lycorisの左腕が守る部屋。',                       monsters:[{monsterId:'lycoris_leftarm',count:1,isMidBoss:true}], isHardArea:true },
-      { name:'右腕の間',      description:'Lycorisの右腕が待ち受ける部屋。',                 monsters:[{monsterId:'lycoris_rightarm',count:1,isMidBoss:true}], isHardArea:true },
-      { name:'眷属の広間',    description:'Visionたちが多数いる広間。',                      monsters:[{monsterId:'vision_of_lycoris',count:2},{monsterId:'lycoris_minion',count:1}] },
-      { name:'玉座の間',      description:'Lycoris本体が玉座に座する最奥。眷属を倒してダメージを与えよ。', monsters:[{monsterId:'lycoris',count:1,isBoss:true}], isHardArea:true },
+      { name:'彼岸花の回廊・入口',   description:'最初の門。Lycorisの手下が群れをなして押し寄せてくる。',           monsters:[{monsterId:'lycoris_minion',count:4},{monsterId:'lycoris_escort',count:2}] },
+      { name:'彼岸花の回廊・中層',   description:'密度が増す。護衛が前衛に立ちふさがる。',                          monsters:[{monsterId:'lycoris_escort',count:3},{monsterId:'lycoris_minion',count:3}] },
+      { name:'彼岸花の回廊・奥',     description:'回廊最深部。眷属の群れが視界を埋める。',                          monsters:[{monsterId:'lycoris_minion',count:5},{monsterId:'lycoris_escort',count:3}] },
+      { name:'眷属の前哨地',         description:'Visionが哨戒する中間地点。倒すたびに転送ダメージが蓄積する。',    monsters:[{monsterId:'vision_of_lycoris',count:4},{monsterId:'lycoris_minion',count:3}], isHardArea:true },
+      { name:'左腕の間・前室',        description:'左腕の間へ向かう前室。護衛が厚く守る。',                          monsters:[{monsterId:'lycoris_escort',count:4},{monsterId:'lycoris_minion',count:3}] },
+      { name:'左腕の間',             description:'Lycorisの左腕が守る部屋。魔法陣展開が脅威。',                     monsters:[{monsterId:'lycoris_leftarm',count:1,isMidBoss:true},{monsterId:'lycoris_minion',count:4},{monsterId:'lycoris_escort',count:2}], isHardArea:true },
+      { name:'右腕の間・前室',        description:'右腕の間へ向かう前室。物理攻撃の圧力が高い。',                    monsters:[{monsterId:'lycoris_escort',count:4},{monsterId:'lycoris_minion',count:3}] },
+      { name:'右腕の間',             description:'Lycorisの右腕が待ち受ける部屋。彼岸斬りに注意。',                 monsters:[{monsterId:'lycoris_rightarm',count:1,isMidBoss:true},{monsterId:'lycoris_minion',count:4},{monsterId:'lycoris_escort',count:2}], isHardArea:true },
+      { name:'眷属の広間・前半',      description:'Visionが大量に湧く広大な間。転送ダメージを稼ぐ好機。',           monsters:[{monsterId:'vision_of_lycoris',count:4},{monsterId:'lycoris_minion',count:3}] },
+      { name:'眷属の広間・後半',      description:'最後の障壁。精鋭の護衛とVisionが混在する。',                      monsters:[{monsterId:'vision_of_lycoris',count:3},{monsterId:'lycoris_escort',count:3},{monsterId:'lycoris_minion',count:2}], isHardArea:true },
+      { name:'玉座の間・前室',        description:'玉座の間に続く廊下。最後の手下たちが行く手を阻む。',              monsters:[{monsterId:'lycoris_minion',count:4},{monsterId:'lycoris_escort',count:2},{monsterId:'vision_of_lycoris',count:2}] },
+      { name:'玉座の間',             description:'Lycoris本体が玉座に座する最奥。眷属を倒してダメージを与えよ。HP50%以下で玉座を降りて直接攻撃に移行する。', monsters:[{monsterId:'lycoris',count:1,isBoss:true}], isHardArea:true },
     ],
   },
   fortress: {
@@ -3905,6 +3911,18 @@ export const DEFAULT_PLAYER_STATS = {
 // フォーマット: { version: 'x.x.x', date: 'YYYY-MM-DD', changes: ['変更内容...'] }
 // ============================================================
 export const VERSION_PATCHES = [
+  {
+    version: '2.29.0',
+    date: '2026-06-27',
+    changes: [
+      '🌸 新裏ダンジョン「彼岸花の檻 【裏初級】」を追加！ダンジョンタブの初級エリアに登場',
+      '⚔️ 12エリア構成・各エリア最大8体の大ボリューム。回廊→中ボス×2→眷属広間→玉座の間という構成',
+      '👑 ボス「Lycoris」は玉座フェーズを持つ特殊ボス。眷属を撃破するたびに本体へ60の転送ダメージ。HP50%以下で玉座を降りて直接攻撃に移行',
+      '🌑 撃破時4%の確率で「覚醒Lycoris」（HP1200）が出現する覚醒戦に突入！覚醒撃破で伝説素材「黒彼岸花」を入手できる',
+      '🆕 新モンスター7種追加：Lycoris Minion / Lycoris Escort / Lycoris Rightarm / Lycoris Leftarm / Vision of Lycoris / Lycoris / 覚醒Lycoris',
+      '🆕 新アイテム9種追加：彼岸花の花びら / 次元エネルギー / 高次元エネルギー / 不気味な種 / 急成長ポット / 栄養の詰まった水 / 花びらガチャキー / リコリスの輝き / 黒彼岸花（legendary）',
+    ],
+  },
   {
     version: '2.28.0',
     date: '2026-06-26',
