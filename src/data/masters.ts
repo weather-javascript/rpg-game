@@ -2253,6 +2253,19 @@ export const GATHER_NODE_MASTER: Record<string, GatherNodeMaster> = {
 
   // FF系統（ffgg_*）の採集ノードはFFタブ専用システム（FFGG_HARVEST_NODES / src/data/freefieldData.ts）に
   // 一本化。専用ツール（ffgg_gather_kit）所持時のみFFタブから採集可能。
+
+  // ============================================================
+  // 裏ダンジョン初級（Lycoris）専用アイテム
+  // ============================================================
+  higanbana_petal:      { id:'higanbana_petal',      name:'彼岸花の花びら',    description:'彼岸花から採れる花びら。裏初級の基本素材。',                          category:'material',   itemType:'Item', rarity:'common',    sellPrice:30,  buyPrice:0, maxStack:-1, icon:'leaf' },
+  dimension_energy:     { id:'dimension_energy',     name:'次元エネルギー',    description:'次元の歪みから生まれたエネルギー体。',                                category:'material',   itemType:'Item', rarity:'uncommon',  sellPrice:120, buyPrice:0, maxStack:-1, icon:'gem_blue' },
+  high_dimension_energy:{ id:'high_dimension_energy',name:'高次元エネルギー',  description:'通常の次元エネルギーより高純度の結晶体。中ボスから入手。',            category:'material',   itemType:'Item', rarity:'rare',      sellPrice:400, buyPrice:0, maxStack:99,  icon:'gem' },
+  eerie_seed:           { id:'eerie_seed',           name:'不気味な種',        description:'誰かが植えようとした謎の種。薄暗い場所で育つらしい。',                 category:'material',   itemType:'Item', rarity:'uncommon',  sellPrice:80,  buyPrice:0, maxStack:99,  icon:'ore_dark' },
+  growth_pot:           { id:'growth_pot',           name:'急成長ポット',      description:'植物の成長を急速に促す小さな鉢。消耗品。',                            category:'consumable', itemType:'Item', rarity:'uncommon',  sellPrice:150, buyPrice:0, maxStack:99,  icon:'potion' },
+  nutrient_water:       { id:'nutrient_water',       name:'栄養の詰まった水',  description:'Lycorisの眷属が持っていた謎の水。飲むとHPが回復する。',               category:'consumable', itemType:'Heal', rarity:'rare',      sellPrice:300, buyPrice:0, maxStack:99,  icon:'droplet', useEffect:{ hpRestore:20, message:'栄養の詰まった水を飲んだ。HPが20回復した！' } },
+  petal_gacha_key:      { id:'petal_gacha_key',      name:'花びらガチャキー',  description:'花びら柄の小さな鍵。専用ガチャを1回回せる。売却不可。',               category:'consumable', itemType:'Item', rarity:'rare',      sellPrice:0,   buyPrice:0, maxStack:99,  icon:'gem_red' },
+  lycoris_gleam:        { id:'lycoris_gleam',        name:'リコリスの輝き',    description:'Lycorisの力が結晶化した輝石。上位装備のクラフトに使う。',              category:'material',   itemType:'Item', rarity:'rare',      sellPrice:500, buyPrice:0, maxStack:99,  icon:'sparkle' },
+  black_higanbana:      { id:'black_higanbana',      name:'黒彼岸花',          description:'覚醒したLycorisだけが咲かせる禁忌の花。入手困難な伝説の素材。売却不可。', category:'treasure', itemType:'Item', rarity:'legendary', sellPrice:0,   buyPrice:0, maxStack:1,   icon:'ore_dark' },
 };
 
 // ============================================================
@@ -2477,6 +2490,15 @@ export const MONSTER_MASTER: Record<string, MonsterMaster> = {
   chaite_black_gladiator:  { id:'chaite_black_gladiator',  name:'黒装剣闘士', description:'チェイテの猛者。出血と高速斬撃で一気に削る。黒装騎士以上の防具が必要。',         icon:'swords', maxHp:600, attack:240, defense:16, baseExp:34, baseGold:18, dungeonIds:['chaite'], skills:['出血(継続ダメージ)','高速斬撃(多段攻撃)'], drops:[{itemId:'chaite_black_emblem',baseRate:0.45,minAmount:1,maxAmount:1},{itemId:'coin',baseRate:1.0,minAmount:10,maxAmount:20}] },
   chaite_nightmare:        { id:'chaite_nightmare',        name:'暗黒騎士ナイト・メア', description:'チェイテの中ボス。ナイトメアブレードと闇霧が凶悪。HP30%以下で暴走する。英雄騎士装備が必要。パルヴァトスがあれば楽になる。', icon:'skull', maxHp:1800, attack:340, defense:28, baseExp:180, baseGold:90, dungeonIds:['chaite'], isMidBoss:true, specialAttack:'ナイトメアブレード', skills:['ナイトメアブレード(高威力攻撃)','闇霧(被ダメ軽減)','暴走(HP30%以下で強化)'], drops:[{itemId:'nightmare_shard',baseRate:0.8,minAmount:1,maxAmount:2},{itemId:'chaite_hero_proof',baseRate:1.0,minAmount:2,maxAmount:3},{itemId:'coin',baseRate:1.0,minAmount:60,maxAmount:100}] },
   chaite_tokugawa:         { id:'chaite_tokugawa',         name:'第999代将軍徳川義和公', description:'チェイテの最終ボス。物理攻撃をほぼ無効化する。貫通ダメージで削るべし。HP50%以下で無双発動。', icon:'castle_jp', maxHp:1800, attack:45, defense:35, baseExp:1200, baseGold:700, dungeonIds:['chaite'], isBoss:true, defensePct:0.85, specialAttack:'政宗', skills:['政宗(高威力単体攻撃)','居合一閃(範囲攻撃)','威圧(プレイヤーデバフ)','無双(HP50%以下で強化)'], drops:[{itemId:'shogun_crest',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'cosmonium',baseRate:0.3,minAmount:1,maxAmount:2},{itemId:'coin',baseRate:1.0,minAmount:400,maxAmount:700}] },
+
+  // ─── 裏ダンジョン初級（Lycoris）─────────────────────────────
+  lycoris_minion:   { id:'lycoris_minion',   name:'Lycoris Minion',       description:'Lycorisの最下位の手下。魔法弾を飛ばしてくる。',                                                    icon:'silhouette',      maxHp:35,   attack:18, defense:3,  baseExp:15,  baseGold:5,   dungeonIds:['lycoris_dungeon'], drops:[{itemId:'higanbana_petal',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'dimension_energy',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'lycoris_gleam',baseRate:0.15,minAmount:1,maxAmount:1},{itemId:'eerie_seed',baseRate:0.60,minAmount:1,maxAmount:1},{itemId:'growth_pot',baseRate:0.50,minAmount:1,maxAmount:1},{itemId:'nutrient_water',baseRate:0.10,minAmount:1,maxAmount:1},{itemId:'petal_gacha_key',baseRate:0.05,minAmount:1,maxAmount:1}] },
+  lycoris_escort:   { id:'lycoris_escort',   name:'Lycoris Escort',       description:'Lycorisの護衛。堅く、状態異常を使ってくる。',                                                    icon:'shield',          maxHp:50,   attack:22, defense:6,  baseExp:25,  baseGold:8,   dungeonIds:['lycoris_dungeon'], drops:[{itemId:'higanbana_petal',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'dimension_energy',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'lycoris_gleam',baseRate:0.15,minAmount:1,maxAmount:1},{itemId:'eerie_seed',baseRate:0.60,minAmount:1,maxAmount:1},{itemId:'growth_pot',baseRate:0.50,minAmount:1,maxAmount:1},{itemId:'nutrient_water',baseRate:0.10,minAmount:1,maxAmount:1},{itemId:'petal_gacha_key',baseRate:0.05,minAmount:1,maxAmount:1}] },
+  lycoris_rightarm: { id:'lycoris_rightarm', name:'Lycoris Rightarm',     description:'Lycorisの右腕。物理攻撃特化の中ボス。',                                                         icon:'swords',          maxHp:220,  attack:32, defense:12, baseExp:120, baseGold:60,  dungeonIds:['lycoris_dungeon'], isMidBoss:true, specialAttack:'彼岸斬り', drops:[{itemId:'higanbana_petal',baseRate:1.0,minAmount:2,maxAmount:4},{itemId:'nutrient_water',baseRate:0.05,minAmount:1,maxAmount:1},{itemId:'high_dimension_energy',baseRate:0.30,minAmount:1,maxAmount:1}] },
+  lycoris_leftarm:  { id:'lycoris_leftarm',  name:'Lycoris Leftarm',      description:'Lycorisの左腕。魔法と防御が高い中ボス。',                                                        icon:'scroll',          maxHp:200,  attack:28, defense:16, baseExp:120, baseGold:60,  dungeonIds:['lycoris_dungeon'], isMidBoss:true, specialAttack:'魔法陣展開', drops:[{itemId:'higanbana_petal',baseRate:1.0,minAmount:2,maxAmount:4},{itemId:'growth_pot',baseRate:0.05,minAmount:1,maxAmount:1},{itemId:'high_dimension_energy',baseRate:0.30,minAmount:1,maxAmount:1}] },
+  vision_of_lycoris:{ id:'vision_of_lycoris',name:'Vision of Lycoris',    description:'Lycorisが召喚する眷属。本体への転送ダメージを持つ。',                                           icon:'cherry_blossom',  maxHp:30,   attack:15, defense:2,  baseExp:40,  baseGold:15,  dungeonIds:['lycoris_dungeon'], isMidBoss:true, specialAttack:'転送（本体に60ダメージ）', drops:[{itemId:'higanbana_petal',baseRate:1.0,minAmount:2,maxAmount:4},{itemId:'eerie_seed',baseRate:0.05,minAmount:1,maxAmount:1},{itemId:'high_dimension_energy',baseRate:0.30,minAmount:1,maxAmount:1}] },
+  lycoris:          { id:'lycoris',          name:'Lycoris',              description:'彼岸花の檻の支配者。玉座に座し、眷属を操る。HPが半分を切ると玉座を降りて直接攻撃する。眷属を撃破して本体を削れ。', icon:'crown', maxHp:800, attack:25, defense:0, baseExp:500, baseGold:300, dungeonIds:['lycoris_dungeon'], isBoss:true, specialAttack:'そっちだよ / あっちだよ / こっちだよ', drops:[{itemId:'higanbana_petal',baseRate:1.0,minAmount:3,maxAmount:6},{itemId:'dimension_energy',baseRate:1.0,minAmount:2,maxAmount:3},{itemId:'lycoris_gleam',baseRate:0.40,minAmount:1,maxAmount:1},{itemId:'eerie_seed',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'nutrient_water',baseRate:0.20,minAmount:1,maxAmount:1},{itemId:'petal_gacha_key',baseRate:0.15,minAmount:1,maxAmount:1}] },
+  lycoris_awakened: { id:'lycoris_awakened', name:'覚醒Lycoris',          description:'4%の確率で目覚める真の姿。眷属が強化され、召喚密度と攻撃頻度が増す。HP50%以下で通常Lycorisが同時湧きする。', icon:'skull', maxHp:1200, attack:35, defense:0, baseExp:1000, baseGold:600, dungeonIds:['lycoris_dungeon'], isBoss:true, specialAttack:'そっちだよ / あっちだよ / こっちだよ（強化版）', drops:[{itemId:'higanbana_petal',baseRate:1.0,minAmount:3,maxAmount:6},{itemId:'dimension_energy',baseRate:1.0,minAmount:2,maxAmount:3},{itemId:'lycoris_gleam',baseRate:0.40,minAmount:1,maxAmount:1},{itemId:'eerie_seed',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'nutrient_water',baseRate:0.20,minAmount:1,maxAmount:1},{itemId:'petal_gacha_key',baseRate:0.15,minAmount:1,maxAmount:1}] },
 };
 
 
@@ -2670,6 +2692,19 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
     areas:[
       { name:'巣窟前半', monsters:[{monsterId:'goblin',count:1}] },
       { name:'巣窟後半', monsters:[{monsterId:'slime',count:1}] },
+    ],
+  },
+  lycoris_dungeon: {
+    id:'lycoris_dungeon', name:'彼岸花の檻 【裏初級】', description:'Lycorisが支配する幻惑の裏ダンジョン。眷属を倒して本体にダメージを与えよ。4%の確率で覚醒戦に突入する。',
+    icon:'cherry_blossom', tier:'beginner', requiredLevel:1, floors:5, expBonus:1.5, goldBonus:1.5,
+    monsterIds:['lycoris_minion','lycoris_escort','lycoris_rightarm','lycoris_leftarm','vision_of_lycoris','lycoris'],
+    bossId:'lycoris',
+    areas:[
+      { name:'彼岸花の回廊',  description:'Lycorisの手下たちが徘徊する入口。',              monsters:[{monsterId:'lycoris_minion',count:2},{monsterId:'lycoris_escort',count:1}] },
+      { name:'左腕の間',      description:'Lycorisの左腕が守る部屋。',                       monsters:[{monsterId:'lycoris_leftarm',count:1,isMidBoss:true}], isHardArea:true },
+      { name:'右腕の間',      description:'Lycorisの右腕が待ち受ける部屋。',                 monsters:[{monsterId:'lycoris_rightarm',count:1,isMidBoss:true}], isHardArea:true },
+      { name:'眷属の広間',    description:'Visionたちが多数いる広間。',                      monsters:[{monsterId:'vision_of_lycoris',count:2},{monsterId:'lycoris_minion',count:1}] },
+      { name:'玉座の間',      description:'Lycoris本体が玉座に座する最奥。眷属を倒してダメージを与えよ。', monsters:[{monsterId:'lycoris',count:1,isBoss:true}], isHardArea:true },
     ],
   },
   fortress: {
