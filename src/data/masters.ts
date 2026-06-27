@@ -2,7 +2,7 @@
 
 import type {
   ItemMaster, SkillMaster, GatherNodeMaster,
-  MonsterMaster, DungeonMaster, GambleMaster, CraftRecipe,
+  MonsterMaster, DungeonMaster, DungeonArea, GambleMaster, CraftRecipe,
 } from '../types/game';
 import { IC_ITEMS, IC_CRAFT_RECIPES, IC_ALL_BEGINNER_ENEMIES } from './infiniteCorridorMaster';
 
@@ -2343,34 +2343,38 @@ export const MONSTER_MASTER: Record<string, MonsterMaster> = {
 
   // ────────────────────────────────────────────────────────────────
   // 星骸宇宙砦 アストラル・ノクス モンスター
-  // 火山比: 雑魚HP×1.5〜1.8 / ATK×1.3〜1.6, 中堅HP×1.8〜2.2 / ATK×1.6〜2.0, ボスHP×2.3〜2.8
+  // 【2026-06-26 ダンジョン構造改修】道中が短く敵が弱いという課題を解消するため、
+  // 全モンスターのHPを大幅増強（雑魚x12〜15／中堅x13〜15／エリートx14〜15）。
+  // 攻撃力は実戦闘ではeffectiveAttackが優先されるため、底上げはそちらも軽く調整。
   // ────────────────────────────────────────────────────────────────
   // ── 雑魚 ──
-  cosmic_mite:    { id:'cosmic_mite',    name:'コズミックマイト',   description:'宇宙塵に混じって大量発生する微小生命体。単体は弱いが、群れると圧倒的な数で押し寄せる。真空ダメージを継続的に与え、回復を妨害する。',                                icon:'slime',         maxHp:38,  attack:8,  defense:4,  baseExp:38,  baseGold:12,  dungeonIds:['astral_nox'], effectiveAttack:130, skills:['真空接触(継続ダメージ付与)','数の圧力(3体以上で攻撃力+15%)'], drops:[{itemId:'cosmic_shard',baseRate:0.6,minAmount:1,maxAmount:1},{itemId:'astral_core_fragment',baseRate:0.05,minAmount:1,maxAmount:1}] },
-  orbit_drone:    { id:'orbit_drone',    name:'軌道ドローン',       description:'発射台の残骸から起動する自律兵器。先制射撃でプレイヤーの動きを制限し、遠距離から継続的に弾幕を張る。数が多いほど弾密度が増す。',                                    icon:'robot',         maxHp:42,  attack:9,  defense:5,  baseExp:40,  baseGold:14,  dungeonIds:['astral_nox'], effectiveAttack:145, skills:['先制射撃(戦闘開始時に先行攻撃)','連射(2ターンごとに2連続攻撃)'], drops:[{itemId:'stardust_gear',baseRate:0.7,minAmount:1,maxAmount:1},{itemId:'cosmic_shard',baseRate:0.3,minAmount:1,maxAmount:1}] },
-  flare_imp:      { id:'flare_imp',      name:'フレアインプ',       description:'恒星炉から飛び出した炎の小悪魔。燃焼を付与して継続ダメージを与え、回復阻害も持つ。太陽航路の序盤から後半まで広く出現する迷惑な存在。',                             icon:'flame',         maxHp:40,  attack:10, defense:3,  baseExp:42,  baseGold:13,  dungeonIds:['astral_nox'], effectiveAttack:150, skills:['星炎(燃焼上位版：継続ダメージ強化+回復阻害)','フレアキック(単体高火力)'], drops:[{itemId:'flare_plate',baseRate:0.5,minAmount:1,maxAmount:1},{itemId:'sun_conductive_crystal',baseRate:0.2,minAmount:1,maxAmount:1}] },
-  lunar_wisp:     { id:'lunar_wisp',     name:'月霊',               description:'月面遺構に漂う霊体。凍結付与で行動速度を低下させる。単体は弱いが、集まると凍結と鈍足の二重苦で行動不能に陥らせる。幻影生成でフェイントをかけることもある。', icon:'snowflake',     maxHp:35,  attack:7,  defense:3,  baseExp:35,  baseGold:11,  dungeonIds:['astral_nox'], effectiveAttack:120, skills:['凍結(行動速度低下付与)','月の幻影(フェイント攻撃)'], drops:[{itemId:'moon_shard',baseRate:0.6,minAmount:1,maxAmount:1},{itemId:'frost_silica',baseRate:0.25,minAmount:1,maxAmount:1}] },
-  vacuum_wisp:    { id:'vacuum_wisp',    name:'真空霊',             description:'真空の虚無から生まれた霊体。接触するだけでMPを吸収し、魔力を枯渇させる。物理攻撃への耐性があり、魔法属性攻撃の方が通りやすい厄介な相手。',                   icon:'skull',         maxHp:32,  attack:6,  defense:2,  baseExp:35,  baseGold:10,  dungeonIds:['astral_nox'], effectiveAttack:115, skills:['MP吸収(接触時にMP−15)','真空纏い(物理ダメージ30%軽減)'], drops:[{itemId:'event_horizon_fiber',baseRate:0.4,minAmount:1,maxAmount:1},{itemId:'abyss_resin',baseRate:0.25,minAmount:1,maxAmount:1}] },
-  starling:       { id:'starling',       name:'スターリング',       description:'星の欠片が意思を持って動く高機動型モブ。回避率が高く攻撃が当たりにくい。範囲攻撃や必中攻撃でないと苦戦する。月面遺構ルートに多く出現する。',                     icon:'gem_blue',      maxHp:30,  attack:7,  defense:2,  baseExp:36,  baseGold:11,  dungeonIds:['astral_nox'], effectiveAttack:125, skills:['星回避(回避率+25%)','流星突(高速突進攻撃)'], drops:[{itemId:'moon_shard',baseRate:0.4,minAmount:1,maxAmount:1},{itemId:'cosmic_shard',baseRate:0.5,minAmount:1,maxAmount:1}] },
+  cosmic_mite:    { id:'cosmic_mite',    name:'コズミックマイト',   description:'宇宙塵に混じって大量発生する微小生命体。単体は弱いが、群れると圧倒的な数で押し寄せる。真空ダメージを継続的に与え、回復を妨害する。',                                icon:'slime',         maxHp:480,  attack:14,  defense:4,  baseExp:38,  baseGold:12,  dungeonIds:['astral_nox'], effectiveAttack:150, skills:['真空接触(継続ダメージ付与)','数の圧力(3体以上で攻撃力+15%)'], drops:[{itemId:'cosmic_shard',baseRate:0.6,minAmount:1,maxAmount:1},{itemId:'astral_core_fragment',baseRate:0.05,minAmount:1,maxAmount:1}] },
+  orbit_drone:    { id:'orbit_drone',    name:'軌道ドローン',       description:'発射台の残骸から起動する自律兵器。先制射撃でプレイヤーの動きを制限し、遠距離から継続的に弾幕を張る。数が多いほど弾密度が増す。',                                    icon:'robot',         maxHp:520,  attack:15,  defense:5,  baseExp:40,  baseGold:14,  dungeonIds:['astral_nox'], effectiveAttack:170, skills:['先制射撃(戦闘開始時に先行攻撃)','連射(2ターンごとに2連続攻撃)'], drops:[{itemId:'stardust_gear',baseRate:0.7,minAmount:1,maxAmount:1},{itemId:'cosmic_shard',baseRate:0.3,minAmount:1,maxAmount:1}] },
+  flare_imp:      { id:'flare_imp',      name:'フレアインプ',       description:'恒星炉から飛び出した炎の小悪魔。燃焼を付与して継続ダメージを与え、回復阻害も持つ。太陽航路の序盤から後半まで広く出現する迷惑な存在。',                             icon:'flame',         maxHp:500,  attack:16, defense:3,  baseExp:42,  baseGold:13,  dungeonIds:['astral_nox'], effectiveAttack:175, skills:['星炎(燃焼上位版：継続ダメージ強化+回復阻害)','フレアキック(単体高火力)'], drops:[{itemId:'flare_plate',baseRate:0.5,minAmount:1,maxAmount:1},{itemId:'sun_conductive_crystal',baseRate:0.2,minAmount:1,maxAmount:1}] },
+  lunar_wisp:     { id:'lunar_wisp',     name:'月霊',               description:'月面遺構に漂う霊体。凍結付与で行動速度を低下させる。単体は弱いが、集まると凍結と鈍足の二重苦で行動不能に陥らせる。幻影生成でフェイントをかけることもある。', icon:'snowflake',     maxHp:460,  attack:13,  defense:3,  baseExp:35,  baseGold:11,  dungeonIds:['astral_nox'], effectiveAttack:140, skills:['凍結(行動速度低下付与)','月の幻影(フェイント攻撃)'], drops:[{itemId:'moon_shard',baseRate:0.6,minAmount:1,maxAmount:1},{itemId:'frost_silica',baseRate:0.25,minAmount:1,maxAmount:1}] },
+  vacuum_wisp:    { id:'vacuum_wisp',    name:'真空霊',             description:'真空の虚無から生まれた霊体。接触するだけでMPを吸収し、魔力を枯渇させる。物理攻撃への耐性があり、魔法属性攻撃の方が通りやすい厄介な相手。',                   icon:'skull',         maxHp:440,  attack:12,  defense:2,  baseExp:35,  baseGold:10,  dungeonIds:['astral_nox'], effectiveAttack:135, skills:['MP吸収(接触時にMP−15)','真空纏い(物理ダメージ30%軽減)'], drops:[{itemId:'event_horizon_fiber',baseRate:0.4,minAmount:1,maxAmount:1},{itemId:'abyss_resin',baseRate:0.25,minAmount:1,maxAmount:1}] },
+  starling:       { id:'starling',       name:'スターリング',       description:'星の欠片が意思を持って動く高機動型モブ。回避率が高く攻撃が当たりにくい。範囲攻撃や必中攻撃でないと苦戦する。月面遺構ルートに多く出現する。',                     icon:'gem_blue',      maxHp:420,  attack:13,  defense:2,  baseExp:36,  baseGold:11,  dungeonIds:['astral_nox'], effectiveAttack:145, skills:['星回避(回避率+25%)','流星突(高速突進攻撃)'], drops:[{itemId:'moon_shard',baseRate:0.4,minAmount:1,maxAmount:1},{itemId:'cosmic_shard',baseRate:0.5,minAmount:1,maxAmount:1}] },
   // ── 中堅 ──
-  orbital_knight: { id:'orbital_knight', name:'軌道騎士',           description:'重力制御装甲を身に纏う高防御の中堅敵。攻撃を弾くブロック能力を持ち、正面からの突破は難しい。ただし側面や背面からの攻撃には弱い。',                               icon:'soldier_helmet', maxHp:82,  attack:14, defense:18, baseExp:90,  baseGold:35,  dungeonIds:['astral_nox'], effectiveAttack:280, skills:['重力盾(被ダメージ40%軽減)','軌道衝撃(全体攻撃)'], drops:[{itemId:'stardust_gear',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'cosmic_shard',baseRate:0.5,minAmount:1,maxAmount:1}] },
-  ray_sniper:     { id:'ray_sniper',     name:'光線狙撃手',         description:'後衛を優先して狙う危険な遠距離攻撃手。直線貫通ビームが回避不能で、後衛キャラを的確に狙ってくる。射程外から処理するか、前衛で壁を作ることが必要。',           icon:'arrow',         maxHp:62,  attack:16, defense:8,  baseExp:85,  baseGold:30,  dungeonIds:['astral_nox'], effectiveAttack:300, skills:['後衛狙撃(後衛優先攻撃)','貫通レイ(直線貫通ビーム)'], drops:[{itemId:'sun_conductive_crystal',baseRate:0.6,minAmount:1,maxAmount:1},{itemId:'flare_plate',baseRate:0.3,minAmount:1,maxAmount:1}] },
-  beam_archer:    { id:'beam_archer',    name:'ビームアーチャー',   description:'直線型のエネルギービームを連射する中距離攻撃手。ビームは直線上の全ての目標に命中する。横に散れば回避できるが、通路では避けにくい。',                         icon:'arrow',         maxHp:58,  attack:15, defense:7,  baseExp:82,  baseGold:28,  dungeonIds:['astral_nox'], effectiveAttack:280, skills:['直線ビーム(直線範囲攻撃)','速射(2ターンごとに3連射)'], drops:[{itemId:'sun_conductive_crystal',baseRate:0.5,minAmount:1,maxAmount:1},{itemId:'cosmic_shard',baseRate:0.6,minAmount:1,maxAmount:1}] },
-  gravity_crusher:{ id:'gravity_crusher',name:'重力クラッシャー',   description:'重力異常を引き起こす大型モブ。周囲の重力を操り、防御力を低下させる圧縮重力波を放つ。被弾後に続く敵の攻撃が急に刺さるようになる危険な相手。',               icon:'hammer',        maxHp:95,  attack:18, defense:12, baseExp:105, baseGold:42,  dungeonIds:['astral_nox'], effectiveAttack:320, skills:['重力圧縮(防御力−30%付与)','重力異常(行動順遅延)'], drops:[{itemId:'stardust_gear',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'astral_core_fragment',baseRate:0.3,minAmount:1,maxAmount:1}] },
-  void_mage:      { id:'void_mage',      name:'虚空魔術師',         description:'虚空の魔法を操る術師。呪いを付与してバフを解除し、防御無視攻撃で装甲を無効化する。また周囲のMP吸収霊を召喚することもある、非常に面倒な相手。',               icon:'mage',          maxHp:65,  attack:20, defense:6,  baseExp:110, baseGold:45,  dungeonIds:['astral_nox'], effectiveAttack:350, skills:['虚空呪詛(バフ解除+呪い付与)','防御無視魔法(防御貫通攻撃)','真空霊召喚(vacuum_wispを1〜2体呼ぶ)'], drops:[{itemId:'void_core',baseRate:0.2,minAmount:1,maxAmount:1},{itemId:'abyss_resin',baseRate:0.8,minAmount:1,maxAmount:1}] },
-  sun_priest:     { id:'sun_priest',     name:'太陽司祭',           description:'恒星炉の神官。周囲の太陽航路の敵の攻撃力を強化する支援役。自身は攻撃力が低いが放置すると周囲の火力が跳ね上がる。最優先で排除すべき危険な支援役。',         icon:'crown',         maxHp:55,  attack:10, defense:8,  baseExp:80,  baseGold:30,  dungeonIds:['astral_nox'], effectiveAttack:200, skills:['星炎の祝福(周囲味方のATK+30%+燃焼付与強化)','光の盾(単体にシールド付与)'], drops:[{itemId:'flare_plate',baseRate:0.7,minAmount:1,maxAmount:1},{itemId:'stellar_core',baseRate:0.1,minAmount:1,maxAmount:1}] },
-  debris_hunter:  { id:'debris_hunter',  name:'デブリハンター',     description:'宇宙デブリを武器とした追跡型の中堅敵。必中のデブリ投擲と強力な追跡能力を持ち、逃げても追ってくる。回避型プレイヤーへの対策として配置されることが多い。',   icon:'dagger',        maxHp:72,  attack:17, defense:9,  baseExp:88,  baseGold:33,  dungeonIds:['astral_nox'], effectiveAttack:295, skills:['必中投擲(回避不能のデブリ攻撃)','強制追跡(逃走不可+鈍足付与)'], drops:[{itemId:'stardust_gear',baseRate:0.8,minAmount:1,maxAmount:1},{itemId:'cosmic_shard',baseRate:0.4,minAmount:1,maxAmount:1}] },
-  mirror_turret:  { id:'mirror_turret',  name:'反射砲台',           description:'受けたダメージの一部を反射する防衛用砲台。単発高火力が通りにくく、物理攻撃を多用すると自滅する。魔法や出血など非反射ダメージが有効。ギミックとして重要な敵。',icon:'shield',        maxHp:88,  attack:12, defense:20, baseExp:95,  baseGold:38,  dungeonIds:['astral_nox'], effectiveAttack:220, skills:['反射装甲(物理ダメージの20%反射)','砲台射撃(全体範囲攻撃)'], drops:[{itemId:'stardust_gear',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'astral_core_fragment',baseRate:0.2,minAmount:1,maxAmount:1}] },
+  orbital_knight: { id:'orbital_knight', name:'軌道騎士',           description:'重力制御装甲を身に纏う高防御の中堅敵。攻撃を弾くブロック能力を持ち、正面からの突破は難しい。ただし側面や背面からの攻撃には弱い。',                               icon:'soldier_helmet', maxHp:1100, attack:22, defense:18, baseExp:90,  baseGold:35,  dungeonIds:['astral_nox'], effectiveAttack:310, skills:['重力盾(被ダメージ40%軽減)','軌道衝撃(全体攻撃)'], drops:[{itemId:'stardust_gear',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'cosmic_shard',baseRate:0.5,minAmount:1,maxAmount:1}] },
+  ray_sniper:     { id:'ray_sniper',     name:'光線狙撃手',         description:'後衛を優先して狙う危険な遠距離攻撃手。直線貫通ビームが回避不能で、後衛キャラを的確に狙ってくる。射程外から処理するか、前衛で壁を作ることが必要。',           icon:'arrow',         maxHp:950,  attack:24, defense:8,  baseExp:85,  baseGold:30,  dungeonIds:['astral_nox'], effectiveAttack:330, skills:['後衛狙撃(後衛優先攻撃)','貫通レイ(直線貫通ビーム)'], drops:[{itemId:'sun_conductive_crystal',baseRate:0.6,minAmount:1,maxAmount:1},{itemId:'flare_plate',baseRate:0.3,minAmount:1,maxAmount:1}] },
+  beam_archer:    { id:'beam_archer',    name:'ビームアーチャー',   description:'直線型のエネルギービームを連射する中距離攻撃手。ビームは直線上の全ての目標に命中する。横に散れば回避できるが、通路では避けにくい。',                         icon:'arrow',         maxHp:900,  attack:23, defense:7,  baseExp:82,  baseGold:28,  dungeonIds:['astral_nox'], effectiveAttack:310, skills:['直線ビーム(直線範囲攻撃)','速射(2ターンごとに3連射)'], drops:[{itemId:'sun_conductive_crystal',baseRate:0.5,minAmount:1,maxAmount:1},{itemId:'cosmic_shard',baseRate:0.6,minAmount:1,maxAmount:1}] },
+  gravity_crusher:{ id:'gravity_crusher',name:'重力クラッシャー',   description:'重力異常を引き起こす大型モブ。周囲の重力を操り、防御力を低下させる圧縮重力波を放つ。被弾後に続く敵の攻撃が急に刺さるようになる危険な相手。',               icon:'hammer',        maxHp:1300, attack:26, defense:12, baseExp:105, baseGold:42,  dungeonIds:['astral_nox'], effectiveAttack:350, skills:['重力圧縮(防御力−30%付与)','重力異常(行動順遅延)'], drops:[{itemId:'stardust_gear',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'astral_core_fragment',baseRate:0.3,minAmount:1,maxAmount:1}] },
+  void_mage:      { id:'void_mage',      name:'虚空魔術師',         description:'虚空の魔法を操る術師。呪いを付与してバフを解除し、防御無視攻撃で装甲を無効化する。また周囲のMP吸収霊を召喚することもある、非常に面倒な相手。',               icon:'mage',          maxHp:980,  attack:28, defense:6,  baseExp:110, baseGold:45,  dungeonIds:['astral_nox'], effectiveAttack:380, skills:['虚空呪詛(バフ解除+呪い付与)','防御無視魔法(防御貫通攻撃)','真空霊召喚(vacuum_wispを1〜2体呼ぶ)'], drops:[{itemId:'void_core',baseRate:0.2,minAmount:1,maxAmount:1},{itemId:'abyss_resin',baseRate:0.8,minAmount:1,maxAmount:1}] },
+  sun_priest:     { id:'sun_priest',     name:'太陽司祭',           description:'恒星炉の神官。周囲の太陽航路の敵の攻撃力を強化する支援役。自身は攻撃力が低いが放置すると周囲の火力が跳ね上がる。最優先で排除すべき危険な支援役。',         icon:'crown',         maxHp:850,  attack:18, defense:8,  baseExp:80,  baseGold:30,  dungeonIds:['astral_nox'], effectiveAttack:220, skills:['星炎の祝福(周囲味方のATK+30%+燃焼付与強化)','光の盾(単体にシールド付与)'], drops:[{itemId:'flare_plate',baseRate:0.7,minAmount:1,maxAmount:1},{itemId:'stellar_core',baseRate:0.1,minAmount:1,maxAmount:1}] },
+  debris_hunter:  { id:'debris_hunter',  name:'デブリハンター',     description:'宇宙デブリを武器とした追跡型の中堅敵。必中のデブリ投擲と強力な追跡能力を持ち、逃げても追ってくる。回避型プレイヤーへの対策として配置されることが多い。',   icon:'dagger',        maxHp:1050, attack:25, defense:9,  baseExp:88,  baseGold:33,  dungeonIds:['astral_nox'], effectiveAttack:320, skills:['必中投擲(回避不能のデブリ攻撃)','強制追跡(逃走不可+鈍足付与)'], drops:[{itemId:'stardust_gear',baseRate:0.8,minAmount:1,maxAmount:1},{itemId:'cosmic_shard',baseRate:0.4,minAmount:1,maxAmount:1}] },
+  mirror_turret:  { id:'mirror_turret',  name:'反射砲台',           description:'受けたダメージの一部を反射する防衛用砲台。単発高火力が通りにくく、物理攻撃を多用すると自滅する。魔法や出血など非反射ダメージが有効。ギミックとして重要な敵。',icon:'shield',        maxHp:1250, attack:20, defense:20, baseExp:95,  baseGold:38,  dungeonIds:['astral_nox'], effectiveAttack:250, skills:['反射装甲(物理ダメージの20%反射)','砲台射撃(全体範囲攻撃)'], drops:[{itemId:'stardust_gear',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'astral_core_fragment',baseRate:0.2,minAmount:1,maxAmount:1}] },
   // ── エリート ──
-  plasma_hound:   { id:'plasma_hound',   name:'プラズマハウンド',   description:'プラズマを纏った高速追跡型エリート。連撃で手数攻めを行い、防御が高いほど無効化して削る。高い機動力で位置取りを崩してくる極めて危険な相手。',               icon:'skull',         maxHp:165, attack:30, defense:12, baseExp:200, baseGold:80,  dungeonIds:['astral_nox'], isMidBoss:true, effectiveAttack:520, skills:['プラズマ連撃(4〜5連続攻撃)','電磁加速(速度+50%・回避不能追跡)'], drops:[{itemId:'astral_core_fragment',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'stellar_core',baseRate:0.15,minAmount:1,maxAmount:1}] },
-  event_hunter:   { id:'event_hunter',   name:'事象ハンター',       description:'事象の地平線に潜む防御無視型エリート。どんなに防御を積んでも無効化する貫通攻撃を持ち、高防御ビルドが崩壊する。対策は回避か回復力の確保のみ。',                 icon:'dagger',        maxHp:155, attack:38, defense:8,  baseExp:210, baseGold:85,  dungeonIds:['astral_nox'], isMidBoss:true, effectiveAttack:580, skills:['防御貫通突き(防御力完全無視攻撃)','重力加速(先制攻撃+会心率+30%)'], drops:[{itemId:'void_core',baseRate:0.3,minAmount:1,maxAmount:1},{itemId:'event_horizon_fiber',baseRate:0.8,minAmount:1,maxAmount:1}] },
-  curse_scribe:   { id:'curse_scribe',   name:'呪刻師',             description:'呪いの書を扱うエリート術師。被回復量を激減させる「回復呪印」が最大の脅威。この呪いを受けた状態で長期戦に入ると自然回復も阻害され一気に崩壊する。',           icon:'scroll',        maxHp:140, attack:28, defense:10, baseExp:185, baseGold:75,  dungeonIds:['astral_nox'], isMidBoss:true, effectiveAttack:480, skills:['回復呪印(被回復量−70%付与)','呪刻魔法(MP吸収+最大HP削り)'], drops:[{itemId:'abyss_resin',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'void_core',baseRate:0.2,minAmount:1,maxAmount:1}] },
-  flare_paladin:  { id:'flare_paladin',  name:'フレアパラディン',   description:'太陽航路の守護者。高耐久かつ燃焼持続攻撃で削り続ける持久戦特化のエリート。一撃は重くないが燃焼と継続ダメージの蓄積で疲弊させる火耐性必須の相手。',          icon:'sword',         maxHp:280, attack:32, defense:22, baseExp:280, baseGold:110, dungeonIds:['astral_nox'], isMidBoss:true, effectiveAttack:600, skills:['星炎連撃(燃焼付与+持続攻撃)','太陽の誓い(HP50%以下で防御+20)','光の回復(自己回復)'], drops:[{itemId:'flare_plate',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'stellar_core',baseRate:0.25,minAmount:1,maxAmount:1}] },
-  drift_guard:    { id:'drift_guard',    name:'漂流守衛',           description:'無重力空間に適応した足止め特化のエリート。重力制御でプレイヤーを拘束し、逃走不能にした上で周囲の雑魚敵を強化する。放置すると危機的な状況が長引く。',           icon:'shield',        maxHp:220, attack:22, defense:25, baseExp:240, baseGold:95,  dungeonIds:['astral_nox'], isMidBoss:true, effectiveAttack:450, skills:['重力拘束(移動不能+行動遅延)','仲間強化(周囲のATK+25%+速度+20%)'], drops:[{itemId:'stardust_gear',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'astral_core_fragment',baseRate:0.5,minAmount:1,maxAmount:1}] },
-  // ── ボス ──
-  solaris_seraph: { id:'solaris_seraph', name:'ソラリス熾天使',     description:'太陽航路の最終ボス。3段階の形態変化を持つ持久戦型の強敵。第1形態は燃焼ビーム乱射、第2形態は砲台召喚とシールド展開、第3形態は全体爆発と自己回復の繰り返し。火耐性と継続回復が攻略の鍵。単発高火力より持続火力が有効。', icon:'flame', maxHp:62000, attack:150, effectiveAttack:3200, defense:35, baseExp:5500, baseGold:2800, dungeonIds:['astral_nox'], isBoss:true, specialAttack:'ソーラーブラスト・ジャッジメント', skills:['フェーズ1:星炎ビーム乱射(全体燃焼+ダメージ)','フェーズ1:光の収束(予兆後に超高火力単体ビーム)','フェーズ2:砲台召喚(mirror_turretを3体召喚)','フェーズ2:聖盾展開(30秒間自身にシールド付与・ダメージ無効)','フェーズ3:恒星爆発(全体割合ダメージ30%)','フェーズ3:星炎回生(自己回復+周囲燃焼付与)','ソーラーブラスト・ジャッジメント(全体超高ダメージ+燃焼確定)'], traits:['HP70%以下でフェーズ2移行','HP35%以下でフェーズ3移行','フェーズ2中は聖盾で実質無敵(シールド破壊必須)','フェーズ3突入時に周囲全体へ燃焼付与'], drops:[{itemId:'seraph_halo',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'stellar_core',baseRate:1.0,minAmount:2,maxAmount:4},{itemId:'flare_plate',baseRate:1.0,minAmount:3,maxAmount:6},{itemId:'moon_key',baseRate:1.0,minAmount:1,maxAmount:1}] },
-  abyss_archon:   { id:'abyss_archon',   name:'虚空大公',           description:'虚空航路の最終ボス。3段階の形態変化を持つ長期戦不利型の凶悪ボス。第1形態は真空斬撃とMP吸収、第2形態は分身生成と防御貫通、第3形態はブラックホール化と最大HP削り。対策装備なしで長引くと完封される。', icon:'skull', maxHp:58000, attack:160, effectiveAttack:3500, defense:28, baseExp:5800, baseGold:3000, dungeonIds:['astral_nox'], isBoss:true, specialAttack:'虚空侵食・終焉', skills:['フェーズ1:真空斬撃(防御無視+真空ダメージ継続)','フェーズ1:MP断絶(大量MP吸収)','フェーズ2:分身生成(偽分身を3体召喚・本体を攻撃しないとダメージ無効)','フェーズ2:防御貫通突撃(防御完全無視の単体即死級攻撃)','フェーズ3:ブラックホール化(全体HP上限−20%削り)','フェーズ3:虚空呪詛波(全体バフ解除+呪い+MP吸収)','虚空侵食・終焉(全体防御無視ダメージ+呪い確定+HP上限削り)'], traits:['HP65%以下でフェーズ2移行','HP30%以下でフェーズ3移行','フェーズ2の偽分身は本体撃破まで消えない','フェーズ3突入時に全バフ解除+HP上限−10%削り'], drops:[{itemId:'archon_void_core',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'void_core',baseRate:1.0,minAmount:2,maxAmount:4},{itemId:'event_horizon_fiber',baseRate:1.0,minAmount:3,maxAmount:6},{itemId:'moon_key',baseRate:1.0,minAmount:1,maxAmount:1}] },
-  moon_sentinel:  { id:'moon_sentinel',  name:'月面番人',           description:'月面遺構の守護者。凍結と幻影でプレイヤーを翻弄し、反射装甲で単発攻撃を弾く。月面遺構ルートの中ボス。短期決戦でないと凍結が蓄積して身動きが取れなくなる。', icon:'snowflake', maxHp:320, attack:42, effectiveAttack:680, defense:28, baseExp:450, baseGold:180, dungeonIds:['astral_nox'], isMidBoss:true, specialAttack:'月光刃', skills:['月光刃(凍結+高火力)','反射装甲(物理ダメージ25%反射)','幻影分身(2体の幻影を生成・本体は無敵)'], drops:[{itemId:'lunar_core',baseRate:0.5,minAmount:1,maxAmount:1},{itemId:'moon_shard',baseRate:1.0,minAmount:2,maxAmount:3},{itemId:'frost_silica',baseRate:0.8,minAmount:1,maxAmount:2}] },
+  plasma_hound:   { id:'plasma_hound',   name:'プラズマハウンド',   description:'プラズマを纏った高速追跡型エリート。連撃で手数攻めを行い、防御が高いほど無効化して削る。高い機動力で位置取りを崩してくる極めて危険な相手。',               icon:'skull',         maxHp:2400, attack:42, defense:12, baseExp:200, baseGold:80,  dungeonIds:['astral_nox'], isMidBoss:true, effectiveAttack:560, skills:['プラズマ連撃(4〜5連続攻撃)','電磁加速(速度+50%・回避不能追跡)'], drops:[{itemId:'astral_core_fragment',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'stellar_core',baseRate:0.15,minAmount:1,maxAmount:1}] },
+  event_hunter:   { id:'event_hunter',   name:'事象ハンター',       description:'事象の地平線に潜む防御無視型エリート。どんなに防御を積んでも無効化する貫通攻撃を持ち、高防御ビルドが崩壊する。対策は回避か回復力の確保のみ。',                 icon:'dagger',        maxHp:2300, attack:50, defense:8,  baseExp:210, baseGold:85,  dungeonIds:['astral_nox'], isMidBoss:true, effectiveAttack:620, skills:['防御貫通突き(防御力完全無視攻撃)','重力加速(先制攻撃+会心率+30%)'], drops:[{itemId:'void_core',baseRate:0.3,minAmount:1,maxAmount:1},{itemId:'event_horizon_fiber',baseRate:0.8,minAmount:1,maxAmount:1}] },
+  curse_scribe:   { id:'curse_scribe',   name:'呪刻師',             description:'呪いの書を扱うエリート術師。被回復量を激減させる「回復呪印」が最大の脅威。この呪いを受けた状態で長期戦に入ると自然回復も阻害され一気に崩壊する。',           icon:'scroll',        maxHp:2100, attack:40, defense:10, baseExp:185, baseGold:75,  dungeonIds:['astral_nox'], isMidBoss:true, effectiveAttack:520, skills:['回復呪印(被回復量−70%付与)','呪刻魔法(MP吸収+最大HP削り)'], drops:[{itemId:'abyss_resin',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'void_core',baseRate:0.2,minAmount:1,maxAmount:1}] },
+  flare_paladin:  { id:'flare_paladin',  name:'フレアパラディン',   description:'太陽航路の守護者。高耐久かつ燃焼持続攻撃で削り続ける持久戦特化のエリート。一撃は重くないが燃焼と継続ダメージの蓄積で疲弊させる火耐性必須の相手。',          icon:'sword',         maxHp:4200, attack:44, defense:22, baseExp:280, baseGold:110, dungeonIds:['astral_nox'], isMidBoss:true, effectiveAttack:650, skills:['星炎連撃(燃焼付与+持続攻撃)','太陽の誓い(HP50%以下で防御+20)','光の回復(自己回復)'], drops:[{itemId:'flare_plate',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'stellar_core',baseRate:0.25,minAmount:1,maxAmount:1}] },
+  drift_guard:    { id:'drift_guard',    name:'漂流守衛',           description:'無重力空間に適応した足止め特化のエリート。重力制御でプレイヤーを拘束し、逃走不能にした上で周囲の雑魚敵を強化する。放置すると危機的な状況が長引く。',           icon:'shield',        maxHp:3300, attack:34, defense:25, baseExp:240, baseGold:95,  dungeonIds:['astral_nox'], isMidBoss:true, effectiveAttack:490, skills:['重力拘束(移動不能+行動遅延)','仲間強化(周囲のATK+25%+速度+20%)'], drops:[{itemId:'stardust_gear',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'astral_core_fragment',baseRate:0.5,minAmount:1,maxAmount:1}] },
+  // ── 関門守護者（旧最終ボス。9ルート→単一ボス収束に伴い各テーマの「門番」中ボスへ再配置）──
+  solaris_seraph: { id:'solaris_seraph', name:'ソラリス熾天使',     description:'太陽航路の門番。3段階の形態変化を持つ持久戦型の強敵。第1形態は燃焼ビーム乱射、第2形態は砲台召喚とシールド展開、第3形態は全体爆発と自己回復の繰り返し。火耐性と継続回復が攻略の鍵。これを退けた先にこそ、星骸の真の支配者が待つ。', icon:'flame', maxHp:16000, attack:60, effectiveAttack:2200, defense:30, baseExp:1600, baseGold:700, dungeonIds:['astral_nox'], isMidBoss:true, specialAttack:'ソーラーブラスト・ジャッジメント', skills:['フェーズ1:星炎ビーム乱射(全体燃焼+ダメージ)','フェーズ1:光の収束(予兆後に超高火力単体ビーム)','フェーズ2:砲台召喚(mirror_turretを3体召喚)','フェーズ2:聖盾展開(一定時間自身にシールド付与・ダメージ無効)','フェーズ3:恒星爆発(全体割合ダメージ30%)','フェーズ3:星炎回生(自己回復+周囲燃焼付与)'], traits:['HP70%以下でフェーズ2移行','HP35%以下でフェーズ3移行','フェーズ2中は聖盾で実質無敵(シールド破壊必須)'], drops:[{itemId:'seraph_halo',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'stellar_core',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'flare_plate',baseRate:1.0,minAmount:2,maxAmount:4}] },
+  abyss_archon:   { id:'abyss_archon',   name:'虚空大公',           description:'虚空航路の門番。3段階の形態変化を持つ長期戦不利型の凶悪ボス。第1形態は真空斬撃とMP吸収、第2形態は分身生成と防御貫通、第3形態はブラックホール化と最大HP削り。対策装備なしで長引くと完封される。これを退けた先にこそ、星骸の真の支配者が待つ。', icon:'skull', maxHp:15000, attack:64, effectiveAttack:2300, defense:26, baseExp:1650, baseGold:720, dungeonIds:['astral_nox'], isMidBoss:true, specialAttack:'虚空侵食・終焉', skills:['フェーズ1:真空斬撃(防御無視+真空ダメージ継続)','フェーズ1:MP断絶(大量MP吸収)','フェーズ2:分身生成(偽分身を3体召喚・本体を攻撃しないとダメージ無効)','フェーズ2:防御貫通突撃(防御完全無視の単体即死級攻撃)','フェーズ3:ブラックホール化(全体HP上限−20%削り)','フェーズ3:虚空呪詛波(全体バフ解除+呪い+MP吸収)'], traits:['HP65%以下でフェーズ2移行','HP30%以下でフェーズ3移行','フェーズ2の偽分身は本体撃破まで消えない'], drops:[{itemId:'archon_void_core',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'void_core',baseRate:1.0,minAmount:1,maxAmount:2},{itemId:'event_horizon_fiber',baseRate:1.0,minAmount:2,maxAmount:4}] },
+  moon_sentinel:  { id:'moon_sentinel',  name:'月面番人',           description:'月面遺構の守護者。凍結と幻影でプレイヤーを翻弄し、反射装甲で単発攻撃を弾く。月面遺構ルートの中ボス。短期決戦でないと凍結が蓄積して身動きが取れなくなる。', icon:'snowflake', maxHp:4800, attack:58, effectiveAttack:920, defense:28, baseExp:450, baseGold:180, dungeonIds:['astral_nox'], isMidBoss:true, specialAttack:'月光刃', skills:['月光刃(凍結+高火力)','反射装甲(物理ダメージ25%反射)','幻影分身(2体の幻影を生成・本体は無敵)'], drops:[{itemId:'lunar_core',baseRate:0.5,minAmount:1,maxAmount:1},{itemId:'moon_shard',baseRate:1.0,minAmount:2,maxAmount:3},{itemId:'frost_silica',baseRate:0.8,minAmount:1,maxAmount:2}] },
+  // ── 真の最終ボス（9ルート全てがここへ収束する単一ボス）──
+  nox_prime: { id:'nox_prime', name:'ノクス・プライム〔星骸の意志〕', description:'星骸宇宙砦そのものに宿った集合意志。太陽航路・虚空航路・残骸/月面ルートいずれの門番を退けた者だけがここへたどり着く。燃焼・真空・重力・凍結のあらゆる脅威を併せ持つ4段階の最終決戦。単一の対策では突破できず、これまでの全ルートで得た知見と装備が問われる。', icon:'gem_blue', maxHp:120000, attack:190, effectiveAttack:4200, defense:38, baseExp:9000, baseGold:5000, dungeonIds:['astral_nox'], isBoss:true, specialAttack:'星骸終焉・ノクス・コラプサー', skills:['フェーズ1:星炎ビーム乱射(全体燃焼+ダメージ)','フェーズ1:重力圧縮(防御力−30%付与)','フェーズ2:虚空分身(偽分身を3体召喚)','フェーズ2:防御貫通突撃(防御完全無視の単体攻撃)','フェーズ3:残骸隕石群(全体範囲ダメージ+鈍足)','フェーズ3:凍結波動(全体凍結+幻影分身)','フェーズ4:星骸終焉・ノクス・コラプサー(全体超高ダメージ+全デバフ確定付与)'], traits:['HP75%以下でフェーズ2移行','HP50%以下でフェーズ3移行','HP25%以下でフェーズ4(覚醒)移行・全攻撃が必中化','フェーズ4突入時に周囲全体へ燃焼+凍結+呪いを同時付与'], drops:[{itemId:'seraph_halo',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'archon_void_core',baseRate:1.0,minAmount:1,maxAmount:1},{itemId:'stellar_core',baseRate:1.0,minAmount:2,maxAmount:4},{itemId:'void_core',baseRate:1.0,minAmount:2,maxAmount:4},{itemId:'flare_plate',baseRate:1.0,minAmount:2,maxAmount:4},{itemId:'event_horizon_fiber',baseRate:1.0,minAmount:2,maxAmount:4},{itemId:'moon_key',baseRate:1.0,minAmount:1,maxAmount:1}] },
   // ── 裏火山追加個体（ジャック・ザ・ステイン／元グリーンベレーゾンビ／KOSAC BUSTER）──
   jack_the_stain:    { id:'jack_the_stain',    name:'ジャック・ザ・ステイン',      description:'ステインポットを遠隔操作する謎の道化師。裏火山入口に陣取り、周囲のステインポットを強制起爆させてくる。', icon:'bomb', maxHp:260, attack:55, effectiveAttack:500, defense:14, baseExp:170, baseGold:70, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'リモート自爆', skills:['リモート自爆(周囲のステインポットを強制起爆)','投げナイフ'], drops:[{itemId:'stain_pot_aura',baseRate:0.5,minAmount:1,maxAmount:2},{itemId:'hard_magic_stone',baseRate:0.6,minAmount:1,maxAmount:2}] },
   green_beret_zombie: { id:'green_beret_zombie', name:'元グリーンベレーゾンビ[雷槌]', description:'かつて精鋭部隊グリーンベレーに所属していた者の成れの果て。雷を纏った大槌「雷槌」を振り回す不死の戦士。裏火山城入口前大広場に出現。', icon:'skull', maxHp:480, attack:88, effectiveAttack:700, defense:30, baseExp:260, baseGold:110, dungeonIds:['volcano'], isMidBoss:true, specialAttack:'雷槌', skills:['雷槌(範囲雷撃)','死兵突撃'], drops:[{itemId:'hard_magic_stone',baseRate:0.8,minAmount:2,maxAmount:3},{itemId:'magma_stone',baseRate:0.6,minAmount:2,maxAmount:3}] },
@@ -2590,6 +2594,57 @@ export const KILL_LOG_MASTER: Record<string, { text: string; color?: string }> =
   slime: { text: 'はスライムにベチャっとされて足を滑らせ転んだ。', color: '#8a92b2' },
   goblin: { text: 'はゴブリンの不意打ちで油断していたところを刺された。', color: '#8a92b2' },
   dragon: { text: 'はドラゴンの咆哮一つで戦意を失い、燃やされた。', color: '#ff3300' },
+  nox_prime: { text: 'は星骸の意志に飲み込まれ、塵となって宇宙に還った。', color: '#9b6bff' },
+};
+
+// ============================================================
+// ダンジョン汎用ランダムイベント（データ駆動）
+// DungeonArea.eventRate が設定されている場合、進入時にこの確率でイベントが発生する。
+// イベント発生率・種類はこのテーブルを編集するだけで全ダンジョン共通で調整可能。
+// ============================================================
+export type DungeonEventType = 'treasure' | 'spring' | 'altar' | 'merchant_cache';
+export const DUNGEON_EVENT_TABLE: { type: DungeonEventType; label: string; weight: number }[] = [
+  { type: 'treasure',       label: '隠された残骸コンテナ', weight: 0.40 },
+  { type: 'spring',         label: '緊急回復ポッド',       weight: 0.25 },
+  { type: 'altar',          label: '星骸の祭壇',           weight: 0.20 },
+  { type: 'merchant_cache', label: '漂流商人の遺品',       weight: 0.15 },
+];
+export function rollDungeonEvent(roll: number): { type: DungeonEventType; label: string; weight: number } {
+  let acc = 0;
+  for (const e of DUNGEON_EVENT_TABLE) {
+    acc += e.weight;
+    if (roll <= acc) return e;
+  }
+  return DUNGEON_EVENT_TABLE[0];
+}
+
+// ============================================================
+// アストラル・ノクス：9ルート木構造の合流先（テーマ門番＋単一最終ボス）
+// 太陽/虚空/月面の3テーマ、各テーマ内3サブルート＝9ルート全てがここを通って同じボスへ合流する。
+// ============================================================
+const ASTRAL_GATE_SOLAR: DungeonArea = {
+  name: '太陽の門【ソラリス熾天使】',
+  description: '太陽航路系3ルート共通の関門。ソラリス熾天使が3段階フェーズで待ち受ける。第1形態は星炎ビーム乱射、第2形態は砲台召喚と聖盾展開（シールド破壊必須）、第3形態は恒星爆発と自己回復。これを退けて初めて星骸の中枢へ進める。',
+  monsters: [{ monsterId: 'solaris_seraph', count: 1, isMidBoss: true }],
+  isHardArea: true, turns: 30,
+};
+const ASTRAL_GATE_VOID: DungeonArea = {
+  name: '虚空の門【虚空大公】',
+  description: '虚空航路系3ルート共通の関門。虚空大公が3段階フェーズで待ち受ける。第1形態は真空斬撃とMP吸収、第2形態は分身生成と防御貫通突撃、第3形態はブラックホール化でHP上限を削る。これを退けて初めて星骸の中枢へ進める。',
+  monsters: [{ monsterId: 'abyss_archon', count: 1, isMidBoss: true }],
+  isHardArea: true, turns: 30,
+};
+const ASTRAL_GATE_MOON: DungeonArea = {
+  name: '月面の門【月面番人・三重奏】',
+  description: '月面/残骸系3ルート共通の関門。月面番人3体が凍結と幻影、反射装甲で守りを固める。短期決戦でないと凍結が蓄積し身動きが取れなくなる。これを退けて初めて星骸の中枢へ進める。',
+  monsters: [{ monsterId: 'moon_sentinel', count: 3, isMidBoss: true }],
+  isHardArea: true, turns: 30,
+};
+const ASTRAL_FINAL_BOSS_AREA: DungeonArea = {
+  name: '星骸中枢【ノクス・プライム】',
+  description: '太陽・虚空・月面、いずれの門番を退けた者だけがたどり着く星骸宇宙砦の中枢。9ルート全ての終着点であり、ノクス・プライムが4段階フェーズで待ち受ける真の最終決戦。燃焼・真空・重力・凍結のあらゆる脅威を併せ持つ。',
+  monsters: [{ monsterId: 'nox_prime', count: 1, isBoss: true }],
+  isHardArea: true, turns: 34,
 };
 
 // ============================================================
@@ -3146,372 +3201,145 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
   },
   // ── 星骸宇宙砦 アストラル・ノクス ──
   astral_nox: {
-    id:'astral_nox', name:'星骸宇宙砦 アストラル・ノクス', description:'廃棄された宇宙要塞の残骸が星の重力に引き寄せられ、凝縮した超高難度ダンジョン。真空・重力異常・放射線・星炎・虚空呪詛が複合的に押し寄せる。分岐前の共通区間だけでも消耗し、太陽航路・虚空航路・月面遺構ルートはそれぞれ別の装備対策が必要。火山攻略済みでも過信は禁物。',
+    id:'astral_nox', name:'星骸宇宙砦 アストラル・ノクス', description:'廃棄された宇宙要塞の残骸が星の重力に引き寄せられ、凝縮した超高難度ダンジョン。真空・重力異常・放射線・星炎・虚空呪詛が複合的に押し寄せる。共通区間を抜けると太陽航路・虚空航路・月面遺構の3テーマに分岐し、さらに各テーマ内で3通りの進み方を選べる（計9ルート）。どのルートを選んでも、最終的には同じ「星骸中枢」のノクス・プライムへ合流する。火山攻略済みでも過信は禁物。',
     icon:'gem_blue', tier:'cosmic', requiredLevel:60, floors:72, expBonus:7.0, goldBonus:6.0,
-    monsterIds:['cosmic_mite','orbit_drone','flare_imp','lunar_wisp','vacuum_wisp','starling','orbital_knight','ray_sniper','beam_archer','gravity_crusher','void_mage','sun_priest','debris_hunter','mirror_turret','plasma_hound','event_hunter','curse_scribe','flare_paladin','drift_guard','solaris_seraph','abyss_archon','moon_sentinel'],
-    bossId:'solaris_seraph',
+    monsterIds:['cosmic_mite','orbit_drone','flare_imp','lunar_wisp','vacuum_wisp','starling','orbital_knight','ray_sniper','beam_archer','gravity_crusher','void_mage','sun_priest','debris_hunter','mirror_turret','plasma_hound','event_hunter','curse_scribe','flare_paladin','drift_guard','solaris_seraph','abyss_archon','moon_sentinel','nox_prime'],
+    bossId:'nox_prime',
     unlockCondition: { dungeonId:'volcano', clearedCount:1, requiredLevel:60 },
     routes: {
-      // ═══════════════ 共通区間 ═══════════════
+      // ═══════════════ 共通区間（150ターン以上）═══════════════
       main: [
         // ── M1. 発射台残骸（敵なし・導入）──
-        {
-          name:'発射台残骸',
-          description:'廃棄された発射台の残骸が漂う宇宙砦の入口。敵は存在しないが、宇宙の真空が体力を少しずつ奪う。この先に待ち受ける脅威の片鱗を感じ取れるだろう。装備の最終確認をしてから奥へ進め。',
-          monsters:[],
-        },
+        { name:'発射台残骸', description:'廃棄された発射台の残骸が漂う宇宙砦の入口。敵は存在しないが、宇宙の真空が体力を少しずつ奪う。この先に待ち受ける脅威の片鱗を感じ取れるだろう。装備の最終確認をしてから奥へ進め。', monsters:[], turns:0 },
         // ── M2. デブリ廊下（遠距離・初登場）──
-        {
-          name:'デブリ廊下',
-          description:'漂流するデブリが飛び交う狭い廊下。軌道ドローンが先制射撃を仕掛けてくる。デブリハンターは必中投擲で回避を封じる。遠距離武器で先に処理したいが、数が多く消耗する。',
-          monsters:[
-            {monsterId:'orbit_drone',    count:3},
-            {monsterId:'cosmic_mite',    count:4},
-            {monsterId:'debris_hunter',  count:2},
-          ],
-        },
+        { name:'デブリ廊下', description:'漂流するデブリが飛び交う狭い廊下。軌道ドローンが先制射撃を仕掛けてくる。デブリハンターは必中投擲で回避を封じる。遠距離武器で先に処理したいが、数が多く消耗する。', monsters:[{monsterId:'orbit_drone',count:3},{monsterId:'cosmic_mite',count:4},{monsterId:'debris_hunter',count:2}], turns:18 },
         // ── M3. 無重力搬送路（重力異常・CP1）──
-        {
-          name:'無重力搬送路',
-          description:'重力制御が失われた搬送路。重力クラッシャーが重力波で防御を削り、軌道騎士が高防御で壁を作る。防御が下がった状態で複数の敵に狙われると一気に削られる。CP1がある。必ず回収のこと。',
-          monsters:[
-            {monsterId:'gravity_crusher', count:2},
-            {monsterId:'orbital_knight',  count:2},
-            {monsterId:'orbit_drone',     count:3},
-            {monsterId:'cosmic_mite',     count:5},
-          ],
-          isCheckpoint:true, checkpointLabel:'CP1',
-        },
+        { name:'無重力搬送路', description:'重力制御が失われた搬送路。重力クラッシャーが重力波で防御を削り、軌道騎士が高防御で壁を作る。防御が下がった状態で複数の敵に狙われると一気に削られる。CP1がある。必ず回収のこと。', monsters:[{monsterId:'gravity_crusher',count:2},{monsterId:'orbital_knight',count:2},{monsterId:'orbit_drone',count:3},{monsterId:'cosmic_mite',count:5}], isCheckpoint:true, checkpointLabel:'CP1', turns:18 },
         // ── M4. 断熱チューブ（燃焼・星炎初登場）──
-        {
-          name:'断熱チューブ',
-          description:'恒星炉への熱を遮断するチューブ状の通路。フレアインプが星炎（燃焼上位版）を付与し、継続ダメージと回復阻害を複合させる。燃焼が複数スタックしてから太陽司祭が登場して火力を底上げ。火耐性が試される。',
-          monsters:[
-            {monsterId:'flare_imp',  count:4},
-            {monsterId:'sun_priest', count:1},
-            {monsterId:'beam_archer',count:2},
-            {monsterId:'cosmic_mite',count:3},
-          ],
-          isHardArea:true,
-        },
+        { name:'断熱チューブ', description:'恒星炉への熱を遮断するチューブ状の通路。フレアインプが星炎（燃焼上位版）を付与し、継続ダメージと回復阻害を複合させる。燃焼が複数スタックしてから太陽司祭が登場して火力を底上げ。火耐性が試される。', monsters:[{monsterId:'flare_imp',count:4},{monsterId:'sun_priest',count:1},{monsterId:'beam_archer',count:2},{monsterId:'cosmic_mite',count:3}], isHardArea:true, turns:18 },
+        // ── M4.5. 電磁嵐区画（新規・デバフ密集）──
+        { name:'電磁嵐区画', description:'制御不能の電磁嵐が荒れ狂う区画。光線狙撃手とビームアーチャーが嵐に乗じて視認しづらい角度から狙撃してくる。電子機器系の装備バフが一時的に乱されることもある。', monsters:[{monsterId:'ray_sniper',count:3},{monsterId:'beam_archer',count:3},{monsterId:'orbit_drone',count:3},{monsterId:'orbital_knight',count:2}], isHardArea:true, turns:18 },
         // ── M5. 観測ドーム前庭（複合デバフ）──
-        {
-          name:'観測ドーム前庭',
-          description:'観測ドームへの前室。虚空魔術師が呪いとバフ解除を撒き、真空霊がMPを吸収する。バフを維持しながら戦う戦術が崩壊する場所。呪い耐性とMP回収手段がないと詰む。',
-          monsters:[
-            {monsterId:'void_mage',    count:2},
-            {monsterId:'vacuum_wisp',  count:3},
-            {monsterId:'orbital_knight',count:2},
-            {monsterId:'debris_hunter',count:2},
-          ],
-          isHardArea:true,
-        },
+        { name:'観測ドーム前庭', description:'観測ドームへの前室。虚空魔術師が呪いとバフ解除を撒き、真空霊がMPを吸収する。バフを維持しながら戦う戦術が崩壊する場所。呪い耐性とMP回収手段がないと詰む。', monsters:[{monsterId:'void_mage',count:2},{monsterId:'vacuum_wisp',count:3},{monsterId:'orbital_knight',count:2},{monsterId:'debris_hunter',count:2}], isHardArea:true, turns:18 },
         // ── M6. 反射鏡区画（反射砲台・CP2）──
-        {
-          name:'反射鏡区画',
-          description:'鏡面装甲に覆われた区画。反射砲台が物理ダメージを跳ね返す。単発高火力で突っ込むと自滅する。魔法・出血・継続ダメージ系が有効。ビームアーチャーとの複合で消耗激しく、CP2は必ず回収。',
-          monsters:[
-            {monsterId:'mirror_turret',count:4},
-            {monsterId:'beam_archer',  count:3},
-            {monsterId:'ray_sniper',   count:2},
-            {monsterId:'orbit_drone',  count:3},
-          ],
-          isHardArea:true, isCheckpoint:true, checkpointLabel:'CP2',
-        },
+        { name:'反射鏡区画', description:'鏡面装甲に覆われた区画。反射砲台が物理ダメージを跳ね返す。単発高火力で突っ込むと自滅する。魔法・出血・継続ダメージ系が有効。ビームアーチャーとの複合で消耗激しく、CP2は必ず回収。', monsters:[{monsterId:'mirror_turret',count:4},{monsterId:'beam_archer',count:3},{monsterId:'ray_sniper',count:2},{monsterId:'orbit_drone',count:3}], isHardArea:true, isCheckpoint:true, checkpointLabel:'CP2', turns:20 },
         // ── M7. 放射線隔壁（HP削り・呪刻師初登場）──
-        {
-          name:'放射線隔壁',
-          description:'放射線を遮断するための隔壁区域。ここから放射線ダメージによる最大HP削りが始まる。呪刻師の回復呪印が合わさると回復量が激減し、高難度の削り合いになる。長期戦を避け短期で片付けたい。',
-          monsters:[
-            {monsterId:'curse_scribe',  count:2},
-            {monsterId:'void_mage',     count:2},
-            {monsterId:'gravity_crusher',count:2},
-            {monsterId:'vacuum_wisp',   count:3},
-            {monsterId:'flare_imp',     count:2},
-          ],
-          isHardArea:true,
-        },
+        { name:'放射線隔壁', description:'放射線を遮断するための隔壁区域。ここから放射線ダメージによる最大HP削りが始まる。呪刻師の回復呪印が合わさると回復量が激減し、高難度の削り合いになる。長期戦を避け短期で片付けたい。', monsters:[{monsterId:'curse_scribe',count:2},{monsterId:'void_mage',count:2},{monsterId:'gravity_crusher',count:2},{monsterId:'vacuum_wisp',count:3},{monsterId:'flare_imp',count:2}], isHardArea:true, turns:20 },
+        // ── M7.5. 残骸潮流（新規・イベント多発の小休止）──
+        { name:'残骸潮流', description:'デブリの潮流が緩やかに流れる小休止区画。敵影は少ないが、漂流する残骸コンテナや祭壇らしき構造物が点在しており、調べると思わぬ収穫がある。油断していると真空霊の奇襲を受けることもある。', monsters:[{monsterId:'vacuum_wisp',count:2},{monsterId:'starling',count:3},{monsterId:'cosmic_mite',count:3}], turns:16, eventRate:0.4 },
         // ── M8. 重力中継室（複合エリート・難所）──
-        {
-          name:'重力中継室',
-          description:'宇宙砦の重力を管理する中継室。漂流守衛が重力拘束で動けなくした状態でプラズマハウンドが連撃を叩き込む凶悪な複合配置。拘束を解除するか、漂流守衛を最優先で排除しないと一瞬で溶ける。',
-          monsters:[
-            {monsterId:'drift_guard',    count:2, isMidBoss:true},
-            {monsterId:'plasma_hound',   count:2, isMidBoss:true},
-            {monsterId:'orbital_knight', count:3},
-            {monsterId:'beam_archer',    count:2},
-          ],
-          isHardArea:true,
-        },
+        { name:'重力中継室', description:'宇宙砦の重力を管理する中継室。漂流守衛が重力拘束で動けなくした状態でプラズマハウンドが連撃を叩き込む凶悪な複合配置。拘束を解除するか、漂流守衛を最優先で排除しないと一瞬で溶ける。', monsters:[{monsterId:'drift_guard',count:2,isMidBoss:true},{monsterId:'plasma_hound',count:2,isMidBoss:true},{monsterId:'orbital_knight',count:3},{monsterId:'beam_archer',count:2}], isHardArea:true, turns:22 },
         // ── M9. 分岐前広間（全種出現・消耗地帯）──
-        {
-          name:'分岐前広間',
-          description:'分岐点手前の広間。共通区間の全種類の敵が凝縮して出現する極限の消耗地帯。フレアパラディンとイベントハンターが初登場し、前者は燃焼で削り、後者は防御を無視して一撃を叩き込む。どちらを先に倒すか判断が問われる。',
-          monsters:[
-            {monsterId:'flare_paladin', count:2, isMidBoss:true},
-            {monsterId:'event_hunter',  count:2, isMidBoss:true},
-            {monsterId:'curse_scribe',  count:1, isMidBoss:true},
-            {monsterId:'void_mage',     count:2},
-            {monsterId:'sun_priest',    count:2},
-            {monsterId:'cosmic_mite',   count:6},
-            {monsterId:'drift_guard',   count:1, isMidBoss:true},
-          ],
-          isHardArea:true,
-        },
-        // ── M10. 分岐中枢（CP3・ルート選択）──
-        {
-          name:'分岐中枢',
-          description:'宇宙砦の中枢制御室。CP3を取得したらここで進路を選択する。太陽航路は燃焼・光線・耐久戦のルート。虚空航路は真空・呪詛・防御貫通のルート。どちらも装備の見直しなしで突破するのは困難。月面遺構ルートは両ルートの中ボス撃破後に解放される。',
-          monsters:[
-            {monsterId:'orbital_knight',count:4},
-            {monsterId:'gravity_crusher',count:3},
-            {monsterId:'mirror_turret', count:2},
-            {monsterId:'plasma_hound',  count:2, isMidBoss:true},
-          ],
-          isHardArea:true, isCheckpoint:true, checkpointLabel:'CP3', isBranchPoint:true,
-        },
+        { name:'分岐前広間', description:'分岐点手前の広間。共通区間の全種類の敵が凝縮して出現する極限の消耗地帯。フレアパラディンとイベントハンターが初登場し、前者は燃焼で削り、後者は防御を無視して一撃を叩き込む。どちらを先に倒すか判断が問われる。', monsters:[{monsterId:'flare_paladin',count:2,isMidBoss:true},{monsterId:'event_hunter',count:2,isMidBoss:true},{monsterId:'curse_scribe',count:1,isMidBoss:true},{monsterId:'void_mage',count:2},{monsterId:'sun_priest',count:2},{monsterId:'cosmic_mite',count:6},{monsterId:'drift_guard',count:1,isMidBoss:true}], isHardArea:true, turns:24 },
+        // ── M9.5. 深層警報（新規・分岐直前の最終警戒）──
+        { name:'深層警報', description:'分岐中枢に近づくと警報が鳴り響き、宇宙砦の防衛機構が総力を挙げて襲ってくる。これまで登場した精鋭の生き残りが入り乱れて出現する、共通区間最後の試練。ここを越えれば自分の進む道を選べる。', monsters:[{monsterId:'plasma_hound',count:1,isMidBoss:true},{monsterId:'event_hunter',count:1,isMidBoss:true},{monsterId:'flare_paladin',count:1,isMidBoss:true},{monsterId:'curse_scribe',count:1,isMidBoss:true},{monsterId:'orbital_knight',count:3},{monsterId:'gravity_crusher',count:2}], isHardArea:true, turns:24 },
+        // ── M10. 分岐中枢（CP3・第1分岐：3択）──
+        { name:'分岐中枢', description:'宇宙砦の中枢制御室。CP3を取得したらここで進路を選択する。☀️太陽航路（燃焼・光線・耐久戦）、🌑虚空航路（真空・呪詛・防御貫通）、🛰月面遺構（凍結・幻影・残骸回収）の3テーマから選択し、さらにその先で進み方（サブルート）を選ぶ。どの組み合わせでも、最後は同じ「星骸中枢」へ合流する。', monsters:[{monsterId:'orbital_knight',count:4},{monsterId:'gravity_crusher',count:3},{monsterId:'mirror_turret',count:2},{monsterId:'plasma_hound',count:2,isMidBoss:true}], isHardArea:true, isCheckpoint:true, checkpointLabel:'CP3', isBranchPoint:true, turns:18 },
       ],
+      // レガシー互換フィールド（旧コードが直接 'lich'/'back'/'moon' を参照した場合のフォールバック先）
+      lich: [],
+      back: [],
+      moon: [],
 
-      // ═══════════════ 分岐A：太陽航路（燃焼・光線・耐久戦）═══════════════
-      lich: [
-        // ── A1. 恒星炉前室（太陽航路導入）──
-        {
-          name:'恒星炉前室',
-          description:'太陽航路の入口。恒星炉の熱が漂い始め、フレアインプの密度が急激に上がる。太陽司祭が複数体で仲間強化を行い、燃焼スタックが一気に上がる。火耐性がないとここで息切れする。',
-          monsters:[
-            {monsterId:'flare_imp',   count:5},
-            {monsterId:'sun_priest',  count:3},
-            {monsterId:'beam_archer', count:3},
-            {monsterId:'orbit_drone', count:2},
-          ],
-          isHardArea:true,
-        },
-        // ── A2. 融光回廊（光線密度が上がる）──
-        {
-          name:'融光回廊',
-          description:'融けた光が漂う回廊。光線狙撃手が複数体で後衛を狙い続け、ビームアーチャーが直線範囲で薙ぎ払う。前衛と後衛の役割分担がないと後衛が優先的に沈む。',
-          monsters:[
-            {monsterId:'ray_sniper',  count:4},
-            {monsterId:'beam_archer', count:4},
-            {monsterId:'flare_imp',   count:3},
-            {monsterId:'sun_priest',  count:2},
-          ],
-          isHardArea:true,
-        },
-        // ── A3. 太陽鏡群（反射+燃焼の複合）──
-        {
-          name:'太陽鏡群',
-          description:'太陽光を集めるための巨大鏡が並ぶ区画。反射砲台と太陽司祭が組み合わさり、物理攻撃が通りにくい上に燃焼バフで敵火力が跳ね上がる。範囲魔法か継続ダメージで対処するのが有効。',
-          monsters:[
-            {monsterId:'mirror_turret', count:5},
-            {monsterId:'sun_priest',    count:3},
-            {monsterId:'flare_paladin', count:2, isMidBoss:true},
-            {monsterId:'flare_imp',     count:4},
-          ],
-          isHardArea:true,
-        },
-        // ── A4. フレア祭壇（フレアパラディン密集）──
-        {
-          name:'フレア祭壇',
-          description:'炎と光の祭壇。フレアパラディン4体が燃焼持続攻撃で圧倒的な継続ダメージを与えてくる。HP上限が削られていると一瞬で落ちる。継続回復と火耐性が揃っていないと突破不可能。',
-          monsters:[
-            {monsterId:'flare_paladin', count:4, isMidBoss:true},
-            {monsterId:'sun_priest',    count:3},
-            {monsterId:'flare_imp',     count:5},
-            {monsterId:'ray_sniper',    count:2},
-          ],
-          isHardArea:true,
-        },
-        // ── A5. 恒星核冷却路（CP4）──
-        {
-          name:'恒星核冷却路[CP4]',
-          description:'恒星核の熱を下げるための冷却路。この区間だけ温度が下がり少し休める。敵の密度も下がるが油断は禁物。CP4を取得したら先へ進め。燃焼デバフがここで解除されると思うな。',
-          monsters:[
-            {monsterId:'orbital_knight', count:3},
-            {monsterId:'beam_archer',    count:3},
-            {monsterId:'cosmic_mite',    count:4},
-          ],
-          isCheckpoint:true, checkpointLabel:'CP4',
-        },
-        // ── A6. 熱崩壊の回廊（全種複合・最難所）──
-        {
-          name:'熱崩壊の回廊',
-          description:'恒星核に近づくほど熱が増し、敵の密度と火力が一気に跳ね上がる。光線狙撃手・フレアパラディン・太陽司祭・反射砲台が密集し、後衛狙撃・燃焼・反射の三重苦が合わさる。回復量低下まで重なると壊滅的。',
-          monsters:[
-            {monsterId:'ray_sniper',    count:4},
-            {monsterId:'flare_paladin', count:3, isMidBoss:true},
-            {monsterId:'mirror_turret', count:4},
-            {monsterId:'sun_priest',    count:4},
-            {monsterId:'event_hunter',  count:2, isMidBoss:true},
-            {monsterId:'flare_imp',     count:5},
-          ],
-          isHardArea:true,
-        },
-        // ── A7. 星炉の心室（ボス前圧縮）──
-        {
-          name:'星炉の心室',
-          description:'恒星核のすぐ外の前室。ソラリス熾天使の気配が漂い、周囲の温度が臨界に近い。最後の難所として全エリートが集結する。入場時にすでに燃焼デバフが付与される。ここを越えれば真のボス戦が始まる。',
-          monsters:[
-            {monsterId:'flare_paladin', count:3, isMidBoss:true},
-            {monsterId:'event_hunter',  count:3, isMidBoss:true},
-            {monsterId:'plasma_hound',  count:2, isMidBoss:true},
-            {monsterId:'sun_priest',    count:4},
-            {monsterId:'mirror_turret', count:3},
-            {monsterId:'ray_sniper',    count:3},
-          ],
-          isHardArea:true,
-        },
-        // ── A8. 恒星核の間（ボス部屋）──
-        {
-          name:'恒星核の間【ソラリス熾天使】',
-          description:'太陽航路の終点。ソラリス熾天使が待ち受ける3段階フェーズのボス戦。第1形態は星炎ビーム乱射、第2形態は砲台召喚と聖盾展開（シールド破壊が必須）、第3形態は恒星爆発と自己回復の繰り返し。単発高火力ではなく持続火力と火耐性が試される。',
-          monsters:[
-            {monsterId:'solaris_seraph', count:1, isBoss:true},
-          ],
-          isHardArea:true,
-        },
-      ],
+      // ═══════════════ 第1分岐 ☀️太陽航路 → 第2分岐（3ルート）═══════════════
+      branches: {
+        // ── ①-A 太陽航路・恒星核強襲（本道・高難度）──
+        lich_inferno: [
+          { name:'恒星炉前室', description:'太陽航路の入口。恒星炉の熱が漂い始め、フレアインプの密度が急激に上がる。太陽司祭が複数体で仲間強化を行い、燃焼スタックが一気に上がる。火耐性がないとここで息切れする。', monsters:[{monsterId:'flare_imp',count:5},{monsterId:'sun_priest',count:3},{monsterId:'beam_archer',count:3},{monsterId:'orbit_drone',count:2}], isHardArea:true, turns:22 },
+          { name:'融光回廊', description:'融けた光が漂う回廊。光線狙撃手が複数体で後衛を狙い続け、ビームアーチャーが直線範囲で薙ぎ払う。前衛と後衛の役割分担がないと後衛が優先的に沈む。', monsters:[{monsterId:'ray_sniper',count:4},{monsterId:'beam_archer',count:4},{monsterId:'flare_imp',count:3},{monsterId:'sun_priest',count:2}], isHardArea:true, turns:24 },
+          { name:'太陽鏡群', description:'太陽光を集めるための巨大鏡が並ぶ区画。反射砲台と太陽司祭が組み合わさり、物理攻撃が通りにくい上に燃焼バフで敵火力が跳ね上がる。範囲魔法か継続ダメージで対処するのが有効。', monsters:[{monsterId:'mirror_turret',count:5},{monsterId:'sun_priest',count:3},{monsterId:'flare_paladin',count:2,isMidBoss:true},{monsterId:'flare_imp',count:4}], isHardArea:true, turns:24 },
+          { name:'フレア祭壇', description:'炎と光の祭壇。フレアパラディン4体が燃焼持続攻撃で圧倒的な継続ダメージを与えてくる。HP上限が削られていると一瞬で落ちる。継続回復と火耐性が揃っていないと突破不可能。', monsters:[{monsterId:'flare_paladin',count:4,isMidBoss:true},{monsterId:'sun_priest',count:3},{monsterId:'flare_imp',count:5},{monsterId:'ray_sniper',count:2}], isHardArea:true, turns:26 },
+          { name:'恒星核冷却路[CP4]', description:'恒星核の熱を下げるための冷却路。この区間だけ温度が下がり少し休める。敵の密度も下がるが油断は禁物。CP4を取得したら先へ進め。燃焼デバフがここで解除されると思うな。', monsters:[{monsterId:'orbital_knight',count:3},{monsterId:'beam_archer',count:3},{monsterId:'cosmic_mite',count:4}], isCheckpoint:true, checkpointLabel:'CP4', turns:16 },
+          { name:'熱崩壊の回廊', description:'恒星核に近づくほど熱が増し、敵の密度と火力が一気に跳ね上がる。光線狙撃手・フレアパラディン・太陽司祭・反射砲台が密集し、後衛狙撃・燃焼・反射の三重苦が合わさる。回復量低下まで重なると壊滅的。', monsters:[{monsterId:'ray_sniper',count:4},{monsterId:'flare_paladin',count:3,isMidBoss:true},{monsterId:'mirror_turret',count:4},{monsterId:'sun_priest',count:4},{monsterId:'event_hunter',count:2,isMidBoss:true},{monsterId:'flare_imp',count:5}], isHardArea:true, turns:28 },
+          ASTRAL_GATE_SOLAR,
+          ASTRAL_FINAL_BOSS_AREA,
+        ],
+        // ── ①-B 太陽航路・観測網掃討（安全だが長い）──
+        lich_purge: [
+          { name:'観測網外縁', description:'太陽航路の外縁部。観測網の小型ドローンと太陽司祭が浅く広く展開している。本道より敵の密度は薄いが、その分長丁場になる。コツコツ削っていく持久戦向きの区間。', monsters:[{monsterId:'beam_archer',count:3},{monsterId:'sun_priest',count:2},{monsterId:'orbit_drone',count:3}], turns:26, eventRate:0.2 },
+          { name:'信号塔回廊', description:'倒壊した信号塔が並ぶ回廊。フレアインプが点在するが、密集はしておらず処理しやすい。残骸の隙間に補給物資が紛れていることもある。', monsters:[{monsterId:'flare_imp',count:4},{monsterId:'cosmic_mite',count:4},{monsterId:'orbit_drone',count:2}], turns:26, eventRate:0.3 },
+          { name:'整流路[CP-灯]', description:'電力を整流するための通路。敵影は少なく一時的に安全。簡易チェックポイントがあり、ここで一息つける。先を急がず態勢を整えてから進みたい。', monsters:[{monsterId:'beam_archer',count:2},{monsterId:'sun_priest',count:1}], isCheckpoint:true, checkpointLabel:'CP-灯', turns:18, eventRate:0.4 },
+          { name:'太陽電池畑', description:'太陽電池パネルが並ぶ広大な平地。視界は良いが遠距離攻撃が飛び交う。光線狙撃手とビームアーチャーが薄く広く展開しており、各個撃破していけば大きな被害は出ない。', monsters:[{monsterId:'ray_sniper',count:3},{monsterId:'beam_archer',count:3},{monsterId:'flare_imp',count:3}], turns:26, eventRate:0.2 },
+          { name:'廃棄観測基地', description:'放棄された観測基地。データ保管庫に手つかずの物資が残っていることが多い。反射砲台と太陽司祭が守りを固めているが、本道に比べると数は少なめ。', monsters:[{monsterId:'mirror_turret',count:3},{monsterId:'sun_priest',count:2},{monsterId:'flare_imp',count:3}], isHardArea:true, turns:28, eventRate:0.3 },
+          { name:'残光の回廊[CP-灯2]', description:'恒星炉の残光だけが届く静かな回廊。簡易チェックポイントが置かれている。ここまで来れば本道の門番との合流地点はそう遠くない。', monsters:[{monsterId:'flare_paladin',count:1,isMidBoss:true},{monsterId:'sun_priest',count:2}], isCheckpoint:true, checkpointLabel:'CP-灯2', turns:20, eventRate:0.4 },
+          { name:'観測網中枢', description:'観測網全体を統括する中枢区画。これまで薄く展開していた敵が最後にまとまって配置されている。ここを越えれば太陽の門番が待つ合流地点に到達する。', monsters:[{monsterId:'flare_paladin',count:2,isMidBoss:true},{monsterId:'mirror_turret',count:3},{monsterId:'ray_sniper',count:3},{monsterId:'sun_priest',count:3}], isHardArea:true, turns:30, eventRate:0.2 },
+          ASTRAL_GATE_SOLAR,
+          ASTRAL_FINAL_BOSS_AREA,
+        ],
+        // ── ①-C 太陽航路・奇襲反撃（短いが危険）──
+        lich_ambush: [
+          { name:'奇襲回廊', description:'太陽航路の最短経路。整備された道だが、その分敵の待ち伏せが極端に濃い。フレアパラディンと事象ハンターが開幕から襲い掛かる、息をつく間もない高密度区間。', monsters:[{monsterId:'flare_paladin',count:3,isMidBoss:true},{monsterId:'event_hunter',count:2,isMidBoss:true},{monsterId:'flare_imp',count:5},{monsterId:'sun_priest',count:3}], isHardArea:true, turns:48 },
+          { name:'伏兵の間', description:'死角の多い円形の間。プラズマハウンドと呪刻師が複数体で同時に襲ってくる。回復呪印と連撃が重なると一瞬でHPが溶ける危険地帯。チェックポイントは一切ない。', monsters:[{monsterId:'plasma_hound',count:3,isMidBoss:true},{monsterId:'curse_scribe',count:2,isMidBoss:true},{monsterId:'mirror_turret',count:3}], isHardArea:true, turns:50 },
+          { name:'包囲陣地', description:'太陽航路最短経路の最終区間。これまでに登場した精鋭が一斉に包囲網を敷いて待ち構えている。短距離だが要求火力は本道以上。装備が整っていなければ即座に撤退すべき。', monsters:[{monsterId:'flare_paladin',count:3,isMidBoss:true},{monsterId:'event_hunter',count:3,isMidBoss:true},{monsterId:'plasma_hound',count:2,isMidBoss:true},{monsterId:'sun_priest',count:3}], isHardArea:true, turns:48 },
+          ASTRAL_GATE_SOLAR,
+          ASTRAL_FINAL_BOSS_AREA,
+        ],
 
-      // ═══════════════ 分岐B：虚空航路（真空・呪詛・防御貫通）═══════════════
-      back: [
-        // ── B1. 冷月外殻（虚空航路導入）──
-        {
-          name:'冷月外殻',
-          description:'虚空航路の入口。宇宙砦の外壁部分で温度が極端に低い。月霊と真空霊が大量に湧き、凍結とMP吸収の二重苦が始まる。凍結耐性とMP回収手段がないとここで詰む最初の関門。',
-          monsters:[
-            {monsterId:'lunar_wisp',   count:5},
-            {monsterId:'vacuum_wisp',  count:4},
-            {monsterId:'starling',     count:3},
-            {monsterId:'cosmic_mite',  count:4},
-          ],
-          isHardArea:true,
-        },
-        // ── B2. 重力断層（行動不能コンボ地帯）──
-        {
-          name:'重力断層',
-          description:'重力が断裂している危険な区域。重力クラッシャーが防御を削り、漂流守衛が拘束した状態で虚空魔術師が防御無視魔法を叩き込む完璧なコンボ地帯。漂流守衛の排除が最優先。',
-          monsters:[
-            {monsterId:'gravity_crusher',count:3},
-            {monsterId:'drift_guard',    count:2, isMidBoss:true},
-            {monsterId:'void_mage',      count:3},
-            {monsterId:'vacuum_wisp',    count:3},
-          ],
-          isHardArea:true,
-        },
-        // ── B3. 暗星図書庫（バフ解除・呪い地帯）──
-        {
-          name:'暗星図書庫',
-          description:'虚空の書物が漂う暗黒の図書庫。呪刻師が回復呪印でHPが回復しない状態を作り出し、虚空魔術師がバフを解除する。回復力に頼ったビルドが完全に崩壊するエリア。CP4がある。必ず回収のこと。',
-          monsters:[
-            {monsterId:'curse_scribe',  count:3, isMidBoss:true},
-            {monsterId:'void_mage',     count:3},
-            {monsterId:'vacuum_wisp',   count:4},
-            {monsterId:'debris_hunter', count:2},
-          ],
-          isHardArea:true, isCheckpoint:true, checkpointLabel:'CP4',
-        },
-        // ── B4. 事象の地平前室（防御無視地帯）──
-        {
-          name:'事象の地平前室',
-          description:'事象の地平線のすぐ手前の前室。事象ハンターが防御を完全無視する貫通攻撃で一撃を叩き込んでくる。高防御ビルドが何の役にも立たない恐怖地帯。回避か回復力での対策が必要。',
-          monsters:[
-            {monsterId:'event_hunter',  count:4, isMidBoss:true},
-            {monsterId:'void_mage',     count:3},
-            {monsterId:'gravity_crusher',count:2},
-            {monsterId:'lunar_wisp',    count:4},
-            {monsterId:'vacuum_wisp',   count:3},
-          ],
-          isHardArea:true,
-        },
-        // ── B5. 反転監獄（行動順反転+拘束）──
-        {
-          name:'反転監獄',
-          description:'重力が逆転した牢獄区域。漂流守衛による拘束に加え、重力クラッシャーの重力反転で行動順が遅れ、その間に事象ハンターと虚空魔術師が攻め立てる。脱出手段がないと詰む。解除スキル必須。',
-          monsters:[
-            {monsterId:'drift_guard',   count:3, isMidBoss:true},
-            {monsterId:'event_hunter',  count:3, isMidBoss:true},
-            {monsterId:'gravity_crusher',count:3},
-            {monsterId:'void_mage',     count:2},
-            {monsterId:'curse_scribe',  count:2, isMidBoss:true},
-          ],
-          isHardArea:true,
-        },
-        // ── B6. 無名回廊（全種虚空敵・CP5）──
-        {
-          name:'無名回廊[CP5]',
-          description:'記録に残っていない謎の回廊。虚空航路の全敵種が凝縮出現する。月霊・真空霊による凍結とMP枯渇、呪刻師の回復阻害が全部重なると詰む。CP5を取得してから挑め。',
-          monsters:[
-            {monsterId:'lunar_wisp',    count:5},
-            {monsterId:'vacuum_wisp',   count:5},
-            {monsterId:'curse_scribe',  count:3, isMidBoss:true},
-            {monsterId:'event_hunter',  count:2, isMidBoss:true},
-            {monsterId:'plasma_hound',  count:2, isMidBoss:true},
-            {monsterId:'void_mage',     count:3},
-          ],
-          isHardArea:true, isCheckpoint:true, checkpointLabel:'CP5',
-        },
-        // ── B7. 虚空結晶室（ボス前圧縮）──
-        {
-          name:'虚空結晶室',
-          description:'虚空の結晶が漂う最後の前室。虚空大公の呪いが既に漂い始め、入場時にバフが1個解除される。全エリートが勢揃いした最終難所。ここを越えれば真のボス戦が始まるが、残HPとMPを確認せよ。',
-          monsters:[
-            {monsterId:'event_hunter',  count:4, isMidBoss:true},
-            {monsterId:'drift_guard',   count:3, isMidBoss:true},
-            {monsterId:'curse_scribe',  count:3, isMidBoss:true},
-            {monsterId:'plasma_hound',  count:2, isMidBoss:true},
-            {monsterId:'void_mage',     count:4},
-            {monsterId:'vacuum_wisp',   count:5},
-          ],
-          isHardArea:true,
-        },
-        // ── B8. 虚空核の間（ボス部屋）──
-        {
-          name:'虚空核の間【虚空大公】',
-          description:'虚空航路の終点。虚空大公が待ち受ける3段階フェーズのボス戦。第1形態は真空斬撃とMP吸収、第2形態は分身生成と防御貫通突撃（本体を当て続けないとダメージ無効）、第3形態はブラックホール化でHP上限を削り続ける。長期戦が命取り。対策装備の有無が明確に問われる。',
-          monsters:[
-            {monsterId:'abyss_archon', count:1, isBoss:true},
-          ],
-          isHardArea:true,
-        },
-      ],
+        // ═══════════════ 第1分岐 🌑虚空航路 → 第2分岐（3ルート）═══════════════
+        // ── ②-A 虚空航路・虚空崩落（本道・高難度）──
+        back_collapse: [
+          { name:'冷月外殻', description:'虚空航路の入口。宇宙砦の外壁部分で温度が極端に低い。月霊と真空霊が大量に湧き、凍結とMP吸収の二重苦が始まる。凍結耐性とMP回収手段がないとここで詰む最初の関門。', monsters:[{monsterId:'lunar_wisp',count:5},{monsterId:'vacuum_wisp',count:4},{monsterId:'starling',count:3},{monsterId:'cosmic_mite',count:4}], isHardArea:true, turns:22 },
+          { name:'重力断層', description:'重力が断裂している危険な区域。重力クラッシャーが防御を削り、漂流守衛が拘束した状態で虚空魔術師が防御無視魔法を叩き込む完璧なコンボ地帯。漂流守衛の排除が最優先。', monsters:[{monsterId:'gravity_crusher',count:3},{monsterId:'drift_guard',count:2,isMidBoss:true},{monsterId:'void_mage',count:3},{monsterId:'vacuum_wisp',count:3}], isHardArea:true, turns:24 },
+          { name:'暗星図書庫[CP5]', description:'虚空の書物が漂う暗黒の図書庫。呪刻師が回復呪印でHPが回復しない状態を作り出し、虚空魔術師がバフを解除する。回復力に頼ったビルドが完全に崩壊するエリア。CP5がある。必ず回収のこと。', monsters:[{monsterId:'curse_scribe',count:3,isMidBoss:true},{monsterId:'void_mage',count:3},{monsterId:'vacuum_wisp',count:4},{monsterId:'debris_hunter',count:2}], isHardArea:true, isCheckpoint:true, checkpointLabel:'CP5', turns:18 },
+          { name:'事象の地平前室', description:'事象の地平線のすぐ手前の前室。事象ハンターが防御を完全無視する貫通攻撃で一撃を叩き込んでくる。高防御ビルドが何の役にも立たない恐怖地帯。回避か回復力での対策が必要。', monsters:[{monsterId:'event_hunter',count:4,isMidBoss:true},{monsterId:'void_mage',count:3},{monsterId:'gravity_crusher',count:2},{monsterId:'lunar_wisp',count:4},{monsterId:'vacuum_wisp',count:3}], isHardArea:true, turns:26 },
+          { name:'反転監獄', description:'重力が逆転した牢獄区域。漂流守衛による拘束に加え、重力クラッシャーの重力反転で行動順が遅れ、その間に事象ハンターと虚空魔術師が攻め立てる。脱出手段がないと詰む。解除スキル必須。', monsters:[{monsterId:'drift_guard',count:3,isMidBoss:true},{monsterId:'event_hunter',count:3,isMidBoss:true},{monsterId:'gravity_crusher',count:3},{monsterId:'void_mage',count:2},{monsterId:'curse_scribe',count:2,isMidBoss:true}], isHardArea:true, turns:28 },
+          { name:'虚空結晶室', description:'虚空の結晶が漂う最後の前室。虚空大公の呪いが既に漂い始め、入場時にバフが1個解除される。全エリートが勢揃いした最終難所。ここを越えれば虚空の門番が待つ合流地点に到達する。', monsters:[{monsterId:'event_hunter',count:4,isMidBoss:true},{monsterId:'drift_guard',count:3,isMidBoss:true},{monsterId:'curse_scribe',count:3,isMidBoss:true},{monsterId:'plasma_hound',count:2,isMidBoss:true},{monsterId:'void_mage',count:4},{monsterId:'vacuum_wisp',count:5}], isHardArea:true, turns:20 },
+          ASTRAL_GATE_VOID,
+          ASTRAL_FINAL_BOSS_AREA,
+        ],
+        // ── ②-B 虚空航路・静寂排除（イベントが多い）──
+        back_silence: [
+          { name:'静寂回廊', description:'物音一つしない不気味な回廊。敵影は薄いが、漂流物資や謎の祭壇が頻繁に見つかる。静寂を破るように真空霊が時折奇襲を仕掛けてくる。', monsters:[{monsterId:'vacuum_wisp',count:3},{monsterId:'lunar_wisp',count:3}], turns:22, eventRate:0.5 },
+          { name:'忘却倉庫', description:'記録から忘れ去られた物資倉庫。月霊が漂う中、漂流商人の遺品や残骸コンテナが多数眠っている。探索する価値は高いが、長居は禁物。', monsters:[{monsterId:'lunar_wisp',count:3},{monsterId:'starling',count:3}], turns:22, eventRate:0.5 },
+          { name:'静寂の祭壇[CP-静]', description:'虚空に捧げられた祭壇群。簡易チェックポイントがあり、祭壇を調べると星骸の祝福を得られることがある。呪刻師が祭壇を守っているが数は少ない。', monsters:[{monsterId:'curse_scribe',count:1,isMidBoss:true},{monsterId:'vacuum_wisp',count:2}], isCheckpoint:true, checkpointLabel:'CP-静', turns:18, eventRate:0.6 },
+          { name:'残響回廊', description:'過去の戦闘の残響が漂う回廊。虚空魔術師とデブリハンターが守っているが本道より手薄。残響に紛れて隠し財宝が見つかることもある。', monsters:[{monsterId:'void_mage',count:2},{monsterId:'debris_hunter',count:2},{monsterId:'vacuum_wisp',count:3}], isHardArea:true, turns:24, eventRate:0.5 },
+          { name:'漂流商人の墓場', description:'かつての漂流商人たちの遺品が眠る区画。事象ハンターが目を光らせているが、丁寧に探索すれば質の良い遺品が手に入る。静寂を求めるなら戦闘より探索を優先したい。', monsters:[{monsterId:'event_hunter',count:2,isMidBoss:true},{monsterId:'lunar_wisp',count:3}], isHardArea:true, turns:26, eventRate:0.4 },
+          { name:'虚空の静寂室[CP-静2]', description:'完全な静寂に包まれた一室。簡易チェックポイントがある。ここまで多くの収穫を得てきたなら、装備を見直す余裕も生まれているはずだ。', monsters:[{monsterId:'drift_guard',count:1,isMidBoss:true},{monsterId:'void_mage',count:2}], isCheckpoint:true, checkpointLabel:'CP-静2', turns:20, eventRate:0.5 },
+          { name:'静寂排除戦線', description:'静寂ルートの最終区間。これまで手薄だった守りがここに集約されている。虚空の門番との合流地点はもう目の前。', monsters:[{monsterId:'curse_scribe',count:2,isMidBoss:true},{monsterId:'event_hunter',count:2,isMidBoss:true},{monsterId:'void_mage',count:3}], isHardArea:true, turns:26, eventRate:0.4 },
+          ASTRAL_GATE_VOID,
+          ASTRAL_FINAL_BOSS_AREA,
+        ],
+        // ── ②-C 虚空航路・漂流強行突破（短いが危険）──
+        back_drift: [
+          { name:'漂流強襲路', description:'虚空航路の最短経路。漂流守衛と事象ハンターが密集して待ち構える、開幕から全力で迎撃してくる超高密度区間。チェックポイントは存在しない。', monsters:[{monsterId:'drift_guard',count:3,isMidBoss:true},{monsterId:'event_hunter',count:2,isMidBoss:true},{monsterId:'gravity_crusher',count:3},{monsterId:'void_mage',count:3}], isHardArea:true, turns:48 },
+          { name:'呪詛の通廊', description:'呪刻師が密集する通廊。回復呪印が重なり合い、回復に頼った戦術がまったく機能しなくなる。短期決戦の覚悟がないと突破できない。', monsters:[{monsterId:'curse_scribe',count:3,isMidBoss:true},{monsterId:'plasma_hound',count:2,isMidBoss:true},{monsterId:'vacuum_wisp',count:4}], isHardArea:true, turns:50 },
+          { name:'虚空強行突破口', description:'虚空航路最短経路の最終区間。これまでに登場した精鋭が一斉に押し寄せる。短距離だが要求火力は本道以上。装備が整っていなければ即座に撤退すべき。', monsters:[{monsterId:'event_hunter',count:3,isMidBoss:true},{monsterId:'drift_guard',count:2,isMidBoss:true},{monsterId:'curse_scribe',count:2,isMidBoss:true},{monsterId:'void_mage',count:3}], isHardArea:true, turns:48 },
+          ASTRAL_GATE_VOID,
+          ASTRAL_FINAL_BOSS_AREA,
+        ],
 
-      // ═══════════════ 隠しルート：月面遺構ルート（太陽+虚空ボス撃破後解放）═══════════════
-      moon: [
-        // ── MOON1. 月面前庭（月面遺構導入）──
-        {
-          name:'月面前庭',
-          description:'太陽ボスと虚空ボスを倒した者のみが入れる月面遺構への入口。スターリングと月霊が群れを作り、凍結と幻影で視界を奪う。反射装甲を持つ月面番人もここから登場。短期決戦を意識しないと凍結が蓄積して動けなくなる。',
-          monsters:[
-            {monsterId:'starling',      count:5},
-            {monsterId:'lunar_wisp',    count:5},
-            {monsterId:'moon_sentinel', count:1, isMidBoss:true},
-          ],
-          isHardArea:true,
-        },
-        // ── MOON2. 月面遺構深部（凍結+反射+探索報酬）──
-        {
-          name:'月面遺構深部',
-          description:'月面遺構の最深部。月面番人2体が反射装甲と凍結で守りを固め、スターリングが高回避で撹乱する。凍結耐性と範囲攻撃・魔法が必須。高報酬の月核や月の欠片が豊富にドロップする。',
-          monsters:[
-            {monsterId:'moon_sentinel', count:2, isMidBoss:true},
-            {monsterId:'starling',      count:6},
-            {monsterId:'lunar_wisp',    count:6},
-            {monsterId:'vacuum_wisp',   count:3},
-          ],
-          isHardArea:true,
-        },
-        // ── MOON3. 月核室（高報酬の終点）──
-        {
-          name:'月核室',
-          description:'月面遺構の核となる部屋。月核・月の欠片・霜珪素が豊富に手に入る高報酬エリア。月面番人3体が守護しており、凍結の蓄積管理と幻影への対処が同時に求められる。短期決戦ビルドの真価が問われる。',
-          monsters:[
-            {monsterId:'moon_sentinel', count:3, isMidBoss:true},
-            {monsterId:'starling',      count:7},
-            {monsterId:'lunar_wisp',    count:7},
-          ],
-          isHardArea:true,
-        },
-      ],
+        // ═══════════════ 第1分岐 🛰月面遺構 → 第2分岐（3ルート）═══════════════
+        // ── ③-A 月面遺構・遺構深部探索（標準）──
+        moon_relic: [
+          { name:'月面前庭', description:'月面遺構への入口。スターリングと月霊が群れを作り、凍結と幻影で視界を奪う。短期決戦を意識しないと凍結が蓄積して動けなくなる。', monsters:[{monsterId:'starling',count:5},{monsterId:'lunar_wisp',count:5},{monsterId:'moon_sentinel',count:1,isMidBoss:true}], isHardArea:true, turns:24 },
+          { name:'残響回廊（月面）', description:'月面遺構の入り口付近に広がる静かな回廊。月霊の幻影に紛れてスターリングが奇襲を仕掛けてくる。凍結の蓄積管理が重要になり始める区間。', monsters:[{monsterId:'lunar_wisp',count:6},{monsterId:'starling',count:5},{monsterId:'vacuum_wisp',count:2}], isHardArea:true, turns:28 },
+          { name:'月面遺構深部', description:'月面遺構の深部。月面番人2体が反射装甲と凍結で守りを固め、スターリングが高回避で撹乱する。凍結耐性と範囲攻撃・魔法が必須。高報酬の月核や月の欠片が豊富にドロップする。', monsters:[{monsterId:'moon_sentinel',count:2,isMidBoss:true},{monsterId:'starling',count:6},{monsterId:'lunar_wisp',count:6},{monsterId:'vacuum_wisp',count:3}], isHardArea:true, turns:32 },
+          { name:'月核室', description:'月面遺構の核となる部屋。月核・月の欠片・霜珪素が豊富に手に入る高報酬エリア。月面番人3体が守護しており、凍結の蓄積管理と幻影への対処が同時に求められる。短期決戦ビルドの真価が問われる。', monsters:[{monsterId:'moon_sentinel',count:3,isMidBoss:true},{monsterId:'starling',count:7},{monsterId:'lunar_wisp',count:7}], isHardArea:true, turns:34 },
+          ASTRAL_GATE_MOON,
+          ASTRAL_FINAL_BOSS_AREA,
+        ],
+        // ── ③-B 月面遺構・残骸回収戦（安全だが長い）──
+        moon_scrap: [
+          { name:'残骸外縁帯', description:'月面遺構の外縁に散らばる残骸地帯。デブリハンターと軌道ドローンが薄く展開している。回収しがいのある残骸が多く、戦闘より探索向きの区間。', monsters:[{monsterId:'debris_hunter',count:2},{monsterId:'orbit_drone',count:3},{monsterId:'cosmic_mite',count:4}], turns:20, eventRate:0.3 },
+          { name:'凍結回収路[CP-残1]', description:'凍結した残骸が並ぶ回収路。簡易チェックポイントがある。月霊がちらほら出現するが本道より遥かに手薄。じっくり回収していける。', monsters:[{monsterId:'lunar_wisp',count:4},{monsterId:'starling',count:3}], isCheckpoint:true, checkpointLabel:'CP-残1', turns:18, eventRate:0.3 },
+          { name:'残骸集積場', description:'回収された残骸が積み上がる集積場。軌道ドローンと反射砲台が守備にあたっているが、隊列を崩さなければ大きな脅威にはならない。', monsters:[{monsterId:'orbit_drone',count:4},{monsterId:'mirror_turret',count:2},{monsterId:'debris_hunter',count:2}], turns:22, eventRate:0.3 },
+          { name:'霜の回廊', description:'霜に覆われた長い回廊。月霊とスターリングがゆっくりと出現する、危険度は低めだが距離が長い区間。霜珪素や月の欠片が定期的に見つかる。', monsters:[{monsterId:'lunar_wisp',count:5},{monsterId:'starling',count:4},{monsterId:'vacuum_wisp',count:2}], turns:20, eventRate:0.3 },
+          { name:'廃棄ドック[CP-残2]', description:'宇宙船の廃棄ドック。簡易チェックポイントがあり、ドック内の格納庫から装備品が見つかることもある。月面番人が1体だけ巡回している。', monsters:[{monsterId:'moon_sentinel',count:1,isMidBoss:true},{monsterId:'debris_hunter',count:2}], isCheckpoint:true, checkpointLabel:'CP-残2', turns:18, eventRate:0.4 },
+          { name:'残骸選別場', description:'回収した残骸を選別する施設。デブリハンターと軌道ドローンが多数いるが、組織的な抵抗は薄い。質の良い素材が安定して手に入る。', monsters:[{monsterId:'debris_hunter',count:3},{monsterId:'orbit_drone',count:3},{monsterId:'cosmic_mite',count:5}], turns:22, eventRate:0.3 },
+          { name:'月光倉庫', description:'月光が差し込む静かな倉庫。スターリングと月霊が守るが密度は低い。長旅の最後にふさわしい落ち着いた区間で、もう一度態勢を整えられる。', monsters:[{monsterId:'starling',count:5},{monsterId:'lunar_wisp',count:5}], turns:22, eventRate:0.4 },
+          { name:'回収戦線終着点', description:'残骸回収ルートの最終区間。月面番人2体が最後の守りを固めている。ここを越えれば月面の門番との合流地点に到達する。', monsters:[{monsterId:'moon_sentinel',count:2,isMidBoss:true},{monsterId:'starling',count:5},{monsterId:'lunar_wisp',count:5}], isHardArea:true, turns:24, eventRate:0.2 },
+          ASTRAL_GATE_MOON,
+          ASTRAL_FINAL_BOSS_AREA,
+        ],
+        // ── ③-C 月面遺構・幽体強行突破（短いが危険）──
+        moon_ghost: [
+          { name:'幽体回廊', description:'月面遺構の最短経路。月霊とスターリングが極めて高密度で出現し、凍結が瞬く間に蓄積していく。チェックポイントは存在しない、覚悟を決めた者だけの道。', monsters:[{monsterId:'lunar_wisp',count:8},{monsterId:'starling',count:6},{monsterId:'moon_sentinel',count:1,isMidBoss:true}], isHardArea:true, turns:48 },
+          { name:'幻影の間', description:'幻影が入り乱れる円形の間。月面番人2体が幻影分身を駆使して攻撃をかわしながら反撃してくる。本体の見極めができないと一方的に削られる。', monsters:[{monsterId:'moon_sentinel',count:2,isMidBoss:true},{monsterId:'starling',count:7},{monsterId:'vacuum_wisp',count:3}], isHardArea:true, turns:50 },
+          { name:'凍結突破口', description:'月面遺構最短経路の最終区間。これまでに登場した精鋭が一斉に押し寄せる。凍結が蓄積しきる前に押し切る瞬発力が要求される。', monsters:[{monsterId:'moon_sentinel',count:2,isMidBoss:true},{monsterId:'lunar_wisp',count:7},{monsterId:'starling',count:6}], isHardArea:true, turns:48 },
+          ASTRAL_GATE_MOON,
+          ASTRAL_FINAL_BOSS_AREA,
+        ],
+      },
     },
     // areasは互換性のために共通ルートのエイリアスとして維持
     areas:[
@@ -3524,7 +3352,37 @@ export const DUNGEON_MASTER: Record<string, DungeonMaster> = {
       { name:'放射線隔壁', description:'呪刻師・最大HP削り地帯。', monsters:[{monsterId:'curse_scribe',count:2},{monsterId:'void_mage',count:2}], isHardArea:true },
       { name:'重力中継室', description:'漂流守衛+プラズマハウンドの凶悪コンボ。', monsters:[{monsterId:'drift_guard',count:2,isMidBoss:true},{monsterId:'plasma_hound',count:2,isMidBoss:true}], isHardArea:true },
       { name:'分岐前広間', description:'全エリート出現。フレアパラディン・事象ハンター初登場。', monsters:[{monsterId:'flare_paladin',count:2,isMidBoss:true},{monsterId:'event_hunter',count:2,isMidBoss:true}], isHardArea:true },
-      { name:'分岐中枢[CP3・分岐点]', description:'CP3あり。太陽・虚空・月面ルートへの分岐点。', monsters:[{monsterId:'orbital_knight',count:4},{monsterId:'plasma_hound',count:2,isMidBoss:true}], isHardArea:true, isCheckpoint:true, checkpointLabel:'CP3', isBranchPoint:true },
+      { name:'分岐中枢[CP3・分岐点]', description:'CP3あり。太陽・虚空・月面の3テーマ×3サブルート＝9ルートへの分岐点。', monsters:[{monsterId:'orbital_knight',count:4},{monsterId:'plasma_hound',count:2,isMidBoss:true}], isHardArea:true, isCheckpoint:true, checkpointLabel:'CP3', isBranchPoint:true },
+    ],
+    // 9ルート選択UI用メタデータ（第1分岐3テーマ×各テーマ内3サブルート）
+    routeTree: [
+      {
+        themeKey: 'lich', label: '☀️ 太陽航路', icon: '☀️', color: '#ff9d3d',
+        description: '燃焼・光線・耐久戦が中心のテーマ。火耐性と継続回復が鍵。',
+        leaves: [
+          { key:'lich_inferno', label:'恒星核強襲', tagline:'本道を正面突破する正統ルート。', danger:4, estimatedTurns:204, healSupply:'normal' },
+          { key:'lich_purge',   label:'観測網掃討', tagline:'CPと小休止が多く安全だが長丁場。', danger:2, estimatedTurns:208, healSupply:'high' },
+          { key:'lich_ambush',  label:'奇襲反撃',   tagline:'最短経路。エリート密度が極めて高い。', danger:5, estimatedTurns:210, healSupply:'low' },
+        ],
+      },
+      {
+        themeKey: 'back', label: '🌑 虚空航路', icon: '🌑', color: '#8a5cff',
+        description: '真空・呪詛・防御貫通が中心のテーマ。回復力とMP管理が鍵。',
+        leaves: [
+          { key:'back_collapse', label:'虚空崩落',   tagline:'本道を正面突破する正統ルート。', danger:4, estimatedTurns:202, healSupply:'normal' },
+          { key:'back_silence',  label:'静寂排除',   tagline:'探索とイベントが多く実入りも大きい。', danger:2, estimatedTurns:208, healSupply:'high' },
+          { key:'back_drift',    label:'漂流強行突破', tagline:'最短経路。エリート密度が極めて高い。', danger:5, estimatedTurns:210, healSupply:'low' },
+        ],
+      },
+      {
+        themeKey: 'moon', label: '🛰 月面遺構', icon: '🛰', color: '#38d9ff',
+        description: '凍結・幻影・残骸回収が中心のテーマ。短期決戦力と凍結耐性が鍵。',
+        leaves: [
+          { key:'moon_relic', label:'遺構深部探索', tagline:'標準的な進み方。高報酬の核部屋を通る。', danger:3, estimatedTurns:210, healSupply:'normal' },
+          { key:'moon_scrap', label:'残骸回収戦',   tagline:'9ルート最長。個々の敵は控えめで安全。', danger:2, estimatedTurns:228, healSupply:'high' },
+          { key:'moon_ghost', label:'幽体強行突破', tagline:'最短経路。凍結蓄積が極めて速い高難度。', danger:5, estimatedTurns:210, healSupply:'low' },
+        ],
+      },
     ],
   },
   // ── フリーフィールド(FFGG)ダンジョン ──
@@ -4012,6 +3870,18 @@ export const DEFAULT_PLAYER_STATS = {
 // フォーマット: { version: 'x.x.x', date: 'YYYY-MM-DD', changes: ['変更内容...'] }
 // ============================================================
 export const VERSION_PATCHES = [
+  {
+    version: '2.28.0',
+    date: '2026-06-26',
+    changes: [
+      '🛠 「星骸宇宙砦 アストラル・ノクス」をダンジョン構造改修！道中の短さ・敵の弱さを解消する大規模リワーク',
+      '🌌 共通区間を13エリアに拡張（想定ターン数150超）。CP3で☀️太陽航路／🌑虚空航路／🛰月面遺構の3テーマに分岐し、各テーマでさらに3通りの進み方（合計9ルート）を選択可能に',
+      '🧭 9ルートはそれぞれ危険度・回復機会・敵傾向が異なる：本道(高難度)／安全だが長い掃討・回収ルート／短いが危険な強行突破ルートの3パターン×3テーマ',
+      '🚪 9ルート全てが各テーマ共通の「門番」関門（旧ボスを再配置）を経て、単一の真の最終ボス「ノクス・プライム〔星骸の意志〕」へ合流するよう統一',
+      '💪 雑魚〜エリートのHPを大幅増強（雑魚x12〜15／中堅x13〜15／エリートx14〜15）。弱すぎる敵を解消し、道中の消耗を強化',
+      '🎲 ダンジョン共通のランダムイベント機構を追加（データ駆動・eventRateで密度を調整可能）。回復ポッド・隠し財宝・祭壇イベントなどが発生',
+    ],
+  },
   {
     version: '2.27.0',
     date: '2026-06-26',
