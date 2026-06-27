@@ -32,6 +32,7 @@ export function useCombatFx() {
   const [enemyFx, setEnemyFx] = useState<EnemyFxMap>({});
   const [selfFx, setSelfFx] = useState<FxInstance[]>([]);
   const [shakeKey, setShakeKey] = useState(0); // 値が変わるたびに画面シェイクCSSを再トリガー
+  const [shakeCritical, setShakeCritical] = useState(false); // 直近のshakeが会心ヒットによるものか（演出強度の分岐用）
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
@@ -90,6 +91,7 @@ export function useCombatFx() {
 
     if (opts?.shake !== false) {
       setShakeKey(k => k + 1);
+      setShakeCritical(anyCritical);
     }
   }, [scheduleCleanup]);
 
@@ -127,5 +129,5 @@ export function useCombatFx() {
     }, intensity === 'normal' ? FX_LIFETIME_MS : FX_LIFETIME_STRONG_MS);
   }, [scheduleCleanup]);
 
-  return { enemyFx, selfFx, shakeKey, triggerEnemyFx, triggerDefeatFx, triggerSelfFx };
+  return { enemyFx, selfFx, shakeKey, shakeCritical, triggerEnemyFx, triggerDefeatFx, triggerSelfFx };
 }

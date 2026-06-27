@@ -22,10 +22,13 @@ function ensureCombatFxStyles() {
 @keyframes cfx-drip    { 0%{opacity:0;transform:translateY(-4px)} 30%{opacity:1} 100%{opacity:0.1;transform:translateY(10px)} }
 @keyframes cfx-spin    { 0%{transform:rotate(0deg);opacity:0.9} 100%{transform:rotate(360deg);opacity:0} }
 @keyframes cfx-shake   { 0%{transform:translate(0,0)} 20%{transform:translate(-2px,1px)} 40%{transform:translate(2px,-1px)} 60%{transform:translate(-1px,1px)} 80%{transform:translate(1px,-1px)} 100%{transform:translate(0,0)} }
+@keyframes cfx-shake-crit { 0%{transform:translate(0,0)} 12%{transform:translate(-6px,3px)} 24%{transform:translate(6px,-4px)} 36%{transform:translate(-5px,3px)} 48%{transform:translate(5px,-3px)} 60%{transform:translate(-3px,2px)} 75%{transform:translate(2px,-1px)} 100%{transform:translate(0,0)} }
+@keyframes cfx-crit-flash { 0%{opacity:0} 12%{opacity:0.5} 100%{opacity:0} }
 @keyframes cfx-flicker { 0%{opacity:0} 10%{opacity:0.95} 25%{opacity:0.3} 40%{opacity:0.9} 60%{opacity:0.2} 80%{opacity:0.85} 100%{opacity:0} }
 @keyframes cfx-freeze  { 0%{opacity:0;transform:scale(0.7)} 40%{opacity:1;transform:scale(1)} 70%{opacity:0.85} 100%{opacity:0;transform:scale(1.05)} }
 @keyframes cfx-glow    { 0%{opacity:0;box-shadow:none} 35%{opacity:1} 100%{opacity:0} }
 .combatfx-shake { animation: cfx-shake 0.26s ease-in-out; }
+.combatfx-shake-crit { animation: cfx-shake-crit 0.42s ease-in-out; }
 `;
   document.head.appendChild(style);
 }
@@ -591,6 +594,18 @@ export function EnemyFxOverlay({ fxList }: { fxList: FxInstance[] }) {
         );
       })}
     </div>
+  );
+}
+
+// 会心ヒット時の画面フラッシュ（shakeKeyが変化した瞬間にcriticalがtrueなら呼び出し側で表示）
+export function CritFlashOverlay({ flashKey }: { flashKey: number }) {
+  ensureCombatFxStyles();
+  return (
+    <div key={flashKey} style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 9,
+      background: 'radial-gradient(circle, rgba(255,235,160,0.9) 0%, rgba(255,200,60,0.3) 45%, transparent 75%)',
+      animation: 'cfx-crit-flash 0.32s ease-out',
+    }} />
   );
 }
 
