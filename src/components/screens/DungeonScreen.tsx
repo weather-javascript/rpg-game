@@ -2351,18 +2351,22 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     if (!battle.result) return;
     if (battle.result === 'win') {
       onManaUpdate?.(0);
-      // レアドロップ（epic/legendary）をナチュラルニュースに投稿
+      // レアドロップ（epic/legendary）をドロップログに投稿
       for (const d of battle.drops) {
         const item = ITEM_MASTER[d.itemId];
         if (!item) continue;
-        if (item.rarity === 'epic' || item.rarity === 'legendary') {
+        const isAstral = runState.dungeonId === 'astral_nox';
+        // アストラル・ノクスはlegendaryのみ投稿、それ以外はepic/legendary
+        if (item.rarity === 'legendary' || (!isAstral && item.rarity === 'epic')) {
           const prefix = item.rarity === 'legendary' ? '🌟' : '✨';
           const color = item.rarity === 'legendary' ? '#ffd700' : '#c97aff';
           postActivityFeed({
             uid: player.uid, displayName: player.displayName,
-            type: 'dungeon_clear',
+            type: 'drop_log',
             message: `がダンジョンで${prefix}【${item.name}】を入手した！`,
             color,
+            dungeonId: runState.dungeonId,
+            itemRarity: item.rarity,
           }).catch(() => {});
         }
       }

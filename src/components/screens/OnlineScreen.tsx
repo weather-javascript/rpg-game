@@ -26,7 +26,7 @@ import { GuildScreen } from './GuildScreen';
 import { FriendScreen } from './FriendScreen';
 
 type SubTab = 'online' | 'board' | 'auction' | 'activity' | 'ranking' | 'proposal' | 'transfer' | 'guild' | 'friend';
-type ActivitySubTab = 'world_news' | 'player_status' | 'world_status' | 'gamble_flash' | 'natural_news';
+type ActivitySubTab = 'world_news' | 'player_status' | 'world_status' | 'gamble_flash' | 'natural_news' | 'drop_log';
 
 // ============================================================
 // 活動タブ内 サブタブ
@@ -96,138 +96,83 @@ function TitleColorText({ text, color }: { text: string; color?: string }) {
 function WorldNewsPanel() {
   const [entries, setEntries] = useState<ActivityFeedEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     const unsub = subscribeActivityFeed(es => {
-      setEntries(es.filter(e => WORLD_NEWS_TYPES.has(e.type)));
+      // epic/legendaryドロップ（drop_log）を除外
+      setEntries(es.filter(e => WORLD_NEWS_TYPES.has(e.type) && e.type !== 'drop_log'));
       setLoading(false);
     });
     return unsub;
   }, []);
 
-  // shimmer animation tick
-  useEffect(() => {
-    const t = setInterval(() => setTick(p => p + 1), 1200);
-    return () => clearInterval(t);
-  }, []);
-
   return (
-    <div>
-      <h3 style={{color:'#f0c060', marginBottom:2, fontSize:'0.95rem', display:'flex', alignItems:'center', gap:6}}>
-        <span style={{animation:`spin ${tick}s linear`}}>🌍</span> ワールドニュース
-      </h3>
-      <p style={{fontSize:'0.72rem', color:'#4a5070', marginBottom:10}}>世界で起きた重要イベント</p>
-      <div style={{display:'flex', flexDirection:'column', gap:6, maxHeight:520, overflowY:'auto', paddingBottom:4}}>
-        {loading && <div style={{color:'#8a92b2', textAlign:'center', padding:24, fontSize:'0.85rem'}}>読み込み中...</div>}
-        {!loading && entries.length === 0 && <div style={{color:'#4a5070', textAlign:'center', padding:24, fontSize:'0.85rem'}}>まだニュースがありません</div>}
+    <div style={{ fontFamily: "'Courier New', 'Consolas', monospace" }}>
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+        <span style={{ color:'#4caf87', fontSize:'0.82rem', fontWeight:700 }}>■</span>
+        <h3 style={{ color:'#c8d8e8', margin:0, fontSize:'0.9rem', letterSpacing:'0.04em' }}>
+          WORLD_NEWS.log
+        </h3>
+        <span style={{ fontSize:'0.65rem', color:'#3a4a5a', marginLeft:'auto' }}>live</span>
+        <span style={{ width:6, height:6, borderRadius:'50%', background:'#4caf87', display:'inline-block', boxShadow:'0 0 6px #4caf87' }} />
+      </div>
+      <p style={{ fontSize:'0.68rem', color:'#3a4a5a', marginBottom:10, paddingLeft:4 }}>// 重要イベントのみ表示（ドロップログは💎タブへ）</p>
+      <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:520, overflowY:'auto', paddingBottom:4 }}>
+        {loading && <div style={{ color:'#3a5a4a', textAlign:'center', padding:24, fontSize:'0.8rem', fontFamily:'monospace' }}>{'>'} loading...</div>}
+        {!loading && entries.length === 0 && <div style={{ color:'#3a4a5a', textAlign:'center', padding:24, fontSize:'0.8rem' }}>{'>'} no entries</div>}
         {entries.map((e, i) => {
-          const s = NEWS_STYLE[e.type] ?? { emoji: '📌', color: '#8a92b2' };
+          const s = NEWS_STYLE[e.type] ?? { emoji: '▸', color: '#5a6a7a' };
           const rank = NEWS_RANK[e.type] ?? 1;
           const now = Date.now();
           const diff = now - e.timestamp;
-          const timeLabel = diff < 60_000 ? 'たった今'
-            : diff < 3_600_000 ? `${Math.floor(diff/60_000)}分前`
-            : diff < 86_400_000 ? `${Math.floor(diff/3_600_000)}時間前`
+          const timeLabel = diff < 60_000 ? 'just now'
+            : diff < 3_600_000 ? `${Math.floor(diff/60_000)}m ago`
+            : diff < 86_400_000 ? `${Math.floor(diff/3_600_000)}h ago`
             : new Date(e.timestamp).toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' });
 
-          // boss_title: 称号獲得（称号テキストは専用カラーで強調表示）
           if (e.type === 'boss_title') {
             const titleText = e.title ?? '';
             return (
               <div key={i} style={{
-                borderRadius:8,
-                background:'rgba(255,255,255,0.03)',
-                border:'1px solid #f0c06088',
-                padding:'7px 10px',
-                display:'flex', alignItems:'center', gap:8,
+                background:'#0d1520',
+                border:'1px solid #1a3040',
+                borderLeft:`3px solid #f0c060`,
+                padding:'6px 10px',
+                display:'flex', alignItems:'flex-start', gap:8,
+                animation: 'wnFadeIn 0.3s ease',
               }}>
-                <span style={{fontSize:'1.05rem'}}>🏆</span>
-                <div style={{flex:1, minWidth:0, wordBreak:'break-word', overflowWrap:'anywhere'}}>
-                  <span style={{fontSize:'0.82rem', fontWeight:700, color:'#e8e6ff'}}>{e.displayName}</span>
-                  <span style={{fontSize:'0.8rem', color:'#c0bcd8'}}>が称号「</span>
+                <span style={{ color:'#f0c060', fontSize:'0.75rem', minWidth:16, marginTop:1 }}>🏆</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <span style={{ fontSize:'0.78rem', color:'#8ab8c8' }}>[TITLE] </span>
+                  <span style={{ fontSize:'0.78rem', color:'#e8e4ff', fontWeight:700 }}>{e.displayName}</span>
+                  <span style={{ fontSize:'0.76rem', color:'#7a8898' }}>が称号「</span>
                   <TitleColorText text={titleText} color={e.color} />
-                  <span style={{fontSize:'0.8rem', color:'#c0bcd8'}}>」を獲得しました！</span>
+                  <span style={{ fontSize:'0.76rem', color:'#7a8898' }}>」を獲得</span>
                 </div>
-                <span style={{fontSize:'0.62rem', color:'#4a5070', whiteSpace:'nowrap'}}>{timeLabel}</span>
+                <span style={{ fontSize:'0.58rem', color:'#3a4a5a', whiteSpace:'nowrap', fontFamily:'monospace' }}>{timeLabel}</span>
               </div>
             );
           }
 
-          // rank5: super jackpot / sky_castle_ex / lv200
-          if (rank >= 5) return (
-            <div key={i} style={{
-              position:'relative', borderRadius:8, overflow:'hidden',
-              background:'rgba(255,215,0,0.06)',
-              border:'1px solid #ffd700',
-              padding:'7px 10px',
-              display:'flex', alignItems:'center', gap:8,
-            }}>
-              {/* shimmer strip */}
-              <div style={{position:'absolute',top:0,left:`${(tick*30)%160-40}%`,width:'40%',height:'100%',
-                background:'linear-gradient(90deg,transparent,rgba(255,215,0,0.15),transparent)',
-                pointerEvents:'none'}} />
-              <span style={{fontSize:'1.1rem'}}>{s.emoji}✨</span>
-              <div style={{flex:1, minWidth:0, wordBreak:'break-word', overflowWrap:'anywhere'}}>
-                <span style={{fontSize:'0.82rem', fontWeight:800, color:'#ffd700'}}>{e.displayName}</span>
-                <span style={{fontSize:'0.8rem', fontWeight:500, color:'#f0d880'}}>{e.message.replace(e.displayName,'')}</span>
-              </div>
-              <span style={{fontSize:'0.62rem', color:'#7a6a30', whiteSpace:'nowrap'}}>{timeLabel}</span>
-            </div>
-          );
+          const borderColor = rank >= 5 ? '#b8860b' : rank === 4 ? s.color : rank === 3 ? s.color + 'aa' : '#1a2a3a';
+          const bgColor = rank >= 5 ? '#0f1810' : rank >= 3 ? '#0a0d14' : '#080b10';
+          const tag = rank >= 5 ? 'EPIC' : rank === 4 ? 'MAJOR' : rank === 3 ? 'INFO' : 'LOG';
+          const tagColor = rank >= 5 ? '#b8860b' : rank === 4 ? s.color : rank === 3 ? s.color + 'cc' : '#3a4a5a';
 
-          // rank4: volcano/boss_kx/boss_rei/boss_ragnarok
-          if (rank === 4) return (
-            <div key={i} style={{
-              borderRadius:8,
-              background:'rgba(255,255,255,0.03)',
-              border:`1px solid ${s.color}88`,
-              padding:'7px 10px',
-              display:'flex', alignItems:'center', gap:8,
-            }}>
-              <span style={{fontSize:'1.05rem'}}>{s.emoji}</span>
-              <div style={{flex:1, minWidth:0, wordBreak:'break-word', overflowWrap:'anywhere'}}>
-                <span style={{fontSize:'0.82rem', fontWeight:700, color: s.color}}>{e.displayName}</span>
-                <span style={{fontSize:'0.8rem', color:'#c0bcd8'}}>{e.message.replace(e.displayName,'')}</span>
-              </div>
-              <span style={{fontSize:'0.62rem', color:'#4a5070', whiteSpace:'nowrap'}}>{timeLabel}</span>
-            </div>
-          );
-
-          // rank3: jackpot/sky_castle_clear/boss_hard/lv100
-          if (rank === 3) return (
-            <div key={i} style={{
-              borderRadius:8,
-              background:'rgba(255,255,255,0.03)',
-              border:`1px solid ${s.color}88`,
-              boxShadow:`inset 0 0 0 1px ${s.color}22`,
-              padding:'9px 12px',
-              display:'flex', alignItems:'center', gap:8,
-            }}>
-              <span style={{fontSize:'1.1rem'}}>{s.emoji}</span>
-              <div style={{flex:1, minWidth:0, wordBreak:'break-word', overflowWrap:'anywhere'}}>
-                <span style={{fontSize:'0.82rem', fontWeight:700, color: s.color}}>{e.displayName}</span>
-                <span style={{fontSize:'0.8rem', color:'#c0bcd8'}}>{e.message.replace(e.displayName,'')}</span>
-              </div>
-              <span style={{fontSize:'0.62rem', color:'#4a5070', whiteSpace:'nowrap'}}>{timeLabel}</span>
-            </div>
-          );
-
-          // rank1-2: default
           return (
             <div key={i} style={{
-              borderRadius:7,
-              background:'rgba(255,255,255,0.015)',
-              border:'1px solid #1c2235',
-              padding:'8px 12px',
-              display:'flex', alignItems:'center', gap:8,
+              background: bgColor,
+              border: `1px solid ${borderColor}`,
+              borderLeft: `3px solid ${borderColor}`,
+              padding:'6px 10px',
+              display:'flex', alignItems:'flex-start', gap:8,
             }}>
-              <span style={{fontSize:'1rem'}}>{s.emoji}</span>
-              <div style={{flex:1, minWidth:0, wordBreak:'break-word', overflowWrap:'anywhere'}}>
-                <span style={{fontSize:'0.8rem', fontWeight:600, color: s.color}}>{e.displayName}</span>
-                <span style={{fontSize:'0.78rem', color:'#8a92b2'}}>{e.message.replace(e.displayName,'')}</span>
+              <span style={{ color: tagColor, fontSize:'0.62rem', fontWeight:700, minWidth:34, whiteSpace:'nowrap', marginTop:1, letterSpacing:'0.02em' }}>[{tag}]</span>
+              <div style={{ flex:1, minWidth:0, wordBreak:'break-word', overflowWrap:'anywhere' }}>
+                <span style={{ fontSize:'0.78rem', fontWeight:700, color: rank >= 3 ? s.color : '#7a9aaa' }}>{e.displayName}</span>
+                <span style={{ fontSize:'0.76rem', color:'#5a6a7a' }}>{e.message.replace(e.displayName,'')}</span>
               </div>
-              <span style={{fontSize:'0.62rem', color:'#4a5070', whiteSpace:'nowrap'}}>{timeLabel}</span>
+              <span style={{ fontSize:'0.58rem', color:'#3a4a5a', whiteSpace:'nowrap', fontFamily:'monospace' }}>{timeLabel}</span>
             </div>
           );
         })}
@@ -491,8 +436,104 @@ function NaturalNewsPanel() {
   );
 }
 
-// ─── ギャンブル速報 ──────────────────────────────────────────
-const GAMBLE_TYPES = new Set(['gamble_win','gamble_lose','jackpot','super_jackpot','gamble_rank_up','treasure','pvp_win','pvp_lose']);
+// ─── 💎 ドロップログ ─────────────────────────────────────────
+// ダンジョン別アクセントカラー
+const DUNGEON_DROP_THEME: Record<string, { accent: string; bg: string; label: string }> = {
+  beginner_cave:       { accent: '#4caf87', bg: '#051510', label: '始まりの洞窟' },
+  frozen_cave:         { accent: '#7fd6ff', bg: '#050e18', label: '凍結洞窟' },
+  sky_castle:          { accent: '#f0c060', bg: '#100e05', label: '天空城' },
+  sky_castle_ex:       { accent: '#ffd24d', bg: '#120f04', label: '天空城EX' },
+  volcano:             { accent: '#ff6644', bg: '#150504', label: '火山ダンジョン' },
+  astral_nox:          { accent: '#9b6df0', bg: '#0a0514', label: 'アストラル・ノクス' },
+  chaite:              { accent: '#e05599', bg: '#140510', label: '彼岸花の檻' },
+  underground_fortress:{ accent: '#c97aff', bg: '#0c0514', label: '地下要塞' },
+  fortress:            { accent: '#8ab0ff', bg: '#05081a', label: '要塞' },
+  garden:              { accent: '#7dd9b0', bg: '#051410', label: '庭園' },
+  kx_fight:            { accent: '#e05555', bg: '#140505', label: 'KX-G21' },
+  rei_fight:           { accent: '#cc44cc', bg: '#0f0514', label: '霊闘' },
+  lycoris_dungeon:     { accent: '#ff6699', bg: '#140510', label: '彼岸花ダンジョン' },
+};
+const DEFAULT_DROP_THEME = { accent: '#5b8dee', bg: '#050a14', label: 'ダンジョン' };
+
+function DropLogPanel() {
+  const [entries, setEntries] = useState<ActivityFeedEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filterDungeon, setFilterDungeon] = useState<string>('all');
+
+  useEffect(() => {
+    const unsub = subscribeActivityFeed(es => {
+      setEntries(es.filter(e => e.type === 'drop_log'));
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  const dungeonIds = Array.from(new Set(entries.map(e => e.dungeonId ?? 'unknown').filter(Boolean)));
+  const filtered = filterDungeon === 'all' ? entries : entries.filter(e => (e.dungeonId ?? 'unknown') === filterDungeon);
+
+  return (
+    <div>
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+        <span style={{ fontSize:'1rem' }}>💎</span>
+        <h3 style={{ color:'#c97aff', margin:0, fontSize:'0.9rem', letterSpacing:'0.03em' }}>ドロップログ</h3>
+        <span style={{ fontSize:'0.65rem', color:'#5a4a7a', marginLeft:'auto' }}>epic / legendary</span>
+      </div>
+      <p style={{ fontSize:'0.68rem', color:'#4a3a6a', marginBottom:8 }}>全プレイヤーのレアドロップを記録</p>
+
+      {/* ダンジョンフィルター */}
+      <div style={{ display:'flex', gap:4, marginBottom:10, overflowX:'auto', paddingBottom:2 }}>
+        <button onClick={() => setFilterDungeon('all')}
+          style={{ flexShrink:0, padding:'3px 8px', fontSize:'0.65rem', background: filterDungeon==='all' ? 'rgba(201,122,255,0.2)' : '#0a0d14', border:`1px solid ${filterDungeon==='all' ? '#c97aff' : '#1a1a2a'}`, color: filterDungeon==='all' ? '#c97aff' : '#4a3a6a', borderRadius:4, cursor:'pointer' }}>
+          ALL
+        </button>
+        {dungeonIds.map(did => {
+          const theme = DUNGEON_DROP_THEME[did] ?? DEFAULT_DROP_THEME;
+          const active = filterDungeon === did;
+          return (
+            <button key={did} onClick={() => setFilterDungeon(did)}
+              style={{ flexShrink:0, padding:'3px 8px', fontSize:'0.65rem', background: active ? `${theme.bg}` : '#0a0d14', border:`1px solid ${active ? theme.accent : '#1a1a2a'}`, color: active ? theme.accent : '#4a3a6a', borderRadius:4, cursor:'pointer' }}>
+              {theme.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:480, overflowY:'auto' }}>
+        {loading && <div style={{ color:'#3a2a5a', textAlign:'center', padding:24, fontSize:'0.8rem' }}>読み込み中...</div>}
+        {!loading && filtered.length === 0 && <div style={{ color:'#3a2a5a', textAlign:'center', padding:24, fontSize:'0.8rem' }}>まだ記録がありません</div>}
+        {filtered.map((e, i) => {
+          const theme = DUNGEON_DROP_THEME[e.dungeonId ?? ''] ?? DEFAULT_DROP_THEME;
+          const isLegendary = e.itemRarity === 'legendary';
+          const now = Date.now();
+          const diff = now - e.timestamp;
+          const timeLabel = diff < 60_000 ? 'たった今'
+            : diff < 3_600_000 ? `${Math.floor(diff/60_000)}分前`
+            : diff < 86_400_000 ? `${Math.floor(diff/3_600_000)}時間前`
+            : new Date(e.timestamp).toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' });
+          return (
+            <div key={i} style={{
+              background: theme.bg,
+              border: `1px solid ${isLegendary ? '#b8860b' : theme.accent + '66'}`,
+              borderLeft: `3px solid ${isLegendary ? '#ffd700' : theme.accent}`,
+              padding:'7px 10px',
+              display:'flex', alignItems:'center', gap:8,
+            }}>
+              <span style={{ fontSize:'0.9rem', minWidth:18 }}>{isLegendary ? '🌟' : '✨'}</span>
+              <div style={{ flex:1, minWidth:0, wordBreak:'break-word' }}>
+                <span style={{ fontSize:'0.78rem', fontWeight:700, color: isLegendary ? '#ffd700' : theme.accent }}>{e.displayName}</span>
+                <span style={{ fontSize:'0.75rem', color:'#5a5a7a' }}>{e.message.replace(e.displayName,'')}</span>
+                <div style={{ fontSize:'0.62rem', color: theme.accent + '99', marginTop:1 }}>{theme.label}</div>
+              </div>
+              <span style={{ fontSize:'0.58rem', color:'#3a2a5a', whiteSpace:'nowrap' }}>{timeLabel}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── ギャンブル速報 ──────────────────────────────────────────const GAMBLE_TYPES = new Set(['gamble_win','gamble_lose','jackpot','super_jackpot','gamble_rank_up','treasure','pvp_win','pvp_lose']);
 
 function GambleFlashPanel() {
   const [entries, setEntries] = useState<ActivityFeedEntry[]>([]);
@@ -554,6 +595,7 @@ function ActivityTabPanel({ users }: { users: OnlineUser[] }) {
 
   const ACT_TABS: { id: ActivitySubTab; label: string; emoji: string }[] = [
     { id: 'world_news',    label: 'ワールドニュース', emoji: '🌍' },
+    { id: 'drop_log',      label: 'ドロップログ',     emoji: '💎' },
     { id: 'player_status', label: 'プレイヤー状況',   emoji: '👥' },
     { id: 'world_status',  label: 'ワールド状況',     emoji: '🌐' },
     { id: 'gamble_flash',  label: 'ギャンブル速報',   emoji: '🎰' },
@@ -575,6 +617,7 @@ function ActivityTabPanel({ users }: { users: OnlineUser[] }) {
         ))}
       </div>
       {actSubTab === 'world_news'    && <WorldNewsPanel />}
+      {actSubTab === 'drop_log'      && <DropLogPanel />}
       {actSubTab === 'player_status' && <PlayerStatusPanel users={users} />}
       {actSubTab === 'world_status'  && <WorldStatusPanel users={users} />}
       {actSubTab === 'gamble_flash'  && <GambleFlashPanel />}
