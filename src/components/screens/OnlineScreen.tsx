@@ -533,7 +533,8 @@ function DropLogPanel() {
   );
 }
 
-// ─── ギャンブル速報 ──────────────────────────────────────────const GAMBLE_TYPES = new Set(['gamble_win','gamble_lose','jackpot','super_jackpot','gamble_rank_up','treasure','pvp_win','pvp_lose']);
+// ─── ギャンブル速報 ──────────────────────────────────────────
+const GAMBLE_TYPES = new Set(['gamble_win','gamble_lose','jackpot','super_jackpot','gamble_rank_up','treasure','pvp_win','pvp_lose']);
 
 function GambleFlashPanel() {
   const [entries, setEntries] = useState<ActivityFeedEntry[]>([]);

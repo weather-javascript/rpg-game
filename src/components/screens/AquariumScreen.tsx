@@ -89,10 +89,7 @@ function rollMutation(): 'none' | 'mutant' | 'super' {
 
 function growthProgress(fish: FishIndividual): number {
   if (fish.growthStage === 'giant') return 100;
-  const stages: GrowthStage[] = ['fry', 'juvenile', 'adult', 'large', 'giant'];
-  const idx = stages.indexOf(fish.growthStage);
-  const nextStage = stages[idx] as GrowthStage;
-  const needed = GROWTH_TIME_NORMAL[nextStage];
+  const needed = GROWTH_TIME_NORMAL[fish.growthStage];
   if (!needed) return 100;
   const elapsed = Date.now() - fish.lastGrowthAt;
   return Math.min(100, Math.floor((elapsed / needed) * 100));
@@ -362,7 +359,7 @@ export function AquariumScreen() {
     }
 
     const newSlots = breeding.slots.filter((_, i) => i !== slotIdx);
-    const updBreeding = { ...breeding, slots: newSlots };
+    const updBreeding = { ...breeding, slots: newSlots, completedChildren: [...breeding.completedChildren, child] };
     await saveBreedingData(updBreeding);
     setBreeding(updBreeding);
     setBreedResult(child);
@@ -421,8 +418,8 @@ export function AquariumScreen() {
   const handleLike = useCallback(async (targetUid: string) => {
     const already = visitedAq?.likedBy.includes(uid) ?? false;
     await likeAquarium(targetUid, uid, !already);
-    const updated = await visitAquarium(targetUid);
-    setVisitedAq(updated);
+    const snap = await getAquarium(targetUid);
+    setVisitedAq(snap);
   }, [visitedAq, uid]);
 
   const handleComment = useCallback(async (targetUid: string) => {
@@ -432,8 +429,8 @@ export function AquariumScreen() {
     };
     await addAquariumComment(targetUid, comment);
     setCommentText('');
-    const updated = await visitAquarium(targetUid);
-    setVisitedAq(updated);
+    const snap = await getAquarium(targetUid);
+    setVisitedAq(snap);
   }, [commentText, uid, displayName]);
 
   // ─── 品評会 ───────────────────────────────────────────
