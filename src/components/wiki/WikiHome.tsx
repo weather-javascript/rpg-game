@@ -78,12 +78,17 @@ export function WikiHome({ playerLevel, uid, displayName, onOpenPage, onOpenCate
         setImportMsg(result.error);
         return;
       }
-      const pageId = await createWikiPage(result.page, uid, displayName);
+      const createResult = await createWikiPage(result.page, uid, displayName);
+      if (!createResult.success || !createResult.pageId) {
+        setImportState('error');
+        setImportMsg(createResult.error || 'ページの作成に失敗しました');
+        return;
+      }
       setImportState('success');
       setImportMsg(`「${result.page.title}」をインポートしました`);
       setTimeout(() => {
         setImportState('idle');
-        onOpenPage(pageId);
+        onOpenPage(createResult.pageId!);
       }, 1500);
     } catch (e) {
       setImportState('error');
