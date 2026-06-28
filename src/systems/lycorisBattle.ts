@@ -264,13 +264,37 @@ export function processSummon(state: LycorisBattleState): LycorisBattleState {
 // ============================================================
 
 function checkPhaseTransition(state: LycorisBattleState): LycorisBattleState {
-  if (state.hpThresholdReached || state.awakened) return state;
-  if (state.bossHp <= state.bossMaxHp * 0.5) {
-    const log = makeLog(state.turn, 'phase_change',
-      '👑 Lycorisが玉座から立ち上がろうとしている...！', '#ffcc44');
-    return { ...state, phase: 'throne_critical', hpThresholdReached: true, log: [...state.log, log] };
+  if (state.awakened) return state;
+  const def = LYCORIS_DEF;
+  const hpPct = state.bossHp / state.bossMaxHp;
+
+  // フェーズは HP閾値降順で定義されているので、現在のHPに合う最後のフェーズを選ぶ
+  let targetPhase = def.phases[0];
+  for (const p of def.phases) {
+    if (hpPct <= p.hpThreshold) targetPhase = p;
   }
-  return state;
+
+  if (state.phase === targetPhase.id) return state;
+
+  const logs: BattleLogEntry[] = [];
+
+  // 玉座フェーズ→直接攻撃フェーズへの遷移ログ
+  if (!targetPhase.onThrone && state.onThrone) {
+    logs.push(makeLog(state.turn, 'phase_change', '💢 Lycorisが玉座を降り、直接攻撃を仕掛けてくる！', '#ff4444'));
+  } else {
+    logs.push(makeLog(state.turn, 'phase_change', `⚡ ${targetPhase.label}に移行した！`, '#ffcc44'));
+  }
+
+  const phaseDef = def.phases.find(p => p.id === targetPhase.id) ?? def.phases[0];
+
+  return {
+    ...state,
+    phase: targetPhase.id as LycorisPhase,
+    onThrone: targetPhase.onThrone,
+    hpThresholdReached: true,
+    summonCooldown: phaseDef.summonCooldown,
+    log: [...state.log, ...logs],
+  };
 }
 
 // ============================================================
@@ -372,16 +396,6 @@ export function endTurn(state: LycorisBattleState, rng: () => number = Math.rand
 
   // 詰み防止
   s = guaranteeMinion(s);
-
-  // throne_critical → direct への遷移（次ターン冒頭）
-  if (s.phase === 'throne_critical') {
-    s = {
-      ...s,
-      phase: 'direct',
-      onThrone: false,
-      log: [...s.log, makeLog(s.turn, 'phase_change', '💢 Lycorisが玉座を降り、直接攻撃を仕掛けてくる！', '#ff4444')],
-    };
-  }
 
   // ターン内一時フラグリセット
   s = {
