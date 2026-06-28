@@ -158,13 +158,9 @@ function parseBody(body: string): ContentBlock[] {
   return blocks;
 }
 
-export interface WikiImportResult {
-  ok: true;
-  page: WikiPageInput;
-} | {
-  ok: false;
-  error: string;
-}
+export type WikiImportResult =
+  | { ok: true; page: WikiPageInput }
+  | { ok: false; error: string };
 
 export function parseWikimdFile(text: string): WikiImportResult {
   try {
