@@ -139,6 +139,8 @@ export function WikiTab() {
         {nav.mode === 'home' && (
           <WikiHome
             playerLevel={player?.stats.level ?? 1}
+            uid={uid ?? ''}
+            displayName={displayName}
             onOpenPage={(pageId) => pushNav({ mode: 'page', pageId })}
             onOpenCategory={(category) => pushNav({ mode: 'category', category })}
             onOpenSearch={() => pushNav({ mode: 'search' })}

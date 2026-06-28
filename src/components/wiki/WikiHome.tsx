@@ -1,15 +1,18 @@
 // src/components/wiki/WikiHome.tsx
 // 攻略WIKIのトップ画面。検索・カテゴリ一覧・最近更新・人気ページ・おすすめページを表示する。
+// ファイルインポート機能（.wikimd / .txt / .md）を追加。
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GameIcon } from '../icons';
 import {
   fetchRecentlyUpdatedPages,
   fetchPopularPages,
+  createWikiPage,
 } from '../../services/wikiService';
 import { recommendDungeonIdForLevel, getIconCandidateByRef } from './wikiMasterBridge';
 import { DUNGEON_MASTER } from '../../data/masters';
 import { WIKI_CATEGORY_LABELS, type WikiCategory, type WikiPage } from '../../types/wiki';
+import { parseWikiFile } from './wikiImport';
 
 const CATEGORY_ORDER: WikiCategory[] = ['beginner_guide', 'item', 'weapon', 'armor', 'material', 'dungeon', 'glossary', 'faq', 'collection', 'strategy_chart', 'other'];
 const CATEGORY_EMOJI: Record<WikiCategory, string> = {
@@ -19,6 +22,8 @@ const CATEGORY_EMOJI: Record<WikiCategory, string> = {
 
 interface WikiHomeProps {
   playerLevel: number;
+  uid: string;
+  displayName: string;
   onOpenPage: (pageId: string) => void;
   onOpenCategory: (category: WikiCategory) => void;
   onOpenSearch: () => void;
@@ -26,11 +31,15 @@ interface WikiHomeProps {
   onOpenUnwrittenLink: (title: string) => void;
 }
 
-export function WikiHome({ playerLevel, onOpenPage, onOpenCategory, onOpenSearch, onCreateNew, onOpenUnwrittenLink }: WikiHomeProps) {
+export function WikiHome({ playerLevel, uid, displayName, onOpenPage, onOpenCategory, onOpenSearch, onCreateNew, onOpenUnwrittenLink }: WikiHomeProps) {
   const [recent, setRecent] = useState<WikiPage[]>([]);
   const [popular, setPopular] = useState<WikiPage[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState('');
+  const [importState, setImportState] = useState<'idle' | 'importing' | 'success' | 'error'>('idle');
+  const [importMsg, setImportMsg] = useState('');
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -51,6 +60,49 @@ export function WikiHome({ playerLevel, onOpenPage, onOpenCategory, onOpenSearch
   const recommendedDungeonId = recommendDungeonIdForLevel(playerLevel);
   const recommendedDungeon = recommendedDungeonId ? DUNGEON_MASTER[recommendedDungeonId] : null;
   const recommendedIcon = recommendedDungeonId ? getIconCandidateByRef('dungeon', recommendedDungeonId) : null;
+
+  async function handleImportFile(file: File) {
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith('.wikimd') && !lower.endsWith('.txt') && !lower.endsWith('.md')) {
+      setImportState('error');
+      setImportMsg('.wikimd / .txt / .md ファイルのみ対応しています');
+      return;
+    }
+    setImportState('importing');
+    setImportMsg('インポート中...');
+    try {
+      const text = await file.text();
+      const result = parseWikiFile(text, file.name);
+      if (!result.ok) {
+        setImportState('error');
+        setImportMsg(result.error);
+        return;
+      }
+      const pageId = await createWikiPage(result.page, uid, displayName);
+      setImportState('success');
+      setImportMsg(`「${result.page.title}」をインポートしました`);
+      setTimeout(() => {
+        setImportState('idle');
+        onOpenPage(pageId);
+      }, 1500);
+    } catch (e) {
+      setImportState('error');
+      setImportMsg(`インポートに失敗しました: ${String(e)}`);
+    }
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) handleImportFile(file);
+    e.target.value = '';
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleImportFile(file);
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -74,6 +126,58 @@ export function WikiHome({ playerLevel, onOpenPage, onOpenCategory, onOpenSearch
       >
         ✏️ 新しいページを作成
       </button>
+
+      {/* ファイルインポートゾーン */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={handleDrop}
+        onClick={() => importState === 'idle' && fileInputRef.current?.click()}
+        style={{
+          padding: '12px 14px',
+          borderRadius: 10,
+          border: `2px dashed ${isDragOver ? 'var(--accent-gold)' : 'var(--border)'}`,
+          background: isDragOver ? 'rgba(240,168,48,0.08)' : 'var(--bg-card)',
+          cursor: importState === 'idle' ? 'pointer' : 'default',
+          textAlign: 'center',
+          transition: 'all 0.15s',
+        }}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".wikimd,.txt,.md"
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+        />
+        {importState === 'idle' && (
+          <>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+              📄 ファイルからWIKIページを作成
+            </div>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 4 }}>
+              .wikimd / .txt / .md をドラッグ＆ドロップ、またはクリックして選択
+            </div>
+          </>
+        )}
+        {importState === 'importing' && (
+          <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>⏳ {importMsg}</div>
+        )}
+        {importState === 'success' && (
+          <div style={{ fontSize: '0.82rem', color: '#4caf7d', fontWeight: 700 }}>✅ {importMsg}</div>
+        )}
+        {importState === 'error' && (
+          <div>
+            <div style={{ fontSize: '0.8rem', color: '#e05050', fontWeight: 700 }}>❌ {importMsg}</div>
+            <button
+              onClick={(e) => { e.stopPropagation(); setImportState('idle'); }}
+              style={{ marginTop: 6, fontSize: '0.7rem', padding: '3px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+            >
+              閉じる
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* おすすめページ（進行度連動） */}
       {recommendedDungeon && (
