@@ -114,6 +114,14 @@ interface TurnBattleState {
   chaiteSlowTurns: number;
   chaiteEnragedIdx: number;
   chaiteIronWallIdx: number;
+  // ===== Lycorisダンジョン専用: 部屋選択フェーズ =====
+  lycorisRoomPhase: {
+    active: boolean;
+    lycorisLine: string;      // Lycorisが言う台詞
+    dangerRoom: 'left' | 'center' | 'right';
+    pendingEnemies: EnemyState[]; // 部屋選択後に継続する敵リスト（残存眷属）
+    pendingLog: { text: string; color: string }[];
+  } | null;
 }
 
 // KXボス戦専用状態
@@ -529,6 +537,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       chaiteSlowTurns: 0,
       chaiteEnragedIdx: -1,
       chaiteIronWallIdx: -1,
+      lycorisRoomPhase: null,
     };
   });
 
@@ -1411,6 +1420,36 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     // 通常モード
     const alive = newEnemies.filter(e => e.hp > 0);
     if (alive.length === 0) {
+      // ===== Lycorisダンジョン専用: 眷属全滅時に50%で部屋選択フェーズ =====
+      if (runState.dungeonId === 'lycoris_dungeon' && Math.random() < 0.5) {
+        const roomLines: { line: string; danger: 'left' | 'center' | 'right' }[] = [
+          { line: 'そっちだよ', danger: 'right' },
+          { line: 'あっちだよ', danger: 'right' },
+          { line: 'こっちだよ', danger: 'left' },
+        ];
+        const chosen = roomLines[Math.floor(Math.random() * roomLines.length)];
+        const roomLog = [
+          ...newLog,
+          { text: '💮 Lycorisの声が響く——', color: '#cc88ff' },
+          { text: `「${chosen.line}」`, color: '#ff88cc' },
+          { text: '⚠️ 3つの扉が目の前に現れた。危険な部屋を避けて進め！', color: '#ffcc44' },
+        ];
+        setBattle(b => ({
+          ...b,
+          enemies: newEnemies,
+          log: roomLog,
+          turn: 'player',
+          pendingAction: null,
+          lycorisRoomPhase: {
+            active: true,
+            lycorisLine: chosen.line,
+            dangerRoom: chosen.danger,
+            pendingEnemies: newEnemies,
+            pendingLog: roomLog,
+          },
+        }));
+        return;
+      }
       const { exp, gold, drops } = calcWinRewards(newEnemies);
       setBattle(b => ({ ...b, enemies: newEnemies, log: [...newLog, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }, ...buildDropLogEntries(drops)], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops, pendingAction: null }));
       return;
@@ -2419,6 +2458,87 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         </div>
       )}
       <div key={combatFx.shakeKey} className={combatFx.shakeKey > 0 ? (combatFx.shakeCritical ? 'combatfx-shake-crit' : 'combatfx-shake') : undefined}>
+      {/* ===== Lycorisダンジョン: 部屋選択フェーズ ===== */}
+      {battle.lycorisRoomPhase?.active && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(80,0,80,0.97), rgba(20,0,30,0.97))',
+          border: '2px solid #cc44ff',
+          borderRadius: 12,
+          padding: 18,
+          marginBottom: 12,
+          boxShadow: '0 0 30px rgba(200,40,255,0.4)',
+          textAlign: 'center',
+        }}>
+          <div style={{ color: '#ff88cc', fontWeight: 800, fontSize: '1.05rem', marginBottom: 6 }}>
+            💮 Lycorisの導き
+          </div>
+          <div style={{
+            color: '#ffddff', fontSize: '1.3rem', fontWeight: 900,
+            letterSpacing: 2, marginBottom: 12,
+            textShadow: '0 0 12px #ff44cc',
+          }}>
+            「{battle.lycorisRoomPhase.lycorisLine}」
+          </div>
+          <div style={{ color: '#ccaaff', fontSize: '0.82rem', marginBottom: 14 }}>
+            3つの扉がある。危険な部屋を避けて進め。
+          </div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+            {(['left', 'center', 'right'] as const).map(room => {
+              const label = room === 'left' ? '🚪 左の扉' : room === 'center' ? '🚪 中央の扉' : '🚪 右の扉';
+              return (
+                <button key={room} onClick={() => {
+                  const phase = battle.lycorisRoomPhase!;
+                  if (room === phase.dangerRoom) {
+                    // 即死ダメージ
+                    const instakillDmg = player.stats.hp + 9999;
+                    changeHp(-instakillDmg);
+                    const deathLog = [
+                      ...phase.pendingLog,
+                      { text: `💀 ${label}に踏み込んだ！Lycorisの罠が発動——${instakillDmg}の致命的ダメージ！`, color: '#ff3333' },
+                      { text: '💀 あなたは倒れた...', color: '#e05555' },
+                    ];
+                    setBattle(b => ({
+                      ...b,
+                      log: deathLog,
+                      turn: 'result',
+                      result: 'lose',
+                      lycorisRoomPhase: null,
+                    }));
+                  } else {
+                    // 安全な部屋 → 通常勝利
+                    const safeLog = [
+                      ...phase.pendingLog,
+                      { text: `✅ ${label}は安全だった！Lycorisの声が遠のく...`, color: '#88ff88' },
+                    ];
+                    const { exp, gold, drops } = calcWinRewards(phase.pendingEnemies);
+                    setBattle(b => ({
+                      ...b,
+                      enemies: phase.pendingEnemies,
+                      log: [...safeLog, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }, ...buildDropLogEntries(drops)],
+                      turn: 'result',
+                      result: 'win',
+                      expGained: exp,
+                      goldGained: gold,
+                      drops,
+                      lycorisRoomPhase: null,
+                    }));
+                  }
+                }} style={{
+                  flex: 1, padding: '12px 6px',
+                  background: 'linear-gradient(135deg, rgba(100,20,120,0.9), rgba(40,5,60,0.9))',
+                  border: '1px solid #9944cc',
+                  borderRadius: 10, color: '#ffccff', fontWeight: 700,
+                  cursor: 'pointer', fontSize: '0.88rem',
+                  boxShadow: '0 0 10px rgba(160,40,200,0.3)',
+                }}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ターゲット選択モーダル */}
       {battle.turn === 'select_target' && (
         <TargetSelectModal
