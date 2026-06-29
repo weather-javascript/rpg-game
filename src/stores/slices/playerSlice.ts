@@ -79,6 +79,7 @@ export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (
   addExp: (amount) => {
     const _p = get().player;
     if (_p) amount = Math.round(amount * getPlayerPowerProfile(_p).expMult); // ver3.0.0: ビルド/職業/ペットの経験値ボーナス
+    if (_p?.vocation?.activeVocationId) (get() as any).gainVocationExp?.(Math.round(amount * 0.5)); // ver3.0.0: 職業熟練度も並行して上昇
     set((state) => {
       if (!state.player) return state;
       let { exp, level } = state.player.stats;
