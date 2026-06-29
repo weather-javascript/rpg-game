@@ -13,6 +13,8 @@ import { createFishingSlice, type FishingSlice } from './slices/fishingSlice';
 import { createReliefSlice, type ReliefSlice } from './slices/reliefSlice';
 import { createInfiniteCorridorSlice, type InfiniteCorridorSlice } from './slices/infiniteCorridorSlice';
 import { calcOfflineMiningResult } from '../systems/offlineMining';
+import { getFlatStatBonuses } from '../systems/playerPower';
+import { defaultEquipmentBuildState, defaultVocationState, defaultPetState, defaultLifeSystemState } from '../types/v3Types';
 
 // ============================================================
 // GameState の型定義（スライス型を合成）
@@ -73,14 +75,29 @@ function ensureDefaults(player: PlayerData): PlayerData {
   // baseMaxHpを保持（初回のみ設定、以降はbonusを加算）
   const baseMaxHp = player.stats?.baseMaxHp ?? player.stats?.maxHp ?? 100;
   const newMaxHp = baseMaxHp + hpBonus;
+  // ver3.0.0: 装備ビルド(特性/付与効果/セット/覚醒)・職業・ペットによる攻撃力/防御力ボーナスを
+  // baseAttack/baseDefense（素の値、初回のみ確定）からの加算で再計算する（baseMaxHpと同じ方式）。
+  const baseAttack = player.stats?.baseAttack ?? player.stats?.attack ?? 10;
+  const baseDefense = player.stats?.baseDefense ?? player.stats?.defense ?? 5;
+  const powerBonus = player.stats ? getFlatStatBonuses(player) : { atkFlat: 0, defFlat: 0, hpFlat: 0, atkPct: 0, defPct: 0 };
+  const newAttack = Math.round((baseAttack + powerBonus.atkFlat) * (1 + powerBonus.atkPct));
+  const newDefense = Math.round((baseDefense + powerBonus.defFlat) * (1 + powerBonus.defPct));
   return {
     ...player,
     stats: player.stats ? {
       ...player.stats,
       baseMaxHp,
-      maxHp: newMaxHp,
-      hp: Math.min(player.stats.hp, newMaxHp),
+      maxHp: newMaxHp + powerBonus.hpFlat,
+      hp: Math.min(player.stats.hp, newMaxHp + powerBonus.hpFlat),
+      baseAttack,
+      baseDefense,
+      attack: newAttack,
+      defense: newDefense,
     } : player.stats,
+    equipmentBuild: player.equipmentBuild ?? defaultEquipmentBuildState(),
+    vocation: player.vocation ?? defaultVocationState(),
+    pets: player.pets ?? defaultPetState(),
+    life: player.life ?? defaultLifeSystemState(),
     dungeonClearedCount: player.dungeonClearedCount ?? {},
     fishingScore: player.fishingScore ?? 0,
     equippedRodId: player.equippedRodId ?? 'basic_rod',
