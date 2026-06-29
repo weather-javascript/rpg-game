@@ -22,6 +22,7 @@ import {
   CATEGORY_CONFIG, calcAllMultipliers, getCollectionBonus, isDangerNodeAvailable,
   calcDangerPenalty, getCategoryFromSkillId,
 } from '../../systems/gatheringSystem';
+import { getPlayerPowerProfile } from '../../systems/playerPower';
 
 const TOD_LABEL: Record<string, string> = { morning:'朝(☀️)', daytime:'昼(🌤️)', evening:'夕(🌅)', night:'夜(🌙)' };
 const WEATHER_LABEL: Record<string, string> = { clear:'晴れ☀️', rain:'雨🌧️', thunder:'雷⛈️', fog:'霧🌫️' };
@@ -152,13 +153,14 @@ export function GatheringScreen() {
 
     // fog成功率補正
     const successMod = mults.successMod;
+    const power = getPlayerPowerProfile(player); // ver3.0.0: 装備ビルド/職業/ペットの採取ボーナス
 
     const drops: { itemId: string; amount: number }[] = [];
     const expGained: Record<string, number> = {};
     for (const drop of node.drops) {
       let rate = Math.min(1.0, (drop.baseRate + (drop.skillRateBonus ?? 0) * skillLevel) * mults.rareMult * eff.rareMult);
       // success mod (fog -10%)
-      rate = Math.max(0, rate + successMod);
+      rate = Math.max(0, rate + successMod + power.gatherSuccessPct);
       if (randomChance(rate)) {
         let amount: number;
         if (eff.forceMaxAmount) {
@@ -168,7 +170,7 @@ export function GatheringScreen() {
         }
         // 危険ノードは ×(2〜5)
         const dangerMult = node.isDanger ? (2 + Math.random() * 3) : 1;
-        amount = Math.ceil(amount * mults.yieldMult * dangerMult);
+        amount = Math.ceil(amount * mults.yieldMult * dangerMult * (1 + power.gatherYieldPct));
         if (eff.extraAmount > 0) amount += eff.extraAmount;
         drops.push({ itemId: drop.itemId, amount });
       }

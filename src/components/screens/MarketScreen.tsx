@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { GameIcon } from '../icons';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
+import { getPlayerPowerProfile } from '../../systems/playerPower';
 import { subscribeItemPrices, subscribeTradeRecipes, subscribeNpcQuests, generateNpcQuests, deleteExpiredNpcQuests, completeNpcQuest, updateQuestRanking, subscribeQuestRanking } from '../../services/multiplayer';
 import type { TradeRecipe, QuestRankingEntry } from '../../services/multiplayer';
 import type { NpcQuest, QuestRank } from '../../types/game';
@@ -159,8 +160,11 @@ export function MarketScreen() {
     const { sellPrice } = getEffectivePrice(itemId);
     if (sellPrice === 0) return;
     if (!consumeItem(itemId, amount)) return;
-    changeGold(sellPrice * amount);
-    addNotification('success', `${item.icon} ${item.name} ×${amount} を ${(sellPrice * amount).toLocaleString()}G で売却しました`);
+    const player = useGameStore.getState().player;
+    const sellMult = player ? getPlayerPowerProfile(player).sellPriceMult : 1; // ver3.0.0: 商人職業/特性/ペットの店売りボーナス
+    const finalGold = Math.round(sellPrice * amount * sellMult);
+    changeGold(finalGold);
+    addNotification('success', `${item.icon} ${item.name} ×${amount} を ${finalGold.toLocaleString()}G で売却しました`);
     // localStorageのみバックアップ（自動保存でFirebase同期）
     const currentPlayer = useGameStore.getState().player;
     if (currentPlayer) {

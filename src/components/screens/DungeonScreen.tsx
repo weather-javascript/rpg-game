@@ -16,6 +16,7 @@ import { TOOLS_MASTER } from '../../data/toolsMaster';
 import { TOOL_GACHA_TABLE } from '../../data/toolAcquisition';
 import { useCombatFx } from '../combat/useCombatFx';
 import { EnemyFxOverlay, SelfFxBadge, SelfFxBanner, CritFlashOverlay } from '../combat/CombatFx';
+import { getPlayerPowerProfile } from '../../systems/playerPower';
 
 // ============================================================
 // 戦闘ロジック（1ターン分）
@@ -50,9 +51,9 @@ function calcArmorReducedDamage(rawDamage: number, totalDef: number, totalToughn
   return Math.max(1, Math.round(reduced));
 }
 
-function calcMonsterDrops(monster: MonsterMaster, combatLv: number) {
+function calcMonsterDrops(monster: MonsterMaster, combatLv: number, dropRateBonus: number = 0) {
   return monster.drops.filter(d => {
-    const rate = Math.min(1, d.baseRate + (d.skillRateBonus ?? 0) * combatLv * 0.01);
+    const rate = Math.min(1, (d.baseRate + (d.skillRateBonus ?? 0) * combatLv * 0.01) * (1 + dropRateBonus));
     return randomChance(rate);
   }).map(d => ({ itemId: d.itemId, amount: randomIntRange(d.minAmount, d.maxAmount) }));
 }
@@ -674,16 +675,17 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
 
   // 勝利チェック＆ドロップ計算
   const calcWinRewards = (enemies: EnemyState[]) => {
+    const power = getPlayerPowerProfile(player); // ver3.0.0: 装備ビルド/職業/ペットのドロップ率・ゴールドボーナス
     let totalExp = 0, totalGold = 0;
     const totalDrops: { itemId: string; amount: number }[] = [];
     for (const e of enemies) {
       const m = getMergedMonster(e.monsterId);
       if (!m) continue;
       const exp = Math.floor(m.baseExp * dungeon.expBonus * (1 + combatLv * 0.01));
-      const gold = Math.floor(m.baseGold * dungeon.goldBonus * (0.8 + secureRandom() * 0.4));
+      const gold = Math.floor(m.baseGold * dungeon.goldBonus * (0.8 + secureRandom() * 0.4) * (1 + power.goldDropPct));
       totalExp += exp;
       totalGold += gold;
-      const drops = calcMonsterDrops(m, combatLv);
+      const drops = calcMonsterDrops(m, combatLv, power.dropRatePct);
       for (const d of drops) {
         const ex = totalDrops.find(x => x.itemId === d.itemId);
         if (ex) ex.amount += d.amount; else totalDrops.push({ ...d });
@@ -2369,7 +2371,8 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
   // 逃走
   const handleEscape = () => {
     if (battle.turn !== 'player' || battle.result) return;
-    if (randomChance(0.4)) {
+    const fleeRate = 0.4 + getPlayerPowerProfile(player).fleeRateBonus; // ver3.0.0: 逃走成功率上昇ボーナス
+    if (randomChance(fleeRate)) {
       setBattle(b => ({ ...b, log: [...b.log, { text: '🏃 逃走成功！', color: '#f0a830' }], turn: 'result', result: 'escaped' }));
     } else {
       const log = [...battle.log, { text: '😰 逃走失敗！', color: '#e05555' }];
