@@ -1,5 +1,7 @@
 // src/types/game.ts
 
+import type { EquipmentBuildState, VocationState, PetState, LifeSystemState } from './v3Types';
+
 export type IdMap<T> = Record<string, T>;
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 export type ItemCategory = 'material' | 'tool' | 'consumable' | 'weapon' | 'armor' | 'treasure' | 'food' | 'potion' | 'bait';
@@ -288,7 +290,7 @@ export interface WeaponUltimate {
   postBuffTurns?: number;
   postBuffPoisonDmg?: number;
 }
-export type TabId = 'gathering' | 'market' | 'dungeon' | 'gamble' | 'status' | 'online' | 'fishing' | 'admin' | 'crafting' | 'navi' | 'aquarium' | 'freefield';
+export type TabId = 'gathering' | 'market' | 'dungeon' | 'gamble' | 'status' | 'online' | 'fishing' | 'admin' | 'crafting' | 'navi' | 'aquarium' | 'freefield' | 'vocation' | 'pets' | 'life' | 'equipmentBuild';
 export type GambleType = 'slot' | 'treasure_box' | 'coin_flip' | 'chohan' | 'chinchiro' | 'jackpot' | 'poker' | 'highlow' | 'mines' | 'dice_race' | 'roulette' | 'blackjack' | 'scratch' | 'race';
 export type GambleGameCategory = 'instant' | 'choice' | 'step' | 'reveal' | 'card';
 export type GambleRank = '見習い' | 'ギャンブラー' | '熟練ギャンブラー' | '賭博王' | 'レジェンド';
@@ -607,6 +609,8 @@ export interface PlayerStats {
   maxSatiety: number;
   attack: number;
   defense: number;
+  baseAttack?: number;  // 装備ビルド/職業/ペットボーナス適用前の素の攻撃力
+  baseDefense?: number; // 同上・防御力
 }
 
 // ホットバー（9スロット）+ 防具枠 + オフハンド
@@ -768,6 +772,11 @@ export interface PlayerData {
   ffHarvestLog?: { itemId: string; displayName: string; amount: number; at: number }[]; // 採集履歴(最新50件)
   ffNodeInteractions?: Record<string, { lastUsedAt: number; useCount: number; completed: boolean }>; // ノードインタラクション状態
   ffBattleWins?: number;                           // FFフィールド戦闘勝利数
+  // ── ver3.0.0: 装備ビルド／職業／ペット／生活系 ──
+  equipmentBuild?: EquipmentBuildState;             // 装備の付与効果ロール・覚醒段階・ビルドプリセット
+  vocation?: VocationState;                        // 職業（ヴォケーション）の選択・経験値・ランク
+  pets?: PetState;                                 // ペット所持・編成・図鑑
+  life?: LifeSystemState;                          // 農業・料理・錬金・精錬・標本収集
 }
 
 export interface ActivityEntry {
