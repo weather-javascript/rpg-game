@@ -2,6 +2,7 @@
 import type { StateCreator } from 'zustand';
 import type { GameState } from '../gameStore';
 import { ITEM_MASTER } from '../../data/masters';
+import { getPlayerPowerProfile } from '../../systems/playerPower';
 import {
   FISH_MASTER, fishingExpRequired, FISHING_ACHIEVEMENTS, FISHING_TITLES,
   SPOT_MASTER, rodEnhanceSuccessRate,
@@ -69,6 +70,10 @@ export const createFishingSlice: StateCreator<GameState, [], [], FishingSlice> =
       if (type === 'fishing' && b.fishingBonus) bonus *= b.fishingBonus;
       if (type === 'mining' && b.miningBonus) bonus *= b.miningBonus;
     }
+    // ver3.0.0: 装備ビルド/職業/ペットの採取・釣りボーナスを合算
+    const power = getPlayerPowerProfile(player);
+    if (type === 'fishing') bonus *= power.fishSuccessMult;
+    if (type === 'mining') bonus *= (1 + power.gatherSuccessPct + power.gatherYieldPct);
     return bonus;
   },
 

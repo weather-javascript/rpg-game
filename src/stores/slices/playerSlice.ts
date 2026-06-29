@@ -5,6 +5,7 @@ import type { StateCreator } from 'zustand';
 import type { GameState } from '../gameStore';
 import type { IdMap, EquipmentSlots, GatherCategory } from '../../types/game';
 import { EXP_TABLE, SKILL_EXP_TABLE, ITEM_MASTER } from '../../data/masters';
+import { getPlayerPowerProfile } from '../../systems/playerPower';
 
 export interface PlayerSlice {
   addItems:           (drops: { itemId: string; amount: number }[]) => void;
@@ -76,6 +77,8 @@ export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (
   },
 
   addExp: (amount) => {
+    const _p = get().player;
+    if (_p) amount = Math.round(amount * getPlayerPowerProfile(_p).expMult); // ver3.0.0: ビルド/職業/ペットの経験値ボーナス
     set((state) => {
       if (!state.player) return state;
       let { exp, level } = state.player.stats;
@@ -97,6 +100,8 @@ export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (
   },
 
   addSkillExp: (skillId, amount) => {
+    const _p = get().player;
+    if (_p) amount = Math.round(amount * getPlayerPowerProfile(_p).skillExpMult); // ver3.0.0
     set((state) => {
       if (!state.player) return state;
       const skillExp = { ...state.player.skillExp };
@@ -174,7 +179,8 @@ export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (
       if (!ok) return { success: false, message: 'アイテムの消費に失敗しました' };
     }
     const { hpRestore, satietyRestore, message } = item.useEffect;
-    if (hpRestore && hpRestore > 0) changeHp(Math.min(hpRestore, player.stats.maxHp - player.stats.hp));
+    const healMult = 1 + getPlayerPowerProfile(player).healPct; // ver3.0.0: 回復特化ボーナス
+    if (hpRestore && hpRestore > 0) changeHp(Math.min(Math.round(hpRestore * healMult), player.stats.maxHp - player.stats.hp));
     if (hpRestore && hpRestore < 0) changeHp(hpRestore);
     if (satietyRestore) changeSatiety(Math.min(satietyRestore, player.stats.maxSatiety - player.stats.satiety));
     const msg = message ?? `${item.name}を使用した！`;
