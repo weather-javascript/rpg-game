@@ -5,6 +5,10 @@ import type {
   MonsterMaster, DungeonMaster, DungeonArea, GambleMaster, CraftRecipe,
 } from '../types/game';
 import { IC_ITEMS, IC_CRAFT_RECIPES, IC_ALL_BEGINNER_ENEMIES } from './infiniteCorridorMaster';
+import { BUILD_MATERIAL_ITEMS, BUILD_CRAFT_RECIPES } from './equipmentBuildData';
+import { VOCATION_ITEMS } from './vocationData';
+import { PET_ITEMS } from './petsData';
+import { FARM_ITEMS, LIFE_RECIPE_ITEMS, COLLECTION_ITEMS } from './lifeSystemData';
 
 // ============================================================
 // アイテムマスター
@@ -957,6 +961,13 @@ export const ITEM_MASTER: Record<string, ItemMaster> = {
   shogun_crest:         { id:'shogun_crest',         name:'将軍の軍配', description:'第999代将軍徳川義和公が振るっていた軍配。TODO: 専用クラフトレシピは未確定。', category:'material', itemType:'Item', rarity:'legendary', sellPrice:5000, buyPrice:0, maxStack:99, icon:'castle_jp' },
   // 無限深層回廊 専用素材・クラフト品
   ...IC_ITEMS,
+  // ver3.0.0: 装備ビルド／職業／ペット／生活系 専用素材
+  ...BUILD_MATERIAL_ITEMS,
+  ...VOCATION_ITEMS,
+  ...PET_ITEMS,
+  ...FARM_ITEMS,
+  ...LIFE_RECIPE_ITEMS,
+  ...COLLECTION_ITEMS,
   // ============================================================
   // 裏ダンジョン初級（Lycoris）専用アイテム
   // ============================================================
@@ -2062,6 +2073,8 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
   },
   // 無限深層回廊 専用クラフトレシピ
   ...IC_CRAFT_RECIPES,
+  // ver3.0.0: 装備ビルド専用クラフトレシピ
+  ...BUILD_CRAFT_RECIPES,
 ];
 
 // ============================================================
