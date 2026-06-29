@@ -16,6 +16,10 @@ import { AdminScreen }     from './components/screens/AdminScreen';
 import { CraftingScreen }   from './components/screens/CraftingScreen';
 import { NaviScreen }       from './components/screens/NaviScreen';
 import { AquariumScreen }  from './components/screens/AquariumScreen';
+import { VocationScreen } from './components/screens/VocationScreen';
+import { PetScreen } from './components/screens/PetScreen';
+import { LifeScreen } from './components/screens/LifeScreen';
+import { EquipmentBuildScreen } from './components/screens/EquipmentBuildScreen';
 import { subscribeSoldNotifications, markSoldNotificationRead, subscribeMaintenanceStatus, setPlayerActivity, subscribeTabMaintenance, subscribeActivityFeed } from './services/multiplayer';
 import type { TabMaintenanceConfig } from './services/multiplayer';
 import type { PlayerActivityCode } from './services/multiplayer';
@@ -46,6 +50,10 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
   { id:'gamble',    label:'ギャンブル', icon:'slot_machine' },
   { id:'online',    label:'オンライン', icon:'globe' },
   { id:'status',    label:'状態',     icon:'chart' },
+  { id:'vocation',  label:'職業',     icon:'chart' },
+  { id:'pets',      label:'ペット',   icon:'pickaxe' },
+  { id:'life',      label:'生活',     icon:'hammer' },
+  { id:'equipmentBuild', label:'装備ビルド', icon:'swords' },
 ];
 
 // ============================================================
@@ -1469,6 +1477,10 @@ function ActiveScreen({ tab }: { tab: TabId }) {
     case 'gamble':    return <GambleScreen />;
     case 'online':    return <OnlineScreen />;
     case 'status':    return <StatusScreen />;
+    case 'vocation':  return <VocationScreen />;
+    case 'pets':      return <PetScreen />;
+    case 'life':      return <LifeScreen />;
+    case 'equipmentBuild': return <EquipmentBuildScreen />;
     case 'admin':     return <AdminScreen />;
     default:          return <GatheringScreen />;
   }
