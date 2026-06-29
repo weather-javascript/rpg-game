@@ -12,6 +12,10 @@ import { createDungeonSlice, type DungeonSlice } from './slices/dungeonSlice';
 import { createFishingSlice, type FishingSlice } from './slices/fishingSlice';
 import { createReliefSlice, type ReliefSlice } from './slices/reliefSlice';
 import { createInfiniteCorridorSlice, type InfiniteCorridorSlice } from './slices/infiniteCorridorSlice';
+import { createBuildSlice, type BuildSlice } from './slices/buildSlice';
+import { createVocationSlice, type VocationSlice } from './slices/vocationSlice';
+import { createPetSlice, type PetSlice } from './slices/petSlice';
+import { createLifeSlice, type LifeSlice } from './slices/lifeSlice';
 import { calcOfflineMiningResult } from '../systems/offlineMining';
 import { getFlatStatBonuses } from '../systems/playerPower';
 import { defaultEquipmentBuildState, defaultVocationState, defaultPetState, defaultLifeSystemState } from '../types/v3Types';
@@ -19,7 +23,7 @@ import { defaultEquipmentBuildState, defaultVocationState, defaultPetState, defa
 // ============================================================
 // GameState の型定義（スライス型を合成）
 // ============================================================
-export interface GameState extends PlayerSlice, DungeonSlice, FishingSlice, ReliefSlice, InfiniteCorridorSlice {
+export interface GameState extends PlayerSlice, DungeonSlice, FishingSlice, ReliefSlice, InfiniteCorridorSlice, BuildSlice, VocationSlice, PetSlice, LifeSlice {
   // 認証・プレイヤー
   uid: string | null;
   isAuthLoading: boolean;
@@ -286,4 +290,8 @@ export const useGameStore = create<GameState>((set, get, api) => ({
   ...createFishingSlice(set, get, api),
   ...createReliefSlice(set, get, api),
   ...createInfiniteCorridorSlice(set, get, api),
+  ...createBuildSlice(set, get, api),
+  ...createVocationSlice(set, get, api),
+  ...createPetSlice(set, get, api),
+  ...createLifeSlice(set, get, api),
 }));
