@@ -15,7 +15,7 @@ import type { MonsterOverride, DungeonOverride } from '../../services/multiplaye
 import { TOOLS_MASTER } from '../../data/toolsMaster';
 import { TOOL_GACHA_TABLE } from '../../data/toolAcquisition';
 import { useCombatFx } from '../combat/useCombatFx';
-import { EnemyFxOverlay, SelfFxBadge, SelfFxBanner, CritFlashOverlay } from '../combat/CombatFx';
+import { EnemyFxOverlay, SelfFxBadge, SelfFxBanner, CritFlashOverlay, BossDefeatFlashOverlay, UltimateCutIn, hasHitReaction } from '../combat/CombatFx';
 import { getPlayerPowerProfile } from '../../systems/playerPower';
 
 // ============================================================
@@ -838,7 +838,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
               const newHp = Math.max(0, prevHp - dmg);
               const newEnemiesArr = prev.enemies.map((e, i) => i === tIdx ? { ...e, hp: newHp } : e);
               combatFx.triggerEnemyFx(weaponIdForCd ?? null, [{ idx: tIdx, damage: dmg, isCritical: false }]);
-              if (prevHp > 0 && newHp <= 0) combatFx.triggerDefeatFx(tIdx);
+              if (prevHp > 0 && newHp <= 0) combatFx.triggerDefeatFx(tIdx, !!mon?.isBoss);
               return {
                 ...prev,
                 enemies: newEnemiesArr,
@@ -1321,7 +1321,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       combatFx.triggerEnemyFx(battle.equippedWeaponId, fxHits);
       for (const hit of fxHits) {
         if (battle.enemies[hit.idx].hp > 0 && newEnemies[hit.idx].hp <= 0) {
-          combatFx.triggerDefeatFx(hit.idx);
+          combatFx.triggerDefeatFx(hit.idx, !!getMergedMonster(battle.enemies[hit.idx].monsterId)?.isBoss);
         }
       }
     }
@@ -1507,7 +1507,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
         const prevHp = e.hp;
         e.hp = Math.max(0, e.hp - dmg);
         fxHits.push({ idx: i, damage: dmg, isCritical: extraPenetrateDmg > 0 });
-        if (prevHp > 0 && e.hp <= 0) combatFx.triggerDefeatFx(i);
+        if (prevHp > 0 && e.hp <= 0) combatFx.triggerDefeatFx(i, !!mon?.isBoss);
       }
       perWeaponLogs.push({ text: `⚔️ ${w.name}で攻撃！ ${weaponTotal}ダメージ！`, color: '#4caf87' });
 
@@ -1688,9 +1688,10 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     });
     if (ultFxHits.length > 0) {
       combatFx.triggerEnemyFx(battle.equippedWeaponId, ultFxHits, { isUltimate: true });
+      combatFx.triggerUltimateCutIn(weaponItem?.name ?? '?', ult.name);
       for (const hit of ultFxHits) {
         if (battle.enemies[hit.idx].hp > 0 && newEnemies[hit.idx].hp <= 0) {
-          combatFx.triggerDefeatFx(hit.idx);
+          combatFx.triggerDefeatFx(hit.idx, !!getMergedMonster(battle.enemies[hit.idx].monsterId)?.isBoss);
         }
       }
     }
@@ -2016,7 +2017,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           const prevEnemyHp = prevState.enemies[hr.tIdx]?.hp ?? 0;
           const newEnemiesArr = prevState.enemies.map((e, i) => i === hr.tIdx ? { ...e, hp: hr.enemies[hr.tIdx].hp } : e);
           combatFx.triggerEnemyFx(itemId, [{ idx: hr.tIdx, damage: hr.dmg, isCritical: false }], { shake: hitIdx === 0 });
-          if (prevEnemyHp > 0 && hr.enemies[hr.tIdx].hp <= 0) combatFx.triggerDefeatFx(hr.tIdx);
+          if (prevEnemyHp > 0 && hr.enemies[hr.tIdx].hp <= 0) combatFx.triggerDefeatFx(hr.tIdx, !!getMergedMonster(prevState.enemies[hr.tIdx].monsterId)?.isBoss);
           const nextState: TurnBattleState = {
             ...prevState,
             enemies: newEnemiesArr,
@@ -2162,7 +2163,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           }
           if (silversFxHits.length > 0) combatFx.triggerEnemyFx(itemId, silversFxHits, { shake: hitIdx === 0 });
           for (let i = 0; i < hitEnemies.length; i++) {
-            if (hitPrevEnemies[i].hp > 0 && hitEnemies[i].hp <= 0) combatFx.triggerDefeatFx(i);
+            if (hitPrevEnemies[i].hp > 0 && hitEnemies[i].hp <= 0) combatFx.triggerDefeatFx(i, !!getMergedMonster(hitPrevEnemies[i].monsterId)?.isBoss);
           }
           const nextState: TurnBattleState = {
             ...prevState,
@@ -2207,7 +2208,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           if (inlineFxHits.length > 0) {
             combatFx.triggerEnemyFx(itemId, inlineFxHits);
             for (const hit of inlineFxHits) {
-              if (prev.enemies[hit.idx].hp > 0 && newEnemies[hit.idx].hp <= 0) combatFx.triggerDefeatFx(hit.idx);
+              if (prev.enemies[hit.idx].hp > 0 && newEnemies[hit.idx].hp <= 0) combatFx.triggerDefeatFx(hit.idx, !!getMergedMonster(prev.enemies[hit.idx].monsterId)?.isBoss);
             }
           }
           const msg = item.useEffect?.message ?? `${item.name}で攻撃した`;
@@ -2445,6 +2446,14 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     <div style={{ background: '#161b26', border: '2px solid #e05555', borderRadius: 12, padding: 14, overflow: 'hidden', position: 'relative' }}>
       <AmbientParticles dungeonId={runState.dungeonId} />
       {combatFx.shakeKey > 0 && combatFx.shakeCritical && <CritFlashOverlay flashKey={combatFx.shakeKey} />}
+      <BossDefeatFlashOverlay flashKey={combatFx.bossDefeatFlash} />
+      {combatFx.ultimateCutIn && (
+        <UltimateCutIn
+          weaponName={combatFx.ultimateCutIn.weaponName}
+          skillName={combatFx.ultimateCutIn.skillName}
+          cutInKey={combatFx.ultimateCutIn.key}
+        />
+      )}
       {phaseBanner && (
         <div key={phaseBanner.key} style={{
           position: 'absolute', left: 0, right: 0, top: '38%', zIndex: 20, textAlign: 'center', pointerEvents: 'none',
@@ -2681,7 +2690,13 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           const isDead = enemy.hp <= 0;
           return (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, opacity: isDead ? 0.35 : 1 }}>
-              <span style={{ fontSize: '2.2rem' }}><GameIcon id={monster?.icon ?? 'skull'} size={36} /></span>
+              <span
+                key={`icon-${i}-${combatFx.enemyFx[i]?.[combatFx.enemyFx[i].length - 1]?.fxId ?? 'idle'}`}
+                style={{ fontSize: '2.2rem', display: 'inline-block' }}
+                className={hasHitReaction(combatFx.enemyFx[i] ?? []) ? 'combatfx-hit-punch' : undefined}
+              >
+                <GameIcon id={monster?.icon ?? 'skull'} size={36} />
+              </span>
               <div style={{ flex: 1, position: 'relative' }}>
                 <div style={{ fontWeight: 700, color: isDead ? '#4a5070' : '#e05555', fontSize: '0.88rem' }}>
                   {monster?.name ?? '?'}{monster?.isBoss && ' 👑'}{isDead && ' 💀'}
