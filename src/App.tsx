@@ -20,6 +20,7 @@ import { VocationScreen } from './components/screens/VocationScreen';
 import { PetScreen } from './components/screens/PetScreen';
 import { LifeScreen } from './components/screens/LifeScreen';
 import { EquipmentBuildScreen } from './components/screens/EquipmentBuildScreen';
+import { WikiTab } from './components/wiki/WikiTab';
 import { subscribeSoldNotifications, markSoldNotificationRead, subscribeMaintenanceStatus, setPlayerActivity, subscribeTabMaintenance, subscribeActivityFeed } from './services/multiplayer';
 import type { TabMaintenanceConfig } from './services/multiplayer';
 import type { PlayerActivityCode } from './services/multiplayer';
@@ -54,6 +55,7 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
   { id:'pets',      label:'ペット',   icon:'pickaxe' },
   { id:'life',      label:'生活',     icon:'hammer' },
   { id:'equipmentBuild', label:'装備ビルド', icon:'swords' },
+  { id:'wiki',      label:'Wiki',     icon:'compass' },
 ];
 
 // ============================================================
@@ -1481,6 +1483,7 @@ function ActiveScreen({ tab }: { tab: TabId }) {
     case 'pets':      return <PetScreen />;
     case 'life':      return <LifeScreen />;
     case 'equipmentBuild': return <EquipmentBuildScreen />;
+    case 'wiki':      return <WikiTab />;
     case 'admin':     return <AdminScreen />;
     default:          return <GatheringScreen />;
   }
