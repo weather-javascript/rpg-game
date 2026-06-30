@@ -1,6 +1,6 @@
 // src/types/game.ts
 
-import type { EquipmentBuildState, VocationState, PetState, LifeSystemState } from './v3types';
+import type { EquipmentBuildState, VocationState, PetState, LifeSystemState } from './buildTypes';
 
 export type IdMap<T> = Record<string, T>;
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
