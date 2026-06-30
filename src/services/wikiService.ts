@@ -61,6 +61,41 @@ export const WIKI_LIMITS = {
   RUN_TEXT_MAX: 2000,
 } as const;
 
+
+// ============================================================
+// Firestore はネストした配列（InlineRun[][]）を保存できないため、
+// 書き込み前に { _runs: InlineRun[] }[] へ変換し、読み取り後に戻す。
+// ============================================================
+function serializeBlocks(blocks: ContentBlock[]): unknown[] {
+  return blocks.map(b => {
+    if (!b.items) return b;
+    return {
+      ...b,
+      items: b.items.map(runs => ({ _runs: runs })),
+    };
+  });
+}
+
+function deserializeBlocks(raw: unknown[]): ContentBlock[] {
+  return (raw as ContentBlock[]).map(b => {
+    if (!b.items) return b;
+    return {
+      ...b,
+      items: (b.items as unknown as { _runs: ContentBlock['runs'] }[]).map(r =>
+        Array.isArray(r) ? r : (r._runs ?? [])
+      ),
+    };
+  });
+}
+
+function deserializePage(id: string, data: Omit<WikiPage, 'id'>): WikiPage {
+  return {
+    id,
+    ...data,
+    contentBlocks: data.contentBlocks ? deserializeBlocks(data.contentBlocks as unknown[]) : [],
+  };
+}
+
 export function slugify(title: string): string {
   return title
     .trim()
@@ -101,7 +136,7 @@ export async function fetchWikiPage(pageId: string): Promise<WikiPage | null> {
   const ref = doc(db, WIKI_COLLECTIONS.PAGES, pageId);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
-  return { id: snap.id, ...(snap.data() as Omit<WikiPage, 'id'>) };
+  return deserializePage(snap.id, snap.data() as Omit<WikiPage, 'id'>);
 }
 
 /** タイトルまたはslugで検索（完全一致優先 → 部分一致フォールバック） */
@@ -113,14 +148,14 @@ export async function findWikiPageByTitleOrSlug(titleOrSlug: string): Promise<Wi
   const slugSnap = await getDocs(slugQ);
   if (!slugSnap.empty) {
     const d = slugSnap.docs[0];
-    return { id: d.id, ...(d.data() as Omit<WikiPage, 'id'>) };
+    return deserializePage(d.id, d.data() as Omit<WikiPage, 'id'>);
   }
 
   const titleQ = query(col, where('title', '==', titleOrSlug), fbLimit(1));
   const titleSnap = await getDocs(titleQ);
   if (!titleSnap.empty) {
     const d = titleSnap.docs[0];
-    return { id: d.id, ...(d.data() as Omit<WikiPage, 'id'>) };
+    return deserializePage(d.id, d.data() as Omit<WikiPage, 'id'>);
   }
   return null;
 }
@@ -163,7 +198,7 @@ export async function fetchWikiPagesByCategory(category: WikiCategory, max = 50)
   // orderBy を外してクライアント側でソート（複合インデックス不要）
   const q = query(col, where('category', '==', category), fbLimit(max));
   const snap = await getDocs(q);
-  const pages = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<WikiPage, 'id'>) }));
+  const pages = snap.docs.map(d => deserializePage(d.id, d.data() as Omit<WikiPage, 'id'>));
   return pages.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
 }
 
@@ -172,7 +207,7 @@ export async function fetchWikiPagesByTag(tag: string, max = 50): Promise<WikiPa
   // orderBy を外してクライアント側でソート（複合インデックス不要）
   const q = query(col, where('tags', 'array-contains', tag), fbLimit(max));
   const snap = await getDocs(q);
-  const pages = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<WikiPage, 'id'>) }));
+  const pages = snap.docs.map(d => deserializePage(d.id, d.data() as Omit<WikiPage, 'id'>));
   return pages.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
 }
 
@@ -180,14 +215,14 @@ export async function fetchRecentlyUpdatedPages(max = 20): Promise<WikiPage[]> {
   const col = collection(db, WIKI_COLLECTIONS.PAGES);
   const q = query(col, orderBy('updatedAt', 'desc'), fbLimit(max));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<WikiPage, 'id'>) }));
+  return snap.docs.map(d => deserializePage(d.id, d.data() as Omit<WikiPage, 'id'>));
 }
 
 export async function fetchPopularPages(max = 10): Promise<WikiPage[]> {
   const col = collection(db, WIKI_COLLECTIONS.PAGES);
   const q = query(col, orderBy('viewCount', 'desc'), fbLimit(max));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<WikiPage, 'id'>) }));
+  return snap.docs.map(d => deserializePage(d.id, d.data() as Omit<WikiPage, 'id'>));
 }
 
 export function subscribeRecentChanges(callback: (changes: WikiRecentChange[]) => void, max = 30): Unsubscribe {
@@ -203,7 +238,7 @@ export async function fetchAllWikiPages(max = 200): Promise<WikiPage[]> {
   const col = collection(db, WIKI_COLLECTIONS.PAGES);
   const q = query(col, orderBy('title'), fbLimit(max));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<WikiPage, 'id'>) }));
+  return snap.docs.map(d => deserializePage(d.id, d.data() as Omit<WikiPage, 'id'>));
 }
 
 // ============================================================
@@ -260,7 +295,7 @@ export async function createWikiPage(
   };
 
   const pageRef = doc(db, WIKI_COLLECTIONS.PAGES, pageId);
-  await setDoc(pageRef, page);
+  await setDoc(pageRef, { ...page, contentBlocks: serializeBlocks(page.contentBlocks) });
 
   const revision: WikiRevision = {
     id: revisionId,
@@ -317,7 +352,7 @@ export async function updateWikiPage(
     category: input.category,
     tags: input.tags,
     summary: input.summary,
-    contentBlocks: input.contentBlocks,
+    contentBlocks: serializeBlocks(input.contentBlocks),
     updatedAt: now,
     updatedBy: uid,
     updatedByName: displayName,
@@ -333,7 +368,7 @@ export async function updateWikiPage(
     editedAt: now,
     editSummary: editSummary || '(編集内容の説明なし)',
     title: input.title,
-    contentBlocks: input.contentBlocks,
+    contentBlocks: serializeBlocks(input.contentBlocks) as unknown as ContentBlock[],
     diffSummary: diff,
   };
   await setDoc(doc(db, WIKI_COLLECTIONS.PAGES, pageId, 'revisions', revisionId), revision);
@@ -391,14 +426,14 @@ export async function fetchPageRevisions(pageId: string, max = 50): Promise<Wiki
   const col = collection(db, WIKI_COLLECTIONS.PAGES, pageId, 'revisions');
   const q = query(col, orderBy('editedAt', 'desc'), fbLimit(max));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<WikiRevision, 'id'>) }));
+  return snap.docs.map(d => { const data = d.data() as Omit<WikiRevision, 'id'>; return { id: d.id, ...data, contentBlocks: data.contentBlocks ? deserializeBlocks(data.contentBlocks as unknown[]) : [] }; });
 }
 
 export async function fetchRevision(pageId: string, revisionId: string): Promise<WikiRevision | null> {
   const ref = doc(db, WIKI_COLLECTIONS.PAGES, pageId, 'revisions', revisionId);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
-  return { id: snap.id, ...(snap.data() as Omit<WikiRevision, 'id'>) };
+  const rdata = snap.data() as Omit<WikiRevision, 'id'>; return { id: snap.id, ...rdata, contentBlocks: rdata.contentBlocks ? deserializeBlocks(rdata.contentBlocks as unknown[]) : [] };
 }
 
 export async function revertToRevision(
@@ -622,7 +657,7 @@ export async function fetchAnyPageRevisionsAcrossWiki(max = 20): Promise<WikiRev
   const col = collectionGroup(db, 'revisions');
   const q = query(col, orderBy('editedAt', 'desc'), fbLimit(max));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<WikiRevision, 'id'>) }));
+  return snap.docs.map(d => { const data = d.data() as Omit<WikiRevision, 'id'>; return { id: d.id, ...data, contentBlocks: data.contentBlocks ? deserializeBlocks(data.contentBlocks as unknown[]) : [] }; });
 }
 
 export { serverTimestamp as wikiServerTimestamp };
