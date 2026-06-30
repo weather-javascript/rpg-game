@@ -8,6 +8,8 @@ import {
   fetchRecentlyUpdatedPages,
   fetchPopularPages,
   createWikiPage,
+  getMissingOfficialPageSlugs,
+  seedOfficialWikiPages,
 } from '../../services/wikiService';
 import { recommendDungeonIdForLevel, getIconCandidateByRef } from './wikiMasterBridge';
 import { DUNGEON_MASTER } from '../../data/masters';
@@ -40,6 +42,9 @@ export function WikiHome({ playerLevel, uid, displayName, onOpenPage, onOpenCate
   const [importMsg, setImportMsg] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [missingCount, setMissingCount] = useState(0);
+  const [seedState, setSeedState] = useState<'idle' | 'seeding' | 'done'>('idle');
+  const [seedProgress, setSeedProgress] = useState({ done: 0, total: 0, title: '' });
 
   useEffect(() => {
     let alive = true;
@@ -53,9 +58,32 @@ export function WikiHome({ playerLevel, uid, displayName, onOpenPage, onOpenCate
       } finally {
         if (alive) setLoading(false);
       }
+      try {
+        const missing = await getMissingOfficialPageSlugs();
+        if (alive) setMissingCount(missing.length);
+      } catch (e) {
+        console.error('[WikiHome] missing page check failed:', e);
+      }
     })();
     return () => { alive = false; };
   }, []);
+
+  async function handleSeedOfficialPages() {
+    setSeedState('seeding');
+    setSeedProgress({ done: 0, total: missingCount, title: '' });
+    try {
+      await seedOfficialWikiPages(uid, displayName, (done, total, title) => {
+        setSeedProgress({ done, total, title });
+      });
+      setSeedState('done');
+      setMissingCount(0);
+      const [r, p] = await Promise.all([fetchRecentlyUpdatedPages(8), fetchPopularPages(6)]);
+      setRecent(r); setPopular(p);
+    } catch (e) {
+      console.error('[WikiHome] seed failed:', e);
+      setSeedState('idle');
+    }
+  }
 
   const recommendedDungeonId = recommendDungeonIdForLevel(playerLevel);
   const recommendedDungeon = recommendedDungeonId ? DUNGEON_MASTER[recommendedDungeonId] : null;
@@ -131,6 +159,36 @@ export function WikiHome({ playerLevel, uid, displayName, onOpenPage, onOpenCate
       >
         ✏️ 新しいページを作成
       </button>
+
+      {/* 公式WIKI一括インポートバナー */}
+      {missingCount > 0 && seedState !== 'done' && (
+        <div style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid var(--accent-gold)', background: 'rgba(240,168,48,0.08)' }}>
+          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: 4 }}>
+            📚 公式WIKIページが {missingCount}件 未読み込みです
+          </div>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginBottom: 8 }}>
+            攻略ガイド・装備ビルド・職業・ペット・生活系などの解説ページをまとめて読み込めます。
+          </div>
+          {seedState === 'idle' && (
+            <button
+              onClick={handleSeedOfficialPages}
+              style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #5b8dee, #3a6fd0)', color: '#fff', fontWeight: 700, fontSize: '0.78rem' }}
+            >
+              公式WIKIを読み込む
+            </button>
+          )}
+          {seedState === 'seeding' && (
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+              ⏳ 読み込み中… {seedProgress.done}/{seedProgress.total}（{seedProgress.title}）
+            </div>
+          )}
+        </div>
+      )}
+      {seedState === 'done' && (
+        <div style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid #4caf7d', background: 'rgba(76,175,125,0.08)', fontSize: '0.78rem', color: '#4caf7d', fontWeight: 700 }}>
+          ✅ 公式WIKIページの読み込みが完了しました！
+        </div>
+      )}
 
       {/* ファイルインポートゾーン */}
       <div
