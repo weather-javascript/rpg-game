@@ -65,7 +65,7 @@ function collectEquipmentModifiers(player: PlayerData): PowerModifiers {
   const autoSets = getAutoSets();
   const equippedSet = new Set(equippedIds);
   for (const setDef of Object.values(autoSets)) {
-    const equippedCount = setDef.itemIds.filter(id => equippedSet.has(id)).length;
+    const equippedCount = setDef.itemIds.filter((id: string) => equippedSet.has(id)).length;
     if (equippedCount < 2) continue;
     for (const th of setDef.thresholds) {
       if (equippedCount >= th.count) acc = addPowerModifiers(acc, th.effects);
