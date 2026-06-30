@@ -3,7 +3,7 @@
 
 import { useGameStore } from '../../stores/gameStore';
 import { VOCATION_MASTER, VOCATION_ORDER } from '../../data/vocationData';
-import { defaultVocationState, VOCATION_EXP_TABLE, type VocationId } from '../../types/v3Types';
+import { defaultVocationState, VOCATION_EXP_TABLE, type VocationId, type VocationRankDef } from '../../types/buildTypes';
 
 const card = (active: boolean): React.CSSProperties => ({
   background: active ? 'rgba(240,192,96,0.1)' : '#1c2235',
@@ -47,7 +47,7 @@ export function VocationScreen() {
         const curLevelExp = VOCATION_EXP_TABLE[level] ?? 0;
         const progress = nextLevelExp > curLevelExp ? Math.min(1, (exp - curLevelExp) / (nextLevelExp - curLevelExp)) : 1;
         const rank = voc.vocationRank[id] ?? 1;
-        const rankDef = def.ranks.find(r => r.rank === rank) ?? def.ranks[0];
+        const rankDef = def.ranks.find((r: VocationRankDef) => r.rank === rank) ?? def.ranks[0];
 
         return (
           <div key={id} style={card(isActive)}>

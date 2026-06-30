@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
 import { CROP_MASTER, LIFE_RECIPES, COLLECTION_MASTER } from '../../data/lifeSystemData';
-import { defaultLifeSystemState, type FarmPlotState } from '../../types/v3types';
+import { defaultLifeSystemState, type FarmPlotState } from '../../types/buildTypes';
 
 type Tab = 'farm' | 'cooking' | 'alchemy' | 'refining' | 'collection';
 

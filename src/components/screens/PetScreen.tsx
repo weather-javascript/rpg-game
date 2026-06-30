@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { PET_SPECIES_MASTER, PET_SKILL_MASTER, PET_EXCHANGE_TABLE } from '../../data/petsData';
-import { defaultPetState, PET_EXP_TABLE, type PetRoleSlot, type OwnedPetInstance } from '../../types/v3types';
+import { defaultPetState, PET_EXP_TABLE, type PetRoleSlot, type OwnedPetInstance } from '../../types/buildTypes';
 
 type Tab = 'owned' | 'party' | 'codex' | 'exchange';
 
@@ -94,7 +94,7 @@ export function PetScreen() {
         <div>
           {(['main', 'sub', 'support'] as PetRoleSlot[]).map(slot => {
             const instanceId = pets.party[slot];
-            const pet = instanceId ? pets.owned.find(p => p.instanceId === instanceId) : null;
+            const pet = instanceId ? pets.owned.find((p: OwnedPetInstance) => p.instanceId === instanceId) : null;
             const species = pet ? PET_SPECIES_MASTER[pet.speciesId] : null;
             return (
               <div key={slot} style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 8, padding: 10, marginBottom: 8 }}>
@@ -107,7 +107,7 @@ export function PetScreen() {
                 <select value={instanceId ?? ''} onChange={(e) => setPartySlot(slot, e.target.value || null)}
                   style={{ width: '100%', padding: 6, background: '#161b26', border: '1px solid #2d3752', borderRadius: 6, color: '#e8e6ff', fontSize: '0.75rem' }}>
                   <option value="">（空き）</option>
-                  {pets.owned.map(p => (
+                  {pets.owned.map((p: OwnedPetInstance) => (
                     <option key={p.instanceId} value={p.instanceId}>{p.nickname || PET_SPECIES_MASTER[p.speciesId]?.name}</option>
                   ))}
                 </select>
@@ -121,7 +121,7 @@ export function PetScreen() {
         <div>
           {Object.values(PET_SPECIES_MASTER).map(species => {
             const seen = pets.seenSpeciesIds.includes(species.id);
-            const owned = pets.owned.some(p => p.speciesId === species.id);
+            const owned = pets.owned.some((p: OwnedPetInstance) => p.speciesId === species.id);
             return (
               <div key={species.id} style={{ background: '#1c2235', border: `1px solid ${owned ? RARITY_COLOR[species.rarity] : '#2d3752'}`, borderRadius: 8, padding: 10, marginBottom: 8 }}>
                 {owned || seen ? (
@@ -129,7 +129,7 @@ export function PetScreen() {
                     <div style={{ fontWeight: 700, color: RARITY_COLOR[species.rarity] }}>{species.name} {owned && '✅'}</div>
                     <div style={{ fontSize: '0.68rem', color: '#8a92b2' }}>{species.description}</div>
                     <div style={{ fontSize: '0.65rem', color: '#5fa8e0', marginTop: 4 }}>
-                      入手方法: {species.acquisition.map(a => a.detail).join(' / ')}
+                      入手方法: {species.acquisition.map((a: { tag: string; detail: string }) => a.detail).join(' / ')}
                     </div>
                     {species.aquariumLinkBonus && (
                       <div style={{ fontSize: '0.65rem', color: '#7ec98a' }}>

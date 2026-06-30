@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
 import { getItemTrait, AFFIX_MASTER, buildAutoSets, getAffixSlotCount } from '../../data/equipmentBuildData';
-import { defaultEquipmentBuildState, AWAKENING_MAX, type AffixInstance, type AffixId, type BuildPreset } from '../../types/v3types';
+import { defaultEquipmentBuildState, AWAKENING_MAX, type AffixInstance, type AffixId, type BuildPreset } from '../../types/buildTypes';
 
 const RARITY_COLOR: Record<string, string> = { common: '#8a92b2', uncommon: '#7ec98a', rare: '#5fa8e0', epic: '#c060e0', legendary: '#f0c060' };
 type SortKey = 'name' | 'rarity' | 'awakening';
