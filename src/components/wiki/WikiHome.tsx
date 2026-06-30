@@ -72,16 +72,25 @@ export function WikiHome({ playerLevel, uid, displayName, onOpenPage, onOpenCate
     setSeedState('seeding');
     setSeedProgress({ done: 0, total: missingCount, title: '' });
     try {
-      await seedOfficialWikiPages(uid, displayName, (done, total, title) => {
+      const result = await seedOfficialWikiPages(uid, displayName, (done, total, title) => {
         setSeedProgress({ done, total, title });
       });
-      setSeedState('done');
-      setMissingCount(0);
+      console.log('[WikiHome] seed result:', result);
+      if (result.failed > 0) {
+        setSeedState('idle');
+        const remaining = await getMissingOfficialPageSlugs();
+        setMissingCount(remaining.length);
+        alert(`⚠️ ${result.failed}件の書き込みに失敗しました。\nFirestoreルールのデプロイを確認してください。\nブラウザのコンソール(F12)に詳細が出ています。`);
+      } else {
+        setSeedState('done');
+        setMissingCount(0);
+      }
       const [r, p] = await Promise.all([fetchRecentlyUpdatedPages(8), fetchPopularPages(6)]);
       setRecent(r); setPopular(p);
     } catch (e) {
       console.error('[WikiHome] seed failed:', e);
       setSeedState('idle');
+      alert(`❌ seed処理でエラーが発生しました:\n${String(e)}`);
     }
   }
 
