@@ -1,6 +1,6 @@
 // src/types/game.ts
 
-import type { EquipmentBuildState, VocationState, PetState, LifeSystemState } from './v3Types';
+import type { EquipmentBuildState, VocationState, PetState, LifeSystemState } from './v3types';
 
 export type IdMap<T> = Record<string, T>;
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
@@ -290,7 +290,7 @@ export interface WeaponUltimate {
   postBuffTurns?: number;
   postBuffPoisonDmg?: number;
 }
-export type TabId = 'gathering' | 'market' | 'dungeon' | 'gamble' | 'status' | 'online' | 'fishing' | 'admin' | 'crafting' | 'navi' | 'aquarium' | 'freefield' | 'vocation' | 'pets' | 'life' | 'equipmentBuild';
+export type TabId = 'gathering' | 'market' | 'dungeon' | 'gamble' | 'status' | 'online' | 'fishing' | 'admin' | 'crafting' | 'navi' | 'aquarium' | 'freefield' | 'vocation' | 'pets' | 'life' | 'equipmentBuild' | 'wiki';
 export type GambleType = 'slot' | 'treasure_box' | 'coin_flip' | 'chohan' | 'chinchiro' | 'jackpot' | 'poker' | 'highlow' | 'mines' | 'dice_race' | 'roulette' | 'blackjack' | 'scratch' | 'race';
 export type GambleGameCategory = 'instant' | 'choice' | 'step' | 'reveal' | 'card';
 export type GambleRank = '見習い' | 'ギャンブラー' | '熟練ギャンブラー' | '賭博王' | 'レジェンド';
