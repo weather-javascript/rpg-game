@@ -225,7 +225,8 @@ export async function createWikiPage(
   const err = validatePageInput(input);
   if (err) return { success: false, error: err };
 
-  const existing = await findWikiPageByTitleOrSlug(input.title);
+  const checkSlug = input.slug || slugify(input.title);
+  const existing = await findWikiPageByTitleOrSlug(checkSlug);
   if (existing) return { success: false, error: '同名のページが既に存在します' };
 
   const pageId = generatePageId();
@@ -604,9 +605,11 @@ export async function seedOfficialWikiPages(
     onProgress?.(i, targets.length, page.title);
     try {
       const res = await createWikiPage(page, uid, displayName);
-      if (res.success) created++; else skipped++;
-    } catch {
+      if (res.success) created++;
+      else { skipped++; console.warn('[seed] skipped:', page.slug, res.error); }
+    } catch (e) {
       failed++;
+      console.error('[seed] failed:', page.slug, e);
     }
   }
   onProgress?.(targets.length, targets.length, '完了');
