@@ -392,6 +392,32 @@ const GLOBAL_ANIM_CSS = `
     50%  { opacity:0.8; transform:scale(1.4); }
     100% { opacity:0; transform:scale(2); }
   }
+  @keyframes levelUpPillar {
+    0%   { opacity:0; transform:scaleY(0); }
+    25%  { opacity:0.9; transform:scaleY(1); }
+    75%  { opacity:0.7; }
+    100% { opacity:0; transform:scaleY(1); }
+  }
+  @keyframes levelUpParticle {
+    0%   { opacity:1; transform:translate(0,0) scale(1); }
+    100% { opacity:0; transform:translate(var(--lpx,0px),var(--lpy,0px)) scale(0.3); }
+  }
+  @keyframes tabSlideInRight {
+    from { opacity:0; transform:translateX(18px); }
+    to   { opacity:1; transform:translateX(0); }
+  }
+  @keyframes tabSlideInLeft {
+    from { opacity:0; transform:translateX(-18px); }
+    to   { opacity:1; transform:translateX(0); }
+  }
+  .rpg-tab-slide-right { animation: tabSlideInRight 0.28s ease-out forwards; }
+  .rpg-tab-slide-left  { animation: tabSlideInLeft  0.28s ease-out forwards; }
+  @keyframes popOut {
+    0%   { opacity:1; transform:scale(1); }
+    100% { opacity:0; transform:scale(0.85); }
+  }
+  @keyframes popupBgIn  { from { opacity:0; } to { opacity:1; } }
+  @keyframes popupBgOut { from { opacity:1; } to { opacity:0; } }
   /* ナビバー・EXPバー用 */
   .rpg-tab-active {
     animation: tabActive 0.2s ease forwards;
@@ -1093,17 +1119,19 @@ function TabMaintenanceScreen({ tab, entry }: { tab: string; entry: { message?: 
 function AdminAnnouncementPopup({ onClose }: { onClose: () => void }) {
   const [announcements, setAnnouncements] = useState<Array<{ id: string; text: string; timestamp: number; imageUrl?: string }>>([]);
   const [loading, setLoading] = useState(true);
+  const [closing, setClosing] = useState(false);
+  const requestClose = () => { setClosing(true); setTimeout(onClose, 200); };
   useEffect(() => {
     import('./services/multiplayer').then(m => {
       m.getAnnouncementHistory().then(list => { setAnnouncements(list as any); setLoading(false); });
     });
   }, []);
   return (
-    <div style={{ background:'rgba(0,0,0,0.85)', position:'fixed', inset:0, zIndex:600, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-      <div style={{ background:'#1c2235', border:'2px solid #5b8dee', borderRadius:14, padding:20, width:'100%', maxWidth:460, maxHeight:'80vh', overflowY:'auto' }}>
+    <div style={{ background:'rgba(0,0,0,0.85)', position:'fixed', inset:0, zIndex:600, display:'flex', alignItems:'center', justifyContent:'center', padding:16, animation: closing ? 'popupBgOut 0.2s ease forwards' : 'popupBgIn 0.25s ease' }}>
+      <div style={{ background:'#1c2235', border:'2px solid #5b8dee', borderRadius:14, padding:20, width:'100%', maxWidth:460, maxHeight:'80vh', overflowY:'auto', animation: closing ? 'popOut 0.2s ease forwards' : 'popIn 0.35s cubic-bezier(0.34,1.56,0.64,1)' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
           <h2 style={{ color:'#5b8dee', fontFamily:'Cinzel,serif', margin:0, fontSize:'1.1rem' }}>📢 ADMINからのお知らせ</h2>
-          <button onClick={onClose} style={{ background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontSize:'0.85rem' }}>✕ 閉じる</button>
+          <button onClick={requestClose} style={{ background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontSize:'0.85rem' }}>✕ 閉じる</button>
         </div>
         {loading ? (
           <div style={{ textAlign:'center', color:'#4a5070', padding:'20px 0' }}>読み込み中...</div>
@@ -1127,7 +1155,7 @@ function AdminAnnouncementPopup({ onClose }: { onClose: () => void }) {
             </div>
           ))
         )}
-        <button onClick={onClose} style={{ width:'100%', padding:'10px', background:'linear-gradient(135deg,#5b8dee,#3a6fd0)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, marginTop:8 }}>
+        <button onClick={requestClose} style={{ width:'100%', padding:'10px', background:'linear-gradient(135deg,#5b8dee,#3a6fd0)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, marginTop:8 }}>
           閉じる
         </button>
       </div>
@@ -1142,15 +1170,17 @@ function VersionPopup({ onClose }: { onClose: () => void }) {
   const patch = VERSION_PATCHES[0];
   if (!patch) return null;
   const [openSections, setOpenSections] = useState<Record<number, boolean>>({ 0: true });
+  const [closing, setClosing] = useState(false);
+  const requestClose = () => { setClosing(true); setTimeout(onClose, 200); };
   return (
-    <div style={{ background:'rgba(0,0,0,0.85)', position:'fixed', inset:0, zIndex:500, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-      <div style={{ background:'#1c2235', border:'2px solid #f0c060', borderRadius:14, padding:20, width:'100%', maxWidth:460, maxHeight:'80vh', overflowY:'auto' }}>
+    <div style={{ background:'rgba(0,0,0,0.85)', position:'fixed', inset:0, zIndex:500, display:'flex', alignItems:'center', justifyContent:'center', padding:16, animation: closing ? 'popupBgOut 0.2s ease forwards' : 'popupBgIn 0.25s ease' }}>
+      <div style={{ background:'#1c2235', border:'2px solid #f0c060', borderRadius:14, padding:20, width:'100%', maxWidth:460, maxHeight:'80vh', overflowY:'auto', animation: closing ? 'popOut 0.2s ease forwards' : 'popIn 0.35s cubic-bezier(0.34,1.56,0.64,1)' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
           <div>
             <h2 style={{ color:'#f0c060', fontFamily:'Cinzel,serif', margin:0, fontSize:'1.1rem' }}>🎉 アップデート情報</h2>
             <div style={{ color:'#4a5070', fontSize:'0.75rem', marginTop:2 }}>Ver.{patch.version} ({patch.date})</div>
           </div>
-          <button onClick={onClose} style={{ background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontSize:'0.85rem' }}>✕ 閉じる</button>
+          <button onClick={requestClose} style={{ background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontSize:'0.85rem' }}>✕ 閉じる</button>
         </div>
         {VERSION_PATCHES.map((p, i) => (
           <div key={p.version} style={{ marginBottom:8 }}>
@@ -1170,7 +1200,7 @@ function VersionPopup({ onClose }: { onClose: () => void }) {
             )}
           </div>
         ))}
-        <button onClick={onClose} style={{ width:'100%', padding:'10px', background:'linear-gradient(135deg,#5b8dee,#3a6fd0)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, marginTop:8 }}>
+        <button onClick={requestClose} style={{ width:'100%', padding:'10px', background:'linear-gradient(135deg,#5b8dee,#3a6fd0)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, marginTop:8 }}>
           確認しました！
         </button>
       </div>
@@ -1183,21 +1213,24 @@ function VersionPopup({ onClose }: { onClose: () => void }) {
 // ============================================================
 interface SoldPopupInfo { itemName: string; itemIcon: string; amount: number; totalGold: number }
 function SoldPopup({ info, onClose }: { info: SoldPopupInfo; onClose: () => void }) {
+  const [closing, setClosing] = useState(false);
+  const requestClose = () => { setClosing(true); setTimeout(onClose, 220); };
   useEffect(() => {
-    const t = setTimeout(onClose, 4000);
+    const t = setTimeout(requestClose, 3780);
     return () => clearTimeout(t);
-  }, [onClose]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:550, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}>
-      <div onClick={onClose} style={{
+      <div onClick={requestClose} style={{
         pointerEvents:'auto',
         background:'linear-gradient(135deg,rgba(28,34,53,0.98),rgba(22,27,38,0.98))',
         border:'2px solid #f0c060',
         borderRadius:16,
         padding:'24px 32px',
         textAlign:'center',
-        animation:'soldPopIn 0.4s ease',
+        animation: closing ? 'popOut 0.22s ease forwards' : 'soldPopIn 0.4s ease',
         boxShadow:'0 0 40px rgba(240,192,96,0.4)',
         maxWidth:300,
         cursor:'pointer',
@@ -1357,12 +1390,35 @@ function LevelUpBanner() {
   const flash = useGameStore(s => s.levelUpFlash);
   const clear = useGameStore(s => s.clearLevelUp);
   if (!flash) return null;
+  const particles = Array.from({ length: 14 }, (_, i) => {
+    const angle = (i / 14) * Math.PI * 2;
+    const dist = 70 + Math.random() * 50;
+    return { id: i, lpx: Math.cos(angle) * dist, lpy: Math.sin(angle) * dist, delay: Math.random() * 0.15 };
+  });
+  const isMilestone = flash.level % 10 === 0;
   return (
     <div key={flash.ts} onClick={clear} style={{
       position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center',
       pointerEvents: 'none',
     }}>
       <div style={{ position: 'relative', textAlign: 'center' }}>
+        {/* 光の柱 */}
+        <div style={{
+          position: 'absolute', left: '50%', bottom: '50%', width: isMilestone ? 26 : 16, height: 280,
+          marginLeft: isMilestone ? -13 : -8,
+          background: 'linear-gradient(180deg, transparent, rgba(255,233,168,0.85) 35%, rgba(255,174,0,0.9) 55%, rgba(255,233,168,0.85) 75%, transparent)',
+          filter: 'blur(2px)', transformOrigin: 'bottom center', mixBlendMode: 'screen',
+          animation: `levelUpPillar ${isMilestone ? 1.4 : 1.1}s ease-out`,
+        }} />
+        {/* パーティクル拡散 */}
+        {particles.map(p => (
+          <div key={p.id} style={{
+            position: 'absolute', left: '50%', top: '50%', width: 5, height: 5, marginLeft: -2.5, marginTop: -2.5,
+            borderRadius: '50%', background: '#ffe9a8', boxShadow: '0 0 8px rgba(255,200,60,0.9)',
+            ['--lpx' as any]: `${p.lpx}px`, ['--lpy' as any]: `${p.lpy}px`,
+            animation: `levelUpParticle ${0.8 + Math.random() * 0.3}s ease-out ${p.delay}s forwards`,
+          }} />
+        ))}
         {/* 拡散リング x2（タイミングをずらして重ねる） */}
         <div style={{
           position: 'absolute', left: '50%', top: '50%', width: 160, height: 160, marginLeft: -80, marginTop: -80,
@@ -1375,6 +1431,7 @@ function LevelUpBanner() {
           animation: 'levelUpBurst 1.1s ease-out 0.18s',
         }} />
         <div className="rpg-badge-pop" style={{
+          position: 'relative',
           background: 'linear-gradient(135deg,#ffae00,#ff6a00)', color: '#fff', fontWeight: 900,
           padding: '14px 30px', borderRadius: 16, fontSize: '1.4rem', lineHeight: 1.3,
           boxShadow: '0 8px 30px rgba(255,140,0,0.5), 0 0 60px rgba(255,174,0,0.4)',
@@ -1382,6 +1439,11 @@ function LevelUpBanner() {
         }}>
           🎉 LEVEL UP!<br/>
           <span style={{ fontSize: '1.15rem' }}>Lv.{flash.level} に到達！</span>
+          {isMilestone && (
+            <div style={{ fontSize: '0.78rem', marginTop: 4, color: '#fff7e0', letterSpacing: 1, textShadow: '0 0 8px rgba(255,255,255,0.6)' }}>
+              ✨ 節目のレベルに到達！ ✨
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1497,6 +1559,8 @@ function MiningResultPopup({ result, onClose }: {
   onClose: () => void;
 }) {
   const [visible, setVisible] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const requestClose = () => { setClosing(true); setTimeout(onClose, 220); };
   useEffect(() => { const t = setTimeout(() => setVisible(true), 50); return () => clearTimeout(t); }, []);
 
   return (
@@ -1505,7 +1569,7 @@ function MiningResultPopup({ result, onClose }: {
       background:'rgba(0,0,0,0.75)',
       display:'flex', alignItems:'center', justifyContent:'center',
       padding:16,
-      animation:'miningBgIn 0.3s ease',
+      animation: closing ? 'popupBgOut 0.2s ease forwards' : 'miningBgIn 0.3s ease',
     }}>
       <style>{`
         @keyframes miningBgIn { from{opacity:0} to{opacity:1} }
@@ -1521,7 +1585,7 @@ function MiningResultPopup({ result, onClose }: {
         padding:'24px 20px',
         width:'100%', maxWidth:420,
         boxShadow:'0 0 60px rgba(240,192,96,0.3), 0 20px 60px rgba(0,0,0,0.8)',
-        animation: visible ? 'miningCardIn 0.4s cubic-bezier(0.16,1,0.3,1) forwards' : 'none',
+        animation: closing ? 'popOut 0.22s ease forwards' : (visible ? 'miningCardIn 0.4s cubic-bezier(0.16,1,0.3,1) forwards' : 'none'),
       }}>
         {/* ヘッダー */}
         <div style={{ textAlign:'center', marginBottom:18 }}>
@@ -1565,7 +1629,7 @@ function MiningResultPopup({ result, onClose }: {
           })}
         </div>
         {/* 受け取りボタン */}
-        <button onClick={onClose} style={{
+        <button onClick={requestClose} style={{
           width:'100%', padding:'13px 0', borderRadius:10,
           border:'none', cursor:'pointer', fontWeight:800, fontSize:'0.95rem',
           background:'linear-gradient(135deg, #f0a830, #e07820)',
@@ -1586,6 +1650,8 @@ function MiningResultPopup({ result, onClose }: {
 function WorldNewsPopup({ onClose }: { onClose: () => void }) {
   const [entries, setEntries] = useState<Array<{type:string;displayName:string;message:string;timestamp:number;title?:string}>>([]);
   const [loading, setLoading] = useState(true);
+  const [closing, setClosing] = useState(false);
+  const requestClose = () => { setClosing(true); setTimeout(onClose, 200); };
 
   const WORLD_NEWS_TYPES = new Set([
     'dungeon_clear','sky_castle_clear','sky_castle_ex_clear','volcano_clear',
@@ -1622,13 +1688,14 @@ function WorldNewsPopup({ onClose }: { onClose: () => void }) {
       background:'rgba(0,0,0,0.8)',
       display:'flex', alignItems:'center', justifyContent:'center',
       padding:16,
+      animation: closing ? 'popupBgOut 0.2s ease forwards' : undefined,
     }}>
       <style>{`@keyframes newsIn { from{transform:scale(0.9) translateY(20px);opacity:0} to{transform:scale(1) translateY(0);opacity:1} }`}</style>
       <div style={{
         background:'#1c2235', border:'2px solid #2d3752',
         borderRadius:16, padding:'20px 16px',
         width:'100%', maxWidth:460, maxHeight:'80vh', overflowY:'auto',
-        animation:'newsIn 0.4s cubic-bezier(0.16,1,0.3,1) forwards',
+        animation: closing ? 'popOut 0.2s ease forwards' : 'newsIn 0.4s cubic-bezier(0.16,1,0.3,1) forwards',
         boxShadow:'0 20px 60px rgba(0,0,0,0.8)',
       }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
@@ -1636,7 +1703,7 @@ function WorldNewsPopup({ onClose }: { onClose: () => void }) {
             <h2 style={{ color:'#f0c060', margin:0, fontSize:'1.1rem', fontFamily:'Cinzel,serif' }}>🌍 ワールドニュース</h2>
             <div style={{ color:'#4a5070', fontSize:'0.72rem', marginTop:2 }}>世界で起きた重要イベント</div>
           </div>
-          <button onClick={onClose} style={{ background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontSize:'0.85rem' }}>✕</button>
+          <button onClick={requestClose} style={{ background:'#2d3752', color:'#8a92b2', border:'none', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontSize:'0.85rem' }}>✕</button>
         </div>
         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
           {loading && <div style={{ color:'#8a92b2', textAlign:'center', padding:24 }}>読み込み中...</div>}
@@ -1661,7 +1728,7 @@ function WorldNewsPopup({ onClose }: { onClose: () => void }) {
             );
           })}
         </div>
-        <button onClick={onClose} style={{ width:'100%', padding:'10px', background:'linear-gradient(135deg,#5b8dee,#3a6fd0)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, marginTop:14 }}>
+        <button onClick={requestClose} style={{ width:'100%', padding:'10px', background:'linear-gradient(135deg,#5b8dee,#3a6fd0)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, marginTop:14 }}>
           確認しました！
         </button>
       </div>
@@ -1676,6 +1743,10 @@ export default function App() {
   const player = useGameStore(s => s.player);
   const [splashDone, setSplashDone] = useState(false);
   const activeTab = useGameStore(s => s.activeTab) as TabId;
+  const prevTabIdxRef = useRef<number>(TABS.findIndex(t => t.id === activeTab));
+  const tabIdx = TABS.findIndex(t => t.id === activeTab);
+  const tabSlideClass = tabIdx >= prevTabIdxRef.current ? 'rpg-tab-slide-right' : 'rpg-tab-slide-left';
+  useEffect(() => { prevTabIdxRef.current = tabIdx; }, [tabIdx]);
   const setActiveTab = useGameStore(s => s.setActiveTab);
   const addNotification = useGameStore(s => s.addNotification);
   const changeGold = useGameStore(s => s.changeGold);
@@ -1820,7 +1891,7 @@ export default function App() {
             if (tabEntry?.active && !ADMIN_UIDS.includes(player.uid)) {
               return <TabMaintenanceScreen tab={activeTab} entry={tabEntry} />;
             }
-            return <div key={activeTab} className="rpg-card-appear"><ActiveScreen tab={activeTab} /></div>;
+            return <div key={activeTab} className={tabSlideClass}><ActiveScreen tab={activeTab} /></div>;
           })()}
         </main>
       <ReliefPanel />
