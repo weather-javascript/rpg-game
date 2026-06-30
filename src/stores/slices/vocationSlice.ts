@@ -3,7 +3,7 @@
 
 import type { StateCreator } from 'zustand';
 import type { GameState } from '../gameStore';
-import { defaultVocationState, VOCATION_EXP_TABLE, type VocationId } from '../../types/v3Types';
+import { defaultVocationState, VOCATION_EXP_TABLE, type VocationId } from '../../types/buildTypes';
 import { VOCATION_MASTER, VOCATION_SWITCH_COOLDOWN_MS } from '../../data/vocationData';
 
 export interface VocationSlice {

@@ -3,7 +3,7 @@
 
 import type { StateCreator } from 'zustand';
 import type { GameState } from '../gameStore';
-import { defaultLifeSystemState, LIFE_EXP_TABLE } from '../../types/v3Types';
+import { defaultLifeSystemState, LIFE_EXP_TABLE, type FarmPlotState } from '../../types/buildTypes';
 import { CROP_MASTER, FARM_WATER_YIELD_BONUS, FARM_FERTILIZER_QUALITY_BONUS } from '../../data/lifeSystemData';
 import { LIFE_RECIPES, COLLECTION_MASTER } from '../../data/lifeSystemData';
 import { randomChance } from '../../utils/random';
@@ -43,7 +43,7 @@ export const createLifeSlice: StateCreator<GameState, [], [], LifeSlice> = (set,
     set((state) => {
       if (!state.player) return state;
       const l = state.player.life ?? defaultLifeSystemState();
-      const farmPlots = l.farmPlots.map(p => p.plotIndex === plotIndex
+      const farmPlots = l.farmPlots.map((p: FarmPlotState) => p.plotIndex === plotIndex
         ? { ...p, cropId, plantedAt: Date.now(), watered: false, fertilized: false }
         : p);
       return { player: { ...state.player, life: { ...l, farmPlots } } };
@@ -56,7 +56,7 @@ export const createLifeSlice: StateCreator<GameState, [], [], LifeSlice> = (set,
     set((state) => {
       if (!state.player) return state;
       const l = state.player.life ?? defaultLifeSystemState();
-      const farmPlots = l.farmPlots.map(p => p.plotIndex === plotIndex ? { ...p, watered: true } : p);
+      const farmPlots = l.farmPlots.map((p: FarmPlotState) => p.plotIndex === plotIndex ? { ...p, watered: true } : p);
       return { player: { ...state.player, life: { ...l, farmPlots } } };
     });
   },
@@ -70,7 +70,7 @@ export const createLifeSlice: StateCreator<GameState, [], [], LifeSlice> = (set,
     set((state) => {
       if (!state.player) return state;
       const l = state.player.life ?? defaultLifeSystemState();
-      const farmPlots = l.farmPlots.map(p => p.plotIndex === plotIndex ? { ...p, fertilized: true } : p);
+      const farmPlots = l.farmPlots.map((p: FarmPlotState) => p.plotIndex === plotIndex ? { ...p, fertilized: true } : p);
       return { player: { ...state.player, life: { ...l, farmPlots } } };
     });
     return true;
@@ -101,7 +101,7 @@ export const createLifeSlice: StateCreator<GameState, [], [], LifeSlice> = (set,
     set((state) => {
       if (!state.player) return state;
       const l = state.player.life ?? defaultLifeSystemState();
-      const farmPlots = l.farmPlots.map(p => p.plotIndex === plotIndex ? { ...p, cropId: null, plantedAt: 0, watered: false, fertilized: false } : p);
+      const farmPlots = l.farmPlots.map((p: FarmPlotState) => p.plotIndex === plotIndex ? { ...p, cropId: null, plantedAt: 0, watered: false, fertilized: false } : p);
       return { player: { ...state.player, life: { ...l, farmPlots } } };
     });
     addNotification('success', `🌾 ${crop.name}を収穫しました！`);

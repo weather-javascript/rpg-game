@@ -4,7 +4,7 @@
 import type { StateCreator } from 'zustand';
 import type { GameState } from '../gameStore';
 import { ITEM_MASTER } from '../../data/masters';
-import { defaultEquipmentBuildState, type BuildPreset, AWAKENING_MAX } from '../../types/v3Types';
+import { defaultEquipmentBuildState, type BuildPreset, AWAKENING_MAX } from '../../types/buildTypes';
 import { rollAffixes, getAffixSlotCount, tryAwaken, awakenMaterialForLevel } from '../../data/equipmentBuildData';
 
 export interface BuildSlice {

@@ -3,7 +3,8 @@
 
 import type { StateCreator } from 'zustand';
 import type { GameState } from '../gameStore';
-import { defaultPetState, PET_EXP_TABLE, type OwnedPetInstance, type PetRoleSlot } from '../../types/v3Types';
+import { defaultPetState, PET_EXP_TABLE, type OwnedPetInstance, type PetRoleSlot } from '../../types/buildTypes';
+type Pet = OwnedPetInstance;
 import { PET_SPECIES_MASTER, PET_BOND_PER_TREAT, PET_BOND_MAX, PET_EXCHANGE_TABLE } from '../../data/petsData';
 
 export interface PetSlice {
@@ -50,7 +51,7 @@ export const createPetSlice: StateCreator<GameState, [], [], PetSlice> = (set, g
     set((state) => {
       if (!state.player) return state;
       const p = state.player.pets ?? defaultPetState();
-      const owned = p.owned.map(pet => pet.instanceId === instanceId
+      const owned = p.owned.map((pet: Pet) => pet.instanceId === instanceId
         ? { ...pet, bond: Math.min(PET_BOND_MAX, pet.bond + PET_BOND_PER_TREAT), exp: pet.exp + 20, level: petLevelFromExp(pet.exp + 20) }
         : pet);
       return { player: { ...state.player, pets: { ...p, owned } } };
@@ -62,7 +63,7 @@ export const createPetSlice: StateCreator<GameState, [], [], PetSlice> = (set, g
     const { player, consumeItem } = get();
     if (!player) return { success: false, message: '読み込みエラー' };
     const p = player.pets ?? defaultPetState();
-    const pet = p.owned.find(x => x.instanceId === instanceId);
+    const pet = p.owned.find((x: Pet) => x.instanceId === instanceId);
     if (!pet) return { success: false, message: 'ペットが見つかりません' };
     const species = PET_SPECIES_MASTER[pet.speciesId];
     if (!species) return { success: false, message: '不明な種族です' };
@@ -77,7 +78,7 @@ export const createPetSlice: StateCreator<GameState, [], [], PetSlice> = (set, g
     set((state) => {
       if (!state.player) return state;
       const ps = state.player.pets ?? defaultPetState();
-      const owned = ps.owned.map(x => x.instanceId === instanceId ? { ...x, evolutionStage: pet.evolutionStage + 1 } : x);
+      const owned = ps.owned.map((x: Pet) => x.instanceId === instanceId ? { ...x, evolutionStage: pet.evolutionStage + 1 } : x);
       return { player: { ...state.player, pets: { ...ps, owned } } };
     });
     get().addNotification('success', `✨ ${species.name}が「${nextStage.name}」に進化しました！`);
@@ -88,7 +89,7 @@ export const createPetSlice: StateCreator<GameState, [], [], PetSlice> = (set, g
     const { player, consumeItem } = get();
     if (!player) return { success: false, message: '読み込みエラー' };
     const p = player.pets ?? defaultPetState();
-    const pet = p.owned.find(x => x.instanceId === instanceId);
+    const pet = p.owned.find((x: Pet) => x.instanceId === instanceId);
     if (!pet) return { success: false, message: 'ペットが見つかりません' };
     const species = PET_SPECIES_MASTER[pet.speciesId];
     if (!species) return { success: false, message: '不明な種族です' };
@@ -101,7 +102,7 @@ export const createPetSlice: StateCreator<GameState, [], [], PetSlice> = (set, g
     set((state) => {
       if (!state.player) return state;
       const ps = state.player.pets ?? defaultPetState();
-      const owned = ps.owned.map(x => x.instanceId === instanceId ? { ...x, awakening: x.awakening + 1 } : x);
+      const owned = ps.owned.map((x: Pet) => x.instanceId === instanceId ? { ...x, awakening: x.awakening + 1 } : x);
       return { player: { ...state.player, pets: { ...ps, owned } } };
     });
     get().addNotification('success', `🌟 ${species.name}が覚醒+${pet.awakening + 1}になりました！`);
@@ -138,7 +139,7 @@ export const createPetSlice: StateCreator<GameState, [], [], PetSlice> = (set, g
     set((state) => {
       if (!state.player) return state;
       const p = state.player.pets ?? defaultPetState();
-      const owned = p.owned.map(x => x.instanceId === instanceId ? { ...x, nickname } : x);
+      const owned = p.owned.map((x: Pet) => x.instanceId === instanceId ? { ...x, nickname } : x);
       return { player: { ...state.player, pets: { ...p, owned } } };
     });
   },
