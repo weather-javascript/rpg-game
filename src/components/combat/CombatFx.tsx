@@ -27,8 +27,14 @@ function ensureCombatFxStyles() {
 @keyframes cfx-flicker { 0%{opacity:0} 10%{opacity:0.95} 25%{opacity:0.3} 40%{opacity:0.9} 60%{opacity:0.2} 80%{opacity:0.85} 100%{opacity:0} }
 @keyframes cfx-freeze  { 0%{opacity:0;transform:scale(0.7)} 40%{opacity:1;transform:scale(1)} 70%{opacity:0.85} 100%{opacity:0;transform:scale(1.05)} }
 @keyframes cfx-glow    { 0%{opacity:0;box-shadow:none} 35%{opacity:1} 100%{opacity:0} }
+@keyframes cfx-hit-recoil { 0%{transform:scale(1) translateX(0)} 25%{transform:scale(0.88) translateX(-4px)} 55%{transform:scale(1.04) translateX(2px)} 100%{transform:scale(1) translateX(0)} }
+@keyframes cfx-combo-pop { 0%{opacity:0;transform:scale(0.4) translateY(6px)} 35%{opacity:1;transform:scale(1.25) translateY(-4px)} 70%{transform:scale(1) translateY(-8px)} 100%{opacity:0;transform:scale(1) translateY(-18px)} }
+@keyframes cfx-boss-defeat-flash { 0%{opacity:0} 8%{opacity:1} 35%{opacity:0.85} 100%{opacity:0} }
+@keyframes cfx-slowmo-ring { 0%{opacity:0.95;transform:scale(0.2)} 100%{opacity:0;transform:scale(3.2)} }
+@keyframes cfx-ultimate-cutin { 0%{opacity:0;transform:scale(0.7) translateY(8px)} 14%{opacity:1;transform:scale(1.04) translateY(0)} 80%{opacity:1;transform:scale(1) translateY(0)} 100%{opacity:0;transform:scale(1.05) translateY(-6px)} }
 .combatfx-shake { animation: cfx-shake 0.26s ease-in-out; }
 .combatfx-shake-crit { animation: cfx-shake-crit 0.42s ease-in-out; }
+.combatfx-hit-punch { animation: cfx-hit-recoil 0.32s ease-out; }
 `;
   document.head.appendChild(style);
 }
@@ -556,18 +562,28 @@ export function EnemyFxOverlay({ fxList }: { fxList: FxInstance[] }) {
     <div style={{ position: 'absolute', inset: 0, overflow: 'visible', borderRadius: 6, zIndex: 5 }}>
       {fxList.map((fx, fxIdx) => {
         if (fx.kind === 'defeat') {
+          const isBoss = !!fx.isBoss;
           return (
             <div key={fx.fxId} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
               <div style={{
-                position: 'absolute', left: '50%', top: '50%', width: 40, height: 40,
-                marginLeft: -20, marginTop: -20, borderRadius: '50%',
-                border: `2px solid ${FX_ELEMENT_COLORS.light.main}`,
-                boxShadow: `0 0 16px ${FX_ELEMENT_COLORS.light.glow}`,
-                animation: 'cfx-ring 0.6s ease-out',
+                position: 'absolute', left: '50%', top: '50%', width: isBoss ? 64 : 40, height: isBoss ? 64 : 40,
+                marginLeft: isBoss ? -32 : -20, marginTop: isBoss ? -32 : -20, borderRadius: '50%',
+                border: `${isBoss ? 3 : 2}px solid ${FX_ELEMENT_COLORS.light.main}`,
+                boxShadow: `0 0 ${isBoss ? 30 : 16}px ${FX_ELEMENT_COLORS.light.glow}`,
+                animation: `cfx-ring ${isBoss ? 1.1 : 0.6}s ease-out`,
               }} />
+              {isBoss && (
+                <div style={{
+                  position: 'absolute', left: '50%', top: '50%', width: 90, height: 90,
+                  marginLeft: -45, marginTop: -45, borderRadius: '50%',
+                  border: '2px solid rgba(255,215,80,0.7)',
+                  animation: 'cfx-slowmo-ring 1.1s ease-out',
+                }} />
+              )}
             </div>
           );
         }
+        const showCombo = (fx.comboTotal ?? 1) >= 2 && fx.comboIndex === (fx.comboTotal ?? 1) - 1;
         return (
           <div key={fx.fxId} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
             {/* 各エレメントレイヤー */}
@@ -590,6 +606,17 @@ export function EnemyFxOverlay({ fxList }: { fxList: FxInstance[] }) {
                 {fx.isCritical ? `CRIT! -${fx.damage}` : `-${fx.damage}`}
               </div>
             )}
+            {/* コンボヒット数ポップアップ */}
+            {showCombo && (
+              <div style={{
+                position: 'absolute', left: '50%', top: '20%', marginLeft: -28,
+                fontSize: '0.85rem', fontWeight: 900, color: '#ffe066',
+                textShadow: '0 0 8px rgba(255,200,40,0.9), 0 1px 2px rgba(0,0,0,0.8)',
+                animation: 'cfx-combo-pop 0.6s ease-out', pointerEvents: 'none', letterSpacing: 0.5,
+              }}>
+                {fx.comboTotal}HIT!
+              </div>
+            )}
           </div>
         );
       })}
@@ -606,6 +633,55 @@ export function CritFlashOverlay({ flashKey }: { flashKey: number }) {
       background: 'radial-gradient(circle, rgba(255,235,160,0.9) 0%, rgba(255,200,60,0.3) 45%, transparent 75%)',
       animation: 'cfx-crit-flash 0.32s ease-out',
     }} />
+  );
+}
+
+// 被弾リアクション：fxList内に攻撃/必殺技の演出が含まれていればtrue（敵アイコンに combatfx-hit-punch クラスを当てるために使う）
+export function hasHitReaction(fxList: FxInstance[]): boolean {
+  return fxList.some(f => f.kind === 'attack' || f.kind === 'ultimate');
+}
+
+// ボス撃破時の画面全体フラッシュ＋スローモーション風の間
+export function BossDefeatFlashOverlay({ flashKey }: { flashKey: number }) {
+  ensureCombatFxStyles();
+  if (flashKey <= 0) return null;
+  return (
+    <div key={flashKey} style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 30,
+      background: 'radial-gradient(circle, rgba(255,235,160,0.95) 0%, rgba(255,180,40,0.45) 40%, transparent 78%)',
+      animation: 'cfx-boss-defeat-flash 1.1s ease-out',
+    }} />
+  );
+}
+
+// 必殺技カットイン：武器名＋技名を画面中央に一瞬表示
+export function UltimateCutIn({ weaponName, skillName, cutInKey }: { weaponName: string; skillName: string; cutInKey: number }) {
+  ensureCombatFxStyles();
+  return (
+    <div key={cutInKey} style={{
+      position: 'absolute', inset: 0, zIndex: 25, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      pointerEvents: 'none',
+    }}>
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(10,8,20,0.55) 45%, rgba(10,8,20,0.55) 55%, rgba(0,0,0,0) 100%)',
+        animation: 'cfx-flash 1.3s ease-out',
+      }} />
+      <div style={{
+        position: 'relative', textAlign: 'center',
+        animation: 'cfx-ultimate-cutin 1.3s cubic-bezier(0.2,0.8,0.3,1)',
+      }}>
+        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#cfe0ff', letterSpacing: 2, textShadow: '0 0 8px rgba(120,160,255,0.8)' }}>
+          {weaponName}
+        </div>
+        <div style={{
+          fontSize: '1.4rem', fontWeight: 900, color: '#ffe066', letterSpacing: 1,
+          textShadow: '0 0 14px rgba(255,200,40,0.9), 0 2px 4px rgba(0,0,0,0.8)',
+        }}>
+          {skillName}
+        </div>
+      </div>
+    </div>
   );
 }
 
