@@ -9,10 +9,11 @@ import { ITEM_MASTER } from '../data/masters';
 import {
   type PowerModifiers, emptyPowerModifiers, addPowerModifiers,
   defaultEquipmentBuildState, defaultVocationState, defaultPetState,
-} from '../types/v3Types';
+} from '../types/buildTypes';
 import { getItemTrait, AFFIX_MASTER, buildAutoSets } from '../data/equipmentBuildData';
 import { VOCATION_MASTER } from '../data/vocationData';
 import { PET_SPECIES_MASTER, PET_SKILL_MASTER } from '../data/petsData';
+import type { AffixId, VocationId } from '../types/buildTypes';
 
 const MULT_KEYS = new Set<keyof PowerModifiers>(['fishSuccessMult', 'sellPriceMult', 'expMult', 'skillExpMult', 'gambleMult']);
 
@@ -50,7 +51,7 @@ function collectEquipmentModifiers(player: PlayerData): PowerModifiers {
     const rolls = build.affixRolls[itemId];
     if (!rolls) continue;
     for (const roll of rolls) {
-      const def = AFFIX_MASTER[roll.affixId];
+      const def = AFFIX_MASTER[roll.affixId as AffixId];
       if (!def) continue;
       const key = def.modifierKey;
       const partial: Partial<PowerModifiers> = MULT_KEYS.has(key)
@@ -79,7 +80,7 @@ function collectVocationModifiers(player: PlayerData): PowerModifiers {
   let acc = emptyPowerModifiers();
   const voc = player.vocation ?? defaultVocationState();
   if (!voc.activeVocationId) return acc;
-  const def = VOCATION_MASTER[voc.activeVocationId];
+  const def = VOCATION_MASTER[voc.activeVocationId as VocationId];
   if (!def) return acc;
   acc = addPowerModifiers(acc, def.signatureSkillEffects);
   const rank = voc.vocationRank[voc.activeVocationId] ?? 1;
@@ -97,7 +98,7 @@ function collectPetModifiers(player: PlayerData): PowerModifiers {
   const fishBookCount = Object.keys(player.fishBook ?? {}).length;
 
   for (const instanceId of slots) {
-    const owned = pets.owned.find(p => p.instanceId === instanceId);
+    const owned = pets.owned.find((p: typeof pets.owned[number]) => p.instanceId === instanceId);
     if (!owned) continue;
     const species = PET_SPECIES_MASTER[owned.speciesId];
     if (!species) continue;
