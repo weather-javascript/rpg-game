@@ -2,7 +2,7 @@
 // ver3.0.0: 生活系コンテンツ拡張（農業・料理・錬金・精錬・標本収集/図鑑）データ。
 
 import type { ItemMaster } from '../types/game';
-import type { CropDef, LifeRecipeDef, CollectionDef } from '../types/v3Types';
+import type { CropDef, LifeRecipeDef, CollectionDef } from '../types/buildTypes';
 
 // ============================================================
 // 農業

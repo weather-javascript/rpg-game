@@ -3,7 +3,7 @@
 // 統一名称は「ペット」。戦闘・採取・釣り・店売り・探索・収集を補助する。
 
 import type { ItemMaster } from '../types/game';
-import type { PetSkillDef, PetSpeciesDef } from '../types/v3Types';
+import type { PetSkillDef, PetSpeciesDef } from '../types/buildTypes';
 
 export const PET_SKILL_MASTER: Record<string, PetSkillDef> = {
   pet_follow_strike:   { id: 'pet_follow_strike', name: '追撃', description: '戦闘時、攻撃力に上乗せする追撃効果。', effects: { atkPct: 0.03 } },

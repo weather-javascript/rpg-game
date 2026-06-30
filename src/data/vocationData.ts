@@ -4,7 +4,7 @@
 // 「ヴォケーション(職業)」を新設し、プレイスタイル全体に影響するパッシブを与える。
 
 import type { ItemMaster } from '../types/game';
-import type { VocationDef, VocationId } from '../types/v3Types';
+import type { VocationDef, VocationId } from '../types/buildTypes';
 
 export const VOCATION_MASTER: Record<VocationId, VocationDef> = {
   warrior: {

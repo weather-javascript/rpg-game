@@ -6,8 +6,8 @@
 import type { ItemMaster, CraftRecipe } from '../types/game';
 import type {
   TraitId, TraitDef, AffixId, AffixDef, AffixInstance, SetDef,
-} from '../types/v3Types';
-import { AWAKENING_MAX, AFFIX_SLOTS_PER_AWAKEN } from '../types/v3Types';
+} from '../types/buildTypes';
+import { AWAKENING_MAX, AFFIX_SLOTS_PER_AWAKEN } from '../types/buildTypes';
 import { randomIntRange, randomChance } from '../utils/random';
 
 // ============================================================
