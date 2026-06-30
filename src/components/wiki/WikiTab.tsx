@@ -3,7 +3,7 @@
 // レイアウト：左にカテゴリ/最近更新ナビ、中央〜右に本文（WikiHome/WikiPageView等が中央＋右の構成を内包）。
 // スマホでは左カラムを折りたたみ式にしてレスポンシブ対応する。
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { WikiHome } from './WikiHome';
 import { WikiPageView } from './WikiPageView';
@@ -12,10 +12,14 @@ import { WikiHistory } from './WikiHistory';
 import { WikiSearch } from './WikiSearch';
 import { WikiCategoryList } from './WikiCategoryList';
 import { WikiReportModal } from './WikiReportModal';
-import { findWikiPageByTitleOrSlug } from '../../services/wikiService';
-import { WIKI_CATEGORY_LABELS, type WikiCategory, type WikiNavState, type WikiTemplateId } from '../../types/wiki';
+import { findWikiPageByTitleOrSlug, fetchRecentlyUpdatedPages } from '../../services/wikiService';
+import { WIKI_CATEGORY_LABELS, type WikiCategory, type WikiNavState, type WikiTemplateId, type WikiPage } from '../../types/wiki';
 
 const CATEGORY_NAV: WikiCategory[] = ['beginner_guide', 'item', 'weapon', 'armor', 'material', 'dungeon', 'glossary', 'faq', 'collection', 'strategy_chart', 'other'];
+const CATEGORY_EMOJI: Partial<Record<WikiCategory, string>> = {
+  item: '🧪', weapon: '⚔️', armor: '🛡️', material: '⛏️', dungeon: '🏰',
+  beginner_guide: '🔰', glossary: '📖', faq: '❓', collection: '📚', strategy_chart: '🗺️', other: '📄',
+};
 
 export function WikiTab() {
   const player = useGameStore(s => s.player);
@@ -28,8 +32,19 @@ export function WikiTab() {
   const [reportingPageId, setReportingPageId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [resolving, setResolving] = useState(false);
+  const [sidebarPages, setSidebarPages] = useState<WikiPage[]>([]);
+  const [sidebarLoading, setSidebarLoading] = useState(false);
 
   const displayName = player?.displayName ?? '名無しの冒険者';
+
+  useEffect(() => {
+    let alive = true;
+    setSidebarLoading(true);
+    fetchRecentlyUpdatedPages(50).then(pages => {
+      if (alive) { setSidebarPages(pages); setSidebarLoading(false); }
+    }).catch(() => { if (alive) setSidebarLoading(false); });
+    return () => { alive = false; };
+  }, [refreshKey]);
 
   const pushNav = useCallback((next: WikiNavState) => {
     historyRef.current = [...historyRef.current, nav];
@@ -124,6 +139,28 @@ export function WikiTab() {
         {CATEGORY_NAV.map(cat => (
           <SidebarBtn key={cat} label={WIKI_CATEGORY_LABELS[cat]} active={nav.mode === 'category' && nav.category === cat} onClick={() => pushNav({ mode: 'category', category: cat })} />
         ))}
+        <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 12, marginBottom: 4, paddingLeft: 4 }}>すべてのページ</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 340, overflowY: 'auto' }}>
+          {sidebarLoading ? (
+            <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', padding: '4px 6px' }}>読み込み中…</div>
+          ) : sidebarPages.length === 0 ? (
+            <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', padding: '4px 6px' }}>ページなし</div>
+          ) : sidebarPages.map(p => (
+            <button
+              key={p.id}
+              onClick={() => pushNav({ mode: 'page', pageId: p.id })}
+              style={{
+                textAlign: 'left', padding: '5px 8px', borderRadius: 6, fontSize: '0.68rem',
+                border: nav.mode === 'page' && nav.pageId === p.id ? '1px solid var(--accent-blue)' : '1px solid transparent',
+                background: nav.mode === 'page' && nav.pageId === p.id ? 'rgba(91,141,238,0.15)' : 'transparent',
+                color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}
+              title={p.title}
+            >
+              {CATEGORY_EMOJI[p.category] ?? '📄'} {p.title}
+            </button>
+          ))}
+        </div>
       </aside>
 
       {/* メインエリア */}
