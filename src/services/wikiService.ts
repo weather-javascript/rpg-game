@@ -21,6 +21,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { INITIAL_WIKI_PAGES } from '../components/wiki/wikiInitialContent';
 import type {
   WikiPage,
   WikiPageInput,
@@ -573,6 +574,39 @@ export async function deleteWikiPage(pageId: string, uid: string): Promise<{ suc
   if (!isWikiAdmin(uid)) return { success: false, error: '権限がありません' };
   await deleteDoc(doc(db, WIKI_COLLECTIONS.PAGES, pageId));
   return { success: true };
+}
+
+// ============================================================
+// 公式WIKIコンテンツの一括投入（ts内蔵データ → Firestore）
+// 既存ページ（同じslug）はスキップし、未投入ページだけを作成する。
+// ============================================================
+export async function getMissingOfficialPageSlugs(): Promise<string[]> {
+  const col = collection(db, WIKI_COLLECTIONS.PAGES);
+  const snap = await getDocs(query(col, fbLimit(500)));
+  const existingSlugs = new Set(snap.docs.map(d => (d.data() as WikiPage).slug));
+  return INITIAL_WIKI_PAGES.filter(p => !existingSlugs.has(p.slug)).map(p => p.slug);
+}
+
+export async function seedOfficialWikiPages(
+  uid: string,
+  displayName: string,
+  onProgress?: (done: number, total: number, title: string) => void
+): Promise<{ created: number; skipped: number; failed: number }> {
+  const missingSlugs = new Set(await getMissingOfficialPageSlugs());
+  const targets = INITIAL_WIKI_PAGES.filter(p => missingSlugs.has(p.slug));
+  let created = 0, skipped = INITIAL_WIKI_PAGES.length - targets.length, failed = 0;
+  for (let i = 0; i < targets.length; i++) {
+    const page = targets[i];
+    onProgress?.(i, targets.length, page.title);
+    try {
+      const res = await createWikiPage(page, uid, displayName);
+      if (res.success) created++; else skipped++;
+    } catch {
+      failed++;
+    }
+  }
+  onProgress?.(targets.length, targets.length, '完了');
+  return { created, skipped, failed };
 }
 
 // collectionGroup を使った全ページ横断のリビジョン検索などで将来拡張する場合に備え、
