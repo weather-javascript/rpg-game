@@ -160,16 +160,20 @@ export async function searchWikiPages(keyword: string, max = 30): Promise<WikiPa
 
 export async function fetchWikiPagesByCategory(category: WikiCategory, max = 50): Promise<WikiPage[]> {
   const col = collection(db, WIKI_COLLECTIONS.PAGES);
-  const q = query(col, where('category', '==', category), orderBy('updatedAt', 'desc'), fbLimit(max));
+  // orderBy を外してクライアント側でソート（複合インデックス不要）
+  const q = query(col, where('category', '==', category), fbLimit(max));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<WikiPage, 'id'>) }));
+  const pages = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<WikiPage, 'id'>) }));
+  return pages.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
 }
 
 export async function fetchWikiPagesByTag(tag: string, max = 50): Promise<WikiPage[]> {
   const col = collection(db, WIKI_COLLECTIONS.PAGES);
-  const q = query(col, where('tags', 'array-contains', tag), orderBy('updatedAt', 'desc'), fbLimit(max));
+  // orderBy を外してクライアント側でソート（複合インデックス不要）
+  const q = query(col, where('tags', 'array-contains', tag), fbLimit(max));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<WikiPage, 'id'>) }));
+  const pages = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<WikiPage, 'id'>) }));
+  return pages.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
 }
 
 export async function fetchRecentlyUpdatedPages(max = 20): Promise<WikiPage[]> {
