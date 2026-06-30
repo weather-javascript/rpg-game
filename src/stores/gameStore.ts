@@ -18,7 +18,7 @@ import { createPetSlice, type PetSlice } from './slices/petSlice';
 import { createLifeSlice, type LifeSlice } from './slices/lifeSlice';
 import { calcOfflineMiningResult } from '../systems/offlineMining';
 import { getFlatStatBonuses } from '../systems/playerPower';
-import { defaultEquipmentBuildState, defaultVocationState, defaultPetState, defaultLifeSystemState } from '../types/v3Types';
+import { defaultEquipmentBuildState, defaultVocationState, defaultPetState, defaultLifeSystemState } from '../types/buildTypes';
 
 // ============================================================
 // GameState の型定義（スライス型を合成）
