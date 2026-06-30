@@ -15,6 +15,9 @@ export interface FxInstance {
   createdAt: number;
   damage?: number;         // ダメージ数値ポップアップ用（任意）
   isCritical?: boolean;
+  comboIndex?: number;     // 同時ヒット内での何番目か（0始まり）
+  comboTotal?: number;     // 同時ヒットの総数（2以上でコンボ表示）
+  isBoss?: boolean;        // 撃破(defeat)演出対象がボスかどうか
 }
 
 export type EnemyFxMap = Record<number, FxInstance[]>; // enemyIdx -> 同時表示エフェクト配列
@@ -68,7 +71,8 @@ export function useCombatFx() {
 
     setEnemyFx(prev => {
       const next = { ...prev };
-      for (const hit of hits) {
+      const comboTotal = hits.length;
+      hits.forEach((hit, hitPos) => {
         const fx: FxInstance = {
           fxId: nextFxId(),
           itemId,
@@ -78,6 +82,8 @@ export function useCombatFx() {
           createdAt: Date.now(),
           damage: hit.damage,
           isCritical: hit.isCritical,
+          comboIndex: hitPos,
+          comboTotal,
         };
         next[hit.idx] = [...(next[hit.idx] ?? []), fx];
         const capturedIdx = hit.idx;
@@ -85,7 +91,7 @@ export function useCombatFx() {
         scheduleCleanup(() => {
           setEnemyFx(p => ({ ...p, [capturedIdx]: (p[capturedIdx] ?? []).filter(f => f.fxId !== capturedFxId) }));
         }, lifetime);
-      }
+      });
       return next;
     });
 
@@ -95,8 +101,9 @@ export function useCombatFx() {
     }
   }, [scheduleCleanup]);
 
-  /** 敵撃破時の「消滅」エフェクト */
-  const triggerDefeatFx = useCallback((targetIdx: number) => {
+  /** 敵撃破時の「消滅」エフェクト（isBoss=trueならボス専用の大演出を追加発火） */
+  const [bossDefeatFlash, setBossDefeatFlash] = useState(0);
+  const triggerDefeatFx = useCallback((targetIdx: number, isBoss?: boolean) => {
     const fx: FxInstance = {
       fxId: nextFxId(),
       itemId: null,
@@ -104,12 +111,23 @@ export function useCombatFx() {
       intensity: 'strong',
       kind: 'defeat',
       createdAt: Date.now(),
+      isBoss,
     };
     setEnemyFx(prev => ({ ...prev, [targetIdx]: [...(prev[targetIdx] ?? []), fx] }));
     scheduleCleanup(() => {
       setEnemyFx(p => ({ ...p, [targetIdx]: (p[targetIdx] ?? []).filter(f => f.fxId !== fx.fxId) }));
     }, FX_LIFETIME_STRONG_MS);
+    if (isBoss) setBossDefeatFlash(k => k + 1);
   }, [scheduleCleanup]);
+
+  /** 必殺技発動時の中央カットイン（武器名＋技名） */
+  const [ultimateCutIn, setUltimateCutIn] = useState<{ weaponName: string; skillName: string; key: number } | null>(null);
+  const ultimateCutInTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const triggerUltimateCutIn = useCallback((weaponName: string, skillName: string) => {
+    setUltimateCutIn({ weaponName, skillName, key: Date.now() });
+    if (ultimateCutInTimerRef.current) clearTimeout(ultimateCutInTimerRef.current);
+    ultimateCutInTimerRef.current = setTimeout(() => setUltimateCutIn(null), 1500);
+  }, []);
 
   /** 自分側（ホットバー/装備武器付近）に表示するエフェクト（回復・シールド・マナ・自己ダメージ等） */
   const triggerSelfFx = useCallback((itemId: string | null, kind: FxInstance['kind'] = 'self') => {
@@ -129,5 +147,5 @@ export function useCombatFx() {
     }, intensity === 'normal' ? FX_LIFETIME_MS : FX_LIFETIME_STRONG_MS);
   }, [scheduleCleanup]);
 
-  return { enemyFx, selfFx, shakeKey, shakeCritical, triggerEnemyFx, triggerDefeatFx, triggerSelfFx };
+  return { enemyFx, selfFx, shakeKey, shakeCritical, bossDefeatFlash, ultimateCutIn, triggerEnemyFx, triggerDefeatFx, triggerSelfFx, triggerUltimateCutIn };
 }
