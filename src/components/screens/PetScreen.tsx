@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { PET_SPECIES_MASTER, PET_SKILL_MASTER, PET_EXCHANGE_TABLE } from '../../data/petsData';
-import { defaultPetState, PET_EXP_TABLE, type PetRoleSlot } from '../../types/v3Types';
+import { defaultPetState, PET_EXP_TABLE, type PetRoleSlot, type OwnedPetInstance } from '../../types/v3types';
 
 type Tab = 'owned' | 'party' | 'codex' | 'exchange';
 
@@ -50,7 +50,7 @@ export function PetScreen() {
       {tab === 'owned' && (
         <div>
           {pets.owned.length === 0 && <div style={{ color: '#4a5070', fontSize: '0.8rem' }}>まだペットがいません。モンスター討伐や交換所で仲間を探しましょう。</div>}
-          {pets.owned.map(pet => {
+          {pets.owned.map((pet: OwnedPetInstance) => {
             const species = PET_SPECIES_MASTER[pet.speciesId];
             if (!species) return null;
             const stage = species.evolution[pet.evolutionStage];

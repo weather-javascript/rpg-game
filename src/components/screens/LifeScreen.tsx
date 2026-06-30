@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
 import { CROP_MASTER, LIFE_RECIPES, COLLECTION_MASTER } from '../../data/lifeSystemData';
-import { defaultLifeSystemState } from '../../types/v3Types';
+import { defaultLifeSystemState, type FarmPlotState } from '../../types/v3types';
 
 type Tab = 'farm' | 'cooking' | 'alchemy' | 'refining' | 'collection';
 
@@ -48,7 +48,7 @@ export function LifeScreen() {
 
       {tab === 'farm' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
-          {life.farmPlots.map(plot => {
+          {life.farmPlots.map((plot: FarmPlotState) => {
             const crop = plot.cropId ? CROP_MASTER[plot.cropId] : null;
             const ready = crop ? Date.now() - plot.plantedAt >= crop.growthMs : false;
             return (

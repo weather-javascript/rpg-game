@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
 import { getItemTrait, AFFIX_MASTER, buildAutoSets, getAffixSlotCount } from '../../data/equipmentBuildData';
-import { defaultEquipmentBuildState, AWAKENING_MAX } from '../../types/v3Types';
+import { defaultEquipmentBuildState, AWAKENING_MAX, type AffixInstance, type AffixId, type BuildPreset } from '../../types/v3types';
 
 const RARITY_COLOR: Record<string, string> = { common: '#8a92b2', uncommon: '#7ec98a', rare: '#5fa8e0', epic: '#c060e0', legendary: '#f0c060' };
 type SortKey = 'name' | 'rarity' | 'awakening';
@@ -71,8 +71,8 @@ export function EquipmentBuildScreen() {
 
         <div style={{ fontSize: '0.7rem', color: '#5fa8e0', marginBottom: 6 }}>
           付与効果:
-          {rolls.length === 0 ? ' なし（再抽選石で付与）' : rolls.map((r, i) => {
-            const def = AFFIX_MASTER[r.affixId];
+          {rolls.length === 0 ? ' なし（再抽選石で付与）' : rolls.map((r: AffixInstance, i: number) => {
+            const def = AFFIX_MASTER[r.affixId as AffixId];
             return <div key={i} style={{ marginLeft: 8 }}>・{def?.name} +{(r.value * 100).toFixed(1)}%（tier{r.tier}）</div>;
           })}
         </div>
@@ -167,7 +167,7 @@ export function EquipmentBuildScreen() {
           </button>
         </div>
         {build.presets.length === 0 && <div style={{ color: '#4a5070', fontSize: '0.76rem' }}>保存されたビルドはありません。</div>}
-        {build.presets.map(p => (
+        {build.presets.map((p: BuildPreset) => (
           <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: '#1c2235', border: '1px solid #2d3752', borderRadius: 6, marginBottom: 6 }}>
             <span style={{ fontSize: '0.76rem' }}>{p.name}</span>
             <div style={{ display: 'flex', gap: 6 }}>
