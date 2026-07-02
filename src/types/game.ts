@@ -290,7 +290,7 @@ export interface WeaponUltimate {
   postBuffTurns?: number;
   postBuffPoisonDmg?: number;
 }
-export type TabId = 'gathering' | 'market' | 'dungeon' | 'gamble' | 'status' | 'online' | 'fishing' | 'admin' | 'crafting' | 'navi' | 'aquarium' | 'freefield' | 'vocation' | 'pets' | 'life' | 'equipmentBuild' | 'wiki';
+export type TabId = 'gathering' | 'market' | 'dungeon' | 'gamble' | 'status' | 'online' | 'fishing' | 'admin' | 'crafting' | 'navi' | 'aquarium' | 'freefield' | 'vocation' | 'pets' | 'life' | 'equipmentBuild' | 'wiki' | 'storage';
 export type GambleType = 'slot' | 'treasure_box' | 'coin_flip' | 'chohan' | 'chinchiro' | 'jackpot' | 'poker' | 'highlow' | 'mines' | 'dice_race' | 'roulette' | 'blackjack' | 'scratch' | 'race';
 export type GambleGameCategory = 'instant' | 'choice' | 'step' | 'reveal' | 'card';
 export type GambleRank = '見習い' | 'ギャンブラー' | '熟練ギャンブラー' | '賭博王' | 'レジェンド';
