@@ -457,3 +457,160 @@ input  { font-family: inherit; }
 .notification-warning { background: rgba(240,168,48,0.9);  color: #000; }
 
 @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+
+/* ============================================================
+   タブスライド・画面遷移アニメーション
+   ============================================================ */
+@keyframes tab-slide-in-right  { from { opacity:0; transform:translateX(28px); }  to { opacity:1; transform:translateX(0); } }
+@keyframes tab-slide-in-left   { from { opacity:0; transform:translateX(-28px); } to { opacity:1; transform:translateX(0); } }
+@keyframes screen-fade-in      { from { opacity:0; transform:translateY(10px); }   to { opacity:1; transform:translateY(0); } }
+
+.rpg-tab-slide-right { animation: tab-slide-in-right 0.22s cubic-bezier(0.22,1,0.36,1) both; }
+.rpg-tab-slide-left  { animation: tab-slide-in-left  0.22s cubic-bezier(0.22,1,0.36,1) both; }
+
+/* 画面コンテンツ共通フェードイン */
+.screen { animation: screen-fade-in 0.25s ease both; }
+
+/* ============================================================
+   カード・リスト要素の出現アニメーション
+   ============================================================ */
+@keyframes card-pop-in {
+  0%   { opacity:0; transform:scale(0.96) translateY(6px); }
+  100% { opacity:1; transform:scale(1) translateY(0); }
+}
+
+/* stagger用：nth-child(1)〜(8)まで遅延 */
+.dungeon-card, .node-card, .gamble-card, .item-row, .inventory-item,
+.status-section, .skill-row {
+  animation: card-pop-in 0.22s ease both;
+}
+.dungeon-card:nth-child(1),.node-card:nth-child(1),.gamble-card:nth-child(1),.item-row:nth-child(1),.inventory-item:nth-child(1) { animation-delay:0.02s; }
+.dungeon-card:nth-child(2),.node-card:nth-child(2),.gamble-card:nth-child(2),.item-row:nth-child(2),.inventory-item:nth-child(2) { animation-delay:0.05s; }
+.dungeon-card:nth-child(3),.node-card:nth-child(3),.gamble-card:nth-child(3),.item-row:nth-child(3),.inventory-item:nth-child(3) { animation-delay:0.08s; }
+.dungeon-card:nth-child(4),.node-card:nth-child(4),.gamble-card:nth-child(4),.item-row:nth-child(4),.inventory-item:nth-child(4) { animation-delay:0.11s; }
+.dungeon-card:nth-child(5),.node-card:nth-child(5),.gamble-card:nth-child(5),.item-row:nth-child(5),.inventory-item:nth-child(5) { animation-delay:0.13s; }
+.dungeon-card:nth-child(6),.node-card:nth-child(6),.gamble-card:nth-child(6),.item-row:nth-child(6),.inventory-item:nth-child(6) { animation-delay:0.15s; }
+.dungeon-card:nth-child(7),.node-card:nth-child(7),.gamble-card:nth-child(7),.item-row:nth-child(7),.inventory-item:nth-child(7) { animation-delay:0.17s; }
+.dungeon-card:nth-child(8),.node-card:nth-child(8),.gamble-card:nth-child(8),.item-row:nth-child(8),.inventory-item:nth-child(8) { animation-delay:0.19s; }
+
+/* ============================================================
+   ボタン・インタラクション強化
+   ============================================================ */
+.tab-btn {
+  transition: color 0.18s ease, background 0.18s ease, transform 0.12s ease;
+}
+.tab-btn:active { transform: scale(0.92); }
+.tab-btn.active .tab-icon { animation: tab-icon-bounce 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+
+@keyframes tab-icon-bounce {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.35) translateY(-3px); }
+  100% { transform: scale(1); }
+}
+
+.gather-btn, .fight-btn, .play-btn, .action-btn, .save-btn-large {
+  transition: all 0.18s cubic-bezier(0.22,1,0.36,1);
+}
+.gather-btn:active:not(:disabled),
+.fight-btn:active:not(:disabled),
+.play-btn:active:not(:disabled),
+.action-btn:active:not(:disabled),
+.save-btn-large:active:not(:disabled) {
+  transform: scale(0.95) translateY(1px) !important;
+  filter: brightness(0.92) !important;
+}
+
+/* ============================================================
+   モーダル・オーバーレイのフェード
+   ============================================================ */
+@keyframes modal-backdrop-in { from { opacity:0; } to { opacity:1; } }
+@keyframes modal-content-in  {
+  from { opacity:0; transform:scale(0.94) translateY(12px); }
+  to   { opacity:1; transform:scale(1) translateY(0); }
+}
+
+/* 固定ポジションの暗転オーバーレイに付与する汎用クラス */
+.rpg-modal-backdrop { animation: modal-backdrop-in 0.18s ease both; }
+.rpg-modal-content  { animation: modal-content-in 0.22s cubic-bezier(0.22,1,0.36,1) both; }
+
+/* ============================================================
+   通知トーストの退場アニメーション
+   ============================================================ */
+@keyframes slideOut { from { opacity:1; transform:translateX(0); } to { opacity:0; transform:translateX(24px); } }
+.notification.leaving { animation: slideOut 0.2s ease forwards; }
+
+/* ============================================================
+   ステータスバー数値変化（HP/EXP等のバー）
+   ============================================================ */
+.mini-bar-fill {
+  transition: width 0.45s cubic-bezier(0.22,1,0.36,1);
+}
+.skill-exp-fill {
+  transition: width 0.6s cubic-bezier(0.22,1,0.36,1);
+}
+
+/* ============================================================
+   ゴールド/数値フロートアップ
+   ============================================================ */
+@keyframes gold-float {
+  0%   { opacity:0; transform:translateY(0) scale(0.7); }
+  25%  { opacity:1; transform:translateY(-6px) scale(1.1); }
+  100% { opacity:0; transform:translateY(-22px) scale(1); }
+}
+.rpg-float-text {
+  position:absolute; pointer-events:none; font-weight:800;
+  font-size:0.85rem; white-space:nowrap;
+  animation: gold-float 0.9s ease both;
+}
+.rpg-float-text.gain { color: var(--accent-gold); }
+.rpg-float-text.loss { color: var(--accent-red); }
+.rpg-float-text.exp  { color: var(--accent-blue); }
+
+/* ============================================================
+   ホバーグロー（カード共通）
+   ============================================================ */
+.dungeon-card, .node-card, .gamble-card {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+.dungeon-card:hover:not(.locked),
+.node-card:hover,
+.gamble-card:hover {
+  box-shadow: 0 0 14px rgba(91,141,238,0.18);
+  transform: translateY(-2px);
+}
+
+/* ============================================================
+   サブタブ切り替えフェード
+   ============================================================ */
+@keyframes subtab-fade { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
+.rpg-subtab-fade { animation: subtab-fade 0.18s ease both; }
+
+/* ============================================================
+   ローディングスケルトン（データ取得中のプレースホルダー）
+   ============================================================ */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.rpg-skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-hover) 50%, var(--bg-card) 75%);
+  background-size: 800px 100%;
+  animation: skeleton-shimmer 1.4s infinite linear;
+}
+
+/* ============================================================
+   アクティブタブのインジケーター滑らか移動（tab-btn追加分）
+   ============================================================ */
+.tab-btn { will-change: color, background; }
+
+/* ============================================================
+   モーション軽減設定を尊重
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
