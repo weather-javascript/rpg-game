@@ -1,7 +1,10 @@
 // src/types/storage.ts
 
 export const CHEST_SLOTS = 27;
+export const CHEST_SLOTS_EXPANDED = 54;
 export const CHEST_COST = 10000;
+export const CHEST_EXPAND_COST = 50000;
+export const CHEST_STACK_LIMIT = 64;   // チェスト内スタック上限（所持は別）
 
 export type ChestColor =
   | 'default' | 'red' | 'orange' | 'yellow'
@@ -19,27 +22,41 @@ export const CHEST_COLOR_MAP: Record<ChestColor, { bg: string; border: string; l
   dark:    { bg: '#0d0d0d', border: '#444',     label: '黒' },
 };
 
-/** スロット1つ分 */
 export interface ChestSlot {
   itemId: string;
   amount: number;
+  pinned?: boolean;   // お気に入りピン留め
 }
 
-/**
- * Firestore: chests/{chestId}
- */
+/** Firestore: chests/{chestId} */
 export interface Chest {
   id: string;
   ownerUid: string;
   ownerName: string;
   name: string;
-  icon: string;           // 絵文字
+  icon: string;
   color: ChestColor;
   isShared: boolean;
-  /** isShared=true のとき、取り出し可能な uid 一覧（空 = 全員） */
+  passwordHash?: string;       // SHA-256 hex（鍵ロック）
   allowedUids: string[];
-  /** 27スロット。空スロットは undefined */
   slots: (ChestSlot | null)[];
+  expanded: boolean;           // 54スロットに拡張済み
+  sortOrder: number;           // チェスト並び替え用
   createdAt: number;
   updatedAt: number;
+}
+
+/** Firestore: chest_logs/{logId} — 共有チェスト操作履歴 */
+export interface ChestLog {
+  id: string;
+  chestId: string;
+  chestName: string;
+  actorUid: string;
+  actorName: string;
+  action: 'deposit' | 'withdraw' | 'move';
+  itemId: string;
+  itemName: string;
+  amount: number;
+  slotIdx: number;
+  at: number;
 }
