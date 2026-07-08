@@ -24,6 +24,7 @@ import type {
   FFHarvestResult,
 } from '../../types/freefield';
 import { FFGG_ENCOUNTER_TABLE, FFGG_ALL_ENEMIES } from '../../data/ffggMaster';
+import { FFGGRScreen } from './FFGGRScreen';
 import { ITEM_MASTER } from '../../data/masters';
 import { useGameStore } from '../../stores/gameStore';
 import { executeFFHarvest } from '../../systems/ffBattleSystem';
@@ -1194,7 +1195,9 @@ export function FreeFieldScreen({ onStartFFBattle }: { onStartFFBattle?: (req: F
         })}
       </div>
 
-      {activeTab === 'harvest' ? (
+      {selectedWorldId === 'ffggr' ? (
+        <FFGGRScreen />
+      ) : activeTab === 'harvest' ? (
         <FFHarvestTab isFeverActive={feverActive} />
       ) : activeTab === 'shop' ? (
         <FFShopModal onClose={() => setActiveTab('map')} />
