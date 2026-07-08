@@ -37,7 +37,7 @@ export interface Chest {
   icon: string;
   color: ChestColor;
   isShared: boolean;
-  passwordHash?: string;       // SHA-256 hex（鍵ロック）
+  passwordHash?: string | null;       // SHA-256 hex（鍵ロック）
   allowedUids: string[];
   slots: (ChestSlot | null)[];
   expanded: boolean;           // 54スロットに拡張済み
