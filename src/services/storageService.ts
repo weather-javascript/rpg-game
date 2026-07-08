@@ -101,10 +101,10 @@ export async function createChest(
   try {
     const chestId = `chest_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
     const now = Date.now();
-    const passwordHash = password ? await hashPassword(password) : undefined;
+    const passwordHash = password ? await hashPassword(password) : null;
     const chest: Omit<Chest,'id'> = {
       ownerUid, ownerName, name, icon, color, isShared, allowedUids,
-      passwordHash,
+      passwordHash: passwordHash ?? null,
       slots: Array(CHEST_SLOTS).fill(null),
       expanded: false,
       sortOrder,
@@ -273,7 +273,7 @@ export async function togglePin(chestId: string, slotIdx: number): Promise<boole
 }
 
 export async function verifyPassword(chest: Chest, input: string): Promise<boolean> {
-  if (!chest.passwordHash) return true;
+  if (!chest.passwordHash || chest.passwordHash === null) return true;
   const hash = await hashPassword(input);
   return hash === chest.passwordHash;
 }
