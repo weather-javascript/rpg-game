@@ -373,7 +373,7 @@ export interface MissionProgress {
   // claimed mission reward ids (separate from completed)
   claimedMissions: string[];
 }
-export type DungeonTier = 'beginner' | 'intermediate' | 'advanced' | 'super' | 'extreme' | 'volcano' | 'cosmic' | 'infinite';
+export type DungeonTier = 'beginner' | 'intermediate' | 'advanced' | 'super' | 'extreme' | 'volcano' | 'gemraid' | 'cosmic' | 'infinite';
 
 // ============================================================
 // マスターデータ型
@@ -526,7 +526,8 @@ export interface MonsterMaster {
   specialAttack?: string;
   defensePct?: number; // ダメージ軽減率 (0.0〜1.0)、貫通攻撃で無効化
   skills?: string[]; // 保有スキル名一覧（フレーバー表示・参照用。各スキルの詳細効果はdescription/specialAttackで補足）
-  traits?: string[]; // 出現時無敵・属性無効・ブロック率など特殊耐性・特徴のフレーバー表示用
+  traits?: string[];
+  moveBehavior?: string;  // 位置システム：aggressive/ranged/evasive/flying/static/circling/erratic
   effectiveAttack?: number; // 実戦闘で使用する実効攻撃力。attackが元データ準拠のフレーバー値（剛撃等のスキル依存で実態と一致しない）の場合に設定し、被ダメージ計算ではこちらを優先使用する
 }
 
