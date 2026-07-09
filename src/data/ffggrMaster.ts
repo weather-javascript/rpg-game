@@ -354,6 +354,11 @@ export const FFGGR_ITEM_MASTER: Record<string, {
   [I.CRATE_GOLD]:     { id:I.CRATE_GOLD,     name:'金クレート',          emoji:'🟨', description:'GGR釣りの金クレート。',    category:'tool', rarity:'uncommon', stackMax:99, sellPrice:500 },
   [I.CRATE_DIAMOND]:  { id:I.CRATE_DIAMOND,  name:'ダイヤクレート',      emoji:'💠', description:'GGR釣りのダイヤクレート。',category:'tool', rarity:'rare',     stackMax:99, sellPrice:2000},
   [I.CRATE_DIAMOND_EX]:{ id:I.CRATE_DIAMOND_EX,name:'強化ダイヤクレート',emoji:'💎', description:'GGR釣りの最高クレート。', category:'tool', rarity:'epic',     stackMax:99, sellPrice:5000},
+
+  gem_mine_ticket: { id:'gem_mine_ticket', name:'宝石採掘場の入場証', emoji:'🎫', description:'強化ダイヤクレート×10をRakuza蒐集家に納品して入手。深穿晶窟リシュカへの入場に必要。', category:'tool', rarity:'epic', stackMax:99, sellPrice:0 },
+  gem_mine_map:    { id:'gem_mine_map',    name:'採掘場の地図（欠片）', emoji:'🗺️', description:'クリスタリスからドロップ。再入場証として使用可能。', category:'tool', rarity:'epic', stackMax:99, sellPrice:5000 },
+  gem_dragon_scale:{ id:'gem_dragon_scale',name:'宝石龍のウロコ',      emoji:'🐲', description:'龍の眷属・クリスタリスから採取。全色ウロコの代替汎用素材。', category:'material', rarity:'legendary', stackMax:99, sellPrice:20000 },
+  rainbow_jewel:   { id:'rainbow_jewel',   name:'虹輝石',              emoji:'🌈', description:'クリスタリスのみから1%でドロップ。武器超強化の最希少素材。', category:'material', rarity:'legendary', stackMax:99, sellPrice:500000 },
   [I.ONTIME_TICKET]:  { id:I.ONTIME_TICKET,  name:'オンタイムチケット',  emoji:'🎟️', description:'バフ食料の素材チケット。', category:'material', rarity:'uncommon', stackMax:999, sellPrice:500},
 };
 
@@ -1212,6 +1217,30 @@ export const FFGGR_SHOPS: FFGGRNPCShop[] = [
       { id:'l1_5', slot1ItemId:'ffggr_surface003',slot1Amount:1,slot2ItemId:I.AREA_D2,slot2Amount:64,resultItemId:'ffggr_surface004',resultAmount:1 },
       { id:'l1_6', slot1ItemId:'ffggr_surface004',slot1Amount:1,slot2ItemId:I.AREA_E2,slot2Amount:64,resultItemId:'ffggr_surface005',resultAmount:1 },
       { id:'l1_7', slot1ItemId:'ffggr_surface005',slot1Amount:1,slot2ItemId:I.AREA_F2,slot2Amount:64,resultItemId:'ffggr_surface006',resultAmount:1 },
+    ],
+  },
+
+  {
+    id:'kurobako', name:'箱師（Kurobako）', emoji:'📦',
+    description:'クレートを合成して上位クレートに変換。3個で1段階上がるが素材コストはかかる。',
+    trades:[
+      { id:'kb1', slot1ItemId:'ffggr_crate_leather', slot1Amount:3, resultItemId:'ffggr_crate_gold',       resultAmount:1 },
+      { id:'kb2', slot1ItemId:'ffggr_crate_gold',    slot1Amount:3, resultItemId:'ffggr_crate_diamond',    resultAmount:1 },
+      { id:'kb3', slot1ItemId:'ffggr_crate_diamond', slot1Amount:3, resultItemId:'ffggr_crate_diamond_ex', resultAmount:1 },
+      { id:'kb4', slot1ItemId:'ffggr_crate_diamond_ex', slot1Amount:10, resultItemId:'gem_mine_ticket',   resultAmount:1 },
+    ],
+  },
+  {
+    id:'rakuza', name:'蒐集家（Rakuza）', emoji:'🧐',
+    description:'クレートを納品してFFGGRポイント・素材・入場証と交換。',
+    trades:[
+      { id:'rk1', slot1ItemId:'ffggr_crate_leather',   slot1Amount:5,  resultItemId:'ffggr_green_crystal', resultAmount:1 },
+      { id:'rk2', slot1ItemId:'ffggr_crate_gold',      slot1Amount:5,  resultItemId:'ffggr_blue_crystal',  resultAmount:1 },
+      { id:'rk3', slot1ItemId:'ffggr_crate_leather',   slot1Amount:20, resultItemId:'ffggr_point',         resultAmount:3 },
+      { id:'rk4', slot1ItemId:'ffggr_crate_gold',      slot1Amount:20, resultItemId:'ffggr_point',         resultAmount:8 },
+      { id:'rk5', slot1ItemId:'ffggr_crate_diamond',   slot1Amount:5,  resultItemId:'ffggr_red_crystal',   resultAmount:1 },
+      { id:'rk6', slot1ItemId:'ffggr_crate_diamond_ex',slot1Amount:3,  resultItemId:'ffggr_yellow_crystal',resultAmount:1 },
+      { id:'rk7', slot1ItemId:'ffggr_crate_diamond_ex',slot1Amount:10, resultItemId:'gem_mine_ticket',     resultAmount:1 },
     ],
   },
   {
