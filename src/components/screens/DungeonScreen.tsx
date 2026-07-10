@@ -17,6 +17,7 @@ import { TOOL_GACHA_TABLE } from '../../data/toolAcquisition';
 import { useCombatFx } from '../combat/useCombatFx';
 import { EnemyFxOverlay, SelfFxBadge, SelfFxBanner, CritFlashOverlay, BossDefeatFlashOverlay, UltimateCutIn, hasHitReaction } from '../combat/CombatFx';
 import { getPlayerPowerProfile } from '../../systems/playerPower';
+import { type EnemyPos, initPos, moveEnemyPos, DIR_LABEL, DIR_EMOJI, behaviorLabel } from '../../systems/enemyPosition';
 
 // ============================================================
 // 戦闘ロジック（1ターン分）
@@ -353,7 +354,7 @@ const SLOT_LABELS: Record<string, string> = {
   helmet: '🪖', chestplate: '🛡️', leggings: '👖', boots: '👟', offhand: '✋'
 };
 
-function HotbarPanel({ equipment, inventory, onSlotClick }: {
+export function HotbarPanel({ equipment, inventory, onSlotClick }: {
   equipment: EquipmentSlots;
   inventory: Record<string, number>;
   onSlotClick: (slot: string, idx?: number) => void;
@@ -408,7 +409,7 @@ function HotbarPanel({ equipment, inventory, onSlotClick }: {
 // ============================================================
 // ホットバーセットモーダル
 // ============================================================
-function HotbarSetModal({ slot, idx, equipment, inventory, onSet, onClose }: {
+export function HotbarSetModal({ slot, idx, equipment, inventory, onSet, onClose }: {
   slot: string; idx?: number;
   equipment: EquipmentSlots; inventory: Record<string, number>;
   onSet: (itemId: string | null) => void; onClose: () => void;
@@ -547,6 +548,32 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
   const [hotbarModal, setHotbarModal] = useState<{slot:string;idx?:number} | null>(null);
   const [localEquip, setLocalEquip] = useState<EquipmentSlots>(equipment);
   const combatFx = useCombatFx();
+
+  // ── 敵位置システム（方向・距離）：全ダンジョンの敵に反映 ──
+  const [enemyPositions, setEnemyPositions] = useState<Record<number, EnemyPos>>({});
+  const enemyRosterKey = battle.enemies.map(e => e.monsterId).join(',');
+  useEffect(() => {
+    setEnemyPositions(() => {
+      const next: Record<number, EnemyPos> = {};
+      battle.enemies.forEach((e, i) => {
+        const mon = getMergedMonster(e.monsterId);
+        next[i] = initPos(mon?.moveBehavior ?? 'aggressive');
+      });
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enemyRosterKey]);
+  useEffect(() => {
+    if (battle.skillTurn === 0) return;
+    setEnemyPositions(prev => {
+      const next = { ...prev };
+      battle.enemies.forEach((e, i) => {
+        if (e.hp <= 0 || !next[i]) return;
+        next[i] = moveEnemyPos(next[i]);
+      });
+      return next;
+    });
+  }, [battle.skillTurn]);
   // ── ボスフェーズ移行カットイン（汎用：isBossの敵HPが66%/33%を切った瞬間に1回だけ演出） ──
   const [phaseBanner, setPhaseBanner] = useState<{ text: string; key: number } | null>(null);
   const bossPhaseFlagsRef = useRef<Record<number, Set<number>>>({});
@@ -2705,6 +2732,13 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
                 <div style={{ height: 5, background: '#2d3752', borderRadius: 3, overflow: 'hidden' }}>
                   <div style={{ height: '100%', background: isDead ? '#4a5070' : '#e05555', width: `${mHpPct}%`, transition: 'width 0.3s' }} />
                 </div>
+                {!isDead && enemyPositions[i] && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, fontSize: '0.62rem', color: '#4a5070' }}>
+                    <span>{DIR_EMOJI[enemyPositions[i].direction]} {DIR_LABEL[enemyPositions[i].direction]}</span>
+                    <span style={{ color: '#f0c060', fontWeight: 700 }}>{Math.round(enemyPositions[i].distanceM)}m</span>
+                    <span>{behaviorLabel(enemyPositions[i].behavior)}</span>
+                  </div>
+                )}
                 <EnemyFxOverlay fxList={combatFx.enemyFx[i] ?? []} />
               </div>
               {battle.turn === 'monster' && !battle.result && !isDead && (
