@@ -113,6 +113,7 @@ export interface WeaponPenetrateOnUseChanceSkill {
   type: 'penetrate_on_use_chance';
   chance: number;          // 0.0〜1.0
   penetrateDamage: number;
+  isArea?: boolean;        // trueの場合、全敵に貫通ダメージを与える（範囲攻撃扱い）
 }
 /**
  * burn_per_turn: 毎ターン敵全体に燃焼ダメージを与える（=業炎の剣=など）
@@ -276,7 +277,34 @@ export interface WeaponPeriodicBarrierSkill {
   reflectPct: number;
   atkPenaltyPct: number;
 }
-export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill | WeaponGoliathSkill | WeaponSilversEyeSkill | WeaponFrostbiteSelfDamageSkill | WeaponPenetrateOnUseChanceSkill | WeaponBurnPerTurnSkill | WeaponMultiCastSkill | WeaponDelayedMultiHitSkill | WeaponSelfLockSkill | WeaponScalingAttackSkill | WeaponRandomStunSkill | WeaponDefBuffSelfDamageSkill | WeaponDelayedSelfHealSkill | WeaponManaDrainRepeatSkill | WeaponSatietyFromDamageSkill | WeaponManaRestoreOnUseSkill | WeaponMarkOnHitSkill | WeaponMarkBurstSkill | WeaponConditionalAtkBonusSkill | WeaponConditionalPenetrateOnHitSkill | WeaponChargeAndFireSkill | WeaponPeriodicBarrierSkill;
+/** free_reposition: 間合い操作。mana消費・CTなし。コンパスUIで方向を選び距離を操作する。1ターンにつき1回。 */
+export interface WeaponFreeRepositionSkill {
+  type: 'free_reposition';
+}
+/** rush_strike: 強襲突入。距離を一気に詰め、次の攻撃に威力ボーナスを乗せる。 */
+export interface WeaponRushStrikeSkill {
+  type: 'rush_strike';
+  atkBonusPct: number;
+  cooldownTurns: number;
+}
+/** primal_slash: 原初の一閃。物理×貫通の連続ヒット。シールド無視・飛行無視。mana消費・CT有り。 */
+export interface WeaponPrimalSlashSkill {
+  type: 'primal_slash';
+  hits: number;
+  physPerHit: number;
+  penetratePerHit: number;
+  manaCost: number;
+  cooldownTurns: number;
+}
+/** primal_return: 原初への回帰。mana残量が閾値未満の時のみ発動可。mana回復・HP割合回復。 */
+export interface WeaponPrimalReturnSkill {
+  type: 'primal_return';
+  manaThresholdPct: number;
+  manaRestore: number;
+  healPct: number;
+  cooldownTurns: number;
+}
+export type WeaponSkill = WeaponPassiveSkill | WeaponRegenSkill | WeaponShieldSkill | WeaponManaSkill | WeaponOffhandManaOnHealSkill | WeaponManaPerTurnRandomSkill | WeaponGoliathSkill | WeaponSilversEyeSkill | WeaponFrostbiteSelfDamageSkill | WeaponPenetrateOnUseChanceSkill | WeaponBurnPerTurnSkill | WeaponMultiCastSkill | WeaponDelayedMultiHitSkill | WeaponSelfLockSkill | WeaponScalingAttackSkill | WeaponRandomStunSkill | WeaponDefBuffSelfDamageSkill | WeaponDelayedSelfHealSkill | WeaponManaDrainRepeatSkill | WeaponSatietyFromDamageSkill | WeaponManaRestoreOnUseSkill | WeaponMarkOnHitSkill | WeaponMarkBurstSkill | WeaponConditionalAtkBonusSkill | WeaponConditionalPenetrateOnHitSkill | WeaponChargeAndFireSkill | WeaponPeriodicBarrierSkill | WeaponFreeRepositionSkill | WeaponRushStrikeSkill | WeaponPrimalSlashSkill | WeaponPrimalReturnSkill;
 
 export interface WeaponUltimate {
   name: string;
@@ -393,6 +421,9 @@ export interface ItemMaster {
   weaponAtk?: number;       // 武器固有攻撃力（通常攻撃をこの値で上書き）
   isAreaWeapon?: boolean;   // 範囲攻撃武器（全体攻撃）
   areaPenetrate?: number;   // 範囲攻撃の貫通ダメージ（防御無視）
+  range?: number;           // 単発武器の有効射程(m)。敵がこれより遠いと威力減衰
+  areaRadius?: number;      // 範囲武器の効果半径(m)。敵がこれより遠いと威力減衰
+  areaShape?: 'omni' | 'front' | 'behind' | 'cone'; // 範囲武器の攻撃形状。未指定はomni(全方位)扱い
   weaponDef?: number;       // 装備時防御ボーナス（防具）
   weaponHpBonus?: number;   // 装備時最大HP増加
   defenseMultiplier?: number; // 装備時、合計防御力に乗算される倍率（ホットバー所持で発動）
