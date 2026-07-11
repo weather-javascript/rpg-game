@@ -15,6 +15,8 @@ import { defaultEquipmentSlots } from '../../types/game';
 import {
   type EnemyPos, initPos, moveEnemyPos, DIR_LABEL, DIR_EMOJI, behaviorLabel,
 } from '../../systems/enemyPosition';
+import { CompassModal, hasFreeReposition, type CompassEnemyDot } from '../BattleSkillUI';
+import { isDirectionInShape, type AreaShape, AREA_SHAPE_BONUS_PCT } from '../../systems/enemyPosition';
 
 // ─── 型 ───────────────────────────────────────────────────────
 interface StatusEffect {
@@ -46,6 +48,7 @@ interface BattleState {
   isDefending: boolean;
   // 通常モブ撃破後、超低確率で中ボス/ボス/レアボスが乱入してきた場合にセットされる
   specialEncounter: FFGGRMonster | null;
+  facingDirection?: import('../../systems/enemyPosition').EnemyDirection;
 }
 
 // ─── スタイル ──────────────────────────────────────────────────
@@ -95,7 +98,7 @@ function EffectsRow({ effects }:{ effects:StatusEffect[] }){
 }
 
 // ─── バトル画面 ──────────────────────────────────────────────
-function BattleScreen({ battle, equipment, inventory, onAttack, onDefend, onFlee, showHotbar, onToggleHotbar, onHotbarSlotClick }:{
+function BattleScreen({ battle, equipment, inventory, onAttack, onDefend, onFlee, showHotbar, onToggleHotbar, onHotbarSlotClick, onOpenCompass, onOpenFacingCompass }:{
   battle: BattleState;
   equipment: EquipmentSlots;
   inventory: Record<string, number>;
@@ -105,6 +108,8 @@ function BattleScreen({ battle, equipment, inventory, onAttack, onDefend, onFlee
   showHotbar: boolean;
   onToggleHotbar: () => void;
   onHotbarSlotClick: (slot: string, idx?: number) => void;
+  onOpenCompass: () => void;
+  onOpenFacingCompass: () => void;
 }){
   const m = battle.monster;
   const hpPct = battle.monsterHp / m.maxHp;
@@ -166,6 +171,12 @@ function BattleScreen({ battle, equipment, inventory, onAttack, onDefend, onFlee
               {weaponItem?.isAreaWeapon ? '🌀 全体攻撃' : '⚔️ 攻撃'}
             </button>
             <button style={{ ...S.btn('#5b8dee') }} onClick={onDefend}>🛡️ 防御</button>
+          </div>
+          <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+            <button onClick={onOpenFacingCompass} style={{ ...S.btn('#4ca86a'), flex:1 }}>↻ 向き変更</button>
+            {hasFreeReposition(weaponItem) && (
+              <button onClick={onOpenCompass} style={{ ...S.btn('#5b8dee'), flex:1 }}>🧭 間合い操作</button>
+            )}
           </div>
           <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
             {equipment.hotbar.map((itemId, i) => {
@@ -403,6 +414,8 @@ export function FFGGRScreen(){
   const updateEquipment = useGameStore(s=>s.updateEquipment);
   const [showHotbar, setShowHotbar] = useState(false);
   const [hotbarModal, setHotbarModal] = useState<{slot:string;idx?:number} | null>(null);
+  const [showCompass, setShowCompass] = useState(false);
+  const [showFacingCompass, setShowFacingCompass] = useState(false);
 
   const inventory = player?.inventory ?? {};
   const equipment = player?.equipment ?? defaultEquipmentSlots();
@@ -458,7 +471,16 @@ export function FFGGRScreen(){
     // 飛行中は物理無効（貫通武器は有効）
     const isFlying = battle.monsterEffects.find(e=>e.type==='fly');
     const pen = weaponItem?.areaPenetrate ?? 0;
-    let dmg = Math.max(1, Math.floor((atk - def*0.5) * (0.85 + Math.random()*0.3)));
+    // 位置システム：射程/範囲半径を超えた距離では威力ペナルティ(50%)
+    const rangeLimit = weaponItem?.isAreaWeapon ? weaponItem?.areaRadius : weaponItem?.range;
+    const rangeMult = rangeLimit === undefined ? 1 : (battle.enemyPos.distanceM <= rangeLimit ? 1 : 0.5);
+    // 攻撃形状(front/behind/cone)：対象方向外なら威力ペナルティ(50%)、対象方向内なら威力補正
+    const shape: AreaShape = (weaponItem?.areaShape ?? 'omni') as AreaShape;
+    const facing = battle.facingDirection ?? 'N';
+    const shapeMult = weaponItem?.isAreaWeapon && shape !== 'omni'
+      ? (isDirectionInShape(battle.enemyPos.direction, facing, shape) ? 1 + AREA_SHAPE_BONUS_PCT[shape] / 100 : 0.5)
+      : 1;
+    let dmg = Math.max(1, Math.floor((atk - def*0.5) * (0.85 + Math.random()*0.3) * rangeMult * shapeMult));
     const weaponMsg = weaponItem ? weaponItem.name : '素手';
     let logText = weaponItem?.isAreaWeapon
       ? `🌀 ${weaponMsg}で全体攻撃！ ${battle.monster.name}に ${dmg} ダメージ！`
@@ -802,7 +824,37 @@ export function FFGGRScreen(){
             showHotbar={showHotbar}
             onToggleHotbar={()=>setShowHotbar(v=>!v)}
             onHotbarSlotClick={(slot,idx)=>setHotbarModal({slot,idx})}
+            onOpenCompass={()=>setShowCompass(true)}
+            onOpenFacingCompass={()=>setShowFacingCompass(true)}
           />
+          {showFacingCompass && (
+            <CompassModal
+              title="↻ 向き変更 — 攻撃前にいつでも変更可能（ターン消費なし）"
+              enemies={[{
+                idx: 0, name: battle.monster.name, direction: battle.enemyPos.direction, distanceM: battle.enemyPos.distanceM,
+                kind: battle.monster.isBoss ? 'boss' : battle.monster.isMidBoss ? 'midboss' : battle.monster.isRareBoss ? 'rareboss' : 'mob',
+              } as CompassEnemyDot]}
+              onSelectDirection={(dir)=>{
+                setBattle(prev=>prev?{...prev, facingDirection:dir}:null);
+                setShowFacingCompass(false);
+              }}
+              onClose={()=>setShowFacingCompass(false)}
+            />
+          )}
+          {showCompass && (
+            <CompassModal
+              enemies={[{
+                idx: 0, name: battle.monster.name, direction: battle.enemyPos.direction, distanceM: battle.enemyPos.distanceM,
+                kind: battle.monster.isBoss ? 'boss' : battle.monster.isMidBoss ? 'midboss' : battle.monster.isRareBoss ? 'rareboss' : 'mob',
+              } as CompassEnemyDot]}
+              onSelectDirection={(dir)=>{
+                setBattle(prev=>prev?{...prev, enemyPos:{...prev.enemyPos, direction:dir, distanceM: Math.max(0, prev.enemyPos.distanceM-6)}, log:[...prev.log,{text:`🧭 ${DIR_LABEL[dir]}方向へ間合いを詰めた！`,color:'#5b8dee'}]}:null);
+                setShowCompass(false);
+                setTimeout(()=>handleMonsterTurn(), 300);
+              }}
+              onClose={()=>setShowCompass(false)}
+            />
+          )}
           {battle.phase!=='fighting' && (
             <div style={{ display:'flex', gap:8, marginTop:8 }}>
               <button style={{ ...S.btn('#2d3752'), flex:1, border:'1px solid #4a5070' }} onClick={()=>{ setBattle(null); setTab('area'); }}>← エリアに戻る</button>

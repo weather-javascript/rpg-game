@@ -17,7 +17,8 @@ import { TOOL_GACHA_TABLE } from '../../data/toolAcquisition';
 import { useCombatFx } from '../combat/useCombatFx';
 import { EnemyFxOverlay, SelfFxBadge, SelfFxBanner, CritFlashOverlay, BossDefeatFlashOverlay, UltimateCutIn, hasHitReaction } from '../combat/CombatFx';
 import { getPlayerPowerProfile } from '../../systems/playerPower';
-import { type EnemyPos, initPos, moveEnemyPos, DIR_LABEL, DIR_EMOJI, behaviorLabel } from '../../systems/enemyPosition';
+import { type EnemyPos, initPos, moveEnemyPos, DIR_LABEL, DIR_EMOJI, behaviorLabel, getShapeDirections, type AreaShape } from '../../systems/enemyPosition';
+import { CompassModal, SkillButtonRow, type CompassEnemyDot } from '../BattleSkillUI';
 
 // ============================================================
 // 戦闘ロジック（1ターン分）
@@ -99,6 +100,10 @@ interface TurnBattleState {
   itemCooldowns: Record<string, number>;
   // 単発攻撃の一時保存（ターゲット選択後に使う）
   pendingAction: null | { type: 'attack' | 'weapon' | 'ultimate' | 'multicast' | 'scaling_weapon'; itemId?: string; itemIds?: string[] };
+  // 強襲突入（rush_strike）発動中：次の攻撃に威力ボーナスが乗る（%）。未使用時はundefined。
+  rushBonusPct?: number;
+  // 攻撃形状(front/behind/cone)武器の基準となる自分の向き。未設定時は'N'扱い。
+  facingDirection?: import('../../systems/enemyPosition').EnemyDirection;
   // KXモード用（省略可）
   kx?: KxState;
   // Goliathシールド：残りターン数（0=無効）
@@ -546,6 +551,8 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
   const updateEquipment = useGameStore(s => s.updateEquipment);
   const [showHotbar, setShowHotbar] = useState(false);
   const [hotbarModal, setHotbarModal] = useState<{slot:string;idx?:number} | null>(null);
+  const [showCompass, setShowCompass] = useState(false);
+  const [showFacingCompass, setShowFacingCompass] = useState(false);
   const [localEquip, setLocalEquip] = useState<EquipmentSlots>(equipment);
   const combatFx = useCombatFx();
 
@@ -731,7 +738,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
 
     // ===== 共通ターン処理：クールダウンデクリメント =====
     const newSkillTurn = prevBattle.skillTurn + 1;
-    newBattle = { ...newBattle, skillTurn: newSkillTurn };
+    newBattle = { ...newBattle, skillTurn: newSkillTurn, rushBonusPct: undefined };
     // tickCooldowns()で一括管理
     const newCooldowns: Record<string, number> = {};
     for (const [id, cd] of Object.entries(prevBattle.itemCooldowns)) {
@@ -1311,7 +1318,8 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
   // 攻撃実行（範囲 or ターゲット選択後）
   const executeAttack = (targetIdx: number) => {
     const weaponItem = battle.equippedWeaponId ? ITEM_MASTER[battle.equippedWeaponId] : null;
-    const atkBase = weaponItem?.weaponAtk ?? player.stats.attack;
+    const rushBonus = battle.rushBonusPct ?? 0;
+    const atkBase = Math.floor((weaponItem?.weaponAtk ?? player.stats.attack) * (1 + rushBonus / 100));
     const isArea = !!weaponItem?.isAreaWeapon;
     const areaPen = weaponItem?.areaPenetrate ?? 0;
     const weaponMsg = weaponItem ? weaponItem.name : '素手';
@@ -1336,11 +1344,35 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
     }
 
     const fxHits: { idx: number; damage: number; isCritical: boolean }[] = [];
+    const reitoumaguroIsArea = !!penetrateChanceSkill?.isArea && reitoumaguroPenetrateDmg > 0;
+    // 位置システム：射程/範囲半径を超えた距離の敵には威力ペナルティ(50%)を適用
+    const rangeMult = (i: number): number => {
+      const pos = enemyPositions[i];
+      if (!pos) return 1;
+      const limit = isArea ? weaponItem?.areaRadius : weaponItem?.range;
+      if (limit === undefined) return 1;
+      return pos.distanceM <= limit ? 1 : 0.5;
+    };
+    // 攻撃形状(front/behind/cone)：対象方向外の敵は範囲攻撃から除外し、対象方向内には威力補正を乗せる
+    const shape: AreaShape = (weaponItem?.areaShape ?? 'omni') as AreaShape;
+    const facing = battle.facingDirection ?? 'N';
+    const shapeDirs = isArea && shape !== 'omni' ? getShapeDirections(facing, shape) : null;
+    const shapeBonusMult = shape === 'cone' ? 1.25 : (shape === 'front' || shape === 'behind') ? 1.15 : 1;
+    const isInShape = (i: number): boolean => {
+      if (!shapeDirs) return true;
+      const pos = enemyPositions[i];
+      if (!pos) return true;
+      return shapeDirs.includes(pos.direction);
+    };
     const newEnemies = battle.enemies.map((e, i) => {
       if (e.hp <= 0) return e;
-      if (!isArea && i !== targetIdx) return e;
+      const isReitoumaguroSplash = reitoumaguroIsArea && i !== targetIdx;
+      if (!isArea && !isReitoumaguroSplash && i !== targetIdx) return e;
+      if (isArea && !isReitoumaguroSplash && !isInShape(i)) return e;
       const mon = getMergedMonster(e.monsterId);
-      const dmg = (areaPen > 0 ? areaPen : applyDefensePct(calcDamage(atkBase, mon?.defense ?? 0), mon)) + reitoumaguroPenetrateDmg + armorAtkExtraDmg;
+      const dmg = Math.floor((isReitoumaguroSplash
+        ? reitoumaguroPenetrateDmg
+        : (areaPen > 0 ? areaPen : applyDefensePct(calcDamage(atkBase, mon?.defense ?? 0), mon)) + reitoumaguroPenetrateDmg + armorAtkExtraDmg) * rangeMult(i) * (isArea && !isReitoumaguroSplash ? shapeBonusMult : 1));
       fxHits.push({ idx: i, damage: dmg, isCritical: reitoumaguroPenetrateDmg > 0 });
       return { ...e, hp: Math.max(0, e.hp - dmg) };
     });
@@ -1356,12 +1388,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
       combatFx.triggerSelfFx(battle.equippedWeaponId, 'self');
     }
 
-    const totalDmg = battle.enemies.reduce((acc, e, i) => {
-      if (e.hp <= 0) return acc;
-      if (!isArea && i !== targetIdx) return acc;
-      const mon = getMergedMonster(e.monsterId);
-      return acc + (areaPen > 0 ? areaPen : applyDefensePct(calcDamage(atkBase, mon?.defense ?? 0), mon)) + reitoumaguroPenetrateDmg;
-    }, 0);
+    const totalDmg = fxHits.reduce((acc, h) => acc + h.damage, 0);
 
     const logMsg = isArea
       ? { text: `🌀 ${weaponMsg}で全体攻撃！ 合計${totalDmg}ダメージ！`, color: '#4caf87' }
@@ -1801,6 +1828,91 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
   };
 
   // ホットバーアイテム使用
+  // ホットバーの武器アイコンタップ＝装備切り替えのみ（攻撃は行わない。攻撃は攻撃ボタンから）
+  const handleEquipWeapon = (idx: number) => {
+    if (battle.turn !== 'player' || battle.result) return;
+    const itemId = localEquip.hotbar[idx];
+    if (!itemId) { addNotification('warning', `スロット${idx+1}にアイテムがありません`); return; }
+    const item = ITEM_MASTER[itemId];
+    if (!item || item.itemType !== 'Weapon') return;
+    if (battle.equippedWeaponId === itemId) return;
+    setBattle(prev => ({ ...prev, equippedWeaponId: itemId, log: [...prev.log, { text: `🔁 ${item.name}を装備した！`, color: '#5b8dee' }] }));
+  };
+
+  // hengenの新スキル群（強襲突入・原初の一閃・原初への回帰）専用の発動処理
+  // 既存のhandleUseHotbarItem内の各スキルとは独立して、スキルタイプ単位でクールダウンを管理する
+  const handleActivateSkill = (skillType: 'rush_strike' | 'primal_slash' | 'primal_return') => {
+    if (battle.turn !== 'player' || battle.result) return;
+    const itemId = battle.equippedWeaponId;
+    if (!itemId) return;
+    const item = ITEM_MASTER[itemId];
+    const skill = item?.weaponSkills?.find(s => s.type === skillType);
+    if (!skill) return;
+    const cdKey = `${itemId}:${skillType}`;
+    const remainingCd = battle.itemCooldowns[cdKey] ?? 0;
+    if (remainingCd > 0) { addNotification('warning', `クールダウン中です（残り${remainingCd}ターン）`); return; }
+
+    if (skillType === 'rush_strike') {
+      const s = skill as import('../../types/game').WeaponRushStrikeSkill;
+      const newCooldowns = { ...battle.itemCooldowns, [cdKey]: s.cooldownTurns };
+      setEnemyPositions(prev => {
+        const next = { ...prev };
+        battle.enemies.forEach((e, i) => { if (e.hp > 0 && next[i]) next[i] = { ...next[i], distanceM: 0 }; });
+        return next;
+      });
+      setBattle(b => ({
+        ...b, itemCooldowns: newCooldowns, rushBonusPct: s.atkBonusPct, turn: 'monster', isDefending: false,
+        log: [...b.log, { text: `⚡ 強襲突入！間合いを一気に詰めた！次の一撃の威力+${s.atkBonusPct}%`, color: '#f0c060' }],
+      }));
+      setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+      return;
+    }
+
+    if (skillType === 'primal_slash') {
+      const s = skill as import('../../types/game').WeaponPrimalSlashSkill;
+      if (battle.weaponMana < s.manaCost) { addNotification('warning', `マナが足りません（必要:${s.manaCost}）`); return; }
+      const bonus = battle.rushBonusPct ?? 0;
+      const perHit = Math.floor((s.physPerHit + s.penetratePerHit) * (1 + bonus / 100));
+      const newEnemies = battle.enemies.map(e => e.hp > 0 ? { ...e, hp: Math.max(0, e.hp - perHit * s.hits) } : e);
+      const newCooldowns = { ...battle.itemCooldowns, [cdKey]: s.cooldownTurns };
+      const aliveAfter = newEnemies.filter(e => e.hp > 0);
+      combatFx.triggerEnemyFx(itemId, newEnemies.map((_e, i) => ({ idx: i, damage: perHit * s.hits, isCritical: true })).filter((_, i) => battle.enemies[i].hp > 0));
+      const logMsg = { text: `🌀 原初の一閃！ 全${s.hits}連撃×${perHit}ダメージ（シールド・飛行無視）！`, color: '#c885ff' };
+      if (aliveAfter.length === 0) {
+        const { exp, gold, drops } = calcWinRewards(newEnemies);
+        setBattle(b => ({ ...b, enemies: newEnemies, weaponMana: b.weaponMana - s.manaCost, itemCooldowns: newCooldowns, rushBonusPct: undefined, log: [...b.log, logMsg, { text: `✨ 全敵を倒した！ EXP+${exp} G+${gold}`, color: '#f0c060' }, ...buildDropLogEntries(drops)], turn: 'result', result: 'win', expGained: exp, goldGained: gold, drops }));
+        return;
+      }
+      setBattle(b => ({ ...b, enemies: newEnemies, weaponMana: b.weaponMana - s.manaCost, itemCooldowns: newCooldowns, rushBonusPct: undefined, turn: 'monster', isDefending: false, log: [...b.log, logMsg] }));
+      setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+      return;
+    }
+
+    if (skillType === 'primal_return') {
+      const s = skill as import('../../types/game').WeaponPrimalReturnSkill;
+      if (battle.weaponMana >= battle.weaponManaMax * (s.manaThresholdPct / 100)) {
+        addNotification('warning', `マナが${s.manaThresholdPct}%以上の時は発動できません`);
+        return;
+      }
+      const newMana = Math.min(battle.weaponMana + s.manaRestore, battle.weaponManaMax);
+      const healAmount = Math.floor(player.stats.maxHp * (s.healPct / 100));
+      changeHp(healAmount);
+      const newCooldowns = { ...battle.itemCooldowns, [cdKey]: s.cooldownTurns };
+      setEnemyPositions(prev => {
+        const next = { ...prev };
+        battle.enemies.forEach((e, i) => { if (e.hp > 0 && next[i]) next[i] = { ...next[i], distanceM: 20 }; });
+        return next;
+      });
+      setBattle(b => ({
+        ...b, weaponMana: newMana, ultimateReady: newMana >= b.weaponManaMax, itemCooldowns: newCooldowns,
+        turn: 'monster', isDefending: false,
+        log: [...b.log, { text: `💫 原初への回帰！ Mana+${s.manaRestore}、HP+${healAmount}回復、間合いを離した！`, color: '#00e5ff' }],
+      }));
+      setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+      return;
+    }
+  };
+
   const handleUseHotbarItem = (idx: number) => {
     if (battle.turn !== 'player' || battle.result) return;
     const itemId = localEquip.hotbar[idx];
@@ -2818,6 +2930,66 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
             </button>
           </div>
 
+          {/* スキルボタン列（装備中の武器が持つアクティブスキルのみ動的表示） */}
+          <SkillButtonRow
+            item={battle.equippedWeaponId ? ITEM_MASTER[battle.equippedWeaponId] : null}
+            cooldownOf={(skillType) => battle.equippedWeaponId ? (battle.itemCooldowns[`${battle.equippedWeaponId}:${skillType}`] ?? battle.itemCooldowns[battle.equippedWeaponId] ?? 0) : 0}
+            disabled={battle.turn !== 'player'}
+            onOpenCompass={() => setShowCompass(true)}
+            onOpenFacingCompass={() => setShowFacingCompass(true)}
+            onActivate={(skillType) => {
+              if (skillType === 'rush_strike' || skillType === 'primal_slash' || skillType === 'primal_return') {
+                handleActivateSkill(skillType);
+              } else {
+                const idx = localEquip.hotbar.indexOf(battle.equippedWeaponId ?? '');
+                if (idx >= 0) handleUseHotbarItem(idx);
+              }
+            }}
+          />
+
+          {showFacingCompass && (
+            <CompassModal
+              title="↻ 向き変更 — 攻撃前にいつでも変更可能（ターン消費なし）"
+              enemies={battle.enemies.map((e, i): CompassEnemyDot | null => {
+                if (e.hp <= 0 || !enemyPositions[i]) return null;
+                const mon = getMergedMonster(e.monsterId);
+                return {
+                  idx: i, name: mon?.name ?? '敵', direction: enemyPositions[i].direction, distanceM: enemyPositions[i].distanceM,
+                  kind: mon?.isBoss ? 'boss' : mon?.isMidBoss ? 'midboss' : 'mob',
+                };
+              }).filter((d): d is CompassEnemyDot => !!d)}
+              onSelectDirection={(dir) => {
+                setBattle(b => ({ ...b, facingDirection: dir }));
+                setShowFacingCompass(false);
+              }}
+              onClose={() => setShowFacingCompass(false)}
+            />
+          )}
+
+          {showCompass && (
+            <CompassModal
+              enemies={battle.enemies.map((e, i): CompassEnemyDot | null => {
+                if (e.hp <= 0 || !enemyPositions[i]) return null;
+                const mon = getMergedMonster(e.monsterId);
+                return {
+                  idx: i, name: mon?.name ?? '敵', direction: enemyPositions[i].direction, distanceM: enemyPositions[i].distanceM,
+                  kind: mon?.isBoss ? 'boss' : mon?.isMidBoss ? 'midboss' : 'mob',
+                };
+              }).filter((d): d is CompassEnemyDot => !!d)}
+              onSelectDirection={(dir) => {
+                setEnemyPositions(prev => {
+                  const next = { ...prev };
+                  battle.enemies.forEach((e, i) => { if (e.hp > 0 && next[i]) next[i] = { ...next[i], direction: dir, distanceM: Math.max(0, next[i].distanceM - 6) }; });
+                  return next;
+                });
+                setBattle(b => ({ ...b, turn: 'monster', isDefending: false, log: [...b.log, { text: `🧭 ${DIR_LABEL[dir]}方向へ間合いを詰めた！`, color: '#5b8dee' }] }));
+                setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
+                setShowCompass(false);
+              }}
+              onClose={() => setShowCompass(false)}
+            />
+          )}
+
           {/* 必殺技・MANAバー */}
           {battle.equippedWeaponId && (() => {
             const wi = ITEM_MASTER[battle.equippedWeaponId!];
@@ -2888,23 +3060,26 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
             {localEquip.hotbar.map((itemId, i) => {
               const item = itemId ? ITEM_MASTER[itemId] : null;
               const qty = itemId ? (player.inventory[itemId] ?? 0) : 0;
-              const cd = itemId ? (battle.itemCooldowns[itemId] ?? 0) : 0;
+              const isWeapon = item?.itemType === 'Weapon';
+              const cd = itemId && !isWeapon ? (battle.itemCooldowns[itemId] ?? 0) : 0;
               const isEquippedAndActive = !!itemId && itemId === battle.equippedWeaponId && combatFx.selfFx.length > 0;
+              const isEquippedNow = isWeapon && itemId === battle.equippedWeaponId;
+              const clickDisabled = isWeapon ? (battle.turn !== 'player' || isEquippedNow) : (battle.turn !== 'player' || !item || qty === 0 || cd > 0);
               return (
-                <button key={i} onClick={() => handleUseHotbarItem(i)}
-                  disabled={battle.turn !== 'player' || !item || qty === 0 || cd > 0}
-                  title={item ? `${item.name} ×${qty}${cd > 0 ? ` (CD:${cd})` : ''}` : `スロット${i+1}（空）`}
+                <button key={i} onClick={() => isWeapon ? handleEquipWeapon(i) : handleUseHotbarItem(i)}
+                  disabled={clickDisabled}
+                  title={item ? `${item.name}${isWeapon ? (isEquippedNow ? '（装備中）' : '（タップで装備）') : ` ×${qty}${cd > 0 ? ` (CD:${cd})` : ''}`}` : `スロット${i+1}（空）`}
                   style={{
-                    width: 38, height: 38, background: cd > 0 ? 'rgba(80,80,80,0.4)' : item && qty > 0 ? 'rgba(155,109,240,0.2)' : '#161b26',
-                    border: `1px solid ${cd > 0 ? '#555' : item && qty > 0 ? '#9b6df0' : '#2d3752'}`, borderRadius: 6,
-                    cursor: item && qty > 0 && battle.turn === 'player' && cd === 0 ? 'pointer' : 'not-allowed',
+                    width: 38, height: 38, background: isEquippedNow ? 'rgba(224,85,85,0.2)' : cd > 0 ? 'rgba(80,80,80,0.4)' : item && (isWeapon || qty > 0) ? 'rgba(155,109,240,0.2)' : '#161b26',
+                    border: `1px solid ${isEquippedNow ? '#e05555' : cd > 0 ? '#555' : item && (isWeapon || qty > 0) ? '#9b6df0' : '#2d3752'}`, borderRadius: 6,
+                    cursor: clickDisabled ? 'not-allowed' : 'pointer',
                     position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
                   {item
                     ? <><GameIcon id={item.icon} size={18} />
-                        {cd > 0
+                        {!isWeapon && (cd > 0
                           ? <span style={{ position:'absolute', bottom:1, right:2, fontSize:'0.5rem', color:'#ff9999' }}>{cd}</span>
-                          : <span style={{ position:'absolute', bottom:1, right:2, fontSize:'0.5rem', color:'#f0c060' }}>{qty}</span>}
+                          : <span style={{ position:'absolute', bottom:1, right:2, fontSize:'0.5rem', color:'#f0c060' }}>{qty}</span>)}
                       </>
                     : <span style={{ fontSize: '0.6rem', color: '#4a5070' }}>{i+1}</span>}
                   {isEquippedAndActive && <SelfFxBadge fxList={combatFx.selfFx} />}
