@@ -1,0 +1,904 @@
+// src/components/screens/FFGGRScreen.tsx
+import { useState, useCallback } from 'react';
+import { useGameStore } from '../../stores/gameStore';
+import {
+  FFGGR_AREAS, FFGGR_MONSTERS, FFGGR_SHOPS, FFGGR_FEVERS,
+  FFGGR_ITEM_MASTER, FFGGR_POINT_KEY, FFGGR_NUTS_COUNT_KEY,
+  getMonstersInArea, selectAction, rollDrops, FFGGR_ITEMS,
+  type FFGGRMonster,
+} from '../../data/ffggrMaster';
+import { ITEM_MASTER } from '../../data/masters';
+import { GameIcon } from '../icons';
+import { HotbarPanel, HotbarSetModal } from './DungeonScreen';
+import type { EquipmentSlots } from '../../types/game';
+import { defaultEquipmentSlots } from '../../types/game';
+import {
+  type EnemyPos, initPos, moveEnemyPos, DIR_LABEL, DIR_EMOJI, behaviorLabel,
+} from '../../systems/enemyPosition';
+import { CompassModal, hasFreeReposition, type CompassEnemyDot } from '../BattleSkillUI';
+import { isDirectionInShape, type AreaShape, AREA_SHAPE_BONUS_PCT } from '../../systems/enemyPosition';
+
+// ─── 型 ───────────────────────────────────────────────────────
+interface StatusEffect {
+  type: 'dot' | 'trap' | 'debuff_def' | 'debuff_atk' | 'buff_enrage' | 'fly';
+  turnsLeft: number;
+  value?: number;
+  label: string;
+  emoji: string;
+}
+
+// レア敵の低確率出現：通常モブを倒した時に0.5%〜1%の確率で中ボス/ボス/レアボスが乱入する
+const RARE_ENCOUNTER_MIN_RATE = 0.005;
+const RARE_ENCOUNTER_MAX_RATE = 0.01;
+
+interface BattleState {
+  monster: FFGGRMonster;
+  monsterHp: number;
+  enemyPos: EnemyPos;
+  playerHp: number;
+  playerMaxHp: number;
+  turn: number;
+  log: { text: string; color: string }[];
+  effects: StatusEffect[];
+  monsterEffects: StatusEffect[];
+  phase: 'fighting' | 'won' | 'fled' | 'dead';
+  pendingDrops: { itemId: string; amount: number }[];
+  expGained: number;
+  pointGained: number;
+  isDefending: boolean;
+  // 通常モブ撃破後、超低確率で中ボス/ボス/レアボスが乱入してきた場合にセットされる
+  specialEncounter: FFGGRMonster | null;
+  facingDirection?: import('../../systems/enemyPosition').EnemyDirection;
+}
+
+// ─── スタイル ──────────────────────────────────────────────────
+const S = {
+  card: { background:'#161b26', border:'1px solid #2d3752', borderRadius:10, padding:'10px 12px', marginBottom:8 } as React.CSSProperties,
+  btn: (color='#5b8dee') => ({ padding:'8px 14px', borderRadius:8, border:'none', background:color, color:'#fff', fontWeight:700, fontSize:'0.8rem', cursor:'pointer' } as React.CSSProperties),
+  smBtn: { padding:'5px 10px', borderRadius:6, border:'1px solid #2d3752', background:'#0d1018', color:'#e8e6ff', fontSize:'0.76rem', cursor:'pointer' } as React.CSSProperties,
+  tag: (c:string) => ({ padding:'2px 7px', borderRadius:10, background:c+'22', border:`1px solid ${c}44`, color:c, fontSize:'0.65rem', fontWeight:700 } as React.CSSProperties),
+  rarityColor: { common:'#8a92b2', uncommon:'#4ca86a', rare:'#5b8dee', epic:'#b060e0', legendary:'#f0c060' } as Record<string,string>,
+};
+
+function rarityLabel(r:string){ return {common:'普通',uncommon:'良品',rare:'レア',epic:'エピック',legendary:'伝説'}[r]??r; }
+function itemName(id:string){ return FFGGR_ITEM_MASTER[id]?.name ?? id; }
+function itemEmoji(id:string){ return FFGGR_ITEM_MASTER[id]?.emoji ?? '📦'; }
+
+// ─── バトルログ ──────────────────────────────────────────────
+function BattleLog({ log }:{ log:{text:string;color:string}[] }){
+  return (
+    <div style={{ maxHeight:160, overflowY:'auto', display:'flex', flexDirection:'column-reverse', gap:2, padding:6, background:'#0a0d14', borderRadius:8, marginBottom:8 }}>
+      {[...log].reverse().map((l,i)=>(
+        <div key={i} style={{ fontSize:'0.72rem', color:l.color, lineHeight:1.4 }}>{l.text}</div>
+      ))}
+    </div>
+  );
+}
+
+// ─── HPバー ──────────────────────────────────────────────────
+function HpBar({ current, max, color='#4ca86a' }:{ current:number; max:number; color?:string }){
+  const pct = Math.max(0, Math.min(100, current/max*100));
+  return (
+    <div style={{ height:8, background:'#1e2535', borderRadius:4, overflow:'hidden' }}>
+      <div style={{ width:`${pct}%`, height:'100%', background:color, transition:'width 0.3s', borderRadius:4 }} />
+    </div>
+  );
+}
+
+// ─── 状態異常表示 ────────────────────────────────────────────
+function EffectsRow({ effects }:{ effects:StatusEffect[] }){
+  if (!effects.length) return null;
+  return (
+    <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
+      {effects.map((e,i)=>(
+        <span key={i} style={S.tag('#f0c060')}>{e.emoji}{e.label} {e.turnsLeft}T</span>
+      ))}
+    </div>
+  );
+}
+
+// ─── バトル画面 ──────────────────────────────────────────────
+function BattleScreen({ battle, equipment, inventory, onAttack, onDefend, onFlee, showHotbar, onToggleHotbar, onHotbarSlotClick, onOpenCompass, onOpenFacingCompass }:{
+  battle: BattleState;
+  equipment: EquipmentSlots;
+  inventory: Record<string, number>;
+  onAttack: () => void;
+  onDefend: () => void;
+  onFlee: () => void;
+  showHotbar: boolean;
+  onToggleHotbar: () => void;
+  onHotbarSlotClick: (slot: string, idx?: number) => void;
+  onOpenCompass: () => void;
+  onOpenFacingCompass: () => void;
+}){
+  const m = battle.monster;
+  const hpPct = battle.monsterHp / m.maxHp;
+  const equippedWeaponId = equipment.hotbar.find(id => id && ITEM_MASTER[id]?.itemType === 'Weapon') ?? null;
+  const weaponItem = equippedWeaponId ? ITEM_MASTER[equippedWeaponId] : null;
+  return (
+    <div>
+      {/* モンスター情報 */}
+      {/* 位置表示 */}
+      <div style={{ ...S.card, background:'#0a0d14', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+        <span style={{ fontSize:'0.68rem', color:'#8a92b2' }}>敵の位置</span>
+        <span style={{ fontSize:'0.88rem' }}>{DIR_EMOJI[battle.enemyPos.direction]} {DIR_LABEL[battle.enemyPos.direction]}</span>
+        <span style={{ fontSize:'0.78rem', color:'#f0c060', fontWeight:700 }}>{Math.round(battle.enemyPos.distanceM)}m</span>
+        <span style={{ fontSize:'0.65rem', color:'#4a5070' }}>{behaviorLabel(battle.enemyPos.behavior)}</span>
+      </div>
+      <div style={{ ...S.card, borderColor: hpPct < 0.3 ? '#7a2020' : '#2d3752' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+          <span style={{ fontSize:'2rem' }}>{m.emoji}</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontWeight:800, fontSize:'0.9rem', color:'#e8e6ff' }}>{m.name}</div>
+            <div style={{ fontSize:'0.68rem', color:'#8a92b2' }}>
+              {m.isBoss && <span style={S.tag('#e05555')}>BOSS</span>}
+              {m.isMidBoss && <span style={S.tag('#f0a020')}>中ボス</span>}
+              {m.isRareBoss && <span style={S.tag('#b060e0')}>レアボス</span>}
+              {m.isSpecialZombie && <span style={S.tag('#4ca86a')}>特殊ゾンビ</span>}
+              {m.traits?.map(t=><span key={t} style={{ marginLeft:4, color:'#8a92b2' }}>・{t}</span>)}
+            </div>
+          </div>
+          <div style={{ textAlign:'right', fontSize:'0.75rem' }}>
+            <div style={{ color:'#e05555', fontWeight:700 }}>{battle.monsterHp.toLocaleString()}</div>
+            <div style={{ color:'#4a5070' }}>/ {m.maxHp.toLocaleString()}</div>
+          </div>
+        </div>
+        <HpBar current={battle.monsterHp} max={m.maxHp} color={hpPct<0.3?'#e05555':hpPct<0.6?'#f0a020':'#4ca86a'} />
+        <EffectsRow effects={battle.monsterEffects} />
+      </div>
+
+      {/* プレイヤー情報 */}
+      <div style={{ ...S.card }}>
+        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4, fontSize:'0.76rem' }}>
+          <span style={{ color:'#e8e6ff' }}>あなたのHP{battle.isDefending && <span style={{ color:'#5b8dee', marginLeft:6 }}>🛡️ 防御中</span>}</span>
+          <span style={{ color:'#4ca86a', fontWeight:700 }}>{battle.playerHp.toLocaleString()} / {battle.playerMaxHp.toLocaleString()}</span>
+        </div>
+        <HpBar current={battle.playerHp} max={battle.playerMaxHp} color='#4ca86a' />
+        <EffectsRow effects={battle.effects} />
+        <div style={{ fontSize:'0.65rem', color:'#4a5070', marginTop:4 }}>
+          ターン {battle.turn} ・ 装備中: {weaponItem ? `${weaponItem.name}` : '素手'}
+        </div>
+      </div>
+
+      {/* バトルログ */}
+      <BattleLog log={battle.log} />
+
+      {/* アクションボタン（他ダンジョンと同じ操作感） */}
+      {battle.phase === 'fighting' && (
+        <>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
+            <button style={S.btn('#e05555')} onClick={onAttack}>
+              {weaponItem?.isAreaWeapon ? '🌀 全体攻撃' : '⚔️ 攻撃'}
+            </button>
+            <button style={{ ...S.btn('#5b8dee') }} onClick={onDefend}>🛡️ 防御</button>
+          </div>
+          <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+            <button onClick={onOpenFacingCompass} style={{ ...S.btn('#4ca86a'), flex:1 }}>↻ 向き変更</button>
+            {hasFreeReposition(weaponItem) && (
+              <button onClick={onOpenCompass} style={{ ...S.btn('#5b8dee'), flex:1 }}>🧭 間合い操作</button>
+            )}
+          </div>
+          <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
+            {equipment.hotbar.map((itemId, i) => {
+              const item = itemId ? ITEM_MASTER[itemId] : null;
+              const qty = itemId ? (inventory[itemId] ?? 0) : 0;
+              const isEquippedWeapon = !!itemId && itemId === equippedWeaponId;
+              return (
+                <div key={i} style={{
+                  width:38, height:38, background: isEquippedWeapon ? 'rgba(224,85,85,0.2)' : item && qty>0 ? 'rgba(91,141,238,0.15)' : '#161b26',
+                  border:`1px solid ${isEquippedWeapon ? '#e05555' : item && qty>0 ? '#5b8dee' : '#2d3752'}`, borderRadius:6,
+                  display:'flex', alignItems:'center', justifyContent:'center', position:'relative',
+                }} title={item ? `${item.name} ×${qty}` : `スロット${i+1}（空）`}>
+                  {item
+                    ? <><GameIcon id={item.icon} size={18} /><span style={{ position:'absolute', bottom:1, right:2, fontSize:'0.5rem', color:'#f0c060' }}>{qty}</span></>
+                    : <span style={{ fontSize:'0.6rem', color:'#4a5070' }}>{i+1}</span>}
+                </div>
+              );
+            })}
+            <button onClick={onToggleHotbar} style={{ padding:'0 10px', height:38, background:'#161b26', border:'1px dashed #5b8dee', borderRadius:6, color:'#5b8dee', cursor:'pointer', fontSize:'0.72rem' }}>
+              🎒 装備を選ぶ
+            </button>
+            <button style={{ ...S.btn('#2d3752'), border:'1px solid #4a5070', height:38 }} onClick={onFlee}>🏃 逃げる</button>
+          </div>
+          {showHotbar && (
+            <HotbarPanel equipment={equipment} inventory={inventory} onSlotClick={onHotbarSlotClick} />
+          )}
+        </>
+      )}
+
+      {/* 結果表示 */}
+      {battle.phase !== 'fighting' && (
+        <div style={{ ...S.card, textAlign:'center', borderColor: battle.phase==='won'?'#4ca86a':battle.phase==='fled'?'#f0c060':'#e05555' }}>
+          {battle.phase==='won' && (
+            <>
+              <div style={{ fontSize:'1.1rem', fontWeight:800, color:'#4ca86a', marginBottom:8 }}>✨ 勝利！</div>
+              <div style={{ fontSize:'0.76rem', color:'#f0c060' }}>EXP +{battle.expGained} / POINT +{battle.pointGained}</div>
+              {battle.pendingDrops.length > 0 && (
+                <div style={{ marginTop:8 }}>
+                  <div style={{ fontSize:'0.72rem', color:'#8a92b2', marginBottom:4 }}>ドロップ:</div>
+                  {battle.pendingDrops.map((d,i)=>(
+                    <div key={i} style={{ fontSize:'0.78rem', color:'#e8e6ff' }}>
+                      {itemEmoji(d.itemId)} {itemName(d.itemId)} × {d.amount}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {battle.specialEncounter && (
+                <div style={{ marginTop:10, padding:8, background:'rgba(176,96,224,0.12)', border:'1px solid #b060e0', borderRadius:8 }}>
+                  <div style={{ fontSize:'0.82rem', color:'#b060e0', fontWeight:800 }}>⚡ 気配を感じる…！</div>
+                  <div style={{ fontSize:'0.72rem', color:'#e8e6ff', marginTop:2 }}>
+                    {battle.specialEncounter.emoji} {battle.specialEncounter.name} が乱入してきた！
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          {battle.phase==='fled' && <div style={{ fontSize:'1rem', fontWeight:800, color:'#f0c060' }}>🏃 逃走した</div>}
+          {battle.phase==='dead' && <div style={{ fontSize:'1rem', fontWeight:800, color:'#e05555' }}>💀 倒れた...</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── NPCショップ ─────────────────────────────────────────────
+function ShopPanel({ inventory, onTrade }:{ inventory:Record<string,number>; onTrade:(s1id:string,s1a:number,rid:string,ra:number,s2id?:string,s2a?:number,s3id?:string,s3a?:number)=>void }){
+  const [shopId, setShopId] = useState(FFGGR_SHOPS[0].id);
+  const shop = FFGGR_SHOPS.find(s=>s.id===shopId)!;
+  function canTrade(t:typeof shop.trades[0]){
+    if((inventory[t.slot1ItemId]??0)<t.slot1Amount) return false;
+    if(t.slot2ItemId && (inventory[t.slot2ItemId]??0)<(t.slot2Amount??0)) return false;
+    if(t.slot3ItemId && (inventory[t.slot3ItemId]??0)<(t.slot3Amount??0)) return false;
+    return true;
+  }
+  return (
+    <div>
+      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:10 }}>
+        {FFGGR_SHOPS.map(s=>(
+          <button key={s.id} onClick={()=>setShopId(s.id)} style={{
+            padding:'5px 8px', borderRadius:6, fontSize:'0.68rem', fontWeight:700,
+            border:`1px solid ${shopId===s.id?'#5b8dee':'#2d3752'}`,
+            background:shopId===s.id?'rgba(91,141,238,0.15)':'transparent',
+            color:shopId===s.id?'#5b8dee':'#8a92b2',
+          }}>{s.emoji} {s.name}</button>
+        ))}
+      </div>
+      <div style={S.card}>
+        <div style={{ fontWeight:700, fontSize:'0.85rem', color:'#f0c060', marginBottom:4 }}>{shop.emoji} {shop.name}</div>
+        <div style={{ fontSize:'0.7rem', color:'#8a92b2', marginBottom:8 }}>{shop.description}</div>
+        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+          {shop.trades.map(t=>{
+            const ok = canTrade(t);
+            const ri = FFGGR_ITEM_MASTER[t.resultItemId];
+            return (
+              <div key={t.id} style={{ ...S.card, background:'#0d1018', display:'flex', alignItems:'center', gap:8, opacity:ok?1:0.5 }}>
+                <div style={{ flex:1, fontSize:'0.72rem' }}>
+                  <span style={{ color:'#e8e6ff' }}>{itemEmoji(t.slot1ItemId)} {itemName(t.slot1ItemId)}×{t.slot1Amount}</span>
+                  {t.slot2ItemId && <span style={{ color:'#8a92b2' }}> + {itemEmoji(t.slot2ItemId)} {itemName(t.slot2ItemId)}×{t.slot2Amount}</span>}
+                  {t.slot3ItemId && <span style={{ color:'#8a92b2' }}> + {itemEmoji(t.slot3ItemId)} {itemName(t.slot3ItemId)}×{t.slot3Amount}</span>}
+                  <span style={{ color:'#f0c060' }}> → {ri?.emoji??'📦'} {ri?.name??t.resultItemId}×{t.resultAmount}</span>
+                </div>
+                <button
+                  style={{ ...S.btn(ok?'#5b8dee':'#2d3752'), padding:'5px 10px', fontSize:'0.72rem', opacity:ok?1:0.4 }}
+                  disabled={!ok}
+                  onClick={()=>onTrade(t.slot1ItemId,t.slot1Amount,t.resultItemId,t.resultAmount,t.slot2ItemId,t.slot2Amount,t.slot3ItemId,t.slot3Amount)}
+                >交換</button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── アイテム図鑑 ─────────────────────────────────────────────
+function ItemsPanel({ inventory }:{ inventory:Record<string,number> }){
+  const [filter, setFilter] = useState('');
+  const items = Object.values(FFGGR_ITEM_MASTER)
+    .filter(i => !filter || i.name.includes(filter) || i.category.includes(filter))
+    .sort((a,b)=>{
+      const order = ['legendary','epic','rare','uncommon','common'];
+      return order.indexOf(a.rarity) - order.indexOf(b.rarity);
+    });
+  return (
+    <div>
+      <input value={filter} onChange={e=>setFilter(e.target.value)} placeholder="アイテム検索..." style={{ width:'100%', padding:'7px 10px', borderRadius:7, background:'#0d1018', border:'1px solid #2d3752', color:'#e8e6ff', fontSize:'0.82rem', marginBottom:10 }} />
+      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+        {items.map(item=>{
+          const have = inventory[item.id]??0;
+          const rc = S.rarityColor[item.rarity]??'#8a92b2';
+          return (
+            <div key={item.id} style={{ ...S.card, display:'flex', alignItems:'center', gap:8, opacity:have>0?1:0.45 }}>
+              <span style={{ fontSize:'1.2rem' }}>{item.emoji}</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:'0.8rem', fontWeight:700, color:'#e8e6ff' }}>{item.name}</div>
+                <div style={{ fontSize:'0.65rem', color:'#8a92b2' }}>{item.description}</div>
+              </div>
+              <div style={{ textAlign:'right' }}>
+                <span style={S.tag(rc)}>{rarityLabel(item.rarity)}</span>
+                <div style={{ fontSize:'0.75rem', color:have>0?'#f0c060':'#4a5070', marginTop:2, fontWeight:700 }}>×{have}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── フィーバー表示 ───────────────────────────────────────────
+function FeverPanel({ ffggrPoint, onSpendPoint }:{ ffggrPoint:number; onSpendPoint:(cost:number,reward:string)=>void }){
+  return (
+    <div>
+      <div style={{ ...S.card, borderColor:'#f0c060' }}>
+        <div style={{ fontWeight:800, fontSize:'0.9rem', color:'#f0c060', marginBottom:4 }}>⭐ FFGGRポイント: {ffggrPoint}</div>
+        <div style={{ fontSize:'0.72rem', color:'#8a92b2', marginBottom:10 }}>敵撃破（確率1pt）・釣りクレート開封で獲得。レイドTP(1pt)や木の実採取追加(10pt)に使用。</div>
+        <div style={{ display:'flex', gap:8 }}>
+          <button style={{ ...S.btn('#5b8dee'), flex:1 }} onClick={()=>onSpendPoint(1,'raid_tp')} disabled={ffggrPoint<1}>1pt → レイドTP</button>
+          <button style={{ ...S.btn('#b060e0'), flex:1 }} onClick={()=>onSpendPoint(10,'nuts_extra')} disabled={ffggrPoint<10}>10pt → 木の実採取+4</button>
+        </div>
+      </div>
+      <div style={{ fontWeight:700, fontSize:'0.85rem', color:'#e8e6ff', marginBottom:8 }}>🌈 フィーバー一覧</div>
+      {Object.values(FFGGR_FEVERS).map(f=>(
+        <div key={f.type} style={S.card}>
+          <div style={{ fontWeight:700, fontSize:'0.82rem', color:'#f0c060' }}>{f.emoji} {f.name}</div>
+          <div style={{ fontSize:'0.7rem', color:'#8a92b2', marginTop:2 }}>{f.description}</div>
+          <div style={{ fontSize:'0.65rem', color:'#4a5070', marginTop:4 }}>
+            発生条件: {f.triggerBy==='fishing'?'FFGGR釣りで確率':f.triggerBy==='battle'?'敵撃破で確率':'釣りまたは敵撃破（超低確率）'}
+            　持続: {f.duration}回
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+// ─── クレート開封パネル ──────────────────────────────────────
+function CratePanel({ inventory, gold, onOpen }:{
+  inventory:Record<string,number>; gold:number;
+  onOpen:(crateId:string,payExtra:boolean,extraCost:number)=>void;
+}){
+  const crates = [
+    { id:'ffggr_crate_leather',    name:'革クレート',        emoji:'📦', extraCost:50000   },
+    { id:'ffggr_crate_gold',       name:'金クレート',        emoji:'🟨', extraCost:200000  },
+    { id:'ffggr_crate_diamond',    name:'ダイヤクレート',    emoji:'💠', extraCost:1000000 },
+    { id:'ffggr_crate_diamond_ex', name:'強化ダイヤクレート',emoji:'💎', extraCost:3000000 },
+  ];
+  return (
+    <div>
+      <div style={{ fontSize:'0.72rem', color:'#8a92b2', marginBottom:10 }}>
+        クレートを開封してアイテムを入手。追加料金を払うとドロップ候補が拡張されます。
+      </div>
+      {crates.map(cr=>{
+        const have = inventory[cr.id]??0;
+        const canExtra = gold>=cr.extraCost;
+        return (
+          <div key={cr.id} style={{ ...S.card, opacity:have>0?1:0.4 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+              <span style={{ fontSize:'1.5rem' }}>{cr.emoji}</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:700, fontSize:'0.85rem', color:'#e8e6ff' }}>{cr.name}</div>
+                <div style={{ fontSize:'0.7rem', color:'#8a92b2' }}>所持: {have}個</div>
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:6 }}>
+              <button style={{ ...S.btn('#2d3752'), flex:1, border:'1px solid #4a5070', opacity:have>0?1:0.3 }}
+                disabled={have<=0}
+                onClick={()=>onOpen(cr.id,false,0)}>
+                開封（無料）
+              </button>
+              <button style={{ ...S.btn('#f0a020'), flex:1.5, fontSize:'0.75rem', opacity:(have>0&&canExtra)?1:0.3 }}
+                disabled={have<=0||!canExtra}
+                onClick={()=>onOpen(cr.id,true,cr.extraCost)}>
+                追加ドロップ（{(cr.extraCost/10000).toFixed(0)}万G）
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── メイン画面 ──────────────────────────────────────────────
+export function FFGGRScreen(){
+  const player      = useGameStore(s=>s.player);
+  const addItems    = useGameStore(s=>s.addItems);
+  const consumeItem = useGameStore(s=>s.consumeItem);
+  const changeGold  = useGameStore(s=>s.changeGold);
+  const addNotif    = useGameStore(s=>s.addNotification);
+  const [tab, setTab] = useState<'area'|'battle'|'shop'|'items'|'fever'|'crate'>('area');
+  const [battle, setBattle] = useState<BattleState|null>(null);
+  const updateEquipment = useGameStore(s=>s.updateEquipment);
+  const [showHotbar, setShowHotbar] = useState(false);
+  const [hotbarModal, setHotbarModal] = useState<{slot:string;idx?:number} | null>(null);
+  const [showCompass, setShowCompass] = useState(false);
+  const [showFacingCompass, setShowFacingCompass] = useState(false);
+
+  const inventory = player?.inventory ?? {};
+  const equipment = player?.equipment ?? defaultEquipmentSlots();
+  const ffggrPoint = (inventory[FFGGR_POINT_KEY] ?? 0);
+  const playerMaxHp = 1000 + (player?.stats?.level ?? 1) * 50;
+
+  // ─── 戦闘開始 ───
+  function startBattle(monster: FFGGRMonster){
+    const behavior = (monster as any).moveBehavior ?? 'aggressive';
+    setBattle({
+      monster,
+      monsterHp: monster.maxHp,
+      enemyPos: initPos(behavior),
+      playerHp: playerMaxHp,
+      playerMaxHp,
+      turn: 1,
+      log: [{ text:`⚔️ ${monster.emoji} ${monster.name} が現れた！`, color:'#f0c060' }],
+      effects: [],
+      monsterEffects: [],
+      phase: 'fighting',
+      pendingDrops: [],
+      expGained: 0,
+      pointGained: 0,
+      isDefending: false,
+      specialEncounter: null,
+    });
+    setTab('battle');
+  }
+
+  // 現在エリアの中ボス/ボス/レアボス一覧（通常モブ撃破後の低確率乱入抽選に使う）
+  function getAreaSpecials(monster: FFGGRMonster): FFGGRMonster[] {
+    const area = Object.values(FFGGR_AREAS).find(a => a.monsterIds.includes(monster.id));
+    if(!area) return [];
+    const ids = [area.bossId, ...(area.midBossIds??[]), area.rareBossId].filter(Boolean) as string[];
+    return ids.map(id=>FFGGR_MONSTERS[id]).filter(Boolean);
+  }
+
+  // ─── プレイヤー攻撃 ───
+  const handleAttack = useCallback(()=>{
+    if(!battle || battle.phase!=='fighting') return;
+    const equippedWeaponId = equipment.hotbar.find(id => id && ITEM_MASTER[id]?.itemType === 'Weapon') ?? null;
+    const weaponItem = equippedWeaponId ? ITEM_MASTER[equippedWeaponId] : null;
+    const atk = weaponItem?.weaponAtk ?? (100 + (player?.stats?.level??1) * 10);
+    const def = battle.monster.defense;
+    // 状態異常チェック
+    const isTrap = battle.effects.find(e=>e.type==='trap');
+    if(isTrap){
+      const newEffects = battle.effects.map(e=>e.type==='trap'?{...e,turnsLeft:e.turnsLeft-1}:e).filter(e=>e.turnsLeft>0);
+      setBattle(prev=>prev?{...prev,effects:newEffects,log:[...prev.log,{text:`⛓️ 拘束中で行動不能！`,color:'#8a92b2'}],turn:prev.turn+1}:null);
+      handleMonsterTurn();
+      return;
+    }
+    // 飛行中は物理無効（貫通武器は有効）
+    const isFlying = battle.monsterEffects.find(e=>e.type==='fly');
+    const pen = weaponItem?.areaPenetrate ?? 0;
+    // 位置システム：射程/範囲半径を超えた距離では威力ペナルティ(50%)
+    const rangeLimit = weaponItem?.isAreaWeapon ? weaponItem?.areaRadius : weaponItem?.range;
+    const rangeMult = rangeLimit === undefined ? 1 : (battle.enemyPos.distanceM <= rangeLimit ? 1 : 0.5);
+    // 攻撃形状(front/behind/cone)：対象方向外なら威力ペナルティ(50%)、対象方向内なら威力補正
+    const shape: AreaShape = (weaponItem?.areaShape ?? 'omni') as AreaShape;
+    const facing = battle.facingDirection ?? 'N';
+    const shapeMult = weaponItem?.isAreaWeapon && shape !== 'omni'
+      ? (isDirectionInShape(battle.enemyPos.direction, facing, shape) ? 1 + AREA_SHAPE_BONUS_PCT[shape] / 100 : 0.5)
+      : 1;
+    let dmg = Math.max(1, Math.floor((atk - def*0.5) * (0.85 + Math.random()*0.3) * rangeMult * shapeMult));
+    const weaponMsg = weaponItem ? weaponItem.name : '素手';
+    let logText = weaponItem?.isAreaWeapon
+      ? `🌀 ${weaponMsg}で全体攻撃！ ${battle.monster.name}に ${dmg} ダメージ！`
+      : `⚔️ ${weaponMsg}で攻撃！ ${battle.monster.name}に ${dmg} ダメージ！`;
+    if(isFlying && pen<=0){
+      dmg = 0;
+      logText = `🦅 ${battle.monster.name}は飛行中！物理攻撃が届かない！（貫通武器のみ有効）`;
+    } else if(isFlying && pen>0){
+      dmg = Math.max(1, pen);
+      logText = `🦅 ${battle.monster.name}は飛行中だが、${weaponMsg}の貫通攻撃が突き刺さる！ ${dmg}ダメージ！`;
+    }
+    const newMonsterHp = Math.max(0, battle.monsterHp - dmg);
+    const newMonsterEffects = battle.monsterEffects.map(e=>({...e,turnsLeft:e.turnsLeft-1})).filter(e=>e.turnsLeft>0);
+    if(newMonsterHp<=0){
+      // 勝利
+      const drops = rollDrops(battle.monster);
+      const exp = battle.monster.baseExp;
+      const pointGain = Math.random()<0.3?1:0;
+      drops.forEach(d=>addItems([d]));
+      if(pointGain>0) addItems([{itemId:FFGGR_POINT_KEY, amount:pointGain}]);
+      // ─ レア乱入抽選：通常モブ（ボス系以外）撃破時のみ、超低確率で中ボス/ボス/レアボスが乱入 ─
+      let specialEncounter: FFGGRMonster | null = null;
+      if(!battle.monster.isBoss && !battle.monster.isMidBoss && !battle.monster.isRareBoss){
+        const specials = getAreaSpecials(battle.monster);
+        for(const sp of specials){
+          const rate = RARE_ENCOUNTER_MIN_RATE + Math.random()*(RARE_ENCOUNTER_MAX_RATE-RARE_ENCOUNTER_MIN_RATE);
+          if(Math.random()<rate){ specialEncounter = sp; break; }
+        }
+      }
+      setBattle(prev=>prev?{
+        ...prev, monsterHp:0, monsterEffects:newMonsterEffects,
+        phase:'won', pendingDrops:drops, expGained:exp, pointGained:pointGain, specialEncounter,
+        log:[...prev.log,{text:logText,color:'#4ca86a'},{text:`🏆 ${prev.monster.name}を倒した！EXP+${exp}`,color:'#f0c060'}],
+      }:null);
+    } else {
+      setBattle(prev=>prev?{...prev, monsterHp:newMonsterHp, monsterEffects:newMonsterEffects, log:[...prev.log,{text:logText,color:'#4ca86a'}]}:null);
+      setTimeout(()=>handleMonsterTurn(), 300);
+    }
+  },[battle, player, equipment]);
+
+  // ─── 防御 ───
+  const handleDefend = useCallback(()=>{
+    if(!battle || battle.phase!=='fighting') return;
+    setBattle(prev=>prev?{...prev, isDefending:true, log:[...prev.log,{text:'🛡️ 防御態勢を取った！（次の被ダメージ半減）',color:'#5b8dee'}]}:null);
+    setTimeout(()=>handleMonsterTurn(), 300);
+  },[battle]);
+
+  // ─── モンスターターン ───
+  const handleMonsterTurn = useCallback(()=>{
+    setBattle(prev=>{
+      if(!prev||prev.phase!=='fighting') return prev;
+      const m = prev.monster;
+      const hpPct = prev.monsterHp/m.maxHp;
+      const action = selectAction(m, hpPct, prev.turn);
+      let newPlayerHp = prev.playerHp;
+      let newEffects = [...prev.effects];
+      let newMonsterHp = prev.monsterHp;
+      let newMonsterEffects = [...prev.monsterEffects];
+      const logs: {text:string;color:string}[] = [];
+
+      // デバフ補正
+      const defDebuff = prev.monsterEffects.find(e=>e.type==='debuff_def');
+      const atkDebuff = prev.monsterEffects.find(e=>e.type==='debuff_atk');
+      const enrage    = prev.monsterEffects.find(e=>e.type==='buff_enrage');
+      const dmgMult   = (defDebuff?2.0:1.0) * (enrage?1.5:1.0) * (atkDebuff?0.7:1.0);
+
+      const wasDefending = prev.isDefending;
+      function calcDmg(power:number, pen:number=0){
+        const base = Math.floor(m.attack * power * dmgMult);
+        const raw = Math.max(1, base - Math.floor(50*0.3) + pen);
+        return wasDefending ? Math.max(1, Math.floor(raw*0.5)) : raw;
+      }
+
+      const msg = action.message ?? `${m.emoji} ${m.name}の「${action.name}」！`;
+
+      switch(action.type){
+        case 'atk_normal': {
+          const d = calcDmg(action.power??1);
+          newPlayerHp -= d;
+          logs.push({text:`${msg} ${d}ダメージ！`,color:'#e05555'});
+          break;
+        }
+        case 'atk_penetrate': {
+          const d = calcDmg(action.power??1, action.penetrateDmg??0);
+          newPlayerHp -= d;
+          logs.push({text:`${msg} 貫通${d}ダメージ！`,color:'#e05555'});
+          break;
+        }
+        case 'atk_multi': {
+          const hits = action.hitCount??2;
+          let total = 0;
+          for(let i=0;i<hits;i++) total += calcDmg(action.power??0.7);
+          newPlayerHp -= total;
+          logs.push({text:`${msg} ${hits}連続攻撃！合計${total}ダメージ！`,color:'#e05555'});
+          break;
+        }
+        case 'atk_aoe': {
+          const d = calcDmg(action.power??1);
+          newPlayerHp -= d;
+          logs.push({text:`${msg} 全体攻撃！${d}ダメージ！`,color:'#e05555'});
+          break;
+        }
+        case 'atk_dot': {
+          const d = calcDmg(action.power??0.8);
+          newPlayerHp -= d;
+          const dot: StatusEffect = { type:'dot', turnsLeft:action.dotTurns??3, value:action.dotDamage??50, label:'毒', emoji:'☠️' };
+          newEffects = [...newEffects.filter(e=>e.type!=='dot'), dot];
+          logs.push({text:`${msg} ${d}ダメージ！☠️ ${action.dotTurns}ターン毒（毎ターン${action.dotDamage}ダメ）`,color:'#e05555'});
+          break;
+        }
+        case 'heal_self': {
+          const healAmt = Math.floor(m.maxHp * (action.healPct??0.05));
+          newMonsterHp = Math.min(m.maxHp, prev.monsterHp + healAmt);
+          logs.push({text:action.message??`💚 ${m.name}がHPを${healAmt}回復！`,color:'#4ca86a'});
+          break;
+        }
+        case 'heal_party': {
+          const healAmt = Math.floor(prev.playerMaxHp * (action.healPct??0.05));
+          newPlayerHp = Math.min(prev.playerMaxHp, prev.playerHp + healAmt);
+          logs.push({text:msg,color:'#4ca86a'});
+          break;
+        }
+        case 'absorb': {
+          const d = calcDmg(action.power??1);
+          newPlayerHp -= d;
+          newMonsterHp = Math.min(m.maxHp, prev.monsterHp + d);
+          logs.push({text:msg,color:'#e05555'},{text:`💚 ${m.name}が${d}HP回復！`,color:'#4ca86a'});
+          break;
+        }
+        case 'debuff_def': {
+          const ef: StatusEffect = { type:'debuff_def', turnsLeft:action.debuffTurns??2, value:action.debuffPct??0.3, label:'防御低下', emoji:'⬇️' };
+          newMonsterEffects = [...newMonsterEffects.filter(e=>e.type!=='debuff_def'), ef];
+          logs.push({text:action.message??`⬇️ ${m.name}の防御が下がった！（${action.debuffTurns}T）`,color:'#f0c060'});
+          break;
+        }
+        case 'debuff_atk': {
+          const ef: StatusEffect = { type:'debuff_atk', turnsLeft:action.debuffTurns??2, value:action.debuffPct??0.3, label:'攻撃低下', emoji:'⬇️' };
+          newMonsterEffects = [...newMonsterEffects.filter(e=>e.type!=='debuff_atk'), ef];
+          logs.push({text:action.message??`⬇️ ${m.name}の攻撃が下がった！（${action.debuffTurns}T）`,color:'#f0c060'});
+          break;
+        }
+        case 'buff_enrage': {
+          const ef: StatusEffect = { type:'buff_enrage', turnsLeft:999, value:1.5, label:'激怒', emoji:'💢' };
+          newMonsterEffects = [...newMonsterEffects.filter(e=>e.type!=='buff_enrage'), ef];
+          logs.push({text:action.message??`💢 ${m.name}が激怒！攻撃力1.5倍！`,color:'#e05555'});
+          break;
+        }
+        case 'trap': {
+          const ef: StatusEffect = { type:'trap', turnsLeft:action.trapTurns??1, label:'拘束', emoji:'⛓️' };
+          newEffects = [...newEffects.filter(e=>e.type!=='trap'), ef];
+          if(action.power && action.power>0){
+            const d = calcDmg(action.power);
+            newPlayerHp -= d;
+            logs.push({text:`${msg} ${d}ダメージ！⛓️ ${action.trapTurns}ターン行動不能！`,color:'#e05555'});
+          } else {
+            logs.push({text:msg,color:'#f0c060'});
+          }
+          break;
+        }
+        case 'fly': {
+          const ef: StatusEffect = { type:'fly', turnsLeft:2, label:'飛行（物理無効）', emoji:'🦅' };
+          newMonsterEffects = [...newMonsterEffects.filter(e=>e.type!=='fly'), ef];
+          logs.push({text:msg,color:'#f0c060'});
+          break;
+        }
+        case 'summon': {
+          logs.push({text:msg,color:'#f0a020'});
+          break;
+        }
+        default: {
+          const d = calcDmg(1);
+          newPlayerHp -= d;
+          logs.push({text:`⚔️ ${m.name}の攻撃！ ${d}ダメージ！`,color:'#e05555'});
+        }
+      }
+
+      // DOTダメージ処理
+      const dotEffect = newEffects.find(e=>e.type==='dot');
+      if(dotEffect){
+        newPlayerHp -= dotEffect.value??50;
+        logs.push({text:`☠️ 毒で${dotEffect.value}ダメージ！`,color:'#b060e0'});
+        newEffects = newEffects.map(e=>e.type==='dot'?{...e,turnsLeft:e.turnsLeft-1}:e).filter(e=>e.turnsLeft>0);
+      }
+
+      const phase = newPlayerHp<=0 ? 'dead' : 'fighting';
+      if(phase==='dead') logs.push({text:'💀 あなたは倒れた...',color:'#e05555'});
+
+      const newPos = phase==='fighting' ? moveEnemyPos(prev.enemyPos) : prev.enemyPos;
+      return {
+        ...prev, playerHp:Math.max(0,newPlayerHp), monsterHp:newMonsterHp,
+        effects:newEffects, monsterEffects:newMonsterEffects,
+        log:[...prev.log,...logs], turn:prev.turn+1, phase, enemyPos:newPos, isDefending:false,
+      };
+    });
+  },[]);
+
+  function handleFlee(){
+    setBattle(prev=>prev?{...prev,phase:'fled',log:[...prev.log,{text:'🏃 逃走した！',color:'#f0c060'}]}:null);
+  }
+
+  // ─── NPC取引 ───
+  function handleTrade(s1id:string,s1a:number,rid:string,ra:number,s2id?:string,s2a?:number,s3id?:string,s3a?:number){
+    if(!consumeItem(s1id,s1a)){ addNotif('error',`${itemName(s1id)}が不足しています`); return; }
+    if(s2id&&s2a){ if(!consumeItem(s2id,s2a)){ addItems([{itemId:s1id,amount:s1a}]); addNotif('error',`${itemName(s2id)}が不足しています`); return; } }
+    if(s3id&&s3a){ if(!consumeItem(s3id,s3a)){ addItems([{itemId:s1id,amount:s1a}]); if(s2id&&s2a)addItems([{itemId:s2id,amount:s2a}]); addNotif('error',`${itemName(s3id)}が不足しています`); return; } }
+    addItems([{itemId:rid,amount:ra}]);
+    addNotif('success',`${FFGGR_ITEM_MASTER[rid]?.emoji??'📦'} ${itemName(rid)}×${ra}を入手！`);
+  }
+
+  // ─── ポイント消費 ───
+  function handleSpendPoint(cost:number, reward:string){
+    if(ffggrPoint<cost){ addNotif('error','FFGGRポイントが足りません'); return; }
+    if(!consumeItem(FFGGR_POINT_KEY,cost)){ addNotif('error','ポイント消費失敗'); return; }
+    if(reward==='nuts_extra'){
+      addItems([{itemId:FFGGR_NUTS_COUNT_KEY,amount:4}]);
+      addNotif('success','木の実採取回数を4回追加しました');
+    } else {
+      addNotif('success','レイドTPポイントを1消費しました（実際のTPはゲーム内で実行）');
+    }
+  }
+
+  // ─── 木の実採取 ───
+  function handleNutsHarvest(){
+    const nutsDailyMax = 32 + (inventory[FFGGR_NUTS_COUNT_KEY]??0);
+    const todayHarvested = inventory['ffggr_nuts_today']??0;
+    if(todayHarvested>=nutsDailyMax){ addNotif('error',`本日の採取上限(${nutsDailyMax}個)に達しました`); return; }
+    const gain = Math.min(4, nutsDailyMax - todayHarvested);
+    addItems([{itemId:'ffggr_nuts',amount:gain},{itemId:'ffggr_nuts_today',amount:gain}]);
+    addNotif('success',`🌰 FFGGR産の木の実×${gain}を採取した！（本日${todayHarvested+gain}/${nutsDailyMax}個）`);
+  }
+
+  // ─── クレート開封 ───
+  function handleCrateOpen(crateId:string, payExtra:boolean, extraCost:number){
+    if(!(inventory[crateId]>0)){ addNotif('error','クレートを所持していません'); return; }
+    if(payExtra && (player?.gold??0)<extraCost){ addNotif('error','Gが不足しています'); return; }
+    consumeItem(crateId,1);
+    if(payExtra) changeGold(-extraCost);
+    const crateData: Record<string,{base:string[][];extra:string[][];point:number}> = {
+      'ffggr_crate_leather': {
+        base:[[FFGGR_ITEMS.GREEN_FRAG,'1'],[FFGGR_ITEMS.GREEN_FRAG,'2'],[FFGGR_ITEMS.GREEN_FRAG,'3']],
+        extra:[[FFGGR_ITEMS.BLUE_FRAG,'1'],[FFGGR_ITEMS.RAJUICE,'1'],[FFGGR_ITEMS.TP_CONSUME,'1'],[FFGGR_ITEMS.RESCUE_CONSUME,'1']],
+        point:1,
+      },
+      'ffggr_crate_gold': {
+        base:[[FFGGR_ITEMS.BLUE_FRAG,'1'],[FFGGR_ITEMS.BLUE_FRAG,'2'],[FFGGR_ITEMS.BLUE_FRAG,'3']],
+        extra:[[FFGGR_ITEMS.RED_FRAG,'1'],[FFGGR_ITEMS.RAJUICE,'1'],[FFGGR_ITEMS.TP_CONSUME,'1'],[FFGGR_ITEMS.RESCUE_CONSUME,'1']],
+        point:2,
+      },
+      'ffggr_crate_diamond': {
+        base:[[FFGGR_ITEMS.RED_FRAG,'1'],[FFGGR_ITEMS.RED_FRAG,'2'],[FFGGR_ITEMS.TOUSEKI,'1'],[FFGGR_ITEMS.MANADRAIN,'1'],[FFGGR_ITEMS.HEBIYUMI,'1']],
+        extra:[[FFGGR_ITEMS.YELLOW_FRAG,'1'],[FFGGR_ITEMS.RAJUICE,'1'],[FFGGR_ITEMS.TP_CONSUME,'1'],[FFGGR_ITEMS.RESCUE_CONSUME,'1'],[FFGGR_ITEMS.RYOIKIKO,'1']],
+        point:5,
+      },
+      'ffggr_crate_diamond_ex': {
+        base:[[FFGGR_ITEMS.YELLOW_FRAG,'1'],[FFGGR_ITEMS.YELLOW_FRAG,'2'],[FFGGR_ITEMS.TOUSEKI,'1'],[FFGGR_ITEMS.MANADRAIN,'1'],[FFGGR_ITEMS.RYOIKIKO,'1']],
+        extra:[[FFGGR_ITEMS.YELLOW_FRAG,'2'],[FFGGR_ITEMS.RAJUICE,'1'],[FFGGR_ITEMS.TP_CONSUME,'1'],[FFGGR_ITEMS.RESCUE_CONSUME,'1'],[FFGGR_ITEMS.KATANA_BLUE,'1']],
+        point:10,
+      },
+    };
+    const d = crateData[crateId];
+    if(!d){ addNotif('error','未対応のクレートです'); return; }
+    const pool = payExtra ? [...d.base,...d.extra] : d.base;
+    const picked = pool[Math.floor(Math.random()*pool.length)];
+    addItems([{itemId:picked[0], amount:parseInt(picked[1])}]);
+    addItems([{itemId:FFGGR_ITEMS.GREEN_FRAG, amount:0}]); // dummy to trigger save
+    // point gain
+    if(Math.random()<0.8) addItems([{itemId:FFGGR_POINT_KEY, amount:d.point}]);
+    const iname = FFGGR_ITEM_MASTER[picked[0]]?.name??picked[0];
+    addNotif('success',`📦 ${iname}×${picked[1]}を入手！${payExtra?'（追加ドロップあり）':''}`);
+  }
+
+  const areaList = Object.values(FFGGR_AREAS);
+
+  return (
+    <div className="rpg-subtab-fade" style={{ paddingBottom:20 }}>
+      {/* タブ */}
+      <div style={{ display:'flex', gap:4, marginBottom:10, flexWrap:'wrap' }}>
+        {([['area','🗺️ エリア'],['shop','🛒 NPC取引'],['items','📦 アイテム'],['fever','⭐ ポイント/フィーバー']] as const).map(([id,label])=>(
+          <button key={id} onClick={()=>setTab(id)} style={{
+            padding:'6px 10px', borderRadius:7, fontSize:'0.75rem', fontWeight:700,
+            border:`1px solid ${tab===id?'#5b8dee':'#2d3752'}`,
+            background:tab===id?'rgba(91,141,238,0.15)':'transparent',
+            color:tab===id?'#5b8dee':'#8a92b2',
+          }}>{label}</button>
+        ))}
+        {battle && <button onClick={()=>setTab('battle')} style={{
+          padding:'6px 10px', borderRadius:7, fontSize:'0.75rem', fontWeight:700,
+          border:`1px solid ${tab==='battle'?'#e05555':'#2d3752'}`,
+          background:tab==='battle'?'rgba(224,85,85,0.15)':'transparent',
+          color:tab==='battle'?'#e05555':'#8a92b2',
+        }}>⚔️ バトル中</button>}
+      </div>
+
+      {/* エリア選択 */}
+      {tab==='area' && (
+        <div>
+          <div style={{ fontSize:'0.72rem', color:'#8a92b2', marginBottom:8 }}>エリアを選択して探索・戦闘を開始（ボス・中ボス・レアボスは戦闘中に低確率で乱入してきます）</div>
+          {areaList.map(area=>{
+            const monsters = getMonstersInArea(area.id);
+            return (
+              <div key={area.id} style={{ ...S.card, borderLeft:`4px solid ${area.color.replace('0.4','1')}` }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                  <span style={{ fontSize:'1.4rem' }}>{area.emoji}</span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontWeight:800, fontSize:'0.88rem', color:'#e8e6ff' }}>{area.name}</div>
+                    <div style={{ fontSize:'0.67rem', color:'#8a92b2' }}>{area.description}</div>
+                  </div>
+                  <div style={{ fontSize:'0.67rem', color:'#4a5070' }}>推奨防御:{area.recommendedDef}</div>
+                </div>
+                <div style={{ fontSize:'0.65rem', color:'#f0c060', marginBottom:6, lineHeight:1.6 }}>💡 {area.tips}</div>
+                {area.id==='abyss' ? (
+                  <div style={{ fontSize:'0.75rem', color:'#4a5070', textAlign:'center', padding:8 }}>🔒 未実装（将来開放）</div>
+                ) : (
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                    {monsters.filter(m=>!m.isBoss&&!m.isMidBoss&&!m.isRareBoss).slice(0,6).map(m=>(
+                      <button key={m.id} onClick={()=>startBattle(m)} style={{ ...S.smBtn, display:'flex', alignItems:'center', gap:4 }}>
+                        {m.emoji} {m.name}
+                      </button>
+                    ))}
+                    {area.id==='forest' && (
+                      <button onClick={handleNutsHarvest} style={{ ...S.btn('#4ca86a'), fontSize:'0.75rem', padding:'5px 12px' }}>🌰 木の実採取</button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* バトル画面 */}
+      {tab==='battle' && battle && (
+        <div>
+          <BattleScreen
+            battle={battle}
+            equipment={equipment}
+            inventory={inventory}
+            onAttack={handleAttack}
+            onDefend={handleDefend}
+            onFlee={handleFlee}
+            showHotbar={showHotbar}
+            onToggleHotbar={()=>setShowHotbar(v=>!v)}
+            onHotbarSlotClick={(slot,idx)=>setHotbarModal({slot,idx})}
+            onOpenCompass={()=>setShowCompass(true)}
+            onOpenFacingCompass={()=>setShowFacingCompass(true)}
+          />
+          {showFacingCompass && (
+            <CompassModal
+              title="↻ 向き変更 — 攻撃前にいつでも変更可能（ターン消費なし）"
+              enemies={[{
+                idx: 0, name: battle.monster.name, direction: battle.enemyPos.direction, distanceM: battle.enemyPos.distanceM,
+                kind: battle.monster.isBoss ? 'boss' : battle.monster.isMidBoss ? 'midboss' : battle.monster.isRareBoss ? 'rareboss' : 'mob',
+              } as CompassEnemyDot]}
+              onSelectDirection={(dir)=>{
+                setBattle(prev=>prev?{...prev, facingDirection:dir}:null);
+                setShowFacingCompass(false);
+              }}
+              onClose={()=>setShowFacingCompass(false)}
+            />
+          )}
+          {showCompass && (
+            <CompassModal
+              enemies={[{
+                idx: 0, name: battle.monster.name, direction: battle.enemyPos.direction, distanceM: battle.enemyPos.distanceM,
+                kind: battle.monster.isBoss ? 'boss' : battle.monster.isMidBoss ? 'midboss' : battle.monster.isRareBoss ? 'rareboss' : 'mob',
+              } as CompassEnemyDot]}
+              onSelectDirection={(dir)=>{
+                setBattle(prev=>prev?{...prev, enemyPos:{...prev.enemyPos, direction:dir, distanceM: Math.max(0, prev.enemyPos.distanceM-6)}, log:[...prev.log,{text:`🧭 ${DIR_LABEL[dir]}方向へ間合いを詰めた！`,color:'#5b8dee'}]}:null);
+                setShowCompass(false);
+                setTimeout(()=>handleMonsterTurn(), 300);
+              }}
+              onClose={()=>setShowCompass(false)}
+            />
+          )}
+          {battle.phase!=='fighting' && (
+            <div style={{ display:'flex', gap:8, marginTop:8 }}>
+              <button style={{ ...S.btn('#2d3752'), flex:1, border:'1px solid #4a5070' }} onClick={()=>{ setBattle(null); setTab('area'); }}>← エリアに戻る</button>
+              {battle.phase==='won' && !battle.specialEncounter && (
+                <button style={{ ...S.btn('#5b8dee'), flex:1 }} onClick={()=>{
+                  const m = battle.monster;
+                  startBattle(m);
+                }}>🔄 再挑戦</button>
+              )}
+              {battle.phase==='won' && battle.specialEncounter && (
+                <button style={{ ...S.btn('#b060e0'), flex:1 }} onClick={()=>{
+                  startBattle(battle.specialEncounter!);
+                }}>⚡ {battle.specialEncounter.emoji} 迎え撃つ</button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {tab==='battle' && !battle && (
+        <div style={{ textAlign:'center', color:'#4a5070', padding:32 }}>
+          バトル中ではありません。<br/>エリアタブから敵を選んでください。
+        </div>
+      )}
+      {hotbarModal && (
+        <HotbarSetModal
+          slot={hotbarModal.slot} idx={hotbarModal.idx}
+          equipment={equipment} inventory={inventory}
+          onSet={(itemId)=>{
+            const next = { ...equipment };
+            if(hotbarModal.slot==='hotbar' && hotbarModal.idx!==undefined){
+              const hb=[...next.hotbar]; hb[hotbarModal.idx]=itemId; next.hotbar=hb;
+            } else {
+              (next as any)[hotbarModal.slot]=itemId;
+            }
+            updateEquipment(next);
+          }}
+          onClose={()=>setHotbarModal(null)}
+        />
+      )}
+
+      {tab==='shop' && <ShopPanel inventory={inventory} onTrade={(s1id,s1a,rid,ra,s2id,s2a,s3id,s3a)=>handleTrade(s1id,s1a,rid,ra,s2id,s2a,s3id,s3a)} />}
+      {tab==='items' && <ItemsPanel inventory={inventory} />}
+      {tab==='fever' && <FeverPanel ffggrPoint={ffggrPoint} onSpendPoint={handleSpendPoint} />}
+      {tab==='crate' && <CratePanel inventory={inventory} gold={player?.gold??0} onOpen={handleCrateOpen} />}
+    </div>
+  );
+}
