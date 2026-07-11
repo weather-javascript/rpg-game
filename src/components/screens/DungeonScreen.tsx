@@ -19,6 +19,7 @@ import { EnemyFxOverlay, SelfFxBadge, SelfFxBanner, CritFlashOverlay, BossDefeat
 import { getPlayerPowerProfile } from '../../systems/playerPower';
 import { type EnemyPos, initPos, moveEnemyPos, DIR_LABEL, DIR_EMOJI, behaviorLabel, getShapeDirections, type AreaShape } from '../../systems/enemyPosition';
 import { CompassModal, SkillButtonRow, type CompassEnemyDot } from '../BattleSkillUI';
+import { RadarDisplay } from '../RadarDisplay';
 
 // ============================================================
 // 戦闘ロジック（1ターン分）
@@ -2931,6 +2932,21 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
           </div>
 
           {/* スキルボタン列（装備中の武器が持つアクティブスキルのみ動的表示） */}
+          <div style={{ fontSize: '0.68rem', color: '#4a5070', marginBottom: 6 }}>
+            ↻ 現在の向き：<span style={{ color: '#4ca86a', fontWeight: 700 }}>{DIR_EMOJI[battle.facingDirection ?? 'N']} {DIR_LABEL[battle.facingDirection ?? 'N']}</span>
+          </div>
+          <RadarDisplay
+            dungeonId={runState.dungeonId}
+            facingDirection={battle.facingDirection ?? 'N'}
+            enemies={battle.enemies.map((e, i): CompassEnemyDot | null => {
+              if (e.hp <= 0 || !enemyPositions[i]) return null;
+              const mon = getMergedMonster(e.monsterId);
+              return {
+                idx: i, name: mon?.name ?? '敵', direction: enemyPositions[i].direction, distanceM: enemyPositions[i].distanceM,
+                kind: mon?.isBoss ? 'boss' : mon?.isMidBoss ? 'midboss' : 'mob',
+              };
+            }).filter((d): d is CompassEnemyDot => !!d)}
+          />
           <SkillButtonRow
             item={battle.equippedWeaponId ? ITEM_MASTER[battle.equippedWeaponId] : null}
             cooldownOf={(skillType) => battle.equippedWeaponId ? (battle.itemCooldowns[`${battle.equippedWeaponId}:${skillType}`] ?? battle.itemCooldowns[battle.equippedWeaponId] ?? 0) : 0}
@@ -2947,9 +2963,15 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
             }}
           />
 
+          {(() => {
+            const eqItem = battle.equippedWeaponId ? ITEM_MASTER[battle.equippedWeaponId] : null;
+            const eqShape: AreaShape = (eqItem?.areaShape ?? 'omni') as AreaShape;
+            const shapeHighlight = eqItem?.isAreaWeapon && eqShape !== 'omni' ? getShapeDirections(battle.facingDirection ?? 'N', eqShape) : undefined;
+            return (<>
           {showFacingCompass && (
             <CompassModal
               title="↻ 向き変更 — 攻撃前にいつでも変更可能（ターン消費なし）"
+              highlightDirs={shapeHighlight}
               enemies={battle.enemies.map((e, i): CompassEnemyDot | null => {
                 if (e.hp <= 0 || !enemyPositions[i]) return null;
                 const mon = getMergedMonster(e.monsterId);
@@ -2968,6 +2990,7 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
 
           {showCompass && (
             <CompassModal
+              highlightDirs={shapeHighlight}
               enemies={battle.enemies.map((e, i): CompassEnemyDot | null => {
                 if (e.hp <= 0 || !enemyPositions[i]) return null;
                 const mon = getMergedMonster(e.monsterId);
@@ -2982,13 +3005,15 @@ function TurnBattle({ runState, equipment, onBattleEnd, onEscape, initialMana, o
                   battle.enemies.forEach((e, i) => { if (e.hp > 0 && next[i]) next[i] = { ...next[i], direction: dir, distanceM: Math.max(0, next[i].distanceM - 6) }; });
                   return next;
                 });
-                setBattle(b => ({ ...b, turn: 'monster', isDefending: false, log: [...b.log, { text: `🧭 ${DIR_LABEL[dir]}方向へ間合いを詰めた！`, color: '#5b8dee' }] }));
+                setBattle(b => ({ ...b, turn: 'monster', isDefending: false, facingDirection: dir, log: [...b.log, { text: `🧭 ${DIR_LABEL[dir]}方向へ間合いを詰め、向きも合わせた！`, color: '#5b8dee' }] }));
                 setTimeout(() => setBattle(prev => doMonsterTurn(prev)), 600);
                 setShowCompass(false);
               }}
               onClose={() => setShowCompass(false)}
             />
           )}
+            </>);
+          })()}
 
           {/* 必殺技・MANAバー */}
           {battle.equippedWeaponId && (() => {

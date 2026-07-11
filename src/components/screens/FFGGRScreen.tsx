@@ -16,7 +16,8 @@ import {
   type EnemyPos, initPos, moveEnemyPos, DIR_LABEL, DIR_EMOJI, behaviorLabel,
 } from '../../systems/enemyPosition';
 import { CompassModal, hasFreeReposition, type CompassEnemyDot } from '../BattleSkillUI';
-import { isDirectionInShape, type AreaShape, AREA_SHAPE_BONUS_PCT } from '../../systems/enemyPosition';
+import { RadarDisplay } from '../RadarDisplay';
+import { isDirectionInShape, getShapeDirections, type AreaShape, AREA_SHAPE_BONUS_PCT } from '../../systems/enemyPosition';
 
 // ─── 型 ───────────────────────────────────────────────────────
 interface StatusEffect {
@@ -49,6 +50,7 @@ interface BattleState {
   // 通常モブ撃破後、超低確率で中ボス/ボス/レアボスが乱入してきた場合にセットされる
   specialEncounter: FFGGRMonster | null;
   facingDirection?: import('../../systems/enemyPosition').EnemyDirection;
+  equippedWeaponId: string | null;
 }
 
 // ─── スタイル ──────────────────────────────────────────────────
@@ -98,7 +100,7 @@ function EffectsRow({ effects }:{ effects:StatusEffect[] }){
 }
 
 // ─── バトル画面 ──────────────────────────────────────────────
-function BattleScreen({ battle, equipment, inventory, onAttack, onDefend, onFlee, showHotbar, onToggleHotbar, onHotbarSlotClick, onOpenCompass, onOpenFacingCompass }:{
+function BattleScreen({ battle, equipment, inventory, onAttack, onDefend, onFlee, showHotbar, onToggleHotbar, onHotbarSlotClick, onOpenCompass, onOpenFacingCompass, onEquipWeapon }:{
   battle: BattleState;
   equipment: EquipmentSlots;
   inventory: Record<string, number>;
@@ -110,11 +112,11 @@ function BattleScreen({ battle, equipment, inventory, onAttack, onDefend, onFlee
   onHotbarSlotClick: (slot: string, idx?: number) => void;
   onOpenCompass: () => void;
   onOpenFacingCompass: () => void;
+  onEquipWeapon: (itemId: string) => void;
 }){
   const m = battle.monster;
   const hpPct = battle.monsterHp / m.maxHp;
-  const equippedWeaponId = equipment.hotbar.find(id => id && ITEM_MASTER[id]?.itemType === 'Weapon') ?? null;
-  const weaponItem = equippedWeaponId ? ITEM_MASTER[equippedWeaponId] : null;
+  const weaponItem = battle.equippedWeaponId ? ITEM_MASTER[battle.equippedWeaponId] : null;
   return (
     <div>
       {/* モンスター情報 */}
@@ -156,12 +158,20 @@ function BattleScreen({ battle, equipment, inventory, onAttack, onDefend, onFlee
         <HpBar current={battle.playerHp} max={battle.playerMaxHp} color='#4ca86a' />
         <EffectsRow effects={battle.effects} />
         <div style={{ fontSize:'0.65rem', color:'#4a5070', marginTop:4 }}>
-          ターン {battle.turn} ・ 装備中: {weaponItem ? `${weaponItem.name}` : '素手'}
+          ターン {battle.turn} ・ 装備中: {weaponItem ? `${weaponItem.name}` : '素手'} ・ ↻向き: {DIR_EMOJI[battle.facingDirection ?? 'N']}{DIR_LABEL[battle.facingDirection ?? 'N']}
         </div>
       </div>
 
       {/* バトルログ */}
       <BattleLog log={battle.log} />
+      <RadarDisplay
+        dungeonId="ffgg"
+        facingDirection={battle.facingDirection ?? 'N'}
+        enemies={[{
+          idx: 0, name: battle.monster.name, direction: battle.enemyPos.direction, distanceM: battle.enemyPos.distanceM,
+          kind: battle.monster.isBoss ? 'boss' : battle.monster.isMidBoss ? 'midboss' : battle.monster.isRareBoss ? 'rareboss' : 'mob',
+        }]}
+      />
 
       {/* アクションボタン（他ダンジョンと同じ操作感） */}
       {battle.phase === 'fighting' && (
@@ -182,17 +192,21 @@ function BattleScreen({ battle, equipment, inventory, onAttack, onDefend, onFlee
             {equipment.hotbar.map((itemId, i) => {
               const item = itemId ? ITEM_MASTER[itemId] : null;
               const qty = itemId ? (inventory[itemId] ?? 0) : 0;
-              const isEquippedWeapon = !!itemId && itemId === equippedWeaponId;
+              const isWeaponSlot = item?.itemType === 'Weapon';
+              const isEquippedWeapon = !!itemId && itemId === battle.equippedWeaponId;
               return (
-                <div key={i} style={{
-                  width:38, height:38, background: isEquippedWeapon ? 'rgba(224,85,85,0.2)' : item && qty>0 ? 'rgba(91,141,238,0.15)' : '#161b26',
-                  border:`1px solid ${isEquippedWeapon ? '#e05555' : item && qty>0 ? '#5b8dee' : '#2d3752'}`, borderRadius:6,
-                  display:'flex', alignItems:'center', justifyContent:'center', position:'relative',
-                }} title={item ? `${item.name} ×${qty}` : `スロット${i+1}（空）`}>
+                <button key={i} onClick={() => isWeaponSlot && itemId && onEquipWeapon(itemId)}
+                  disabled={!isWeaponSlot || isEquippedWeapon}
+                  style={{
+                    width:38, height:38, background: isEquippedWeapon ? 'rgba(224,85,85,0.2)' : item && qty>0 ? 'rgba(91,141,238,0.15)' : '#161b26',
+                    border:`1px solid ${isEquippedWeapon ? '#e05555' : item && qty>0 ? '#5b8dee' : '#2d3752'}`, borderRadius:6,
+                    display:'flex', alignItems:'center', justifyContent:'center', position:'relative',
+                    cursor: isWeaponSlot && !isEquippedWeapon ? 'pointer' : 'default',
+                  }} title={item ? `${item.name}${isWeaponSlot ? (isEquippedWeapon ? '（装備中）' : '（タップで装備）') : ` ×${qty}`}` : `スロット${i+1}（空）`}>
                   {item
-                    ? <><GameIcon id={item.icon} size={18} /><span style={{ position:'absolute', bottom:1, right:2, fontSize:'0.5rem', color:'#f0c060' }}>{qty}</span></>
+                    ? <><GameIcon id={item.icon} size={18} />{!isWeaponSlot && <span style={{ position:'absolute', bottom:1, right:2, fontSize:'0.5rem', color:'#f0c060' }}>{qty}</span>}</>
                     : <span style={{ fontSize:'0.6rem', color:'#4a5070' }}>{i+1}</span>}
-                </div>
+                </button>
               );
             })}
             <button onClick={onToggleHotbar} style={{ padding:'0 10px', height:38, background:'#161b26', border:'1px dashed #5b8dee', borderRadius:6, color:'#5b8dee', cursor:'pointer', fontSize:'0.72rem' }}>
@@ -423,6 +437,14 @@ export function FFGGRScreen(){
   const playerMaxHp = 1000 + (player?.stats?.level ?? 1) * 50;
 
   // ─── 戦闘開始 ───
+  const [equippedWeaponId, setEquippedWeaponId] = useState<string | null>(
+    () => equipment.hotbar.find(id => id && ITEM_MASTER[id]?.itemType === 'Weapon') ?? null
+  );
+  function handleEquipWeapon(itemId: string){
+    setEquippedWeaponId(itemId);
+    setBattle(prev => prev ? { ...prev, equippedWeaponId: itemId, log: [...prev.log, { text: `🔁 ${ITEM_MASTER[itemId]?.name}を装備した！`, color: '#5b8dee' }] } : null);
+  }
+
   function startBattle(monster: FFGGRMonster){
     const behavior = (monster as any).moveBehavior ?? 'aggressive';
     setBattle({
@@ -441,6 +463,8 @@ export function FFGGRScreen(){
       pointGained: 0,
       isDefending: false,
       specialEncounter: null,
+      facingDirection: 'N',
+      equippedWeaponId,
     });
     setTab('battle');
   }
@@ -456,8 +480,7 @@ export function FFGGRScreen(){
   // ─── プレイヤー攻撃 ───
   const handleAttack = useCallback(()=>{
     if(!battle || battle.phase!=='fighting') return;
-    const equippedWeaponId = equipment.hotbar.find(id => id && ITEM_MASTER[id]?.itemType === 'Weapon') ?? null;
-    const weaponItem = equippedWeaponId ? ITEM_MASTER[equippedWeaponId] : null;
+    const weaponItem = battle.equippedWeaponId ? ITEM_MASTER[battle.equippedWeaponId] : null;
     const atk = weaponItem?.weaponAtk ?? (100 + (player?.stats?.level??1) * 10);
     const def = battle.monster.defense;
     // 状態異常チェック
@@ -826,10 +849,17 @@ export function FFGGRScreen(){
             onHotbarSlotClick={(slot,idx)=>setHotbarModal({slot,idx})}
             onOpenCompass={()=>setShowCompass(true)}
             onOpenFacingCompass={()=>setShowFacingCompass(true)}
+            onEquipWeapon={handleEquipWeapon}
           />
+          {(() => {
+            const eqItem = battle.equippedWeaponId ? ITEM_MASTER[battle.equippedWeaponId] : null;
+            const eqShape: AreaShape = (eqItem?.areaShape ?? 'omni') as AreaShape;
+            const shapeHighlight = eqItem?.isAreaWeapon && eqShape !== 'omni' ? getShapeDirections(battle.facingDirection ?? 'N', eqShape) : undefined;
+            return (<>
           {showFacingCompass && (
             <CompassModal
               title="↻ 向き変更 — 攻撃前にいつでも変更可能（ターン消費なし）"
+              highlightDirs={shapeHighlight}
               enemies={[{
                 idx: 0, name: battle.monster.name, direction: battle.enemyPos.direction, distanceM: battle.enemyPos.distanceM,
                 kind: battle.monster.isBoss ? 'boss' : battle.monster.isMidBoss ? 'midboss' : battle.monster.isRareBoss ? 'rareboss' : 'mob',
@@ -843,18 +873,21 @@ export function FFGGRScreen(){
           )}
           {showCompass && (
             <CompassModal
+              highlightDirs={shapeHighlight}
               enemies={[{
                 idx: 0, name: battle.monster.name, direction: battle.enemyPos.direction, distanceM: battle.enemyPos.distanceM,
                 kind: battle.monster.isBoss ? 'boss' : battle.monster.isMidBoss ? 'midboss' : battle.monster.isRareBoss ? 'rareboss' : 'mob',
               } as CompassEnemyDot]}
               onSelectDirection={(dir)=>{
-                setBattle(prev=>prev?{...prev, enemyPos:{...prev.enemyPos, direction:dir, distanceM: Math.max(0, prev.enemyPos.distanceM-6)}, log:[...prev.log,{text:`🧭 ${DIR_LABEL[dir]}方向へ間合いを詰めた！`,color:'#5b8dee'}]}:null);
+                setBattle(prev=>prev?{...prev, enemyPos:{...prev.enemyPos, direction:dir, distanceM: Math.max(0, prev.enemyPos.distanceM-6)}, facingDirection:dir, log:[...prev.log,{text:`🧭 ${DIR_LABEL[dir]}方向へ間合いを詰め、向きも合わせた！`,color:'#5b8dee'}]}:null);
                 setShowCompass(false);
                 setTimeout(()=>handleMonsterTurn(), 300);
               }}
               onClose={()=>setShowCompass(false)}
             />
           )}
+            </>);
+          })()}
           {battle.phase!=='fighting' && (
             <div style={{ display:'flex', gap:8, marginTop:8 }}>
               <button style={{ ...S.btn('#2d3752'), flex:1, border:'1px solid #4a5070' }} onClick={()=>{ setBattle(null); setTab('area'); }}>← エリアに戻る</button>
