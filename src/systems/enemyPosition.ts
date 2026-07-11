@@ -68,3 +68,23 @@ export function moveEnemyPos(p: EnemyPos): EnemyPos {
       return p;
   }
 }
+
+export type AreaShape = 'omni' | 'front' | 'behind' | 'cone';
+export const AREA_SHAPE_BONUS_PCT: Record<AreaShape, number> = { omni: 0, front: 15, behind: 15, cone: 25 };
+export const AREA_SHAPE_LABEL: Record<AreaShape, string> = { omni: '全方位', front: '前方', behind: '後方', cone: '扇形' };
+
+/** 向き(facing)と形状(shape)から、対象となる方向の一覧を返す。omniは全8方向、front/behindは3方向、coneは正面1方向のみ。 */
+export function getShapeDirections(facing: EnemyDirection, shape: AreaShape): EnemyDirection[] {
+  const fi = ALL_DIRS.indexOf(facing);
+  if (shape === 'omni') return [...ALL_DIRS];
+  if (shape === 'cone') return [facing];
+  if (shape === 'front') return [ALL_DIRS[(fi - 1 + 8) % 8], facing, ALL_DIRS[(fi + 1) % 8]];
+  // behind: facingの正反対を中心に3方向
+  const bi = (fi + 4) % 8;
+  return [ALL_DIRS[(bi - 1 + 8) % 8], ALL_DIRS[bi], ALL_DIRS[(bi + 1) % 8]];
+}
+
+/** 指定した敵の方向が、この形状の対象に入っているかどうか */
+export function isDirectionInShape(enemyDir: EnemyDirection, facing: EnemyDirection, shape: AreaShape): boolean {
+  return getShapeDirections(facing, shape).includes(enemyDir);
+}
