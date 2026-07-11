@@ -22,11 +22,12 @@ const KIND_COLOR: Record<CompassEnemyKind, string> = {
 };
 
 // ─── コンパスUI（間合い操作） ───────────────────────────────
-export function CompassModal({ enemies, onSelectDirection, onClose, title }: {
+export function CompassModal({ enemies, onSelectDirection, onClose, title, highlightDirs }: {
   enemies: CompassEnemyDot[];
   onSelectDirection: (dir: EnemyDirection) => void;
   onClose: () => void;
   title?: string;
+  highlightDirs?: EnemyDirection[];
 }) {
   const SIZE = 260;
   const CENTER = SIZE / 2;
@@ -71,17 +72,34 @@ export function CompassModal({ enemies, onSelectDirection, onClose, title }: {
               }} />
             );
           })}
+          {/* 形状ハイライト（扇形セクター） */}
+          {highlightDirs && highlightDirs.map(dir => {
+            const i = ALL_DIRS.indexOf(dir);
+            const angleDeg = i * 45 - 90;
+            const rad = (angleDeg * Math.PI) / 180;
+            const x = CENTER + MAX_R * 0.55 * Math.cos(rad);
+            const y = CENTER + MAX_R * 0.55 * Math.sin(rad);
+            return (
+              <div key={`hl-${dir}`} style={{
+                position: 'absolute', left: x - 26, top: y - 26, width: 52, height: 52, borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(255,183,3,0.35) 0%, rgba(255,183,3,0) 70%)',
+                pointerEvents: 'none',
+              }} />
+            );
+          })}
           {ALL_DIRS.map((dir, i) => {
             const angleDeg = i * 45 - 90;
             const rad = (angleDeg * Math.PI) / 180;
             const r = MAX_R + 14;
             const x = CENTER + r * Math.cos(rad);
             const y = CENTER + r * Math.sin(rad);
+            const isHl = !!highlightDirs?.includes(dir);
             return (
               <button key={dir} onClick={() => onSelectDirection(dir)} style={{
                 position: 'absolute', left: x - 20, top: y - 14, width: 40, height: 28,
-                background: '#161b26', border: '1px solid #5b8dee', borderRadius: 6,
-                color: '#5b8dee', fontSize: '0.68rem', cursor: 'pointer', fontWeight: 700,
+                background: isHl ? 'rgba(255,183,3,0.18)' : '#161b26', border: `1px solid ${isHl ? '#ffb703' : '#5b8dee'}`, borderRadius: 6,
+                color: isHl ? '#ffb703' : '#5b8dee', fontSize: '0.68rem', cursor: 'pointer', fontWeight: 700,
+                boxShadow: isHl ? '0 0 8px 1px rgba(255,183,3,0.5)' : 'none',
               }}>{DIR_LABEL[dir]}</button>
             );
           })}
@@ -89,6 +107,7 @@ export function CompassModal({ enemies, onSelectDirection, onClose, title }: {
         <div style={{ fontSize: '0.65rem', color: '#4a5070', display: 'flex', gap: 10 }}>
           <span>🟢 通常モブ</span><span>🟡 中ボス</span><span>🔴 ボス</span><span>🟣 レアボス</span>
         </div>
+        {highlightDirs && <div style={{ fontSize: '0.62rem', color: '#ffb703' }}>🟠 光っている方向＝装備中武器の攻撃形状が届く範囲</div>}
         <button onClick={onClose} style={{ padding: '5px 16px', background: '#2d3752', border: 'none', borderRadius: 6, color: '#e8e6ff', cursor: 'pointer', fontSize: '0.72rem' }}>閉じる</button>
       </div>
     </div>
