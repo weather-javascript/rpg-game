@@ -456,6 +456,9 @@ export interface ItemMaster {
     buffType?: string;
     buffDuration?: number;
     areaAttack?: boolean;   // 範囲攻撃フラグ（変幻始動す原初の剣斧など）
+    // ver3.2.0: 料理バフ（実際にactiveDishBuffsへ反映され、戦闘/採取/釣り/市場/ギャンブルに自動反映される）
+    lifeBuffEffects?: Partial<import('./buildTypes').PowerModifiers>;
+    lifeBuffDurationMs?: number;
   };
 }
 

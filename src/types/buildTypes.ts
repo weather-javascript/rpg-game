@@ -275,6 +275,7 @@ export interface CropDef {
   qualityProduceItemId?: string;
   qualityChance: number; // 肥料/水やり込みでの高品質化率
   requiredLevel: number;
+  theme?: string; // ver3.2.0: ダンジョンテーマ連動（図鑑フィルター用）
 }
 
 export interface FarmPlotState {
@@ -299,6 +300,7 @@ export interface LifeRecipeDef {
   expGain: number;
   greatSuccessChance: number;
   greatSuccessMultiplier: number;
+  theme?: string; // ver3.2.0: ダンジョンテーマ連動（図鑑フィルター用）
 }
 
 export type CollectionCategory = 'item' | 'fish' | 'monster' | 'gather' | 'cooking' | 'pet' | 'specimen';
@@ -312,6 +314,7 @@ export interface CollectionDef {
   rewardGold: number;
   rewardItems: { itemId: string; amount: number }[];
   rewardEffects: Partial<PowerModifiers>;
+  theme?: string; // ver3.2.0: ダンジョンテーマ連動（図鑑フィルター用）
 }
 
 export interface LifeSystemState {
