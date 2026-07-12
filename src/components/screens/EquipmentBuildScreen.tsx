@@ -6,6 +6,7 @@ import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
 import { getItemTrait, AFFIX_MASTER, buildAutoSets, getAffixSlotCount } from '../../data/equipmentBuildData';
 import { defaultEquipmentBuildState, AWAKENING_MAX, type AffixInstance, type AffixId, type BuildPreset } from '../../types/buildTypes';
+import { TutorialCard } from '../TutorialCard';
 
 const RARITY_COLOR: Record<string, string> = { common: '#8a92b2', uncommon: '#7ec98a', rare: '#5fa8e0', epic: '#c060e0', legendary: '#f0c060' };
 type SortKey = 'name' | 'rarity' | 'awakening';
@@ -106,9 +107,33 @@ export function EquipmentBuildScreen() {
   return (
     <div style={{ padding: '12px 8px 80px' }}>
       <h2 style={{ fontFamily: 'Cinzel,serif', color: '#f0c060', marginBottom: 4, fontSize: '1rem' }}>🛡️ 装備ビルド</h2>
-      <p style={{ fontSize: '0.72rem', color: '#8a92b2', marginBottom: 12 }}>
+      <p style={{ fontSize: '0.72rem', color: '#8a92b2', marginBottom: 8 }}>
         所持している武器・防具の特性・付与効果・セット効果・覚醒段階を確認・強化できます。
       </p>
+      <div style={{ background:'rgba(91,141,238,0.1)', border:'1px solid rgba(91,141,238,0.3)', borderRadius:8, padding:'8px 10px', marginBottom:12, fontSize:'0.68rem', color:'#8a92b2', lineHeight:1.7 }}>
+        <b style={{ color:'#5b8dee' }}>使い方：</b>
+        ① 下の一覧から強化したい武器・防具をタップして選択
+        　② 選択すると特性・付与効果(アフィックス)・セット効果・覚醒段階が表示される
+        　③ 「付与効果を振り直す」でランダムなアフィックスを再抽選、「覚醒させる」で覚醒段階を上げて付与枠を増やせる
+        　④ 気に入った組み合わせは画面下部の「プリセット保存」で名前を付けて保存・呼び出し可能
+      </div>
+
+      <TutorialCard
+        tutorialId="equipment_build_starter"
+        title="はじめての装備ビルド"
+        starterLabel="武器と再抽選石"
+        steps={[
+          { text: 'お試しの武器と再抽選石を受け取る' },
+          { text: '左の一覧からもらった武器をタップして選択する' },
+          { text: '右側に特性・付与効果・覚醒段階が表示される' },
+          { text: '「付与効果を再抽選」ボタンを押すと、再抽選石を1個消費してランダムな効果が付く' },
+          { text: '気に入ったら画面下部でプリセットとして保存しておこう' },
+        ]}
+        starterItems={[
+          { itemId: 'iron_sword', amount: 1 },
+          { itemId: 'affix_reroll_stone', amount: 3 },
+        ]}
+      />
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
         {(['all', 'weapon', 'armor'] as const).map(c => (

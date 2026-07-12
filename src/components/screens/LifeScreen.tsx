@@ -6,6 +6,7 @@ import { useGameStore } from '../../stores/gameStore';
 import { ITEM_MASTER } from '../../data/masters';
 import { CROP_MASTER, LIFE_RECIPES, COLLECTION_MASTER, LIFE_THEMES } from '../../data/lifeSystemData';
 import { defaultLifeSystemState, type FarmPlotState } from '../../types/buildTypes';
+import { TutorialCard } from '../TutorialCard';
 
 type Tab = 'farm' | 'cooking' | 'alchemy' | 'refining' | 'collection' | 'codex';
 
@@ -28,6 +29,12 @@ export function LifeScreen() {
   const [codexSearch, setCodexSearch] = useState('');
   const [codexTheme, setCodexTheme] = useState<string>('all');
   const [codexCat, setCodexCat] = useState<'all'|'crop'|'cooking'|'alchemy'|'refining'>('all');
+  const [seedSearch, setSeedSearch] = useState('');
+  const [seedTheme, setSeedTheme] = useState<string>('all');
+  const [seedOwnedOnly, setSeedOwnedOnly] = useState(true);
+  const [recipeSearch, setRecipeSearch] = useState('');
+  const [recipeCraftableOnly, setRecipeCraftableOnly] = useState(true);
+  const [codexOwnedOnly, setCodexOwnedOnly] = useState(true);
 
   if (!player) return null;
   const life = player.life ?? defaultLifeSystemState();
@@ -53,6 +60,25 @@ export function LifeScreen() {
       </div>
 
       {tab === 'farm' && (
+        <TutorialCard
+          tutorialId="farm_starter"
+          title="はじめての農業"
+          starterLabel="種セット"
+          steps={[
+            { text: 'お試しの種と肥料を受け取る' },
+            { text: '空いている畑（点線の枠）をタップして「＋ 種を植える」を選ぶ' },
+            { text: '一覧からもらった種を選んで植える（自動で「所持している種のみ」が表示されます）' },
+            { text: '水やり・肥料をあげると収穫量や高品質率がアップ' },
+            { text: '成長時間が経過したら「収穫」ボタンで受け取り、料理タブで使ってみよう' },
+          ]}
+          starterItems={[
+            { itemId: 'wheat_seed', amount: 3 },
+            { itemId: 'crop_plain_1_1_seed', amount: 3 },
+            { itemId: 'fertilizer', amount: 2 },
+          ]}
+        />
+      )}
+      {tab === 'farm' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
           {life.farmPlots.map((plot: FarmPlotState) => {
             const crop = plot.cropId ? CROP_MASTER[plot.cropId] : null;
@@ -61,22 +87,10 @@ export function LifeScreen() {
               <div key={plot.plotIndex} style={{ background: '#1c2235', border: `1px solid ${ready ? '#7ec98a' : '#2d3752'}`, borderRadius: 8, padding: 10 }}>
                 <div style={{ fontSize: '0.72rem', color: '#8a92b2', marginBottom: 4 }}>畑 #{plot.plotIndex + 1}</div>
                 {!crop ? (
-                  pickerPlot === plot.plotIndex ? (
-                    <div>
-                      {Object.values(CROP_MASTER).map(c => (
-                        <button key={c.id} onClick={() => { plantCrop(plot.plotIndex, c.id); setPickerPlot(null); }}
-                          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '4px 6px', marginBottom: 3, background: '#161b26', border: '1px solid #2d3752', borderRadius: 4, color: '#e8e6ff', fontSize: '0.68rem', cursor: 'pointer' }}>
-                          🌱 {c.name}（種×1 / 所持{inv[c.seedItemId] ?? 0}）
-                        </button>
-                      ))}
-                      <button onClick={() => setPickerPlot(null)} style={{ fontSize: '0.65rem', color: '#8a92b2', background: 'none', border: 'none', cursor: 'pointer' }}>キャンセル</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => setPickerPlot(plot.plotIndex)}
-                      style={{ width: '100%', padding: '8px', background: '#161b26', border: '1px dashed #2d3752', borderRadius: 6, color: '#8a92b2', cursor: 'pointer', fontSize: '0.72rem' }}>
-                      ＋ 種を植える
-                    </button>
-                  )
+                  <button onClick={() => { setPickerPlot(plot.plotIndex); setSeedSearch(''); }}
+                    style={{ width: '100%', padding: '8px', background: '#161b26', border: '1px dashed #2d3752', borderRadius: 6, color: '#8a92b2', cursor: 'pointer', fontSize: '0.72rem' }}>
+                    ＋ 種を植える
+                  </button>
                 ) : (
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '0.8rem' }}>{ready ? '🌾' : '🌱'} {crop.name}</div>
@@ -96,17 +110,104 @@ export function LifeScreen() {
         </div>
       )}
 
-      {(tab === 'cooking' || tab === 'alchemy' || tab === 'refining') && (
+      {tab === 'farm' && pickerPlot !== null && (() => {
+        const ownedSeedCrops = Object.values(CROP_MASTER).filter(c => (inv[c.seedItemId] ?? 0) > 0);
+        const pool = seedOwnedOnly ? ownedSeedCrops : Object.values(CROP_MASTER);
+        const q = seedSearch.trim();
+        const filtered = pool.filter(c =>
+          (seedTheme === 'all' || c.theme === seedTheme) &&
+          (!q || c.name.includes(q) || c.description.includes(q))
+        ).slice(0, 60);
+        return (
+          <div style={{ position:'fixed', inset:0, background:'rgba(5,7,14,0.85)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center' }} onClick={()=>setPickerPlot(null)}>
+            <div onClick={e=>e.stopPropagation()} style={{ background:'#0a0d14', border:'1px solid #2d3752', borderRadius:14, padding:16, width:'min(420px, 92vw)', maxHeight:'80vh', overflowY:'auto' }}>
+              <div style={{ fontWeight:800, color:'#f0c060', marginBottom:8, fontSize:'0.88rem' }}>🌱 畑#{pickerPlot+1} に植える種を選択</div>
+              <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+                <input value={seedSearch} onChange={e=>setSeedSearch(e.target.value)} placeholder="🔍 名前・説明で検索"
+                  style={{ flex:1, padding:'6px 10px', background:'#161b26', border:'1px solid #2d3752', borderRadius:6, color:'#e8e6ff', fontSize:'0.78rem' }} />
+              </div>
+              <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap', alignItems:'center' }}>
+                <button onClick={()=>setSeedOwnedOnly(v=>!v)} style={{ padding:'4px 10px', fontSize:'0.68rem', borderRadius:6, cursor:'pointer',
+                  background: seedOwnedOnly ? 'rgba(76,168,106,0.2)' : '#161b26', border:`1px solid ${seedOwnedOnly?'#4ca86a':'#2d3752'}`, color: seedOwnedOnly?'#4ca86a':'#8a92b2' }}>
+                  {seedOwnedOnly ? '✅ 所持している種のみ' : '所持している種のみ'}
+                </button>
+                <select value={seedTheme} onChange={e=>setSeedTheme(e.target.value)}
+                  style={{ padding:'4px 8px', fontSize:'0.7rem', background:'#161b26', border:'1px solid #2d3752', borderRadius:6, color:'#8a92b2' }}>
+                  <option value="all">全テーマ</option>
+                  {LIFE_THEMES.map(t => <option key={t.id} value={t.id}>{t.emoji}{t.label}</option>)}
+                </select>
+              </div>
+              {seedOwnedOnly && ownedSeedCrops.length === 0 && (
+                <div style={{ fontSize:'0.7rem', color:'#8a92b2', marginBottom:8 }}>
+                  種を所持していません。マーケットの「購入」タブ→「🌾生活素材(種)のみ」で購入するか、上のチェックを外して全種類を見られます。
+                </div>
+              )}
+              {filtered.map(c => (
+                <button key={c.id} onClick={() => { plantCrop(pickerPlot, c.id); setPickerPlot(null); }}
+                  style={{ display:'block', width:'100%', textAlign:'left', padding:'6px 8px', marginBottom:4, background:'#161b26', border:'1px solid #2d3752', borderRadius:6, color:'#e8e6ff', fontSize:'0.72rem', cursor:'pointer' }}>
+                  <div style={{ fontWeight:700 }}>🌱 {c.name}（所持 {inv[c.seedItemId] ?? 0}）</div>
+                  <div style={{ fontSize:'0.64rem', color:'#8a92b2', marginTop:2 }}>{c.description}</div>
+                </button>
+              ))}
+              <button onClick={()=>setPickerPlot(null)} style={{ width:'100%', marginTop:6, padding:'6px', fontSize:'0.72rem', color:'#8a92b2', background:'none', border:'1px solid #2d3752', borderRadius:6, cursor:'pointer' }}>キャンセル</button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {tab === 'cooking' && (
+        <TutorialCard
+          tutorialId="cooking_starter"
+          title="はじめての料理"
+          starterLabel="食材セット"
+          steps={[
+            { text: 'お試しの食材を受け取る' },
+            { text: '「作れるものだけ」チェックがONの状態だと、今の所持素材で作れる料理だけが表示されます' },
+            { text: '作りたい料理の「作成する」ボタンを押すと完成' },
+            { text: '完成した料理はアイテム欄から使用すると、攻撃力や採取成功率などが一定時間アップします' },
+          ]}
+          starterItems={[
+            { itemId: 'crop_plain_1_1_produce', amount: 4 },
+            { itemId: 'crop_plain_2_1_produce', amount: 2 },
+          ]}
+        />
+      )}
+      {(tab === 'cooking' || tab === 'alchemy' || tab === 'refining') && (() => {
+        const q = recipeSearch.trim();
+        const all = LIFE_RECIPES.filter(r => r.category === tab).map(r => ({
+          recipe: r, canMake: r.inputs.every(i => (inv[i.itemId] ?? 0) >= i.amount),
+        }));
+        const filtered = all
+          .filter(({ recipe }) => !q || recipe.name.includes(q) || recipe.description.includes(q))
+          .filter(({ canMake }) => !recipeCraftableOnly || canMake)
+          .sort((a, b) => (a.canMake === b.canMake ? 0 : a.canMake ? -1 : 1));
+        const shown = filtered.slice(0, 80);
+        return (
         <div>
           <div style={{ fontSize: '0.72rem', color: '#7ec98a', marginBottom: 8 }}>
             {tab}Lv. {getLifeLevel(tab)}
           </div>
-          {LIFE_RECIPES.filter(r => r.category === tab).map(recipe => {
-            const canMake = recipe.inputs.every(i => (inv[i.itemId] ?? 0) >= i.amount);
+          <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+            <input value={recipeSearch} onChange={e=>setRecipeSearch(e.target.value)} placeholder="🔍 料理名・素材で検索"
+              style={{ flex:1, padding:'6px 10px', background:'#161b26', border:'1px solid #2d3752', borderRadius:6, color:'#e8e6ff', fontSize:'0.78rem' }} />
+            <button onClick={()=>setRecipeCraftableOnly(v=>!v)} style={{ padding:'6px 10px', fontSize:'0.7rem', borderRadius:6, cursor:'pointer', whiteSpace:'nowrap' as const,
+              background: recipeCraftableOnly ? 'rgba(76,168,106,0.2)' : '#161b26', border:`1px solid ${recipeCraftableOnly?'#4ca86a':'#2d3752'}`, color: recipeCraftableOnly?'#4ca86a':'#8a92b2' }}>
+              {recipeCraftableOnly ? '✅ 作れるものだけ' : '作れるものだけ'}
+            </button>
+          </div>
+          <div style={{ fontSize:'0.65rem', color:'#4a5070', marginBottom:8 }}>
+            {filtered.length}件ヒット（作成可能: {all.filter(a=>a.canMake).length}/{all.length}）{filtered.length>80?'　先頭80件を表示':''}
+          </div>
+          {recipeCraftableOnly && all.filter(a=>a.canMake).length===0 && (
+            <div style={{ fontSize:'0.7rem', color:'#8a92b2', marginBottom:8 }}>
+              現在の所持素材で作れるレシピがありません。チェックを外すと必要な素材を確認できます。
+            </div>
+          )}
+          {shown.map(({ recipe, canMake }) => {
             return (
-              <div key={recipe.id} style={{ background: '#1c2235', border: '1px solid #2d3752', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+              <div key={recipe.id} style={{ background: '#1c2235', border: `1px solid ${canMake ? '#4ca86a' : '#2d3752'}`, borderRadius: 8, padding: 10, marginBottom: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>{itemIcon(recipe.outputItemId)} {recipe.name}</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>{canMake ? '✅' : itemIcon(recipe.outputItemId)} {recipe.name}</span>
                   <span style={{ fontSize: '0.65rem', color: '#8a92b2' }}>必要Lv{recipe.requiredLevel}</span>
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#8a92b2', margin: '4px 0' }}>{recipe.description}</div>
@@ -121,7 +222,8 @@ export function LifeScreen() {
             );
           })}
         </div>
-      )}
+        );
+      })()}
 
       {tab === 'collection' && (
         <div>
@@ -148,14 +250,21 @@ export function LifeScreen() {
       )}
       {tab === 'codex' && (() => {
         const q = codexSearch.trim();
-        type CodexEntry = { id: string; name: string; description: string; theme?: string; requiredLevel: number; kind: 'crop'|'cooking'|'alchemy'|'refining'; icon?: string };
+        type CodexEntry = { id: string; name: string; description: string; theme?: string; requiredLevel: number; kind: 'crop'|'cooking'|'alchemy'|'refining'; icon?: string; owned: boolean };
         const entries: CodexEntry[] = [
-          ...Object.values(CROP_MASTER).map(c => ({ id: c.id, name: c.name, description: c.description, theme: c.theme, requiredLevel: c.requiredLevel, kind: 'crop' as const, icon: c.icon })),
-          ...LIFE_RECIPES.map(r => ({ id: r.id, name: r.name, description: r.description, theme: r.theme, requiredLevel: r.requiredLevel, kind: r.category as 'cooking'|'alchemy'|'refining' })),
+          ...Object.values(CROP_MASTER).map(c => ({
+            id: c.id, name: c.name, description: c.description, theme: c.theme, requiredLevel: c.requiredLevel, kind: 'crop' as const, icon: c.icon,
+            owned: (inv[c.seedItemId] ?? 0) > 0 || (inv[c.produceItemId] ?? 0) > 0 || (c.qualityProduceItemId ? (inv[c.qualityProduceItemId] ?? 0) > 0 : false),
+          })),
+          ...LIFE_RECIPES.map(r => ({
+            id: r.id, name: r.name, description: r.description, theme: r.theme, requiredLevel: r.requiredLevel, kind: r.category as 'cooking'|'alchemy'|'refining',
+            owned: (inv[r.outputItemId] ?? 0) > 0 || r.inputs.every(i => (inv[i.itemId] ?? 0) >= i.amount),
+          })),
         ];
         const filtered = entries.filter(e =>
           (codexCat === 'all' || e.kind === codexCat) &&
           (codexTheme === 'all' || e.theme === codexTheme) &&
+          (!codexOwnedOnly || e.owned) &&
           (!q || e.name.includes(q) || e.description.includes(q))
         );
         const LIMIT = 60;
@@ -165,6 +274,10 @@ export function LifeScreen() {
             <div style={{ display:'flex', gap:6, marginBottom:8 }}>
               <input value={codexSearch} onChange={e=>setCodexSearch(e.target.value)} placeholder="🔍 名前・説明で検索"
                 style={{ flex:1, padding:'6px 10px', background:'#161b26', border:'1px solid #2d3752', borderRadius:6, color:'#e8e6ff', fontSize:'0.8rem' }} />
+              <button onClick={()=>setCodexOwnedOnly(v=>!v)} style={{ padding:'6px 10px', fontSize:'0.7rem', borderRadius:6, cursor:'pointer', whiteSpace:'nowrap' as const,
+                background: codexOwnedOnly ? 'rgba(76,168,106,0.2)' : '#161b26', border:`1px solid ${codexOwnedOnly?'#4ca86a':'#2d3752'}`, color: codexOwnedOnly?'#4ca86a':'#8a92b2' }}>
+                {codexOwnedOnly ? '✅ 所持/作成可能のみ' : '所持/作成可能のみ'}
+              </button>
             </div>
             <div style={{ display:'flex', gap:6, marginBottom:6, flexWrap:'wrap' }}>
               {(['all','crop','cooking','alchemy','refining'] as const).map(c => (
@@ -185,11 +298,11 @@ export function LifeScreen() {
               ))}
             </div>
             <div style={{ fontSize:'0.68rem', color:'#4a5070', marginBottom:8 }}>
-              {filtered.length}件ヒット{filtered.length > LIMIT ? `（先頭${LIMIT}件を表示。絞り込むとすべて見つけやすくなります）` : ''}
+              {filtered.length}件ヒット{filtered.length > LIMIT ? `（先頭${LIMIT}件を表示。絞り込むとすべて見つけやすくなります）` : ''}　全{entries.length}件登録済み
             </div>
-            {q === '' && codexTheme === 'all' && codexCat === 'all' && (
+            {codexOwnedOnly && filtered.length === 0 && (
               <div style={{ fontSize:'0.7rem', color:'#8a92b2', marginBottom:8 }}>
-                💡 検索語やテーマ・カテゴリを指定すると絞り込めます（全{entries.length}件登録済み）
+                所持/作成可能なものがまだありません。「所持/作成可能のみ」のチェックを外すと図鑑全体を見られます。
               </div>
             )}
             {shown.map(e => (
