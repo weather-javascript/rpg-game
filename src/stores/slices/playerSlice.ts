@@ -6,6 +6,7 @@ import type { GameState } from '../gameStore';
 import type { IdMap, EquipmentSlots, GatherCategory } from '../../types/game';
 import { EXP_TABLE, SKILL_EXP_TABLE, ITEM_MASTER } from '../../data/masters';
 import { getPlayerPowerProfile } from '../../systems/playerPower';
+import { defaultLifeSystemState } from '../../types/buildTypes';
 
 export interface PlayerSlice {
   addItems:           (drops: { itemId: string; amount: number }[]) => void;
@@ -179,11 +180,26 @@ export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (
       const ok = consumeItem(itemId, 1);
       if (!ok) return { success: false, message: 'アイテムの消費に失敗しました' };
     }
-    const { hpRestore, satietyRestore, message } = item.useEffect;
+    const { hpRestore, satietyRestore, message, lifeBuffEffects, lifeBuffDurationMs } = item.useEffect;
     const healMult = 1 + getPlayerPowerProfile(player).healPct; // ver3.0.0: 回復特化ボーナス
     if (hpRestore && hpRestore > 0) changeHp(Math.min(Math.round(hpRestore * healMult), player.stats.maxHp - player.stats.hp));
     if (hpRestore && hpRestore < 0) changeHp(hpRestore);
     if (satietyRestore) changeSatiety(Math.min(satietyRestore, player.stats.maxSatiety - player.stats.satiety));
+    // ver3.2.0: 料理バフを実際に player.life.activeDishBuffs へ反映する（getPlayerPowerProfile経由で戦闘/採取/釣り/市場/ギャンブルに自動反映）
+    if (lifeBuffEffects && lifeBuffDurationMs) {
+      set(state => {
+        if (!state.player) return {};
+        const life = state.player.life ?? defaultLifeSystemState();
+        const now = Date.now();
+        const existing = (life.activeDishBuffs ?? []).filter(b => b.expiry > now && b.dishId !== itemId);
+        return {
+          player: {
+            ...state.player,
+            life: { ...life, activeDishBuffs: [...existing, { dishId: itemId, expiry: now + lifeBuffDurationMs, effects: lifeBuffEffects }] },
+          },
+        };
+      });
+    }
     const msg = message ?? `${item.name}を使用した！`;
     addNotification('success', msg);
     return { success: true, message: msg };
