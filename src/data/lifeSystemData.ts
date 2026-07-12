@@ -3,11 +3,17 @@
 
 import type { ItemMaster } from '../types/game';
 import type { CropDef, LifeRecipeDef, CollectionDef } from '../types/buildTypes';
+import { GEN_CROP_MASTER, GEN_FARM_ITEMS } from './life/crops.generated';
+import { GEN_COOKING_RECIPES, GEN_COOKING_ITEMS } from './life/cooking.generated';
+import { GEN_ALCHEMY_RECIPES, GEN_ALCHEMY_ITEMS } from './life/alchemy.generated';
+import { GEN_REFINING_RECIPES, GEN_REFINING_ITEMS } from './life/refining.generated';
+import { GEN_COLLECTIONS } from './life/collections.generated';
+export { LIFE_THEMES, type LifeTheme } from './life/themes';
 
 // ============================================================
 // 農業
 // ============================================================
-export const CROP_MASTER: Record<string, CropDef> = {
+const BASE_CROP_MASTER: Record<string, CropDef> = {
   wheat_crop: {
     id: 'wheat_crop', name: '小麦', description: '基本の農作物。料理の主原料になる。', icon: 'wheat',
     seedItemId: 'wheat_seed', produceItemId: 'wheat', growthMs: 10 * 60 * 1000, baseYield: 3,
@@ -33,7 +39,7 @@ export const CROP_MASTER: Record<string, CropDef> = {
 export const FARM_WATER_YIELD_BONUS = 0.20;     // 水やり済みなら収穫量+20%
 export const FARM_FERTILIZER_QUALITY_BONUS = 0.10; // 肥料済みなら高品質化率+10%
 
-export const FARM_ITEMS: Record<string, ItemMaster> = {
+const BASE_FARM_ITEMS: Record<string, ItemMaster> = {
   wheat_seed:   { id:'wheat_seed', name:'小麦の種', description:'畑に植えると小麦が育つ。', category:'material', itemType:'Item', rarity:'common', sellPrice:5, buyPrice:10, maxStack:99, icon:'wheat' },
   wheat:        { id:'wheat', name:'小麦', description:'料理の基本素材。', category:'material', itemType:'Item', rarity:'common', sellPrice:8, buyPrice:0, maxStack:99, icon:'wheat' },
   wheat_quality:{ id:'wheat_quality', name:'高品質な小麦', description:'高品質な小麦。料理効果が高い。', category:'material', itemType:'Item', rarity:'uncommon', sellPrice:20, buyPrice:0, maxStack:99, icon:'wheat' },
@@ -52,7 +58,7 @@ export const FARM_ITEMS: Record<string, ItemMaster> = {
 // ============================================================
 // 料理・錬金・精錬
 // ============================================================
-export const LIFE_RECIPES: LifeRecipeDef[] = [
+const BASE_LIFE_RECIPES: LifeRecipeDef[] = [
   // ---- 料理（戦闘向け／採取向け／釣り向け／店売り向け） ----
   {
     id: 'dish_power_stew', name: '力の濃厚シチュー', description: '食べると一定時間、攻撃力が上昇する。',
@@ -130,12 +136,12 @@ export const LIFE_RECIPES: LifeRecipeDef[] = [
   },
 ];
 
-export const LIFE_RECIPE_ITEMS: Record<string, ItemMaster> = {
-  dish_power_stew:        { id:'dish_power_stew', name:'力の濃厚シチュー', description:'食べると一定時間、攻撃力+8%。', category:'food', itemType:'Heal', rarity:'common', sellPrice:60, buyPrice:0, maxStack:20, icon:'food', nonconsumable:false, useEffect:{ message:'攻撃力が一時的に上昇した！' } },
-  dish_gatherers_bento:    { id:'dish_gatherers_bento', name:'採取人の弁当', description:'食べると一定時間、採取成功率・採取量が上昇する。', category:'food', itemType:'Heal', rarity:'common', sellPrice:60, buyPrice:0, maxStack:20, icon:'food' },
-  dish_anglers_rice_ball:  { id:'dish_anglers_rice_ball', name:'釣り人のおにぎり', description:'食べると一定時間、釣りの成功率・レア魚率が上昇する。', category:'food', itemType:'Heal', rarity:'common', sellPrice:60, buyPrice:0, maxStack:20, icon:'food' },
-  dish_merchants_tea:      { id:'dish_merchants_tea', name:'商人の特製茶', description:'飲むと一定時間、店売り価格が上昇する。', category:'food', itemType:'Heal', rarity:'uncommon', sellPrice:90, buyPrice:0, maxStack:20, icon:'food' },
-  dish_feast_platter:      { id:'dish_feast_platter', name:'大成功の宴の皿', description:'複数効果が同時発動する豪華料理。', category:'food', itemType:'Heal', rarity:'rare', sellPrice:300, buyPrice:0, maxStack:10, icon:'food' },
+const BASE_LIFE_RECIPE_ITEMS: Record<string, ItemMaster> = {
+  dish_power_stew:        { id:'dish_power_stew', name:'力の濃厚シチュー', description:'食べると一定時間、攻撃力+8%。', category:'food', itemType:'Heal', rarity:'common', sellPrice:60, buyPrice:0, maxStack:20, icon:'food', nonconsumable:false, useEffect:{ satietyRestore:15, message:'攻撃力が一時的に上昇した！', lifeBuffEffects:{ atkPct:0.08 }, lifeBuffDurationMs:20*60*1000 } },
+  dish_gatherers_bento:    { id:'dish_gatherers_bento', name:'採取人の弁当', description:'食べると一定時間、採取成功率・採取量が上昇する。', category:'food', itemType:'Heal', rarity:'common', sellPrice:60, buyPrice:0, maxStack:20, icon:'food', useEffect:{ satietyRestore:15, message:'採取成功率・採取量が上昇した！', lifeBuffEffects:{ gatherSuccessPct:0.08, gatherYieldPct:0.08 }, lifeBuffDurationMs:20*60*1000 } },
+  dish_anglers_rice_ball:  { id:'dish_anglers_rice_ball', name:'釣り人のおにぎり', description:'食べると一定時間、釣りの成功率・レア魚率が上昇する。', category:'food', itemType:'Heal', rarity:'common', sellPrice:60, buyPrice:0, maxStack:20, icon:'food', useEffect:{ satietyRestore:15, message:'釣りの成功率・レア魚率が上昇した！', lifeBuffEffects:{ fishSuccessMult:1.1, fishRarePct:0.05 }, lifeBuffDurationMs:20*60*1000 } },
+  dish_merchants_tea:      { id:'dish_merchants_tea', name:'商人の特製茶', description:'飲むと一定時間、店売り価格が上昇する。', category:'food', itemType:'Heal', rarity:'uncommon', sellPrice:90, buyPrice:0, maxStack:20, icon:'food', useEffect:{ satietyRestore:10, message:'店売り価格が上昇した！', lifeBuffEffects:{ sellPriceMult:1.12 }, lifeBuffDurationMs:20*60*1000 } },
+  dish_feast_platter:      { id:'dish_feast_platter', name:'大成功の宴の皿', description:'複数効果が同時発動する豪華料理。', category:'food', itemType:'Heal', rarity:'rare', sellPrice:300, buyPrice:0, maxStack:10, icon:'food', useEffect:{ satietyRestore:40, message:'攻撃力・防御力・経験値が同時に上昇した！', lifeBuffEffects:{ atkPct:0.1, defPct:0.1, expMult:1.1 }, lifeBuffDurationMs:30*60*1000 } },
   alchemy_minor_potion:    { id:'alchemy_minor_potion', name:'簡易ポーション', description:'HPを30回復する。', category:'potion', itemType:'Heal', rarity:'common', sellPrice:30, buyPrice:0, maxStack:99, icon:'potion', useEffect:{ hpRestore:30, message:'簡易ポーションでHPが30回復した！' } },
   alchemy_catalyst_powder: { id:'alchemy_catalyst_powder', name:'触媒の粉', description:'生活スキル経験値を一時的に増加させる。', category:'material', itemType:'Item', rarity:'rare', sellPrice:150, buyPrice:0, maxStack:99, icon:'gem' },
   alchemy_grand_elixir:    { id:'alchemy_grand_elixir', name:'満開エリクサー', description:'HPを200回復する最上位ポーション。', category:'potion', itemType:'Heal', rarity:'epic', sellPrice:600, buyPrice:0, maxStack:30, icon:'potion', useEffect:{ hpRestore:200, message:'満開エリクサーでHPが200回復した！' } },
@@ -147,7 +153,7 @@ export const LIFE_RECIPE_ITEMS: Record<string, ItemMaster> = {
 // ============================================================
 // 標本収集・図鑑系コレクション
 // ============================================================
-export const COLLECTION_MASTER: CollectionDef[] = [
+const BASE_COLLECTION_MASTER: CollectionDef[] = [
   {
     id: 'collection_gems', name: '宝石標本セット', description: 'FF洞窟群の宝石を集めて標本登録する。',
     category: 'specimen', targetIds: ['aurora_spinel', 'nether_ruby', 'cave_king_gem'],
@@ -165,6 +171,20 @@ export const COLLECTION_MASTER: CollectionDef[] = [
   },
 ];
 
-export const COLLECTION_ITEMS: Record<string, ItemMaster> = {
+const BASE_COLLECTION_ITEMS: Record<string, ItemMaster> = {
   slime_essence: { id:'slime_essence', name:'スライムの核', description:'標本収集用素材。', category:'material', itemType:'Item', rarity:'common', sellPrice:5, buyPrice:0, maxStack:99, icon:'slime' },
 };
+
+// ============================================================
+// ver3.2.0: 大規模拡張分（作物300・料理1500・錬金40・精錬20・標本収集10）をマージ
+// ============================================================
+export const CROP_MASTER: Record<string, CropDef> = { ...BASE_CROP_MASTER, ...GEN_CROP_MASTER };
+export const FARM_ITEMS: Record<string, ItemMaster> = { ...BASE_FARM_ITEMS, ...GEN_FARM_ITEMS };
+export const LIFE_RECIPES: LifeRecipeDef[] = [
+  ...BASE_LIFE_RECIPES, ...GEN_COOKING_RECIPES, ...GEN_ALCHEMY_RECIPES, ...GEN_REFINING_RECIPES,
+];
+export const LIFE_RECIPE_ITEMS: Record<string, ItemMaster> = {
+  ...BASE_LIFE_RECIPE_ITEMS, ...GEN_COOKING_ITEMS, ...GEN_ALCHEMY_ITEMS, ...GEN_REFINING_ITEMS,
+};
+export const COLLECTION_MASTER: CollectionDef[] = [...BASE_COLLECTION_MASTER, ...GEN_COLLECTIONS];
+export const COLLECTION_ITEMS: Record<string, ItemMaster> = { ...BASE_COLLECTION_ITEMS };
