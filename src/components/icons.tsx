@@ -2001,6 +2001,284 @@ const ICONS: Record<string, SvgDef> = {
   ` },
 
   // ──────────────────────────────────────────
+  // ver3.2.0追加: 未定義だったアイコンを一括補完
+  // ──────────────────────────────────────────
+  wheat: { content: `
+    <path d="M16 6 L16 27" stroke="${C.wood}" stroke-width="1.5"/>
+    <path d="M16 8 Q12 7 11 10 Q15 10 16 12" fill="${C.gold}"/>
+    <path d="M16 8 Q20 7 21 10 Q17 10 16 12" fill="${C.goldDk}"/>
+    <path d="M16 12 Q12 11 11 14 Q15 14 16 16" fill="${C.gold}"/>
+    <path d="M16 12 Q20 11 21 14 Q17 14 16 16" fill="${C.goldDk}"/>
+    <path d="M16 16 Q12 15 11 18 Q15 18 16 20" fill="${C.gold}"/>
+    <path d="M16 16 Q20 15 21 18 Q17 18 16 20" fill="${C.goldDk}"/>
+    <circle cx="16" cy="6" r="1.6" fill="${C.gold}"/>
+  ` },
+
+  herb: { content: `
+    <path d="M16 27 L16 15" stroke="${C.leafDk}" stroke-width="1.5"/>
+    <path d="M16 18 Q9 15 8 8 Q15 9 16 18Z" fill="${C.leaf}"/>
+    <path d="M16 16 Q23 13 24 7 Q17 8 16 16Z" fill="${C.leafDk}"/>
+    <path d="M16 22 Q11 20 10 15 Q15 16 16 22Z" fill="${C.leaf}" opacity="0.85"/>
+  ` },
+
+  spice: { content: `
+    <ellipse cx="16" cy="21" rx="9" ry="4" fill="${C.rust}"/>
+    <path d="M8 21 Q8 12 16 10 Q24 12 24 21" fill="${C.fire}" opacity="0.9"/>
+    <path d="M11 19 Q13 13 16 12" stroke="${C.fireDk}" stroke-width="1.2" fill="none" opacity="0.7"/>
+    <path d="M21 19 Q19 13 16 12" stroke="${C.fireDk}" stroke-width="1.2" fill="none" opacity="0.7"/>
+  ` },
+
+  flower: { content: `
+    <line x1="16" y1="30" x2="16" y2="18" stroke="${C.leafDk}" stroke-width="1.5"/>
+    <path d="M13 26 Q9 25 9 22" stroke="${C.leaf}" stroke-width="1.5" fill="none"/>
+    <circle cx="16" cy="12" r="3" fill="${C.gold}"/>
+    <circle cx="11" cy="10" r="3" fill="#e888c8"/>
+    <circle cx="21" cy="10" r="3" fill="#e888c8"/>
+    <circle cx="13" cy="6" r="3" fill="#f0a8d8"/>
+    <circle cx="19" cy="6" r="3" fill="#f0a8d8"/>
+    <circle cx="16" cy="8" r="2.5" fill="${C.gold}"/>
+  ` },
+
+  fruit: { content: `
+    <path d="M16 12 Q9 12 9 20 Q9 27 16 27 Q23 27 23 20 Q23 12 16 12Z" fill="#e05555"/>
+    <path d="M12 15 Q10 20 13 24" stroke="#f08888" stroke-width="1.2" fill="none" opacity="0.7"/>
+    <path d="M16 12 Q15 8 17 6" stroke="${C.woodDk}" stroke-width="1.5" fill="none"/>
+    <path d="M17 7 Q20 6 21 9 Q18 10 17 7Z" fill="${C.leaf}"/>
+  ` },
+
+  food: { content: `
+    <ellipse cx="16" cy="24" rx="11" ry="3" fill="${C.stoneDk}" opacity="0.5"/>
+    <path d="M7 22 Q16 27 25 22 Q23 12 16 10 Q9 12 7 22Z" fill="#e8a850"/>
+    <path d="M10 19 Q16 22 22 19" stroke="#c07830" stroke-width="1.2" fill="none" opacity="0.6"/>
+    <circle cx="13" cy="15" r="1.3" fill="${C.leaf}"/>
+    <circle cx="19" cy="16" r="1.3" fill="#e05555"/>
+  ` },
+
+  ingot: { content: `
+    <path d="M6 22 L8 12 L24 12 L26 22 Z" fill="${C.gold}"/>
+    <path d="M8 12 L10 8 L22 8 L24 12 Z" fill="#ffe090"/>
+    <line x1="8" y1="16" x2="24" y2="16" stroke="${C.goldDk}" stroke-width="1" opacity="0.6"/>
+    <line x1="8" y1="19" x2="24" y2="19" stroke="${C.goldDk}" stroke-width="1" opacity="0.4"/>
+  ` },
+
+  honey: { content: `
+    <path d="M11 6 L21 6 L23 12 L21 27 L11 27 L9 12 Z" fill="rgba(240,192,96,0.25)"/>
+    <path d="M12 14 L20 14 L20 25 L12 25 Z" fill="${C.gold}" opacity="0.9"/>
+    <path d="M11 6 L21 6 L21 9 L11 9 Z" fill="${C.woodDk}"/>
+    <circle cx="16" cy="19" r="2" fill="#c89028" opacity="0.6"/>
+  ` },
+
+  bag: { content: `
+    <path d="M9 13 L23 13 L24 27 Q16 30 8 27 Z" fill="${C.wood}"/>
+    <path d="M9 13 L23 13 L22.5 16 L9.5 16Z" fill="${C.woodDk}"/>
+    <path d="M13 13 Q13 8 16 8 Q19 8 19 13" stroke="${C.bark}" stroke-width="1.6" fill="none"/>
+    <circle cx="16" cy="20" r="1.5" fill="${C.gold}"/>
+  ` },
+
+  leather: { content: `
+    <path d="M16 6 L25 11 L25 21 L16 27 L7 21 L7 11 Z" fill="${C.rust}"/>
+    <path d="M16 6 L25 11 L16 16 L7 11 Z" fill="#b06a48" opacity="0.8"/>
+    <path d="M12 13 L14 15 M18 13 L20 15 M12 19 L14 21" stroke="${C.bark}" stroke-width="1" opacity="0.6"/>
+  ` },
+
+  leather_armor: { content: `
+    <path d="M16 6 L24 9 L24 18 Q24 25 16 28 Q8 25 8 18 L8 9 Z" fill="${C.rust}"/>
+    <path d="M16 6 L24 9 L24 18 Q24 25 16 28 Z" fill="#8a4a30" opacity="0.6"/>
+    <path d="M12 13 L20 13 M12 17 L20 17 M13 21 L19 21" stroke="${C.bark}" stroke-width="1" opacity="0.7"/>
+  ` },
+
+  chest_armor: { content: `
+    <path d="M16 5 L25 9 L25 17 Q25 26 16 29 Q7 26 7 17 L7 9 Z" fill="${C.steel}"/>
+    <path d="M16 5 L25 9 L25 17 Q25 26 16 29 Z" fill="${C.steelDk}" opacity="0.6"/>
+    <path d="M16 9 L21 11 L21 17 Q21 22 16 25 Q11 22 11 17 L11 11 Z" fill="${C.iron}" opacity="0.8"/>
+    <line x1="16" y1="9" x2="16" y2="25" stroke="${C.navyDk}" stroke-width="1" opacity="0.5"/>
+  ` },
+
+  mana_shard: { content: `
+    <path d="M16 4 L21 14 L16 28 L11 14 Z" fill="${C.magic}"/>
+    <path d="M16 4 L21 14 L16 17 Z" fill="#c8a0ff" opacity="0.8"/>
+    <path d="M16 17 L21 14 L16 28 Z" fill="${C.magicDk}" opacity="0.7"/>
+    <path d="M16 4 L11 14 L16 17 Z" fill="#8850d8" opacity="0.6"/>
+  ` },
+
+  potion_red: { content: `
+    <path d="M14 6 L18 6 L18 11 L21 15 L21 25 Q21 28 16 28 Q11 28 11 25 L11 15 Z" fill="rgba(232,240,255,0.25)"/>
+    <path d="M11 18 L21 18 L21 25 Q21 28 16 28 Q11 28 11 25Z" fill="#e05555"/>
+    <path d="M13 20 Q16 22 19 20" stroke="#ff9090" stroke-width="1" fill="none" opacity="0.6"/>
+    <rect x="13" y="5" width="6" height="2.5" rx="1" fill="${C.woodDk}"/>
+  ` },
+
+  star: { content: `
+    <path d="M16 4 L19 13 L28 13 L21 19 L23 28 L16 22 L9 28 L11 19 L4 13 L13 13 Z" fill="${C.gold}"/>
+    <path d="M16 4 L19 13 L16 16 L13 13Z" fill="#ffe8a0" opacity="0.8"/>
+  ` },
+
+  flag: { content: `
+    <line x1="9" y1="4" x2="9" y2="28" stroke="${C.bark}" stroke-width="2"/>
+    <path d="M9 5 L25 9 L18 13 L25 17 L9 21 Z" fill="#e05555"/>
+    <path d="M9 5 L25 9 L18 13 L9 15 Z" fill="#ff8080" opacity="0.5"/>
+  ` },
+
+  anchor: { content: `
+    <circle cx="16" cy="7" r="2.5" fill="none" stroke="${C.steel}" stroke-width="2"/>
+    <line x1="16" y1="9" x2="16" y2="24" stroke="${C.steel}" stroke-width="2"/>
+    <line x1="10" y1="13" x2="22" y2="13" stroke="${C.steel}" stroke-width="2"/>
+    <path d="M16 24 Q9 24 9 18 M16 24 Q23 24 23 18" stroke="${C.steel}" stroke-width="2" fill="none"/>
+    <path d="M6 18 L9 18 L9 21Z M26 18 L23 18 L23 21Z" fill="${C.steel}"/>
+  ` },
+
+  lantern: { content: `
+    <path d="M12 6 L20 6 L20 9 L12 9Z" fill="${C.iron}"/>
+    <path d="M13 9 L19 9 L19 23 L13 23Z" fill="rgba(240,192,96,0.2)" stroke="${C.iron}" stroke-width="1"/>
+    <circle cx="16" cy="16" r="4" fill="${C.gold}" opacity="0.9"/>
+    <line x1="16" y1="4" x2="16" y2="6" stroke="${C.iron}" stroke-width="1.5"/>
+    <path d="M12 23 L20 23 L18 27 L14 27Z" fill="${C.iron}"/>
+  ` },
+
+  infinite_spiral: { content: `
+    <path d="M16 16 Q10 10 6 16 Q10 22 16 16 Q22 10 26 16 Q22 22 16 16" fill="none" stroke="${C.magic}" stroke-width="2.4"/>
+    <circle cx="16" cy="16" r="2" fill="${C.white}"/>
+  ` },
+
+  boss_proof: { content: `
+    <path d="M16 4 L26 9 L26 17 Q26 25 16 29 Q6 25 6 17 L6 9 Z" fill="${C.navy}"/>
+    <path d="M16 4 L26 9 L26 17 Q26 25 16 29 Z" fill="${C.navyDk}" opacity="0.6"/>
+    <path d="M11 16 L15 20 L21 12" stroke="${C.gold}" stroke-width="2.2" fill="none"/>
+  ` },
+
+  reinforced_bone: { content: `
+    <path d="M8 16 Q6 13 8 11 Q11 9 12 12 L20 20 Q23 21 21 24 Q19 27 16 24Z" fill="${C.white}"/>
+    <circle cx="8.5" cy="10.5" r="2.4" fill="${C.dimWhite}"/>
+    <circle cx="23.5" cy="24.5" r="2.4" fill="${C.dimWhite}"/>
+    <path d="M13 13 L19 19" stroke="${C.steel}" stroke-width="1.4"/>
+  ` },
+
+  ogre_bone: { content: `
+    <path d="M7 15 Q5 12 7 10 Q10 8 11 11 L21 21 Q24 22 22 25 Q20 28 17 25Z" fill="#d8c8a8"/>
+    <circle cx="7.5" cy="9.5" r="2.6" fill="#c8b898"/>
+    <circle cx="22.5" cy="25.5" r="2.6" fill="#c8b898"/>
+  ` },
+
+  skeleton: { content: `
+    <circle cx="16" cy="10" r="6" fill="${C.white}"/>
+    <circle cx="13.5" cy="9" r="1.3" fill="${C.navyDk}"/>
+    <circle cx="18.5" cy="9" r="1.3" fill="${C.navyDk}"/>
+    <path d="M14 13 L18 13" stroke="${C.navyDk}" stroke-width="1"/>
+    <line x1="16" y1="16" x2="16" y2="24" stroke="${C.white}" stroke-width="3"/>
+    <line x1="11" y1="19" x2="21" y2="19" stroke="${C.white}" stroke-width="2"/>
+    <line x1="12" y1="24" x2="16" y2="28" stroke="${C.white}" stroke-width="2.5"/>
+    <line x1="20" y1="24" x2="16" y2="28" stroke="${C.white}" stroke-width="2.5"/>
+  ` },
+
+  knight: { content: `
+    <path d="M16 4 Q22 4 22 10 L22 13 Q22 16 16 16 Q10 16 10 13 L10 10 Q10 4 16 4Z" fill="${C.steel}"/>
+    <rect x="14" y="10" width="4" height="2.5" fill="${C.navyDk}"/>
+    <path d="M10 17 L22 17 L24 28 L8 28 Z" fill="${C.navy}"/>
+    <path d="M10 17 L22 17 L23 21 L9 21Z" fill="${C.steelDk}"/>
+  ` },
+
+  dark_knight: { content: `
+    <path d="M16 4 Q22 4 22 10 L22 13 Q22 16 16 16 Q10 16 10 13 L10 10 Q10 4 16 4Z" fill="#3a3a44"/>
+    <rect x="14" y="10" width="4" height="2.5" fill="#e05555"/>
+    <path d="M10 17 L22 17 L24 28 L8 28 Z" fill="#22222a"/>
+    <path d="M10 17 L22 17 L23 21 L9 21Z" fill="#4a4a56"/>
+    <path d="M16 8 L18 11 L16 13 L14 11Z" fill="#e05555" opacity="0.8"/>
+  ` },
+
+  ogre: { content: `
+    <ellipse cx="16" cy="15" rx="10" ry="9" fill="#7a9a4a"/>
+    <circle cx="12" cy="13" r="1.6" fill="${C.navyDk}"/>
+    <circle cx="20" cy="13" r="1.6" fill="${C.navyDk}"/>
+    <path d="M11 20 Q16 23 21 20" stroke="${C.navyDk}" stroke-width="1.4" fill="none"/>
+    <path d="M10 19 L12 22 M22 19 L20 22" stroke="${C.white}" stroke-width="1.6"/>
+  ` },
+
+  ogre_boss: { content: `
+    <ellipse cx="16" cy="16" rx="11" ry="10" fill="#5a7a30"/>
+    <circle cx="12" cy="14" r="1.8" fill="${C.fire}"/>
+    <circle cx="20" cy="14" r="1.8" fill="${C.fire}"/>
+    <path d="M10 21 Q16 25 22 21" stroke="${C.navyDk}" stroke-width="1.6" fill="none"/>
+    <path d="M9 20 L11 24 M23 20 L21 24" stroke="${C.white}" stroke-width="2"/>
+    <path d="M8 8 L12 11 M24 8 L20 11" stroke="${C.gold}" stroke-width="1.6"/>
+  ` },
+
+  slime: { content: `
+    <path d="M16 8 Q26 10 25 19 Q24 27 16 27 Q8 27 7 19 Q6 10 16 8Z" fill="${C.gem}" opacity="0.85"/>
+    <ellipse cx="16" cy="20" rx="8" ry="5" fill="${C.gemDk}" opacity="0.5"/>
+    <circle cx="13" cy="17" r="1.4" fill="${C.navyDk}"/>
+    <circle cx="19" cy="17" r="1.4" fill="${C.navyDk}"/>
+    <ellipse cx="12" cy="13" rx="2" ry="1.4" fill="${C.white}" opacity="0.5"/>
+  ` },
+
+  slime_green: { content: `
+    <path d="M16 8 Q26 10 25 19 Q24 27 16 27 Q8 27 7 19 Q6 10 16 8Z" fill="${C.leaf}" opacity="0.9"/>
+    <ellipse cx="16" cy="20" rx="8" ry="5" fill="${C.leafDk}" opacity="0.5"/>
+    <circle cx="13" cy="17" r="1.4" fill="${C.navyDk}"/>
+    <circle cx="19" cy="17" r="1.4" fill="${C.navyDk}"/>
+    <ellipse cx="12" cy="13" rx="2" ry="1.4" fill="${C.white}" opacity="0.5"/>
+  ` },
+
+  slime_jelly: { content: `
+    <path d="M16 8 Q26 10 25 19 Q24 27 16 27 Q8 27 7 19 Q6 10 16 8Z" fill="#e888c8" opacity="0.85"/>
+    <ellipse cx="16" cy="20" rx="8" ry="5" fill="#c860a0" opacity="0.5"/>
+    <circle cx="13" cy="17" r="1.4" fill="${C.navyDk}"/>
+    <circle cx="19" cy="17" r="1.4" fill="${C.navyDk}"/>
+    <ellipse cx="12" cy="13" rx="2" ry="1.4" fill="${C.white}" opacity="0.6"/>
+  ` },
+
+  wolf: { content: `
+    <path d="M9 20 L7 10 L13 14 L16 10 L19 14 L25 10 L23 20 Q16 25 9 20Z" fill="${C.stoneDk}"/>
+    <circle cx="12" cy="17" r="1.3" fill="${C.fire}"/>
+    <circle cx="20" cy="17" r="1.3" fill="${C.fire}"/>
+    <path d="M14 21 L16 23 L18 21" stroke="${C.white}" stroke-width="1.2" fill="none"/>
+  ` },
+
+  bat: { content: `
+    <ellipse cx="16" cy="16" rx="3" ry="4" fill="#3a3a44"/>
+    <path d="M13 14 Q4 10 4 18 Q9 18 13 15" fill="#3a3a44"/>
+    <path d="M19 14 Q28 10 28 18 Q23 18 19 15" fill="#3a3a44"/>
+    <circle cx="14.5" cy="14.5" r="0.8" fill="${C.fire}"/>
+    <circle cx="17.5" cy="14.5" r="0.8" fill="${C.fire}"/>
+  ` },
+
+  turtle: { content: `
+    <ellipse cx="16" cy="17" rx="9" ry="7" fill="${C.leaf}"/>
+    <path d="M11 14 L16 12 L21 14 L21 20 L16 22 L11 20Z" fill="${C.leafDk}"/>
+    <circle cx="7" cy="15" r="2.6" fill="${C.leaf}"/>
+    <path d="M22 22 L25 25 M10 22 L7 25" stroke="${C.leaf}" stroke-width="2"/>
+  ` },
+
+  crab: { content: `
+    <ellipse cx="16" cy="17" rx="8" ry="6" fill="#e05555"/>
+    <circle cx="9" cy="11" r="2" fill="#e05555"/>
+    <circle cx="23" cy="11" r="2" fill="#e05555"/>
+    <circle cx="9" cy="10" r="0.9" fill="${C.navyDk}"/>
+    <circle cx="23" cy="10" r="0.9" fill="${C.navyDk}"/>
+    <path d="M6 19 L2 17 M6 21 L2 22 M26 19 L30 17 M26 21 L30 22" stroke="#e05555" stroke-width="1.6"/>
+  ` },
+
+  scorpion: { content: `
+    <ellipse cx="14" cy="18" rx="6" ry="4" fill="${C.rust}"/>
+    <path d="M20 17 Q26 15 27 9 Q29 5 26 4 Q24 6 25 10 Q24 14 19 15" fill="none" stroke="${C.rust}" stroke-width="2"/>
+    <path d="M25 5 L28 4 L27 7Z" fill="${C.rust}"/>
+    <path d="M8 16 L4 14 M8 19 L3 20" stroke="${C.rust}" stroke-width="1.6"/>
+    <circle cx="11" cy="16" r="0.8" fill="${C.navyDk}"/>
+  ` },
+
+  feather: { content: `
+    <path d="M20 6 Q26 12 22 20 Q18 27 10 27 Q14 20 20 6Z" fill="${C.white}"/>
+    <path d="M20 6 Q23 12 20 18 Q17 23 12 25" stroke="${C.dimWhite}" stroke-width="1" fill="none"/>
+    <line x1="10" y1="27" x2="20" y2="6" stroke="${C.dimWhite}" stroke-width="0.8"/>
+  ` },
+
+  spirit: { content: `
+    <path d="M16 4 Q24 8 22 18 Q20 27 16 27 Q12 27 10 18 Q8 8 16 4Z" fill="${C.ice}" opacity="0.7"/>
+    <circle cx="13" cy="14" r="1.4" fill="${C.navyDk}"/>
+    <circle cx="19" cy="14" r="1.4" fill="${C.navyDk}"/>
+    <path d="M13 18 Q16 20 19 18" stroke="${C.navyDk}" stroke-width="1" fill="none"/>
+  ` },
+
+  // ──────────────────────────────────────────
   // フォールバック（未定義IDの場合）
   // ──────────────────────────────────────────
   _fallback: { content: `
