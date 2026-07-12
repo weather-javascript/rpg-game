@@ -38,16 +38,28 @@ export function getSlotCount(chest: Chest): number {
 // ============================================================
 
 export function subscribeMyChests(uid: string, cb: (chests: Chest[]) => void): Unsubscribe {
-  const q = query(collection(db, COL), where('ownerUid', '==', uid), orderBy('sortOrder', 'asc'));
+  // ver3.3.0: where+orderByの複合クエリはFirestore複合インデックス作成が必須で、
+  // 未作成環境だとonSnapshotがエラーコールバックに落ちてUIが更新されず
+  // 「チェストを作成してもチェストがありません」と表示され続ける不具合があった。
+  // orderByをクライアント側ソートに切り替えて複合インデックス不要にする。
+  const q = query(collection(db, COL), where('ownerUid', '==', uid));
   return onSnapshot(q, snap => {
-    cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as Chest)));
+    const chests = snap.docs.map(d => ({ id: d.id, ...d.data() } as Chest));
+    chests.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    cb(chests);
+  }, err => {
+    console.error('[storageService] subscribeMyChests failed:', err);
   });
 }
 
 export function subscribeSharedChests(cb: (chests: Chest[]) => void): Unsubscribe {
-  const q = query(collection(db, COL), where('isShared', '==', true), orderBy('createdAt', 'asc'));
+  const q = query(collection(db, COL), where('isShared', '==', true));
   return onSnapshot(q, snap => {
-    cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as Chest)));
+    const chests = snap.docs.map(d => ({ id: d.id, ...d.data() } as Chest));
+    chests.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+    cb(chests);
+  }, err => {
+    console.error('[storageService] subscribeSharedChests failed:', err);
   });
 }
 
