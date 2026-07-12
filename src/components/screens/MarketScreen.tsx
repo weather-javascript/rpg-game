@@ -102,6 +102,8 @@ export function MarketScreen() {
   const [sellSearch, setSellSearch] = useState('');
   const [sellCat, setSellCat] = useState('all');
   const [buyQty, setBuyQty] = useState<Record<string, number>>({});
+  const [buySearch, setBuySearch] = useState('');
+  const [buyCat, setBuyCat] = useState<'all'|'life'>('all');
   const [npcQuests, setNpcQuests] = useState<NpcQuest[]>([]);
   const [questRanking, setQuestRanking] = useState<QuestRankingEntry[]>([]);
   const [questRankTab, setQuestRankTab] = useState<'count' | 'gold'>('count');
@@ -258,7 +260,9 @@ export function MarketScreen() {
     if (sellCat === 'other') return OTHER_SELL_CATS.has(item.category);
     return item.category === sellCat;
   });
-  const buyable = Object.values(ITEM_MASTER).filter(item => getEffectivePrice(item.id).buyPrice > 0);
+  const buyable = Object.values(ITEM_MASTER).filter(item => getEffectivePrice(item.id).buyPrice > 0)
+    .filter(item => !buySearch || item.name.includes(buySearch) || item.id.includes(buySearch))
+    .filter(item => buyCat === 'all' || (buyCat === 'life' && item.id.includes('_seed')));
   const usable = inventoryEntries.map(([id, qty]) => ({ item: ITEM_MASTER[id], qty, id })).filter(e => e.item?.useEffect && e.item?.category === 'food');
 
   const satietyCount = player?.satietyUpgradeCount ?? 0;
@@ -364,6 +368,14 @@ export function MarketScreen() {
 
       {shopTab === 'buy' && (
         <>
+          <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+            <input value={buySearch} onChange={e=>setBuySearch(e.target.value)} placeholder="🔍 アイテム名で検索"
+              style={{ flex:1, padding:'6px 10px', background:'#161b26', border:'1px solid #2d3752', borderRadius:6, color:'#e8e6ff', fontSize:'0.8rem' }} />
+            <button onClick={()=>setBuyCat(c=>c==='life'?'all':'life')}
+              style={{ padding:'6px 12px', background: buyCat==='life' ? 'rgba(76,168,106,0.25)' : '#161b26', border:`1px solid ${buyCat==='life'?'#4ca86a':'#2d3752'}`, borderRadius:6, color: buyCat==='life'?'#4ca86a':'#8a92b2', fontSize:'0.75rem', cursor:'pointer', whiteSpace:'nowrap' as const }}>
+              🌾 生活素材(種)のみ
+            </button>
+          </div>
           {/* 満腹度上限アップグレードバナー */}
           <div style={{background:'rgba(240,168,48,0.08)', border:'1px solid rgba(240,168,48,0.3)', borderRadius:8, padding:'10px 14px', marginBottom:8, display:'flex', alignItems:'center', justifyContent:'space-between', gap:8}}>
             <div>
