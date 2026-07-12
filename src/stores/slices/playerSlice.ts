@@ -29,9 +29,30 @@ export interface PlayerSlice {
   updateGatherCombo:  (category: string, success: boolean) => void;
   updateGatherCollection: (itemIds: string[], amounts: Record<string, number>) => void;
   setOfflineMining: (enabled: boolean, category: GatherCategory) => void;
+  claimTutorial:      (tutorialId: string, starterItems: { itemId: string; amount: number }[]) => { success: boolean; message: string };
 }
 
 export const createPlayerSlice: StateCreator<GameState, [], [], PlayerSlice> = (set, get) => ({
+  claimTutorial: (tutorialId, starterItems) => {
+    const state = get();
+    if (!state.player) return { success: false, message: 'プレイヤーデータがありません' };
+    if ((state.player.claimedTutorials ?? []).includes(tutorialId)) {
+      return { success: false, message: 'このお試しセットは既に受け取り済みです' };
+    }
+    set((s) => {
+      if (!s.player) return {};
+      const inv: IdMap<number> = { ...s.player.inventory };
+      for (const { itemId, amount } of starterItems) inv[itemId] = (inv[itemId] ?? 0) + amount;
+      return {
+        player: {
+          ...s.player, inventory: inv,
+          claimedTutorials: [...(s.player.claimedTutorials ?? []), tutorialId],
+        },
+      };
+    });
+    return { success: true, message: 'お試しセットを受け取りました！さっそく試してみましょう' };
+  },
+
   addItems: (drops) => {
     set((state) => {
       if (!state.player) return state;
