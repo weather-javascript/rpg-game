@@ -35,6 +35,7 @@ export interface GameState extends PlayerSlice, DungeonSlice, FishingSlice, Reli
   levelUpFlash: { level: number; ts: number } | null; // レベルアップ演出用の一時フラグ
   isFishingLocked: boolean;
   isGatheringLocked: boolean;
+  activeGuide: { id: string; stepIndex: number } | null; // ver3.3.0: 冒険ナビの「やりたいこと」ガイド進行状態
 
   setUid: (uid: string | null) => void;
   setAuthLoading: (loading: boolean) => void;
@@ -48,6 +49,9 @@ export interface GameState extends PlayerSlice, DungeonSlice, FishingSlice, Reli
   removeNotification: (id: string) => void;
   triggerLevelUp: (level: number) => void; // レベルアップ演出（カットイン）を発火
   clearLevelUp: () => void;
+  startGuide: (guideId: string) => void;
+  advanceGuide: () => void;
+  clearGuide: () => void;
 }
 
 // ============================================================
@@ -221,6 +225,7 @@ export const useGameStore = create<GameState>((set, get, api) => ({
   isSaving: false,
   lastSaveTime: 0,
   activeTab: 'gathering',
+  activeGuide: null,
   notifications: [],
   levelUpFlash: null,
   isFishingLocked: false,
@@ -244,6 +249,9 @@ export const useGameStore = create<GameState>((set, get, api) => ({
   },
 
   setActiveTab: (tab) => set({ activeTab: tab }),
+  startGuide: (guideId) => set({ activeGuide: { id: guideId, stepIndex: 0 } }),
+  advanceGuide: () => set((s) => s.activeGuide ? { activeGuide: { ...s.activeGuide, stepIndex: s.activeGuide.stepIndex + 1 } } : {}),
+  clearGuide: () => set({ activeGuide: null }),
   setFishingLocked: (locked) => set({ isFishingLocked: locked }),
   setGatheringLocked: (locked) => set({ isGatheringLocked: locked }),
 
