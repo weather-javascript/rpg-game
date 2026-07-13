@@ -397,12 +397,14 @@ export function getFishingBonuses(lv: number) {
   return { rarityBonus, largeFishBonus, legendaryBonus };
 }
 
-// EXP計算（Lv1〜Lv20:200固定 / Lv21〜100 / Lv101〜200 / Lv201〜 の4段階スケール）
+// EXP計算（Lv1〜Lv20:200固定 / Lv21〜100 / Lv101〜 は滑らかに増加する単一式）
+// ver3.3.1: 旧式はLv201から Math.abs(level-500) を使っており、Lv200→201で必要EXPが
+// 約745倍に跳ね上がる致命的な壁があった（かつ500に近づくほど必要EXPが減る逆転現象付き）。
+// Lv100,000超まで滑らかにスケールする単一式に置き換えて修正。
 export function fishingExpRequired(level: number): number {
   if (level <= 20) return 200;
   if (level <= 100) return 200 + (level - 20) * 6;
-  if (level <= 200) return Math.floor(600 + Math.pow(level - 100, 2) * 0.6);
-  return Math.floor(90000 + Math.pow(Math.abs(level - 500), 2.7));
+  return Math.floor(600 + Math.pow(level - 100, 1.7) * 2);
 }
 
 // サイズ→重量
