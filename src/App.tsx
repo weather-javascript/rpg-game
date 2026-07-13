@@ -40,6 +40,7 @@ const TAB_TO_ACTIVITY: Partial<Record<string, PlayerActivityCode>> = {
 import { onSnapshot, doc } from 'firebase/firestore';
 import { db } from './services/firebase';
 import { ITEM_MASTER, VERSION_PATCHES } from './data/masters';
+import { GuideBanner } from './components/GuideBanner';
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id:'navi',      label:'冒険ナビ',  icon:'compass' },
@@ -1898,6 +1899,7 @@ export default function App() {
           })()}
         </main>
       <ReliefPanel />
+      <GuideBanner />
       <TabNav activeTab={activeTab} setTab={(t) => {
         setActiveTab(t as TabId);
         if (player) {
