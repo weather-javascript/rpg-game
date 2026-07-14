@@ -118,6 +118,20 @@ export function EquipmentBuildScreen() {
         　④ 気に入った組み合わせは画面下部の「プリセット保存」で名前を付けて保存・呼び出し可能
       </div>
 
+      <div style={{ background:'rgba(91,141,238,0.1)', border:'1px solid rgba(91,141,238,0.3)', borderRadius:8, padding:'10px 12px', marginBottom:12, fontSize:'0.7rem', color:'#c8d0e8', lineHeight:1.8 }}>
+        <div style={{ fontWeight:800, color:'#5b8dee', marginBottom:6, fontSize:'0.78rem' }}>📘 装備ビルドとは？（3つの仕組み）</div>
+        <div style={{ marginBottom:6 }}>
+          武器・防具1つ1つに、基本ステータスとは別の「隠しボーナス」を後付けできる育成システムです。効果は攻撃力・防御力・採取成功率など実際のゲーム内数値に直結し、装備するだけで戦闘・採取・釣り・市場・ギャンブルに反映されます。
+        </div>
+        <div style={{ marginBottom:4 }}><b style={{ color:'#f0c060' }}>① 特性</b>：装備ごとに自動で決まっている固定の個性（変更不可）。例：攻撃特化・防御特化など。</div>
+        <div style={{ marginBottom:4 }}><b style={{ color:'#c060e0' }}>② 付与効果</b>：攻撃+%や採取成功率+%など、ランダムに付く追加ボーナス（1〜5個）。「再抽選石」を消費すると効果をガチャり直せる。</div>
+        <div style={{ marginBottom:8 }}><b style={{ color:'#7ec98a' }}>③ 覚醒</b>：装備をLv0→Lv5まで育てる。①の効果が強化され、②の付与枠が増える。</div>
+        <div style={{ fontWeight:800, color:'#f0c060', marginBottom:4, fontSize:'0.74rem' }}>🪨 素材の入手方法</div>
+        <div>・<b>覚醒の欠片</b>：初級〜中級ダンジョンのボス撃破でドロップ（洞窟王・バイオマンサー・冷焦など）</div>
+        <div>・<b>覚醒の輝石／再抽選石</b>：クラフト画面で「覚醒の欠片」等から作成、または上位ボス（極冷焦・リッチ・マッドガイボット等）からドロップ</div>
+        <div>・<b>覚醒の聖石</b>：最上位ボス（獄炎帝・KX-G21[ライフエナジー]等）から低確率でドロップ、またはクラフトで作成</div>
+      </div>
+
       <TutorialCard
         tutorialId="equipment_build_starter"
         title="はじめての装備ビルド"

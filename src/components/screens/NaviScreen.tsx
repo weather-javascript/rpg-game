@@ -6,6 +6,8 @@ import { useGameStore, type GameState } from '../../stores/gameStore';
 import { DUNGEON_MASTER, ITEM_MASTER, CRAFT_RECIPES, MONSTER_MASTER } from '../../data/masters';
 import type { PlayerData } from '../../types/game';
 import { WikiTab } from '../wiki/WikiTab';
+import { GUIDE_MASTER } from '../../data/guides';
+import { CROP_MASTER } from '../../data/lifeSystemData';
 
 type NaviSubTab = 'navi' | 'wiki';
 type NaviSection = 'goal' | 'analysis' | 'drops' | 'build';
@@ -423,6 +425,8 @@ function NaviHomePanel({ onOpenWiki }: { onOpenWiki: () => void }) {
           changeGold={changeGold} changeWealthCoin={changeWealthCoin}
           addNotification={addNotification} onOpenWiki={onOpenWiki} />
       )}
+      {section === 'goal' && <WantToDoGrid setActiveTab={setActiveTab} />}
+      {section === 'goal' && <AllTabsDashboard player={player} setActiveTab={setActiveTab} />}
 
       {/* ② 分析セクション */}
       {section === 'analysis' && (
@@ -509,8 +513,115 @@ function NaviHomePanel({ onOpenWiki }: { onOpenWiki: () => void }) {
 }
 
 // ============================================================
-// GoalSection（以前のメインカード）
+// WantToDoGrid（「やりたいこと」ボタン一覧 — 押すと該当タブへ移動しガイドを開始）
 // ============================================================
+function WantToDoGrid({ setActiveTab }: { setActiveTab: (tab: import('../../types/game').TabId) => void }) {
+  const startGuide = useGameStore(s => s.startGuide);
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#f0c060', marginBottom: 4 }}>🎯 これをしたい！</div>
+      <div style={{ fontSize: '0.68rem', color: '#8a92b2', marginBottom: 8 }}>
+        押すと該当の画面へ移動し、下に手順ガイドが表示され続けます。
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+        {Object.values(GUIDE_MASTER).map(g => (
+          <button key={g.id} onClick={() => { startGuide(g.id); setActiveTab(g.targetTab); }}
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '12px 8px',
+              background: '#161b26', border: '1px solid #2d3752', borderRadius: 10, cursor: 'pointer',
+              color: '#e8e6ff', fontSize: '0.72rem', fontWeight: 700,
+            }}>
+            <span style={{ fontSize: '1.4rem' }}>{g.emoji}</span>
+            {g.title}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// AllTabsDashboard（全体マップ — 全16タブへの直行ダッシュボード。可能な範囲で状態バッジ付き）
+// ============================================================
+const DASHBOARD_TILES: { id: import('../../types/game').TabId; label: string; emoji: string }[] = [
+  { id: 'gathering', label: '採取', emoji: '⛏️' },
+  { id: 'fishing', label: '釣り', emoji: '🎣' },
+  { id: 'aquarium', label: '水族館', emoji: '🐠' },
+  { id: 'crafting', label: '製作', emoji: '🔨' },
+  { id: 'market', label: '市場', emoji: '🏪' },
+  { id: 'dungeon', label: 'ダンジョン', emoji: '⚔️' },
+  { id: 'gamble', label: 'ギャンブル', emoji: '🎰' },
+  { id: 'online', label: 'オンライン', emoji: '🌐' },
+  { id: 'status', label: '状態', emoji: '📊' },
+  { id: 'vocation', label: '職業', emoji: '🎓' },
+  { id: 'pets', label: 'ペット', emoji: '🐾' },
+  { id: 'life', label: '生活', emoji: '🌱' },
+  { id: 'equipmentBuild', label: '装備ビルド', emoji: '🛡️' },
+  { id: 'wiki', label: 'Wiki', emoji: '📖' },
+  { id: 'storage', label: '倉庫', emoji: '📦' },
+];
+
+function AllTabsDashboard({ player, setActiveTab }: { player: PlayerData | null; setActiveTab: (tab: import('../../types/game').TabId) => void }) {
+  // 収穫可能な作物件数（生活タブの農業）
+  const harvestableCount = useMemo(() => {
+    if (!player?.life?.farmPlots) return 0;
+    const now = Date.now();
+    return player.life.farmPlots.filter(p => {
+      if (!p.cropId) return false;
+      const crop = CROP_MASTER[p.cropId];
+      if (!crop) return false;
+      return now - p.plantedAt >= crop.growthMs;
+    }).length;
+  }, [player?.life?.farmPlots]);
+
+  // 未覚醒(強化余地あり)の装備数
+  const unawakenedCount = useMemo(() => {
+    if (!player?.equipment) return 0;
+    const eq = player.equipment;
+    const ids = [eq.helmet, eq.chestplate, eq.leggings, eq.boots, eq.offhand, ...(eq.hotbar ?? [])].filter(Boolean) as string[];
+    const uniq = Array.from(new Set(ids));
+    const awakening = player.equipmentBuild?.awakening ?? {};
+    return uniq.filter(id => (awakening[id] ?? 0) < 5).length;
+  }, [player?.equipment, player?.equipmentBuild]);
+
+  const badgeFor = (id: import('../../types/game').TabId): string | null => {
+    if (id === 'life' && harvestableCount > 0) return `収穫可能 ${harvestableCount}件`;
+    if (id === 'equipmentBuild' && unawakenedCount > 0) return `強化余地 ${unawakenedCount}件`;
+    return null;
+  };
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#5b8dee', marginBottom: 4 }}>🗂️ 全体マップ</div>
+      <div style={{ fontSize: '0.66rem', color: '#8a92b2', marginBottom: 8 }}>
+        全ての機能へここから直行できます。タブバーは今まで通り使えます。
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 6 }}>
+        {DASHBOARD_TILES.map(t => {
+          const badge = badgeFor(t.id);
+          return (
+            <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+              position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+              padding: '10px 4px', background: '#161b26', border: '1px solid #2d3752', borderRadius: 8,
+              cursor: 'pointer', color: '#c8d0e8', fontSize: '0.66rem', fontWeight: 700,
+            }}>
+              <span style={{ fontSize: '1.2rem' }}>{t.emoji}</span>
+              {t.label}
+              {badge && (
+                <span style={{
+                  position: 'absolute', top: -5, right: -5, background: '#e05555', color: '#fff',
+                  fontSize: '0.52rem', fontWeight: 800, borderRadius: 8, padding: '2px 5px', whiteSpace: 'nowrap',
+                }}>{badge}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
 function GoalSection({ goal, player, setActiveTab, changeGold, changeWealthCoin, addNotification, onOpenWiki }: {
   goal: NaviGoal; player: PlayerData;
   setActiveTab: (tab: import('../../types/game').TabId) => void;

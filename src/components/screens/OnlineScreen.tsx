@@ -1323,6 +1323,13 @@ export function LoginBonusButton() {
 
   if (!player) return null;
   const DAY_LABELS = ['','1000G','3000G','5000G','10000G','30000G','50000G','🎁宝箱'];
+  const claimedCount = state?.claimed.length ?? 0;
+  const nextDay = Math.min(claimedCount + 1, 7);
+  const now = Date.now();
+  const alreadyClaimedToday = !!state && claimedCount > 0 && (() => {
+    const a = new Date(now), b = new Date(state.lastClaimedAt);
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  })();
 
   return (
     <>
@@ -1334,11 +1341,14 @@ export function LoginBonusButton() {
         <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center'}} onClick={() => setOpen(false)}>
           <div style={{background:'#161a2e', border:'1px solid #2d3752', borderRadius:12, padding:20, width:'min(400px,92vw)', maxHeight:'80vh', overflowY:'auto'}} onClick={e => e.stopPropagation()}>
             <h3 style={{color:'#f0c060', marginBottom:4}}>🎁 ログインボーナス</h3>
-            <p style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:16}}>毎週リセット。順番に受け取ってください。</p>
+            <p style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:6}}>毎週リセット。1日1回、順番に受け取ってください。</p>
+            <div style={{fontSize:'0.78rem', color:'#5b8dee', fontWeight:700, marginBottom:12}}>
+              {claimedCount >= 7 ? '✅ 今週分は受取完了！' : alreadyClaimedToday ? `本日は${claimedCount}日目を受取済み。明日${nextDay}日目を受け取れます` : `📍 現在 ${nextDay}日目 を受取可能`}
+            </div>
             <div style={{display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8, marginBottom:16}}>
               {LOGIN_BONUS_REWARDS.map(r => {
                 const claimed = state?.claimed.includes(r.day) ?? false;
-                const canClaim = !claimed && (r.day === 1 || (state?.claimed.includes(r.day - 1) ?? false));
+                const canClaim = !claimed && !alreadyClaimedToday && (r.day === 1 || (state?.claimed.includes(r.day - 1) ?? false));
                 return (
                   <div key={r.day} style={{background: claimed ? 'rgba(76,175,87,0.1)' : canClaim ? 'rgba(240,192,96,0.1)' : '#1c2235', border:`1px solid ${claimed ? '#4caf57' : canClaim ? '#f0c060' : '#2d3752'}`, borderRadius:8, padding:12, textAlign:'center'}}>
                     <div style={{fontSize:'0.7rem', color:'#8a92b2', marginBottom:4}}>{r.day}日目</div>
@@ -1351,14 +1361,16 @@ export function LoginBonusButton() {
                             style={{padding:'5px 12px', background:'#f0c060', color:'#0d1117', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.78rem'}}>
                             受け取る
                           </button>
-                        : <div style={{fontSize:'0.72rem', color:'#4a5070'}}>🔒 未解放</div>
+                        : (!claimed && r.day === nextDay && alreadyClaimedToday)
+                          ? <div style={{fontSize:'0.68rem', color:'#8a92b2'}}>⏰ また明日</div>
+                          : <div style={{fontSize:'0.72rem', color:'#4a5070'}}>🔒 未解放</div>
                     }
                   </div>
                 );
               })}
             </div>
             <div style={{fontSize:'0.75rem', color:'#8a92b2', marginBottom:4}}>
-              今週: {state?.claimed.length ?? 0}/7日受取済み
+              今週: {claimedCount}/7日受取済み
             </div>
             <button onClick={() => setOpen(false)} style={{width:'100%', padding:'8px', background:'#2d3752', border:'none', borderRadius:8, color:'#e8e6ff', cursor:'pointer'}}>閉じる</button>
           </div>
