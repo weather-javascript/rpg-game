@@ -5,19 +5,8 @@ import {
   FFGGR_AREAS, FFGGR_MONSTERS, FFGGR_SHOPS, FFGGR_FEVERS,
   FFGGR_ITEM_MASTER, FFGGR_POINT_KEY, FFGGR_NUTS_COUNT_KEY,
   getMonstersInArea, selectAction, rollDrops, FFGGR_ITEMS,
-  type FFGGRMonster,
+  type FFGGRMonster, type FFGGRArea,
 } from '../../data/ffggrMaster';
-import { ITEM_MASTER } from '../../data/masters';
-import { GameIcon } from '../icons';
-import { HotbarPanel, HotbarSetModal } from './DungeonScreen';
-import type { EquipmentSlots } from '../../types/game';
-import { defaultEquipmentSlots } from '../../types/game';
-import {
-  type EnemyPos, initPos, moveEnemyPos, DIR_LABEL, DIR_EMOJI, behaviorLabel,
-} from '../../systems/enemyPosition';
-import { CompassModal, hasFreeReposition, type CompassEnemyDot } from '../BattleSkillUI';
-import { RadarDisplay } from '../RadarDisplay';
-import { isDirectionInShape, getShapeDirections, type AreaShape, AREA_SHAPE_BONUS_PCT } from '../../systems/enemyPosition';
 
 // ─── 型 ───────────────────────────────────────────────────────
 interface StatusEffect {
@@ -28,9 +17,46 @@ interface StatusEffect {
   emoji: string;
 }
 
-// レア敵の低確率出現：通常モブを倒した時に0.5%〜1%の確率で中ボス/ボス/レアボスが乱入する
-const RARE_ENCOUNTER_MIN_RATE = 0.005;
-const RARE_ENCOUNTER_MAX_RATE = 0.01;
+interface EnemyPos {
+  direction: 'N'|'NE'|'E'|'SE'|'S'|'SW'|'W'|'NW';
+  distanceM: number;
+  behavior: string;
+}
+const DIR_LABEL: Record<string,string> = { N:'北',NE:'北東',E:'東',SE:'南東',S:'南',SW:'南西',W:'西',NW:'北西' };
+const DIR_EMOJI: Record<string,string> = { N:'⬆️',NE:'↗️',E:'➡️',SE:'↘️',S:'⬇️',SW:'↙️',W:'⬅️',NW:'↖️' };
+const ALL_DIRS: EnemyPos['direction'][] = ['N','NE','E','SE','S','SW','W','NW'];
+function randomDir(): EnemyPos['direction'] { return ALL_DIRS[Math.floor(Math.random()*8)]; }
+function initPos(behavior:string): EnemyPos {
+  const distMap: Record<string,[number,number]> = {
+    aggressive:[8,15], ranged:[10,18], evasive:[12,20],
+    flying:[10,18], circling:[6,12], erratic:[4,20], static:[0,5],
+  };
+  const [mn,mx] = distMap[behavior]??[5,15];
+  return { direction:randomDir(), distanceM:mn+Math.floor(Math.random()*(mx-mn)), behavior };
+}
+function moveEnemyPos(p: EnemyPos): EnemyPos {
+  const di = ALL_DIRS.indexOf(p.direction);
+  switch(p.behavior){
+    case 'aggressive': return {...p, distanceM:Math.max(0,p.distanceM-(3+Math.floor(Math.random()*3)))};
+    case 'ranged': {
+      const [mn,mx]=[5,12]; let d=p.distanceM;
+      if(d<mn) d=Math.min(d+4,mx); else if(d>mx) d=Math.max(d-4,mn);
+      return {...p,distanceM:d};
+    }
+    case 'evasive': {
+      const newDi=(di+(Math.random()<0.5?1:-1)+8)%8;
+      return {...p,distanceM:Math.min(p.distanceM+5,20),direction:ALL_DIRS[newDi]};
+    }
+    case 'flying': {
+      const newDi=(di+(Math.random()<0.5?1:-1)+8)%8;
+      const d=Math.max(8,Math.min(15,p.distanceM));
+      return {...p,distanceM:d,direction:ALL_DIRS[newDi]};
+    }
+    case 'circling': return {...p,direction:ALL_DIRS[(di+(Math.random()<0.5?1:-1)+8)%8]};
+    case 'erratic': return {...p,direction:randomDir(),distanceM:Math.max(0,Math.min(25,p.distanceM+(Math.random()-0.5)*6))};
+    default: return p;
+  }
+}
 
 interface BattleState {
   monster: FFGGRMonster;
@@ -46,11 +72,6 @@ interface BattleState {
   pendingDrops: { itemId: string; amount: number }[];
   expGained: number;
   pointGained: number;
-  isDefending: boolean;
-  // 通常モブ撃破後、超低確率で中ボス/ボス/レアボスが乱入してきた場合にセットされる
-  specialEncounter: FFGGRMonster | null;
-  facingDirection?: import('../../systems/enemyPosition').EnemyDirection;
-  equippedWeaponId: string | null;
 }
 
 // ─── スタイル ──────────────────────────────────────────────────
@@ -100,23 +121,13 @@ function EffectsRow({ effects }:{ effects:StatusEffect[] }){
 }
 
 // ─── バトル画面 ──────────────────────────────────────────────
-function BattleScreen({ battle, equipment, inventory, onAttack, onDefend, onFlee, showHotbar, onToggleHotbar, onHotbarSlotClick, onOpenCompass, onOpenFacingCompass, onEquipWeapon }:{
+function BattleScreen({ battle, onAction, onFlee }:{
   battle: BattleState;
-  equipment: EquipmentSlots;
-  inventory: Record<string, number>;
-  onAttack: () => void;
-  onDefend: () => void;
+  onAction: (type:'attack'|'skill') => void;
   onFlee: () => void;
-  showHotbar: boolean;
-  onToggleHotbar: () => void;
-  onHotbarSlotClick: (slot: string, idx?: number) => void;
-  onOpenCompass: () => void;
-  onOpenFacingCompass: () => void;
-  onEquipWeapon: (itemId: string) => void;
 }){
   const m = battle.monster;
   const hpPct = battle.monsterHp / m.maxHp;
-  const weaponItem = battle.equippedWeaponId ? ITEM_MASTER[battle.equippedWeaponId] : null;
   return (
     <div>
       {/* モンスター情報 */}
@@ -125,7 +136,9 @@ function BattleScreen({ battle, equipment, inventory, onAttack, onDefend, onFlee
         <span style={{ fontSize:'0.68rem', color:'#8a92b2' }}>敵の位置</span>
         <span style={{ fontSize:'0.88rem' }}>{DIR_EMOJI[battle.enemyPos.direction]} {DIR_LABEL[battle.enemyPos.direction]}</span>
         <span style={{ fontSize:'0.78rem', color:'#f0c060', fontWeight:700 }}>{Math.round(battle.enemyPos.distanceM)}m</span>
-        <span style={{ fontSize:'0.65rem', color:'#4a5070' }}>{behaviorLabel(battle.enemyPos.behavior)}</span>
+        <span style={{ fontSize:'0.65rem', color:'#4a5070' }}>
+          {battle.enemyPos.behavior==='aggressive'?'突進型':battle.enemyPos.behavior==='ranged'?'遠距離型':battle.enemyPos.behavior==='evasive'?'逃走型':battle.enemyPos.behavior==='flying'?'飛行型':battle.enemyPos.behavior==='circling'?'旋回型':battle.enemyPos.behavior==='erratic'?'不規則型':'固定型'}
+        </span>
       </div>
       <div style={{ ...S.card, borderColor: hpPct < 0.3 ? '#7a2020' : '#2d3752' }}>
         <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
@@ -152,72 +165,23 @@ function BattleScreen({ battle, equipment, inventory, onAttack, onDefend, onFlee
       {/* プレイヤー情報 */}
       <div style={{ ...S.card }}>
         <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4, fontSize:'0.76rem' }}>
-          <span style={{ color:'#e8e6ff' }}>あなたのHP{battle.isDefending && <span style={{ color:'#5b8dee', marginLeft:6 }}>🛡️ 防御中</span>}</span>
+          <span style={{ color:'#e8e6ff' }}>あなたのHP</span>
           <span style={{ color:'#4ca86a', fontWeight:700 }}>{battle.playerHp.toLocaleString()} / {battle.playerMaxHp.toLocaleString()}</span>
         </div>
         <HpBar current={battle.playerHp} max={battle.playerMaxHp} color='#4ca86a' />
         <EffectsRow effects={battle.effects} />
-        <div style={{ fontSize:'0.65rem', color:'#4a5070', marginTop:4 }}>
-          ターン {battle.turn} ・ 装備中: {weaponItem ? `${weaponItem.name}` : '素手'} ・ ↻向き: {DIR_EMOJI[battle.facingDirection ?? 'N']}{DIR_LABEL[battle.facingDirection ?? 'N']}
-        </div>
+        <div style={{ fontSize:'0.65rem', color:'#4a5070', marginTop:4 }}>ターン {battle.turn}</div>
       </div>
 
       {/* バトルログ */}
       <BattleLog log={battle.log} />
-      <RadarDisplay
-        dungeonId="ffgg"
-        facingDirection={battle.facingDirection ?? 'N'}
-        enemies={[{
-          idx: 0, name: battle.monster.name, direction: battle.enemyPos.direction, distanceM: battle.enemyPos.distanceM,
-          kind: battle.monster.isBoss ? 'boss' : battle.monster.isMidBoss ? 'midboss' : battle.monster.isRareBoss ? 'rareboss' : 'mob',
-        }]}
-      />
 
-      {/* アクションボタン（他ダンジョンと同じ操作感） */}
+      {/* アクションボタン */}
       {battle.phase === 'fighting' && (
-        <>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
-            <button style={S.btn('#e05555')} onClick={onAttack}>
-              {weaponItem?.isAreaWeapon ? '🌀 全体攻撃' : '⚔️ 攻撃'}
-            </button>
-            <button style={{ ...S.btn('#5b8dee') }} onClick={onDefend}>🛡️ 防御</button>
-          </div>
-          <div style={{ display:'flex', gap:6, marginBottom:8 }}>
-            <button onClick={onOpenFacingCompass} style={{ ...S.btn('#4ca86a'), flex:1 }}>↻ 向き変更</button>
-            {hasFreeReposition(weaponItem) && (
-              <button onClick={onOpenCompass} style={{ ...S.btn('#5b8dee'), flex:1 }}>🧭 間合い操作</button>
-            )}
-          </div>
-          <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>
-            {equipment.hotbar.map((itemId, i) => {
-              const item = itemId ? ITEM_MASTER[itemId] : null;
-              const qty = itemId ? (inventory[itemId] ?? 0) : 0;
-              const isWeaponSlot = item?.itemType === 'Weapon';
-              const isEquippedWeapon = !!itemId && itemId === battle.equippedWeaponId;
-              return (
-                <button key={i} onClick={() => isWeaponSlot && itemId && onEquipWeapon(itemId)}
-                  disabled={!isWeaponSlot || isEquippedWeapon}
-                  style={{
-                    width:38, height:38, background: isEquippedWeapon ? 'rgba(224,85,85,0.2)' : item && qty>0 ? 'rgba(91,141,238,0.15)' : '#161b26',
-                    border:`1px solid ${isEquippedWeapon ? '#e05555' : item && qty>0 ? '#5b8dee' : '#2d3752'}`, borderRadius:6,
-                    display:'flex', alignItems:'center', justifyContent:'center', position:'relative',
-                    cursor: isWeaponSlot && !isEquippedWeapon ? 'pointer' : 'default',
-                  }} title={item ? `${item.name}${isWeaponSlot ? (isEquippedWeapon ? '（装備中）' : '（タップで装備）') : ` ×${qty}`}` : `スロット${i+1}（空）`}>
-                  {item
-                    ? <><GameIcon id={item.icon} size={18} />{!isWeaponSlot && <span style={{ position:'absolute', bottom:1, right:2, fontSize:'0.5rem', color:'#f0c060' }}>{qty}</span>}</>
-                    : <span style={{ fontSize:'0.6rem', color:'#4a5070' }}>{i+1}</span>}
-                </button>
-              );
-            })}
-            <button onClick={onToggleHotbar} style={{ padding:'0 10px', height:38, background:'#161b26', border:'1px dashed #5b8dee', borderRadius:6, color:'#5b8dee', cursor:'pointer', fontSize:'0.72rem' }}>
-              🎒 装備を選ぶ
-            </button>
-            <button style={{ ...S.btn('#2d3752'), border:'1px solid #4a5070', height:38 }} onClick={onFlee}>🏃 逃げる</button>
-          </div>
-          {showHotbar && (
-            <HotbarPanel equipment={equipment} inventory={inventory} onSlotClick={onHotbarSlotClick} />
-          )}
-        </>
+        <div style={{ display:'flex', gap:8 }}>
+          <button style={{ ...S.btn('#e05555'), flex:2 }} onClick={()=>onAction('attack')}>⚔️ 攻撃</button>
+          <button style={{ ...S.btn('#2d3752'), flex:1, border:'1px solid #4a5070' }} onClick={onFlee}>🏃 逃げる</button>
+        </div>
       )}
 
       {/* 結果表示 */}
@@ -235,14 +199,6 @@ function BattleScreen({ battle, equipment, inventory, onAttack, onDefend, onFlee
                       {itemEmoji(d.itemId)} {itemName(d.itemId)} × {d.amount}
                     </div>
                   ))}
-                </div>
-              )}
-              {battle.specialEncounter && (
-                <div style={{ marginTop:10, padding:8, background:'rgba(176,96,224,0.12)', border:'1px solid #b060e0', borderRadius:8 }}>
-                  <div style={{ fontSize:'0.82rem', color:'#b060e0', fontWeight:800 }}>⚡ 気配を感じる…！</div>
-                  <div style={{ fontSize:'0.72rem', color:'#e8e6ff', marginTop:2 }}>
-                    {battle.specialEncounter.emoji} {battle.specialEncounter.name} が乱入してきた！
-                  </div>
                 </div>
               )}
             </>
@@ -425,26 +381,12 @@ export function FFGGRScreen(){
   const addNotif    = useGameStore(s=>s.addNotification);
   const [tab, setTab] = useState<'area'|'battle'|'shop'|'items'|'fever'|'crate'>('area');
   const [battle, setBattle] = useState<BattleState|null>(null);
-  const updateEquipment = useGameStore(s=>s.updateEquipment);
-  const [showHotbar, setShowHotbar] = useState(false);
-  const [hotbarModal, setHotbarModal] = useState<{slot:string;idx?:number} | null>(null);
-  const [showCompass, setShowCompass] = useState(false);
-  const [showFacingCompass, setShowFacingCompass] = useState(false);
 
   const inventory = player?.inventory ?? {};
-  const equipment = player?.equipment ?? defaultEquipmentSlots();
   const ffggrPoint = (inventory[FFGGR_POINT_KEY] ?? 0);
   const playerMaxHp = 1000 + (player?.stats?.level ?? 1) * 50;
 
   // ─── 戦闘開始 ───
-  const [equippedWeaponId, setEquippedWeaponId] = useState<string | null>(
-    () => equipment.hotbar.find(id => id && ITEM_MASTER[id]?.itemType === 'Weapon') ?? null
-  );
-  function handleEquipWeapon(itemId: string){
-    setEquippedWeaponId(itemId);
-    setBattle(prev => prev ? { ...prev, equippedWeaponId: itemId, log: [...prev.log, { text: `🔁 ${ITEM_MASTER[itemId]?.name}を装備した！`, color: '#5b8dee' }] } : null);
-  }
-
   function startBattle(monster: FFGGRMonster){
     const behavior = (monster as any).moveBehavior ?? 'aggressive';
     setBattle({
@@ -461,27 +403,14 @@ export function FFGGRScreen(){
       pendingDrops: [],
       expGained: 0,
       pointGained: 0,
-      isDefending: false,
-      specialEncounter: null,
-      facingDirection: 'N',
-      equippedWeaponId,
     });
     setTab('battle');
-  }
-
-  // 現在エリアの中ボス/ボス/レアボス一覧（通常モブ撃破後の低確率乱入抽選に使う）
-  function getAreaSpecials(monster: FFGGRMonster): FFGGRMonster[] {
-    const area = Object.values(FFGGR_AREAS).find(a => a.monsterIds.includes(monster.id));
-    if(!area) return [];
-    const ids = [area.bossId, ...(area.midBossIds??[]), area.rareBossId].filter(Boolean) as string[];
-    return ids.map(id=>FFGGR_MONSTERS[id]).filter(Boolean);
   }
 
   // ─── プレイヤー攻撃 ───
   const handleAttack = useCallback(()=>{
     if(!battle || battle.phase!=='fighting') return;
-    const weaponItem = battle.equippedWeaponId ? ITEM_MASTER[battle.equippedWeaponId] : null;
-    const atk = weaponItem?.weaponAtk ?? (100 + (player?.stats?.level??1) * 10);
+    const atk = 100 + (player?.stats?.level??1) * 10;
     const def = battle.monster.defense;
     // 状態異常チェック
     const isTrap = battle.effects.find(e=>e.type==='trap');
@@ -491,29 +420,13 @@ export function FFGGRScreen(){
       handleMonsterTurn();
       return;
     }
-    // 飛行中は物理無効（貫通武器は有効）
+    // 飛行中は物理無効
     const isFlying = battle.monsterEffects.find(e=>e.type==='fly');
-    const pen = weaponItem?.areaPenetrate ?? 0;
-    // 位置システム：射程/範囲半径を超えた距離では威力ペナルティ(50%)
-    const rangeLimit = weaponItem?.isAreaWeapon ? weaponItem?.areaRadius : weaponItem?.range;
-    const rangeMult = rangeLimit === undefined ? 1 : (battle.enemyPos.distanceM <= rangeLimit ? 1 : 0.5);
-    // 攻撃形状(front/behind/cone)：対象方向外なら威力ペナルティ(50%)、対象方向内なら威力補正
-    const shape: AreaShape = (weaponItem?.areaShape ?? 'omni') as AreaShape;
-    const facing = battle.facingDirection ?? 'N';
-    const shapeMult = weaponItem?.isAreaWeapon && shape !== 'omni'
-      ? (isDirectionInShape(battle.enemyPos.direction, facing, shape) ? 1 + AREA_SHAPE_BONUS_PCT[shape] / 100 : 0.5)
-      : 1;
-    let dmg = Math.max(1, Math.floor((atk - def*0.5) * (0.85 + Math.random()*0.3) * rangeMult * shapeMult));
-    const weaponMsg = weaponItem ? weaponItem.name : '素手';
-    let logText = weaponItem?.isAreaWeapon
-      ? `🌀 ${weaponMsg}で全体攻撃！ ${battle.monster.name}に ${dmg} ダメージ！`
-      : `⚔️ ${weaponMsg}で攻撃！ ${battle.monster.name}に ${dmg} ダメージ！`;
-    if(isFlying && pen<=0){
+    let dmg = Math.max(1, Math.floor((atk - def*0.5) * (0.85 + Math.random()*0.3)));
+    let logText = `⚔️ あなたの攻撃！ ${battle.monster.name}に ${dmg} ダメージ！`;
+    if(isFlying){
       dmg = 0;
-      logText = `🦅 ${battle.monster.name}は飛行中！物理攻撃が届かない！（貫通武器のみ有効）`;
-    } else if(isFlying && pen>0){
-      dmg = Math.max(1, pen);
-      logText = `🦅 ${battle.monster.name}は飛行中だが、${weaponMsg}の貫通攻撃が突き刺さる！ ${dmg}ダメージ！`;
+      logText = `🦅 ${battle.monster.name}は飛行中！物理攻撃が届かない！（貫通スキルは有効）`;
     }
     const newMonsterHp = Math.max(0, battle.monsterHp - dmg);
     const newMonsterEffects = battle.monsterEffects.map(e=>({...e,turnsLeft:e.turnsLeft-1})).filter(e=>e.turnsLeft>0);
@@ -524,32 +437,16 @@ export function FFGGRScreen(){
       const pointGain = Math.random()<0.3?1:0;
       drops.forEach(d=>addItems([d]));
       if(pointGain>0) addItems([{itemId:FFGGR_POINT_KEY, amount:pointGain}]);
-      // ─ レア乱入抽選：通常モブ（ボス系以外）撃破時のみ、超低確率で中ボス/ボス/レアボスが乱入 ─
-      let specialEncounter: FFGGRMonster | null = null;
-      if(!battle.monster.isBoss && !battle.monster.isMidBoss && !battle.monster.isRareBoss){
-        const specials = getAreaSpecials(battle.monster);
-        for(const sp of specials){
-          const rate = RARE_ENCOUNTER_MIN_RATE + Math.random()*(RARE_ENCOUNTER_MAX_RATE-RARE_ENCOUNTER_MIN_RATE);
-          if(Math.random()<rate){ specialEncounter = sp; break; }
-        }
-      }
       setBattle(prev=>prev?{
         ...prev, monsterHp:0, monsterEffects:newMonsterEffects,
-        phase:'won', pendingDrops:drops, expGained:exp, pointGained:pointGain, specialEncounter,
+        phase:'won', pendingDrops:drops, expGained:exp, pointGained:pointGain,
         log:[...prev.log,{text:logText,color:'#4ca86a'},{text:`🏆 ${prev.monster.name}を倒した！EXP+${exp}`,color:'#f0c060'}],
       }:null);
     } else {
       setBattle(prev=>prev?{...prev, monsterHp:newMonsterHp, monsterEffects:newMonsterEffects, log:[...prev.log,{text:logText,color:'#4ca86a'}]}:null);
       setTimeout(()=>handleMonsterTurn(), 300);
     }
-  },[battle, player, equipment]);
-
-  // ─── 防御 ───
-  const handleDefend = useCallback(()=>{
-    if(!battle || battle.phase!=='fighting') return;
-    setBattle(prev=>prev?{...prev, isDefending:true, log:[...prev.log,{text:'🛡️ 防御態勢を取った！（次の被ダメージ半減）',color:'#5b8dee'}]}:null);
-    setTimeout(()=>handleMonsterTurn(), 300);
-  },[battle]);
+  },[battle, player]);
 
   // ─── モンスターターン ───
   const handleMonsterTurn = useCallback(()=>{
@@ -570,11 +467,9 @@ export function FFGGRScreen(){
       const enrage    = prev.monsterEffects.find(e=>e.type==='buff_enrage');
       const dmgMult   = (defDebuff?2.0:1.0) * (enrage?1.5:1.0) * (atkDebuff?0.7:1.0);
 
-      const wasDefending = prev.isDefending;
       function calcDmg(power:number, pen:number=0){
         const base = Math.floor(m.attack * power * dmgMult);
-        const raw = Math.max(1, base - Math.floor(50*0.3) + pen);
-        return wasDefending ? Math.max(1, Math.floor(raw*0.5)) : raw;
+        return Math.max(1, base - Math.floor(50*0.3) + pen);
       }
 
       const msg = action.message ?? `${m.emoji} ${m.name}の「${action.name}」！`;
@@ -695,7 +590,7 @@ export function FFGGRScreen(){
       return {
         ...prev, playerHp:Math.max(0,newPlayerHp), monsterHp:newMonsterHp,
         effects:newEffects, monsterEffects:newMonsterEffects,
-        log:[...prev.log,...logs], turn:prev.turn+1, phase, enemyPos:newPos, isDefending:false,
+        log:[...prev.log,...logs], turn:prev.turn+1, phase, enemyPos:newPos,
       };
     });
   },[]);
@@ -775,7 +670,7 @@ export function FFGGRScreen(){
     addNotif('success',`📦 ${iname}×${picked[1]}を入手！${payExtra?'（追加ドロップあり）':''}`);
   }
 
-  const areaList = Object.values(FFGGR_AREAS);
+  const areaList = Object.values(FFGGR_AREAS) as FFGGRArea[];
 
   return (
     <div className="rpg-subtab-fade" style={{ paddingBottom:20 }}>
@@ -800,9 +695,10 @@ export function FFGGRScreen(){
       {/* エリア選択 */}
       {tab==='area' && (
         <div>
-          <div style={{ fontSize:'0.72rem', color:'#8a92b2', marginBottom:8 }}>エリアを選択して探索・戦闘を開始（ボス・中ボス・レアボスは戦闘中に低確率で乱入してきます）</div>
+          <div style={{ fontSize:'0.72rem', color:'#8a92b2', marginBottom:8 }}>エリアを選択して探索・戦闘を開始</div>
           {areaList.map(area=>{
             const monsters = getMonstersInArea(area.id);
+            const boss = area.bossId ? FFGGR_MONSTERS[area.bossId] : null;
             return (
               <div key={area.id} style={{ ...S.card, borderLeft:`4px solid ${area.color.replace('0.4','1')}` }}>
                 <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
@@ -818,11 +714,20 @@ export function FFGGRScreen(){
                   <div style={{ fontSize:'0.75rem', color:'#4a5070', textAlign:'center', padding:8 }}>🔒 未実装（将来開放）</div>
                 ) : (
                   <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                    {monsters.filter(m=>!m.isBoss&&!m.isMidBoss&&!m.isRareBoss).slice(0,6).map(m=>(
+                    {monsters.filter((m:FFGGRMonster)=>!m.isBoss&&!m.isRareBoss).slice(0,4).map((m:FFGGRMonster)=>(
                       <button key={m.id} onClick={()=>startBattle(m)} style={{ ...S.smBtn, display:'flex', alignItems:'center', gap:4 }}>
                         {m.emoji} {m.name}
                       </button>
                     ))}
+                    {boss && <button onClick={()=>startBattle(boss)} style={{ ...S.btn('#e05555'), fontSize:'0.75rem', padding:'5px 12px' }}>{boss.emoji} {boss.name}[BOSS]</button>}
+                    {area.midBossIds?.map((mid:string)=>FFGGR_MONSTERS[mid]).filter(Boolean).map((m:FFGGRMonster)=>(
+                      <button key={m.id} onClick={()=>startBattle(m)} style={{ ...S.btn('#f0a020'), fontSize:'0.75rem', padding:'5px 12px' }}>{m.emoji} {m.name}</button>
+                    ))}
+                    {area.rareBossId && FFGGR_MONSTERS[area.rareBossId] && (
+                      <button onClick={()=>startBattle(FFGGR_MONSTERS[area.rareBossId!])} style={{ ...S.btn('#b060e0'), fontSize:'0.75rem', padding:'5px 12px' }}>
+                        {FFGGR_MONSTERS[area.rareBossId].emoji} {FFGGR_MONSTERS[area.rareBossId].name}[RARE]
+                      </button>
+                    )}
                     {area.id==='forest' && (
                       <button onClick={handleNutsHarvest} style={{ ...S.btn('#4ca86a'), fontSize:'0.75rem', padding:'5px 12px' }}>🌰 木の実採取</button>
                     )}
@@ -837,70 +742,15 @@ export function FFGGRScreen(){
       {/* バトル画面 */}
       {tab==='battle' && battle && (
         <div>
-          <BattleScreen
-            battle={battle}
-            equipment={equipment}
-            inventory={inventory}
-            onAttack={handleAttack}
-            onDefend={handleDefend}
-            onFlee={handleFlee}
-            showHotbar={showHotbar}
-            onToggleHotbar={()=>setShowHotbar(v=>!v)}
-            onHotbarSlotClick={(slot,idx)=>setHotbarModal({slot,idx})}
-            onOpenCompass={()=>setShowCompass(true)}
-            onOpenFacingCompass={()=>setShowFacingCompass(true)}
-            onEquipWeapon={handleEquipWeapon}
-          />
-          {(() => {
-            const eqItem = battle.equippedWeaponId ? ITEM_MASTER[battle.equippedWeaponId] : null;
-            const eqShape: AreaShape = (eqItem?.areaShape ?? 'omni') as AreaShape;
-            const shapeHighlight = eqItem?.isAreaWeapon && eqShape !== 'omni' ? getShapeDirections(battle.facingDirection ?? 'N', eqShape) : undefined;
-            return (<>
-          {showFacingCompass && (
-            <CompassModal
-              title="↻ 向き変更 — 攻撃前にいつでも変更可能（ターン消費なし）"
-              highlightDirs={shapeHighlight}
-              enemies={[{
-                idx: 0, name: battle.monster.name, direction: battle.enemyPos.direction, distanceM: battle.enemyPos.distanceM,
-                kind: battle.monster.isBoss ? 'boss' : battle.monster.isMidBoss ? 'midboss' : battle.monster.isRareBoss ? 'rareboss' : 'mob',
-              } as CompassEnemyDot]}
-              onSelectDirection={(dir)=>{
-                setBattle(prev=>prev?{...prev, facingDirection:dir}:null);
-                setShowFacingCompass(false);
-              }}
-              onClose={()=>setShowFacingCompass(false)}
-            />
-          )}
-          {showCompass && (
-            <CompassModal
-              highlightDirs={shapeHighlight}
-              enemies={[{
-                idx: 0, name: battle.monster.name, direction: battle.enemyPos.direction, distanceM: battle.enemyPos.distanceM,
-                kind: battle.monster.isBoss ? 'boss' : battle.monster.isMidBoss ? 'midboss' : battle.monster.isRareBoss ? 'rareboss' : 'mob',
-              } as CompassEnemyDot]}
-              onSelectDirection={(dir)=>{
-                setBattle(prev=>prev?{...prev, enemyPos:{...prev.enemyPos, direction:dir, distanceM: Math.max(0, prev.enemyPos.distanceM-6)}, facingDirection:dir, log:[...prev.log,{text:`🧭 ${DIR_LABEL[dir]}方向へ間合いを詰め、向きも合わせた！`,color:'#5b8dee'}]}:null);
-                setShowCompass(false);
-                setTimeout(()=>handleMonsterTurn(), 300);
-              }}
-              onClose={()=>setShowCompass(false)}
-            />
-          )}
-            </>);
-          })()}
+          <BattleScreen battle={battle} onAction={handleAttack} onFlee={handleFlee} />
           {battle.phase!=='fighting' && (
             <div style={{ display:'flex', gap:8, marginTop:8 }}>
               <button style={{ ...S.btn('#2d3752'), flex:1, border:'1px solid #4a5070' }} onClick={()=>{ setBattle(null); setTab('area'); }}>← エリアに戻る</button>
-              {battle.phase==='won' && !battle.specialEncounter && (
+              {battle.phase==='won' && (
                 <button style={{ ...S.btn('#5b8dee'), flex:1 }} onClick={()=>{
                   const m = battle.monster;
                   startBattle(m);
                 }}>🔄 再挑戦</button>
-              )}
-              {battle.phase==='won' && battle.specialEncounter && (
-                <button style={{ ...S.btn('#b060e0'), flex:1 }} onClick={()=>{
-                  startBattle(battle.specialEncounter!);
-                }}>⚡ {battle.specialEncounter.emoji} 迎え撃つ</button>
               )}
             </div>
           )}
@@ -910,22 +760,6 @@ export function FFGGRScreen(){
         <div style={{ textAlign:'center', color:'#4a5070', padding:32 }}>
           バトル中ではありません。<br/>エリアタブから敵を選んでください。
         </div>
-      )}
-      {hotbarModal && (
-        <HotbarSetModal
-          slot={hotbarModal.slot} idx={hotbarModal.idx}
-          equipment={equipment} inventory={inventory}
-          onSet={(itemId)=>{
-            const next = { ...equipment };
-            if(hotbarModal.slot==='hotbar' && hotbarModal.idx!==undefined){
-              const hb=[...next.hotbar]; hb[hotbarModal.idx]=itemId; next.hotbar=hb;
-            } else {
-              (next as any)[hotbarModal.slot]=itemId;
-            }
-            updateEquipment(next);
-          }}
-          onClose={()=>setHotbarModal(null)}
-        />
       )}
 
       {tab==='shop' && <ShopPanel inventory={inventory} onTrade={(s1id,s1a,rid,ra,s2id,s2a,s3id,s3a)=>handleTrade(s1id,s1a,rid,ra,s2id,s2a,s3id,s3a)} />}
